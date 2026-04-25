@@ -2,7 +2,7 @@
 
 Research on debugger implementations — user-facing bug-finding tools that pause, inspect, step, replay, or time-travel through program execution.
 
-This document covers breakpoint mechanisms from the debugger's side, record/replay and checkpointing, omniscient/time-travel tooling, live-visualization and in-engine overlays, debugger-as-service protocols and scripting APIs, retroactive and partial evaluation, DWARF correctness and build-ID symbol distribution, automated fault-isolation (delta debugging, slicing, spectrum-based localization, statistical debugging, cause-effect chains, symbolic execution, fuzzer-assisted triage, IR-level UB interpreters, interrogative and declarative debugging), async-stack reconstruction, concurrency-aware race and deadlock detectors, post-mortem / out-of-process debugging (core dumps, kdump, kernel debuggers, embedded probe stacks), and specification-level debugging (model-checker counterexamples, interactive theorem prover proof states). Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`.
+This document covers breakpoint mechanisms from the debugger's side, record/replay and checkpointing, omniscient/time-travel tooling, live-visualization and in-engine overlays, debugger-as-service protocols and scripting APIs, retroactive and partial evaluation, DWARF correctness and build-ID symbol distribution, automated fault-isolation (delta debugging, slicing, spectrum-based localization, statistical debugging, cause-effect chains, symbolic execution, fuzzer-assisted triage, IR-level UB interpreters, interrogative and declarative debugging), async-stack reconstruction, concurrency-aware race and deadlock detectors, post-mortem / out-of-process debugging (core dumps, kdump, kernel debuggers, embedded probe stacks), and specification-level debugging (model-checker counterexamples, interactive theorem prover proof states). Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`; the Miri/Stacked-Borrows angle is split between `DEBUGGERS.md §8.8` here and `MEMORY.md §§1.3, 8.11`. Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`.
 
 ---
 
@@ -97,13 +97,13 @@ The trade-off: Pernosco's analysis takes minutes to hours and writes tens of gig
 
 Source: https://pernos.co/ and https://robert.ocallahan.org/2024/10/debt-workshop.html
 
-### 2.3. Visual Studio Snapshot Debugger — Fork + Copy-on-Write
+### 2.3. Visual Studio Snapshot Debugger — Non-Breaking Production Snapshots
 
-Visual Studio's Snapshot Debugger for Azure App Service uses `fork()` to debug production applications. When a "snappoint" (a non-breaking breakpoint) is hit, the application process forks. The forked child is immediately suspended, creating a snapshot. The developer debugs against the frozen fork while the parent continues serving requests.
+Visual Studio's Snapshot Debugger for Azure App Service and Application Insights introduced "snappoints": non-breaking breakpoints that collect a point-in-time view of application state when a condition is hit in production. Unlike traditional breakpoints, a snappoint does not stop the live process for interactive stepping; it captures stack frames, locals, and related diagnostic data so the developer can inspect the recorded state later.
 
-Because `fork()` uses copy-on-write pages, the snapshot is nearly free in memory — only pages that the parent subsequently modifies are actually copied. The overhead to the production process is one `fork()` system call per snappoint hit.
+The important design pattern is not Unix `fork()` itself but **out-of-band snapshot collection**: the production request continues while the debugger receives a bounded artifact for later inspection. The implementation details vary by platform and runtime, and Microsoft documents the feature as a managed .NET snapshot/debugging facility rather than as a general fork-and-copy-on-write debugger.
 
-This is a fundamentally different model from traditional debugging: snappoints don't stop execution. They create a point-in-time clone that can be inspected at leisure, possibly hours later. Multiple snapshots can be collected over time and compared. The trade-off: you cannot step forward from a snapshot, only inspect state.
+This is a fundamentally different model from traditional debugging: snappoints don't stop execution. They create an inspectable point-in-time artifact, possibly collected from production, but you cannot freely step forward from it the way you would in a paused live process.
 
 Source: https://devblogs.microsoft.com/visualstudio/snapshot-debugging-with-visual-studio-2017-now-ready-for-production/
 
@@ -193,7 +193,7 @@ Source: https://github.com/janestreet/magic-trace and https://blog.janestreet.co
 
 OCaml's built-in bytecode debugger has supported **reverse execution for three decades** — long predating rr, Pernosco, and most of this chapter. Commands: `reverse`, `backstep`, `previous` (step backward skipping calls), `start` (run backward to function entry), `goto time` (jump to an absolute instruction counter), `last` (undo the previous navigation command), `set history size`.
 
-The implementation is the same fork-CoW trick Visual Studio's Snapshot Debugger (§2.3) uses for point-in-time snapshots, but applied recursively for **time-travel**: the OCaml runtime periodically `fork()`s and suspends the child process as a **checkpoint**. Forward execution runs against the current process; reverse execution discards the current process and resumes the nearest checkpoint ≤ the target time, replaying forward to land exactly. Because each checkpoint is copy-on-write, memory overhead is proportional to post-checkpoint divergence, not to process size.
+The implementation is a classic Unix fork-CoW checkpointing trick applied recursively for **time-travel**: the OCaml runtime periodically `fork()`s and suspends the child process as a **checkpoint**. Forward execution runs against the current process; reverse execution discards the current process and resumes the nearest checkpoint ≤ the target time, replaying forward to land exactly. Because each checkpoint is copy-on-write, memory overhead is proportional to post-checkpoint divergence, not to process size.
 
 The restrictions are concrete: `ocamldebug` only works on bytecode (not native), only on Unix (Cygwin on Windows), and requires `-g` at compile time. But within those bounds, it demonstrates that **reverse execution is cheap in a language whose runtime controls process forking and whose instruction counter is deterministic** — two properties any new language can adopt at design time.
 
@@ -249,7 +249,7 @@ Source: https://www.tobyho.com/video/Time-Traveling-Debugger-Part-1.html
 
 Elm's architecture (The Elm Architecture, TEA) naturally supports time-travel debugging because every state update produces a new immutable state value. The debugger simply holds onto each state over time and provides a slider to scrub through them.
 
-Because Elm's model values are immutable, there is no need for deep copying or structural sharing — the runtime already shares structure between consecutive states via persistent data structures. Time-travel is essentially free.
+Because Elm's model values are immutable, the debugger does not need to deep-copy mutable object graphs at each step. Consecutive states can share structure through persistent data structures, making time-travel cheap compared with snapshotting an equivalent mutable program.
 
 This only works for languages designed around immutable values from the start. Retrofitting it onto mutable-state languages requires explicit snapshotting, which is expensive. Elm demonstrates that language-level design decisions can make powerful debugging features trivial to implement.
 
@@ -463,7 +463,7 @@ Source: https://remedybg.handmade.network/blog/p/3631-remedybgs_debug_protocol
 
 ### 5.2. Debug Adapter Protocol — The LSP of Debugging
 
-The Debug Adapter Protocol (Microsoft, 2016) does for debuggers what LSP did for language servers: it decouples the IDE from the debugger runtime via a standardized JSON-RPC protocol. Before DAP, every IDE had to implement custom integrations with every debugger (Eclipse + JDI for Java, Visual Studio + COM for C++, etc.) — an N×M problem.
+The Debug Adapter Protocol (Microsoft, 2016) does for debuggers what LSP did for language servers: it decouples the IDE from the debugger runtime via a standardized JSON message protocol with LSP-like framing. Before DAP, every IDE had to implement custom integrations with every debugger (Eclipse + JDI for Java, Visual Studio + COM for C++, etc.) — an N×M problem.
 
 DAP defines a standard set of requests (launch, attach, setBreakpoints, continue, stepIn, stackTrace, variables, evaluate) and events (stopped, output, terminated) that any IDE can send to any debug adapter. The debug adapter translates these into the native debugger's API (GDB/MI, LLDB, JDI, Chrome DevTools Protocol, etc.).
 
@@ -549,6 +549,14 @@ The language-design lesson: **design reflection as the debugger's primitive**, n
 
 Source: https://bracha.org/mirrors.pdf and https://bracha.org/newspeak.pdf
 
+### 5.8. MoarVM Remote Debug Protocol — Comma's Durable Artifact
+
+The (now-discontinued) **Comma IDE** drove substantial improvements to MoarVM's debug surface that survive Comma itself: a **TCP-based remote debug protocol** for Raku/MoarVM, plus an open-source Raku client library and CLI driver. The protocol shape mirrors the JDWP / DAP / CDP family (§§5.2, 5.4, 5.5) — connect to a port the running MoarVM listens on, exchange typed commands, receive event notifications. Distinctive features: stack-frame introspection that understands Raku's role in a multi-stage compilation pipeline (RakuAST nodes → QAST → MoarVM bytecode all addressable), and integration with MoarVM's spesh and inliner metadata so that debugging *specialized* code reconstructs the original frame layout (cross-ref `COMPILERS.md §14.4` on uninlining).
+
+The product itself shut down, but the durable artifact — a documented language-specific debug protocol contributed back to a small-team VM — is a useful pattern for new languages: even a single commercial tooling vendor can leave behind a debug protocol that outlives them, *if* the protocol is upstreamed into the runtime rather than kept inside the IDE binary. The lesson is symmetric to `TRACERS.md §3.11` (MoarVM Telemetry / heap snapshots): both originated as Comma-driven additions that became MoarVM mainline.
+
+Source: https://commaide.com/features and https://commaide.com/faq
+
 ---
 
 ## 6. Retroactive and Partial Evaluation
@@ -630,7 +638,7 @@ The lesson: debug information is not optional metadata bolted on at the end. It 
 
 ### 7.3. Bytecode-to-Native Source Map — Apache Harmony / HotSpot
 
-JVMs maintain a bidirectional mapping between bytecode offsets and native code addresses. For every bytecode instruction, the JIT records which native instruction(s) implement it. This allows setting a breakpoint at a bytecode offset by inserting `int 3` at the corresponding native address, and mapping a native fault address back to a source line via bytecode offset → line number table.
+JVMs maintain metadata that maps between bytecode offsets, source positions, and relevant native-code addresses. For debuggable or deoptimizable code, the JIT records enough information to map selected native PCs back to bytecode/source locations, handle safepoints, and reconstruct inlined frames. This allows a breakpoint requested at a bytecode offset to be implemented in native code where possible, and allows a native fault or sampled PC to be explained via native address → bytecode offset → line number table. The mapping is implementation-dependent and becomes approximate or many-to-many under optimization and inlining.
 
 Source maps are the critical bridge between the user's mental model (source lines) and the machine's reality (instruction pointers or bytecode offsets). Without bidirectional mapping, debugging is impossible. Every debuggable system has this mapping in some form.
 
@@ -644,9 +652,9 @@ The primitive is the **build-ID**: a 160-bit SHA-1 embedded in the ELF header at
 
 When GDB attaches to a stripped binary, it reads the build-ID from the ELF, sends it to the servers listed in `DEBUGINFOD_URLS`, and caches the response under `$XDG_CACHE_HOME/.debuginfod_client/`. Distribution servers — `debuginfod.archlinux.org`, `debuginfod.ubuntu.com`, Fedora's, and `debuginfod.elfutils.org` (a federated front-end that fans out to multiple upstreams) — index every package's `.debug` files and source trees and serve them globally. Ubuntu, Arch, and Fedora auto-enable the client via shell profile.
 
-The implication for language design: **debug info becomes a separate concern from the binary and can be retrieved on demand by the debugger**. A language emitting standard DWARF with build-IDs gets the entire debuginfod ecosystem for free. Delve (Go debugger) supports it; Valgrind and KDE Crash Report do too. One notable gap: AddressSanitizer, which symbolizes in-process at crash time, cannot asynchronously pull debug info over HTTP — sanitizers need their symbols at link time or not at all.
+The implication for language design: **debug info becomes a separate concern from the binary and can be retrieved on demand by the debugger**. A language emitting standard DWARF with build-IDs gets the entire debuginfod ecosystem for free. Delve (Go debugger) supports it; Valgrind and KDE Crash Report do too. Sanitizer symbolization is more constrained because crash-time reporting may run in-process or in a tightly controlled helper, but modern sanitizer flows commonly delegate to external symbolizers such as `llvm-symbolizer`; debuginfod can participate when the symbolizer and distribution are built/configured for it.
 
-The broader pattern is content-addressed symbol distribution: Microsoft's symsrv + SymbolSource has offered a similar service for PDB files for decades, keyed on the PE `.debug_info` GUID + age. debuginfod's contribution is making this ecosystem *default-on* for open-source stripped Linux binaries.
+The broader pattern is content-addressed symbol distribution: Microsoft's symsrv + SymbolSource has offered a similar service for PDB files for decades, keyed on the PDB signature/GUID plus age. debuginfod's contribution is making this ecosystem *default-on* for open-source stripped Linux binaries.
 
 Source: https://sourceware.org/elfutils/Debuginfod.html and https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html
 
@@ -941,7 +949,115 @@ Source: https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-
 
 ---
 
-## 13. Summary of Debugger Techniques
+## 13. Additional Semantic and Production Debugging Techniques
+
+This chapter collects additional debugger mechanisms that complement the earlier taxonomy and should be considered when designing a new language. The common theme is **semantic debugging**: break not only on program counters and memory addresses, but on language events, runtime states, scheduler choices, contract violations, and deployed crash artifacts.
+
+### 13.1. Event Breakpoints / Catchpoints
+
+Line breakpoints answer "stop here." Event breakpoints answer "stop when this kind of thing happens anywhere." Mature debuggers expose catchpoints for exceptions, signals, syscalls, process creation, thread creation, library loading, allocation, panic, and language-specific runtime events.
+
+GDB's `catch throw`, `catch syscall`, `catch fork`, `catch exec`, and shared-library catchpoints are the native model. Java debuggers expose caught/uncaught exception breakpoints through JPDA/JDWP. Chrome DevTools has "pause on caught exceptions" and "pause on uncaught exceptions." A language runtime can generalize this to actor message sends, task spawns, cancellation, effect invocation, allocation classes, or contract violations.
+
+The language-design lesson: **make runtime events first-class debugger stop reasons**. If the runtime already classifies events for exceptions, panics, tasks, actors, effects, or allocators, expose those same event IDs to the debugger instead of forcing users to guess implementation functions to break on.
+
+Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html and https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
+
+### 13.2. Page-Protection Watchpoints and Guard Pages
+
+Hardware debug registers are precise but tiny: on x86, usually four watched addresses, each limited to a small width. A scalable alternative is to use page permissions. Mark a page `PROT_NONE` with `mprotect()` or `PAGE_GUARD` / `VirtualProtect()` on Windows; when the target reads or writes that page, the CPU raises a page fault and the debugger decides whether the access is interesting.
+
+The trade-off is precision versus scale. Page watchpoints can cover kilobytes or megabytes and can be created in large numbers, but they trigger on every access to the protected page, not only the watched object. Debuggers and runtimes can reduce false positives by isolating selected objects onto their own pages, using guard pages around stacks or heap allocations, or combining page faults with single-step/reprotect logic.
+
+The language-design lesson: **allocator cooperation turns crude page faults into useful object watchpoints**. A runtime that can place one object, arena, stack segment, or actor heap on a protected page can offer data breakpoints that are far larger than hardware DR registers allow.
+
+Source: https://man7.org/linux/man-pages/man2/mprotect.2.html and https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
+
+### 13.3. Debugger Expression Evaluation and State Surgery
+
+A debugger is not only an observer. Users expect to evaluate expressions in the current frame, call functions, assign variables, force returns, restart frames, and inspect values using language semantics. This requires a miniature evaluator whose environment is the paused program: current lexical scope, stack frame, registers, heap, generic instantiations, dynamic dispatch rules, and optimized-code location mappings.
+
+GDB has `print`, `call`, `set variable`, and `return`. LLDB embeds Clang to evaluate C/C++/Objective-C expressions. Chrome DevTools evaluates JavaScript in paused stack frames. JDWP exposes operations such as object invocation and `ForceEarlyReturn`. Smalltalk/Pharo and Common Lisp go further: the debugger is an interactive development environment where live frames can be inspected, edited, restarted, or resumed through restarts.
+
+The hard part is safety. Calling arbitrary code from a paused thread can deadlock, allocate, throw, mutate state, or observe inconsistent invariants. A language can define a **debug expression subset**: pure field access, formatting, total helper functions, controlled mutation, or explicitly unsafe target calls.
+
+The language-design lesson: **design the debugger evaluator as part of the language semantics, not as an afterthought**. If the compiler can emit enough metadata for lexical scopes, generic types, closures, effects, async frames, and optimized-out values, the debugger can evaluate expressions that feel like the source language instead of raw memory pokes.
+
+Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html and https://lldb.llvm.org/use/tutorial.html. For JDWP object invocation and `ForceEarlyReturn`, see §5.5.
+
+### 13.4. Edit-and-Continue / Hot Code Replacement
+
+Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version.
+
+Visual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk images, Flutter hot reload, Clojure REPL-driven development, and browser hot-module replacement all pick different points in the design space. The core problems are stable function identity, active-frame migration, closure layout changes, object shape changes, inlined-frame deoptimization, and coexistence of old and new code.
+
+The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Debuggers become dramatically more powerful if the runtime can deoptimize optimized frames back into an inspectable representation before applying a patch.
+
+Source: https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue, https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html, and https://docs.flutter.dev/tools/hot-reload
+
+### 13.5. Production Crash Pipelines: Minidumps, Symbolication, and Grouping
+
+Core dumps are complete but often too large, too sensitive, or too platform-specific for deployed software. Production crash systems instead collect compact crash artifacts: Windows minidumps, Breakpad/Crashpad dumps, Apple crash reports with `.dSYM` symbolication, JavaScript stack traces with source maps, or Sentry-style event envelopes. Server-side symbolication then reconstructs source locations from build IDs, debug files, unwind tables, source maps, and inlining metadata.
+
+This is a debugger technique because most deployed bugs are debugged after the fact, without the original process. The crash pipeline decides whether the developer gets a useful stack trace, async causality, registers, thread list, loaded module versions, panic payload, breadcrumbs, and privacy-filtered local variables — or only "segmentation fault."
+
+The language-design lesson: **standardize the crash artifact early**. A new language should define panic/crash metadata, build IDs, symbol lookup, async stack capture, source-map/debug-info integration, and privacy controls as part of its tooling story.
+
+Source: https://chromium.googlesource.com/breakpad/breakpad, https://chromium.googlesource.com/crashpad/crashpad, and https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
+
+### 13.6. JTAG / SWD / OpenOCD Hardware Debugging
+
+Bare-metal targets often lack `ptrace`, signals, virtual memory, files, or an operating system. Debugging happens through a hardware probe. JTAG and ARM SWD let the host halt the core, read/write registers and memory, set hardware breakpoints/watchpoints, flash firmware, and sometimes stream trace data through CoreSight, ETM, ITM, or SWO.
+
+OpenOCD is the classic open-source bridge from probes to GDB remote protocol. `probe-rs` is the Rust-native replacement for many Cortex-M workflows (§11.4). Flash breakpoints are a special constraint: code in flash cannot be patched with `INT3` cheaply, so debuggers rely on a limited number of hardware comparators or rewrite flash pages sparingly. Semihosting lets target code request host I/O through debugger traps, useful but slow.
+
+The language-design lesson: **embedded debugging is a target ABI, not just a tool**. Panic formatting, stack unwinding, symbol names, frame pointers, no-std allocators, and debug sections must work when the only communication channel is a probe reading memory.
+
+Source: https://openocd.org/doc/html/index.html and https://developer.arm.com/documentation/ihi0031/latest/. For `probe-rs`, see §11.4.
+
+### 13.7. Systematic Concurrency Schedule Exploration
+
+Race detectors find races that happened in one execution. Systematic concurrency testing tries to make rare schedules happen. The runtime replaces the normal scheduler with a controlled scheduler, explores task interleavings, injects yields at synchronization points, records schedules, and replays failing schedules deterministically.
+
+Microsoft CHESS pioneered this for threaded programs using schedule bounding and partial-order reduction. Rust's `loom` explores possible interleavings of atomics, mutexes, and threads by replacing synchronization primitives with instrumented models. FoundationDB's deterministic simulation runs distributed-system components under a deterministic event loop with randomized faults, delays, and schedules, making entire cluster failures reproducible.
+
+The language-design lesson: **if the language owns tasks, channels, actors, or effects, it can own the scheduler in tests**. A debugger can then show "the schedule that caused the bug" as a first-class artifact, not just a stack trace.
+
+Source: https://www.microsoft.com/en-us/research/project/chess/, https://github.com/tokio-rs/loom, and https://apple.github.io/foundationdb/testing.html
+
+### 13.8. Deadlock and Liveness Debugging
+
+Data races are not the only concurrency bugs. Programs also hang: locks form cycles, tasks wait on futures that will never complete, actors starve in mailboxes, channels have no receiver, and thread pools exhaust themselves. The debugger question is not "who wrote this memory?" but "why is nothing making progress?"
+
+Classic thread dumps expose blocked threads, owned locks, and wait stacks; JVM tools can detect monitor deadlocks from a wait-for graph. Go goroutine dumps show goroutines blocked on channels, mutexes, syscalls, and timers. Linux `lockdep` validates lock ordering in the kernel. Async runtimes such as Tokio can expose task graphs and resource wait states through tools like `tokio-console`.
+
+The language-design lesson: **debug wait relationships explicitly**. If the runtime has structured concurrency, channels, actors, promises, mutexes, and cancellation, it can maintain a wait-for graph: task A awaits future B, B waits for timer C, actor D waits for mailbox message E. A debugger can then answer "why is this task stuck?" directly.
+
+Source: https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html, https://go.dev/doc/diagnostics, https://docs.kernel.org/locking/lockdep-design.html, and https://github.com/tokio-rs/console
+
+### 13.9. Dynamic Invariant Detection / Specification Mining
+
+Dynamic invariant detectors observe executions and infer properties that appear to hold: `x <= y`, `len(buffer) == count`, `field != null`, "this collection is sorted", or "this function returns a value larger than its argument." Daikon is the canonical system: it instruments programs, records values at program points, and emits likely invariants that could be written as assertions, contracts, or documentation.
+
+This is useful for debugging because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations. False positives are expected — the technique depends on test quality — but even false invariants reveal missing tests or underspecified behavior.
+
+The language-design lesson: **make values observable at semantic program points**. If the compiler can expose function entries/exits, loop heads, object fields, algebraic data constructors, and effect boundaries in a typed trace format, invariant mining becomes much more accurate than raw memory observation.
+
+Source: https://plse.cs.washington.edu/daikon/ and https://plse.cs.washington.edu/daikon/pubs/
+
+### 13.10. Assertions, Contracts, and Semantic Breakpoints
+
+Assertions and contracts are executable claims about program state: preconditions, postconditions, invariants, representation checks, and internal sanity checks. They are usually treated as testing or verification tools, but they are also debugger hooks. A contract violation is a semantically meaningful breakpoint: the program can stop exactly where an assumption first becomes false, with the violated predicate, source location, values, and call stack preserved.
+
+Eiffel made Design by Contract central to the language. Racket contracts enforce boundaries between components. Ada/SPARK contracts connect runtime checking and formal proof. Rust separates always-on `assert!` from debug-only `debug_assert!`. C++26 contract assertions add language-level `pre`, `post`, and `contract_assert` forms with different evaluation modes. Swift distinguishes `assert`, `precondition`, and unconditional traps.
+
+The language-design lesson: **contracts should have debugger semantics**. A new language can define whether contract failures terminate, throw, invoke restarts, enter the debugger, continue in observe mode, log telemetry, or become catchable semantic breakpoints. This gives users a precise spectrum from zero-overhead release builds to invariant-rich debug builds.
+
+Source: https://docs.racket-lang.org/guide/contracts.html, https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions, and https://cppreference.dev/w/cpp/language/contracts
+
+---
+
+## 14. Summary of Debugger Techniques
 
 Rows grouped by chapter, in chapter order.
 
@@ -982,12 +1098,13 @@ Rows grouped by chapter, in chapter order.
 | Capture-and-inspect GPU frame | On-demand capture | Full frame serialized to disk | Offline only; shader debug info must be preserved | RenderDoc, NSight, PIX — pixel history + shader debugger (§4.5) |
 | Live state-machine visualizer | Per-inspection WebSocket | Event-stream dispatch | Requires instrumented runtime | XState / Stately Inspector (§4.6) |
 | Shared-memory debug protocol | Memory-mapped buffers | Near-zero IPC latency | Proprietary vs standardized | RemedyBG (§5.1) |
-| JSON-RPC debug adapter protocol | Per-message JSON | Higher latency than native APIs | Lowest-common-denominator abstraction | DAP (VS Code, Neovim, Helix, Zed, …) (§5.2) |
+| JSON message debug adapter protocol | Per-message JSON | Higher latency than native APIs | Lowest-common-denominator abstraction | DAP (VS Code, Neovim, Helix, Zed, …) (§5.2) |
 | Debugger scripting API | Python import | Per-value callback | Slower than native C++ formatters | GDB Python, LLDB formatters, gdb-dashboard, pwndbg (§5.3) |
 | Domain-structured browser protocol | Persistent WebSocket | Per-domain agent dispatch | Runtime-coupled; richer than DAP | Chrome DevTools Protocol (§5.4) |
 | Transport-agnostic language-typed protocol | Per-packet command ID | Typed command sets (RedefineClasses, ForceEarlyReturn) | Locked to one language's semantics | JDWP / JPDA / JVMTI (§5.5) |
 | Client-vs-platform-authoritative remote | Single TCP session | Per-packet memory/reg access | gdbserver thin vs lldb-server + SBPlatform thick | gdbserver, lldb-server, debugserver (§5.6) |
 | Mirror-based reflection | Capability required | Mirror dispatch per meta-op | Language must be designed for it | Newspeak, Self; JDWP/JDI shares the shape (§5.7) |
+| Language-specific TCP debug protocol | Zero until client connects | Per-command dispatch, spesh-aware frame reconstruction | Protocol outlives the IDE if upstreamed | MoarVM remote debug (§5.8) |
 | Retroactive console.log | Fork pool + ring buffer | Low-logarithmic response | Requires upfront deterministic recording | Replay.io (§6.1) |
 | Typed holes + live eval | Language-level holes | Per-hole type check | Requires language co-design | Hazel (§6.2) |
 | Compile-time macro print | Zero when removed | One formatter call per hit | Source-level only; not toggleable at runtime | Rust `dbg!`, Elixir `dbg/2`, icecream (§6.3) |
@@ -1014,12 +1131,22 @@ Rows grouped by chapter, in chapter order.
 | Deferred-format embedded logging | Format strings in `.debug` only | Binary frame + host decode | Requires probe + host-side ELF | defmt + probe-rs + RTT + ITM (§11.4) |
 | Counterexample-trace navigable debugger | Model-checker output | Per-state expression evaluation | Requires finite-state verification tool | TLA+ Toolbox Trace Explorer + TLA+ Debugger (§12.1) |
 | Proof-state viewer with diffs | ITP kernel state | Per-tactic diff + widget render | Only meaningful for proof-construction languages | Lean 4 InfoView, Coq goal view, Agda typed holes (§12.2) |
+| Event breakpoint / catchpoint | Runtime event taxonomy | Stop on matching event | Needs language/runtime event IDs, not just PCs | GDB catchpoints, JDWP exception breakpoints, DevTools pause-on-exception (§13.1) |
+| Page-protection watchpoint | Page table permission bit | Page fault + filter + reprotect | Coarse page granularity; scales beyond DR registers | `mprotect`, `VirtualProtect(PAGE_GUARD)`, guard pages (§13.2) |
+| Debug expression evaluation | Debug metadata + evaluator | Target calls may mutate/deadlock | Requires safe subset or explicit unsafe evaluation | GDB `print/call`, LLDB expressions, DevTools console, JDWP invoke (§13.3) |
+| Hot code replacement | Versioned code metadata | Patch + deopt/frame policy | Active-frame migration is hard | Visual Studio Edit and Continue, JVM HotSwap, Erlang, Flutter (§13.4) |
+| Production minidump pipeline | Build IDs + unwind metadata | Crash artifact upload + symbolication | Privacy and symbol availability dominate usefulness | Breakpad, Crashpad, Windows minidumps, Sentry (§13.5) |
+| Hardware probe debugging | Debug port wired in silicon | Halt/resume over JTAG/SWD | Limited breakpoints; no OS services | OpenOCD, CoreSight, probe-rs (§13.6) |
+| Systematic schedule exploration | Controlled test scheduler | Many explored interleavings | State-space explosion; needs runtime-owned sync | CHESS, Rust `loom`, FoundationDB simulation (§13.7) |
+| Deadlock/liveness wait graph | Runtime wait metadata | Graph update per wait/block | Requires all blocking primitives to be known | JVM thread dumps, Go goroutine dumps, lockdep, tokio-console (§13.8) |
+| Dynamic invariant detection | Instrumented passing runs | Trace values + infer predicates | False positives depend on test quality | Daikon (§13.9) |
+| Contract violation as semantic breakpoint | Contract metadata/check mode | Predicate evaluation | Needs policy: ignore/observe/enforce/debug | Eiffel, Racket contracts, Rust `debug_assert!`, C++26 contracts (§13.10) |
 
 ---
 
-## 14. References
+## 15. References
 
-References are grouped by the chapter that first cites them. Within each chapter they follow subsection order.
+References are grouped by the chapter that first cites them. Within each chapter they roughly follow subsection order, with some broad background references grouped by topic rather than by exact first mention.
 
 ### Chapter 1 — Native Breakpoints
 
@@ -1108,6 +1235,8 @@ References are grouped by the chapter that first cites them. Within each chapter
 12. GDB Remote Connection and Packets — https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html
 13. Bracha & Ungar: Mirrors — Design Principles for Meta-level Facilities (OOPSLA 2004) — https://bracha.org/mirrors.pdf
 14. Bracha: The Newspeak Programming Platform — https://bracha.org/newspeak.pdf
+15. Comma IDE features — https://commaide.com/features
+16. Comma IDE FAQ — https://commaide.com/faq
 
 ### Chapter 6 — Retroactive and Partial Evaluation
 
@@ -1177,3 +1306,32 @@ References are grouped by the chapter that first cites them. Within each chapter
 2. TLA+ Debugger: Interactive State-Space Exploration — https://discuss.tlapl.us/msg06620.html
 3. Nawrocki et al.: An Extensible User Interface for Lean 4 (ITP 2023) — https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf
 4. leanprover/vscode-lean4 InfoView Manual — https://github.com/leanprover/vscode-lean4
+
+### Chapter 13 — Additional Semantic and Production Debugging Techniques
+
+1. GDB Set Catchpoints — https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html
+2. Chrome DevTools Protocol Debugger Domain — https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
+3. Linux `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html
+4. Windows Guard Pages — https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
+5. GDB Expressions — https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html
+6. LLDB Tutorial — https://lldb.llvm.org/use/tutorial.html
+7. Visual Studio Edit and Continue — https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue
+8. JPDA Enhancements: HotSwap / Class Redefinition — https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html
+9. Flutter Hot Reload — https://docs.flutter.dev/tools/hot-reload
+10. Google Breakpad — https://chromium.googlesource.com/breakpad/breakpad
+11. Google Crashpad — https://chromium.googlesource.com/crashpad/crashpad
+12. Windows Minidump Files — https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
+13. OpenOCD User Guide — https://openocd.org/doc/html/index.html
+14. ARM Debug Interface Architecture Specification — https://developer.arm.com/documentation/ihi0031/latest/
+15. Microsoft CHESS — https://www.microsoft.com/en-us/research/project/chess/
+16. Rust `loom` — https://github.com/tokio-rs/loom
+17. FoundationDB Deterministic Simulation Testing — https://apple.github.io/foundationdb/testing.html
+18. Java Troubleshooting: Thread Dumps — https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html
+19. Go Diagnostics — https://go.dev/doc/diagnostics
+20. Linux Lockdep Design — https://docs.kernel.org/locking/lockdep-design.html
+21. tokio-console — https://github.com/tokio-rs/console
+22. Daikon Dynamic Invariant Detector — https://plse.cs.washington.edu/daikon/
+23. Daikon Publications — https://plse.cs.washington.edu/daikon/pubs/
+24. Racket Contracts — https://docs.racket-lang.org/guide/contracts.html
+25. Eiffel Design by Contract — https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions
+26. C++ Contract Assertions — https://cppreference.dev/w/cpp/language/contracts

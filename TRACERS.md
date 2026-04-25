@@ -2,7 +2,7 @@
 
 Research on observability, tracing, profiling, instrumentation, and runtime event pipelines — the "always-on" side of runtime introspection, as distinct from pause-and-inspect debugging.
 
-Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`.
+Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`. Memory disciplines and runtime memory architectures — GC, allocators, ownership, regions, hardware tagging, concurrent reclamation — are in `MEMORY.md`; memory-specific tracing mechanisms (heap snapshots, allocation sampling) currently live alongside their host event-pipeline entries in this document rather than being split out. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`.
 
 ---
 
@@ -45,11 +45,11 @@ Source: https://www.erlang.org/doc/apps/erts/beamasm — "Tracing and NIF Loadin
 
 ### 1.3. Linux ftrace / eBPF — NOP-to-CALL Patching
 
-The Linux kernel compiles every function with `-fpatchable-function-entry`, inserting a 5-byte NOP (`0F 1F 44 00 00`) at the entry point. When tracing is enabled for a function, the NOP is atomically replaced with a 5-byte `call trampoline`. When tracing is disabled, it is patched back to NOP.
+Linux function tracing is built around compiler-emitted patch points, but the exact mechanism varies by kernel version, architecture, and configuration. Historically ftrace used `-pg`/`mcount`; modern kernels commonly use `__fentry__`, dynamic ftrace, and related patchable-entry schemes. When tracing is disabled, a call site is patched to a NOP; when enabled, it is patched to call a trampoline. `text_poke()` and architecture-specific machinery handle instruction-cache coherency and cross-CPU synchronization.
 
-eBPF tracepoints use the same mechanism. At compile time, each tracepoint location is a 5-byte NOP. At runtime, enabling a tracepoint patches the NOP into a 5-byte jump to the trampoline. BPF trampolines (fentry/fexit) claim "practically zero overhead" compared to kprobes, which use the heavier INT 3 mechanism.
+eBPF uses several different attachment mechanisms rather than one universal NOP-to-CALL path. BPF fentry/fexit attaches near function entry/exit through BPF trampolines and is much cheaper than kprobes, which rely on breakpoint-style instrumentation. Static tracepoints are a separate facility, commonly implemented with tracepoint call sites, static keys, and per-tracepoint metadata rather than the same function-entry patch as ftrace. The taxonomy of static tracepoints, kprobes, kretprobes, and BPF fentry/fexit is separated in §1.11.
 
-Truly zero cost when disabled — NOPs are eliminated by the CPU's front end. The patching is done via `text_poke()` which handles instruction cache coherency and cross-CPU synchronization. This is the gold standard for "zero when off, cheap when on" instrumentation. It has been battle-tested across billions of machines.
+The disabled cost is best described as near-zero dispatch overhead, not literally zero: NOP sites still consume code bytes and can affect layout, I-cache pressure, and decode bandwidth. Even so, patchable instrumentation is the gold standard for "almost free when off, cheap when on" tracing and has been battle-tested across billions of machines.
 
 Source: https://docs.ebpf.io/linux/concepts/trampolines/
 
@@ -63,11 +63,11 @@ Source: https://hackmd.io/@hvqFkDgPTuGNcu-NiycXZQ/SyXX166Yp
 
 ### 1.5. DTrace USDT — Is-Enabled Probes
 
-DTrace's User Statically Defined Tracing (USDT) probes allow application developers to place trace points in their code that have near-zero overhead when not enabled. The mechanism: at each probe site, the compiler emits a `test-and-branch` over the probe payload, where the test reads an "is-enabled" flag. When no tracer is attached, the flag is 0 and the branch skips the probe arguments entirely.
+DTrace's User Statically Defined Tracing (USDT) probes allow application developers to place trace points in their code with very low disabled overhead. A USDT probe is a static probe site described by metadata so a tracing subsystem can find it, enable it, and collect its arguments when active. On many systems the inactive probe site is a NOP-like instruction sequence or otherwise arranged so the common path avoids the expensive tracing work.
 
-More recent implementations go further: the `test-and-branch` is replaced by a NOP when no tracer is active, and patched to a jump to the trampoline when a probe is enabled — the same technique as ftrace. This means the disabled cost isn't even a predicted branch; it is a NOP eliminated by the CPU front-end.
+`is-enabled` probes are a related but distinct facility: they let user code cheaply ask whether a probe is active before constructing expensive arguments. That guard prevents wasted formatting, allocation, or data copying when no tracer is listening. Implementations differ in whether the guard is a memory load, a branch, a patched instruction, or a provider-specific fast path.
 
-The key design pattern: separate the "is anyone listening?" check from the "prepare and emit probe data" work. The expensive part (formatting arguments, copying data) only runs when the probe is active. This two-phase pattern — cheap guard, expensive payload — appears in almost every high-performance tracing system.
+The key design pattern is stable across implementations: separate the "is anyone listening?" check from the "prepare and emit probe data" work. The expensive part only runs when the probe is active. This two-phase pattern — cheap guard, expensive payload — appears in almost every high-performance tracing system.
 
 Source: https://blogs.oracle.com/linux/from-kernel-to-user-space-tracing
 
@@ -105,6 +105,30 @@ The broader consequence is an entire tooling category becoming viable. Distribut
 
 Source: https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html and https://nakryiko.com/posts/bpf-core-reference-guide/ and https://docs.kernel.org/bpf/btf.html and https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html
 
+### 1.10. LLVM XRay — Compiler-Inserted Patchable Function Sleds
+
+LLVM XRay is the compiler-toolchain version of the same "zero when off, patch when on" design. When a program is compiled with `-fxray-instrument`, LLVM inserts patchable sleds into selected functions and emits an `xray_instr_map` section that describes where those sleds live. The runtime library can then patch individual sleds into calls to XRay trampolines, or unpatch them back to no-ops, without rebuilding the binary.
+
+The important difference from ad-hoc function instrumentation is that XRay makes traceability an explicit ABI between the compiler and the runtime. The compiler decides which functions are eligible, lays down enough bytes to patch safely, and records a compact map from code locations to instrumentation points. The runtime owns the policy: patch everything before `main`, patch a selected function at runtime, sample a subset of functions, or emit only custom typed events.
+
+XRay supports multiple instrumentation kinds: function entry, function exit, tail-call handling on supported architectures, and user-defined `custom` / `typed` event points. The default "basic" mode records entry/exit events into trace files for later analysis with `llvm-xray`, while the runtime API exposes finer-grained patching such as `__xray_patch_function()` for targeted tracing.
+
+For a new language, the reusable lesson is direct: **reserve patchable trace sleds in generated code and emit a side table that lets the runtime patch them selectively**. This gives the language an always-available production tracing surface without forcing every function call through a hook check.
+
+Source: https://llvm.org/docs/XRay.html and https://llvm.org/docs/XRayExample.html and https://llvm.org/doxygen/XRayInstrumentation_8cpp_source.html
+
+### 1.11. Linux kprobes, kretprobes, TRACE_EVENT, and BPF fentry/fexit
+
+The Linux tracing stack is easiest to understand as a taxonomy of probe stability and cost. `TRACE_EVENT` static tracepoints are deliberate semantic events placed by kernel developers — `sched_switch`, block I/O events, syscall events — with stable names and structured fields. They are the production-friendly surface: a tool can depend on the event contract rather than reverse-engineering implementation details.
+
+`kprobes` and `kretprobes` are the opposite end of the spectrum: dynamic probes attached to arbitrary kernel instruction addresses or function returns. They are excellent for one-off investigation because they require no source change and no pre-existing tracepoint, but their contract is unstable: function names, argument registers, inlining, and instruction layouts can change across kernel versions. Traditional kprobes also pay trap overhead, which is why optimized kprobes, ftrace integration, and trapless probes (§1.6) exist.
+
+BPF `fentry` and `fexit` are the modern low-overhead middle ground. They attach eBPF programs to kernel function entry/exit paths using ftrace-style patching and BTF type metadata. Compared with kprobes, they avoid the INT 3 trap path and can expose typed arguments to the verifier and the BPF program. Compared with static tracepoints, they can target many functions that were never annotated as official events.
+
+The language-runtime analogue is valuable. A runtime should distinguish **stable semantic tracepoints** from **unstable implementation probes**. Stable events are for production tools and compatibility promises; implementation probes are for experts diagnosing a specific build. A typed metadata format, like BTF, can make both safer by letting trace programs read arguments and fields by type rather than by guessed offsets.
+
+Source: https://docs.kernel.org/trace/kprobetrace.html and https://docs.kernel.org/trace/events.html and https://docs.kernel.org/bpf/btf.html and https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/
+
 ---
 
 ## 2. Cooperative Safepoints and Managed Handoff
@@ -121,7 +145,7 @@ test eax, [polling_page]
 
 During normal execution the page is readable, the load succeeds silently (~1 cycle, always predicted to not fault), and execution continues. When the JVM needs to pause all threads (for GC, deoptimization, or debugger attachment), it calls `mprotect(polling_page, PROT_NONE)`. Every thread's next safepoint poll triggers a SIGSEGV. The JVM's signal handler recognizes the faulting address as the polling page and suspends the thread.
 
-A memory load is essentially free on modern CPUs due to caching and speculative execution. The "should I stop?" check is not a branch at all — it is a load that either succeeds silently or faults. The hardware handles the rare case (fault) at zero cost to the common case (no fault). This is the fastest possible polling mechanism on x86 — faster even than a branch that is perfectly predicted, because there is no branch at all.
+A cached memory load is very cheap on modern CPUs, and the "should I stop?" check is not a branch at all — it is a load that either succeeds silently or faults. The hardware handles the rare case (fault) outside the common execution path. This makes polling-page safepoints a classic low-overhead design on x86, though exact performance depends on microarchitecture and HotSpot implementation details.
 
 The downside: signal handling is expensive when it fires (~microseconds per thread). But since it only fires for rare events (GC, debugger attach), the amortized cost is negligible.
 
@@ -157,7 +181,7 @@ Safepoint polling (§2.1) is elegant as a stop-the-world mechanism, but it quiet
 
 **`AsyncGetCallTrace` (AGCT)** is Sun's undocumented back-door, exported so their own Studio profiler could sample outside safepoints. It walks Java frames directly from a signal handler, *without* the safepoint handshake — hence *async*, hence can crash if the JVM mutates the stack mid-walk. Andrei Pangin's **async-profiler** productionized it by installing a SIGSEGV handler, catching AGCT's failure cases, and chaining to the JVM's own deoptimization handler. Its other design trick is merging two sources: `perf_events` gives the native stack (kernel → libjvm → JIT code); AGCT gives the Java frames (including inlined methods). async-profiler walks the native stack until it hits JIT territory, then hands off to AGCT — one unified flame graph across kernel, JNI, JVM internals, and Java.
 
-**JEP 509 "JFR CPU-Time Profiling" (JDK 25, 2025)** is the official, supported fix. JFR grew a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and a new AGCT-successor API written specifically for safe async stack walks. The JEP explicitly names async-profiler's reliance on unsupported internals as the motivation, and records failure-mode events when sampling fails — so an incomplete profile is *visibly* incomplete rather than silently biased.
+**JEP 509 "JFR CPU-Time Profiling" (JDK 25, 2025)** is OpenJDK's supported path toward reducing this reliance on unsupported internals, but it should be treated as an experimental, Linux-focused step rather than a universal replacement for every AGCT use case. JFR grows a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased. The JEP explicitly names async-profiler's reliance on unsupported internals as motivation.
 
 For a new language: design the async-safe stack-walk API *up front*. Retrofitting it cost OpenJDK roughly 15 years of tool-author workarounds. Go (§3.5) sidestepped the same problem by pairing unconditional frame pointers with Go 1.14's asynchronous preemption — SIGPROF samples can now land anywhere, not just at cooperative safepoints.
 
@@ -221,13 +245,13 @@ Source: https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_contro
 
 ### 3.5. Go `runtime/trace` — Partitioned Execution Traces and Flight Recorder
 
-Go's `runtime/trace` is a first-party execution tracer emitting runtime-semantic events — `GoCreate`, `GoStart`, `GoBlock{Recv,Send,Select,Sync,Cond}`, `GoSysCall`, `GCStart`, plus user-defined `Task` and `Region` spans. Buffers are **per-P** (per scheduler processor), written without locks, and serialization is split from emission. Dmitry Vyukov's original 2014 design targeted ~35% overhead; Felix Geisendörfer and Nick Ripley brought it below 1% by Go 1.21 primarily by switching to **frame-pointer-based unwinding** (Go enables FP unconditionally on amd64/arm64 since Go 1.12/1.18, so a traceback is a pointer chase, not a DWARF decode — see §13.6).
+Go's `runtime/trace` is a first-party execution tracer emitting runtime-semantic events — `GoCreate`, `GoStart`, `GoBlock{Recv,Send,Select,Sync,Cond}`, `GoSysCall`, `GCStart`, plus user-defined `Task` and `Region` spans. Buffers are **per-P** (per scheduler processor), written without locks, and serialization is split from emission. Dmitry Vyukov's original 2014 design targeted ~35% overhead; Felix Geisendörfer and Nick Ripley brought it below 1% by Go 1.21 primarily by switching to **frame-pointer-based unwinding**. Go has kept frame pointers available by default on key production architectures for years, making tracebacks a pointer chase rather than a DWARF decode on those platforms; see §13.7 for the policy history.
 
 The Go 1.22 execution-tracer overhaul (Michael Knyszek) changed the on-wire shape from one monolithic trace to a sequence of **self-contained generations**. Each partition is a complete mini-trace that a reader can parse independently; the historical "buffer the whole thing in RAM to sort events" pain disappears. This is the load-bearing change that enabled Go 1.25's **`FlightRecorder` API** — a fixed-size in-memory circular buffer holding the last ~N seconds of runtime events, flushed on application-side trigger (error, SLO breach, user command). Directly parallel to JFR (§3.1), reached via a partition/generation model instead of a global circular buffer.
 
-The other Go contribution is the **pprof `profile.proto` format** used by `runtime/pprof`. It is intentionally profile-type-agnostic (CPU, heap, goroutine, block, mutex, and custom profiles all share one `Sample → [Location] → Mapping` schema with arbitrary `value` dimensions) and it became the industry-standard wire format for profiles: Parca, Pyroscope / Grafana Phlare, Google Cloud Profiler, Polar Signals, and Datadog all speak pprof. See §14.2 for why that mattered for the rise of continuous profiling.
+The other Go contribution is the **pprof `profile.proto` format** used by `runtime/pprof`. Rather than repeat the interchange-format details here, §14.2 covers why pprof became the common wire format for CPU, heap, goroutine, block, mutex, and custom profiles.
 
-Because Go 1.14 added asynchronous preemption (SIGURG-delivered `asyncPreempt` that synthesizes a safepoint at arbitrary PC), its SIGPROF-driven CPU profiler lands samples uniformly over execution — it does not suffer the HotSpot-style safepoint bias of §2.4. This is one of the clearer cases where a language-level runtime decision (always-FP + async preemption) pays down a decade of profiling pathology that other managed runtimes still work around via AGCT-style side doors.
+Because Go 1.14 added asynchronous preemption (SIGURG-delivered `asyncPreempt` that synthesizes a safepoint at many otherwise non-cooperative PCs), its SIGPROF-driven CPU profiler is much less tied to cooperative safepoints than older managed-runtime profilers. It can still lose or bias samples because of signal delivery, runtime state, cgo/native frames, and unwinding constraints, but it avoids the worst HotSpot-style safepoint bias of §2.4. This is one of the clearer cases where language-level runtime decisions (frame-pointer discipline + async preemption) pay down profiling pathology that other managed runtimes still work around via AGCT-style side doors.
 
 Source: https://go.dev/blog/execution-traces-2024 and https://go.dev/blog/flight-recorder and https://github.com/golang/proposal/blob/master/design/60773-execution-tracer-overhaul.md and https://blog.felixge.de/waiting-for-go1-21-execution-tracing-with-less-than-one-percent-overhead/ and https://github.com/google/pprof/blob/main/proto/profile.proto
 
@@ -292,6 +316,14 @@ Database engines have their own tracing subsystems parallel to ETW (§3.2), JFR 
 The pattern across all three: **mature DB engines reinvent ETW for themselves** because operator-level visibility requires in-engine instrumentation. The runtime is a database, the events are plan-node transitions, and the design space is the same one ETW / JFR / EventPipe already mapped out at the OS / VM level. Complement rather than compete with §12.3 OpenTelemetry's `db.statement` attribute: OTEL sees the query from outside, XE / auto_explain / Performance Schema see it from inside.
 
 Source: https://www.postgresql.org/docs/current/auto-explain.html and https://www.postgresql.org/docs/current/pgstatstatements.html and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server and https://dev.mysql.com/doc/refman/en/performance-schema.html
+
+### 3.11. MoarVM Telemetry, snapper, and Heap Snapshots
+
+Raku's MoarVM ships production-grade language-runtime observability built around three pieces. The **`Telemetry`** module instruments `Usage`, `Thread`, `ThreadPool`, and `AdHoc` event sources; `$*SAMPLER` controls active instruments. A dedicated **`snapper` thread** samples every 0.1 s; `-Msnapper` / `-Msafe-snapper` enables zero-code-change profiling on any Raku program. **Heap snapshots** use a binary format `MoarHeapDumpv00X` (current version 3, subversion 1), produced by `src/profiler/heapsnapshot.c`, with a TOC + string-intern table; produced via `--profile=foo.mvmheap` or `Telemetry::snap(:heap)` and saved with the `.mvmheap` extension.
+
+Tooling: **`App::MoarVM::HeapAnalyzer`** is a CLI shell over the binary format; **`moarperf`** (timo, last release 2020 but still working) is a web UI; the now-discontinued Comma IDE integrated the same. The architectural design — snapper thread + opcode-level Telemetry events + a binary heap-snapshot format with offline analyzer tools — sits squarely in the JFR / EventPipe / `runtime/trace` family (§§3.1, 3.3, 3.5), but for a smaller, less-known runtime. Worth recording as evidence that a small-team VM can ship credible always-on observability if the binary format and the analyzer are co-designed from the start — with the caveat that bus-factor is real: moarperf's last release was 2020 and the analyzer ecosystem is small enough that a single maintainer's departure is meaningful risk.
+
+Source: https://docs.raku.org/type/Telemetry and https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c and https://github.com/timo/moarperf
 
 ---
 
@@ -406,7 +438,7 @@ Intel processors maintain a hardware ring buffer called the Last Branch Record (
 The use case that makes LBR uniquely valuable is **Hardware Transactional Memory (TSX) debugging**. As noted by kernel developer Andi Kleen, any interrupt instantly aborts a TSX transaction, so normal profilers and breakpoint debuggers cannot observe transaction internals — the moment you interrupt to inspect state, the state is gone. LBR runs silently and does not perturb transactions, letting developers recover the exact branch history that led to an internal abort.
 
 Beyond TSX, LBR is the enabling primitive for two very different production uses:
-- **Per-sample call-stack capture** for profilers — `perf record --call-graph lbr` uses the branch ring as a zero-cost stack-walk shortcut. Covered as a dedicated mechanism in §13.5.
+- **Per-sample call-stack capture** for profilers — `perf record --call-graph lbr` uses the branch ring as a zero-cost stack-walk shortcut. Covered as a dedicated mechanism in §13.6.
 - **PEBS record augmentation** — PEBS records (§5.5) can be configured to include the current LBR contents, correlating a precise sample with the branch history that led to it.
 
 Source: https://lwn.net/Articles/680996/
@@ -613,7 +645,7 @@ if (shadow_value != 0 && (shadow_value <= (addr & 7)))
     report_error()
 ```
 
-This check is 2 loads + 1 branch — roughly 2x overall slowdown. ASan detects use-after-free (by poisoning freed memory and quarantining it), heap/stack/global buffer overflows (by inserting poisoned "red zones" around allocations), and use-after-return.
+This instrumentation adds one shadow-memory load plus compare/branch logic before the original application load/store; if counting the application access too, the fast path is effectively two memory accesses plus a branch. ASan detects use-after-free (by poisoning freed memory and quarantining it), heap/stack/global buffer overflows (by inserting poisoned "red zones" around allocations), and use-after-return.
 
 ### 8.3. ThreadSanitizer, MemorySanitizer, UBSan — The Sanitizer Family
 
@@ -759,7 +791,7 @@ Source: https://opentelemetry.io/docs/concepts/sampling/ and https://opentelemet
 
 ### 12.3. OpenTelemetry — The Observability Standard
 
-OpenTelemetry (OTEL) is the emerging standard for distributed tracing, metrics, and logging across service boundaries. It defines:
+OpenTelemetry (OTEL) is the de facto standard for distributed tracing, metrics, and logging across service boundaries. It defines:
 
 - **Traces**: a tree of spans representing the path of a request through a distributed system. Each span has a trace ID, span ID, parent span ID, start/end timestamps, attributes (key-value metadata), and events (timestamped log entries within a span).
 - **Context propagation**: trace context (trace ID, span ID, trace flags) is serialized into HTTP headers (W3C Trace Context format: `traceparent: 00-{trace_id}-{span_id}-{flags}`) and propagated across service boundaries. Each service extracts the context, creates a child span, and propagates the updated context to downstream calls.
@@ -788,11 +820,23 @@ Source: https://sigops.org/s/conferences/sosp/2015/current/2015-Monterey/printab
 
 ---
 
-## 13. Stack Unwinding for Sampling Profilers
+## 13. Sampling Profilers: Substrates and Stack Unwinding
 
-Every sampling profiler — perf, pprof, async-profiler, py-spy, Parca, VTune — is built on the same primitive: *given a signal-handler snapshot of a thread, reconstruct the call stack*. The choice of unwinding mechanism is the single largest determinant of whether production sampling is viable. This section catalogs the main options and the trade-off axis: **cost-at-walk-time vs cost-at-steady-state**.
+Every sampling profiler — perf, pprof, async-profiler, py-spy, Parca, VTune — is built on two primitives: first, *interrupt or observe a thread often enough to get statistically useful samples*; second, *given that snapshot, reconstruct the call stack*. The choice of sampling substrate determines bias, delivery cost, signal-safety constraints, and lost-sample behavior. The choice of unwinding mechanism determines whether production sampling is viable once a sample has been taken. This section catalogs both layers, with the main trade-off axis for unwinding being **cost-at-walk-time vs cost-at-steady-state**.
 
-### 13.1. Frame Pointers — Zero Walk Cost, 1–3% Steady-State Tax
+### 13.1. Statistical Sampling Substrates — Timers, PMU Overflows, Signals, and Ring Buffers
+
+Before a profiler can unwind anything, it needs a reason to take a sample. The classic Unix substrate is timer-driven signal delivery: `setitimer(ITIMER_PROF)` or POSIX timers raise `SIGPROF` against a running thread after some amount of CPU time or wall time. The profiler's signal handler captures the interrupted PC/register state, optionally walks the stack immediately, and records a compact sample. This is portable and simple, but it inherits every signal-handler constraint: the handler must avoid allocation, locks, most runtime APIs, and any operation that is not async-signal-safe.
+
+Linux `perf_event_open` generalizes the substrate. A perf event can be a counter (read occasionally for an aggregate) or a sampled event (write records into an `mmap` ring buffer on overflow). The trigger can be time, CPU cycles, instructions, cache misses, branch misses, context switches, software events, or precise PMU events such as PEBS/IBS/SPE (§5.5). The ring-buffer model decouples sample production from userspace consumption: the kernel writes records into per-event buffers, and the profiler drains them asynchronously.
+
+This layer introduces its own failure modes. Sampling by frequency ("99 Hz") and sampling by period ("every 1,000,000 cycles") answer different questions. High rates can be throttled by the kernel, overflow buffers, or perturb cache behavior enough to bias the workload. Hardware event sampling can suffer skid: the sampled PC may be near, but not exactly at, the instruction that caused the event, unless precise sampling support is available. Signal-based profilers can deadlock themselves if they try to walk runtime metadata protected by locks held by the interrupted thread.
+
+For a new language, the design pattern is to separate **sample trigger**, **sample transport**, and **stack attribution**. The runtime may expose a safe self-sampling path, register code metadata so external profilers can unwind it, or provide a per-thread/per-CPU ring buffer for samples. Whatever the choice, the profiler must report lost samples and throttling explicitly; silent drops are worse than lower sample rates.
+
+Source: https://man7.org/linux/man-pages/man2/perf_event_open.2.html and https://www.brendangregg.com/perf.html and https://man7.org/linux/man-pages/man2/setitimer.2.html and https://man7.org/linux/man-pages/man7/signal-safety.7.html
+
+### 13.2. Frame Pointers — Zero Walk Cost, 1–3% Steady-State Tax
 
 The classical method: every function prologue saves the caller's frame pointer (e.g., `push %rbp; mov %rsp, %rbp` on x86-64), so the stack is a linked list of frames that can be walked by following `rbp` → `rbp` → `rbp` until null. Walking is a handful of instructions per frame, safe from a signal handler, requires no metadata at all.
 
@@ -802,7 +846,7 @@ In 2022–2024 this consensus reversed. **Fedora 38** (April 2023) and **Ubuntu 
 
 Source: https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer and https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default and https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html and https://peps.python.org/pep-0831/
 
-### 13.2. DWARF `.eh_frame` / CFI — Zero Tax, Expensive Walk
+### 13.3. DWARF `.eh_frame` / CFI — Zero Tax, Expensive Walk
 
 DWARF Call Frame Information (CFI) — shipped in every ELF binary's `.eh_frame` section for exception unwinding — describes how to recover each frame's caller by executing a **bytecode program**. The instructions describe where the caller's registers are saved relative to the current CFA (Canonical Frame Address), which itself can be computed by an arbitrary expression over the current register file.
 
@@ -812,7 +856,7 @@ The design cost: the bytecode is **Turing-complete**, and every frame requires i
 
 Source: https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding and https://www.airs.com/blog/archives/460
 
-### 13.3. Linux ORC Unwinder — DWARF Without the Bytecode
+### 13.4. Linux ORC Unwinder — DWARF Without the Bytecode
 
 Josh Poimboeuf's **ORC** (Oops Rewind Capability) unwinder, merged into Linux 4.14 (2017), replaced DWARF for in-kernel unwinding. The motivating constraint was political (Linus Torvalds rejected a full DWARF state-machine interpreter in the kernel) and practical (DWARF is too slow and too complex to run safely from interrupt context). ORC's design: a purpose-built static unwind table, emitted at build time by the `objtool` static analyzer, storing only what a kernel unwinder actually needs — CFA offset, frame pointer recoverability, return-address location — and no bytecode.
 
@@ -820,7 +864,7 @@ Measured speedup vs DWARF in the kernel is 20–40×. The space cost is an extra
 
 Source: https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html and https://lwn.net/Articles/728339/ and https://lwn.net/Articles/727553/
 
-### 13.4. SFrame — DWARF Minus Everything DWARF Doesn't Need
+### 13.5. SFrame — DWARF Minus Everything DWARF Doesn't Need
 
 **SFrame** (Indu Bhagat / Oracle, in binutils 2.40+, glibc 2.39+) brings the ORC philosophy to userspace. It is a new unwind-table format designed for *sampling profilers*, not exception handling. The core design choice: encode only CFA / FP / RA per PC range, binary-searchable, ~8 bytes per FDE row. No general bytecode interpreter. No callee-saved-register recovery (samplers don't need it). No support for arbitrary CFI programs (compilers that emit complex CFI must either simplify or fall back to DWARF).
 
@@ -828,7 +872,7 @@ The result is a metadata format whose fast-path walk is comparable to frame-poin
 
 Source: https://sourceware.org/binutils/docs/sframe-spec.html and https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe and https://lwn.net/Articles/930622/ and https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs
 
-### 13.5. LBR Call-Stack Sampling — Hardware Shortcut
+### 13.6. LBR Call-Stack Sampling — Hardware Shortcut
 
 Intel's Last Branch Record ring buffer (introduced in §5.2 as a TSX debugging tool) can also be used as a zero-cost stack-unwinding shortcut. `perf record --call-graph lbr` configures the PMU so that on each sample, the CPU hands the kernel the last 16 or 32 taken branches — which is *already* the call chain the profiler wants, with no metadata lookup, no frame-pointer walk, no DWARF interpretation.
 
@@ -838,9 +882,9 @@ LBR-based sampling sits at the "zero-cost walk" endpoint of the spectrum. It is 
 
 Source: https://lwn.net/Articles/619180/ and cross-reference §5.2 for the underlying LBR mechanism.
 
-### 13.6. Go's Unconditional Frame-Pointer Discipline
+### 13.7. Go's Unconditional Frame-Pointer Discipline
 
-Go (amd64/arm64, since Go 1.7 in 2016) *always* emits frame pointers, with no `-fno-omit-frame-pointer` to toggle. The decision was measured — the Go team quantified the cost at 1–3% on representative workloads and deemed it acceptable in exchange for every Go binary being continuously profilable, crash-traceable, and compatible with every external profiler without debug-info distribution. This is a language-level policy choice, not a compiler flag.
+Go made frame pointers a default-on runtime policy for its most important production architectures, starting with amd64 in Go 1.7 and expanding/solidifying support on other architectures over time. There is no ordinary `-fno-omit-frame-pointer` style user knob for Go code. The decision was measured — the Go team quantified the cost at roughly 1–3% on representative workloads and deemed it acceptable in exchange for Go binaries being continuously profilable, crash-traceable, and compatible with external profilers without requiring full debug-info distribution. This is a language-level policy choice, not just a compiler flag.
 
 The dividend compounds. Felix Geisendörfer's 2023 work on Go's execution tracer (§3.5) reduced its runtime overhead from ~20% to under 1% almost entirely by switching the tracer's stack capture from its previous mechanism to frame-pointer walks. That speedup is only available because *every* Go binary has frame pointers; a tracer that had to probe for them, or fall back to DWARF, could not achieve the same baseline.
 
@@ -878,7 +922,7 @@ Source: https://github.com/google/pprof/blob/main/proto/profile.proto and https:
 
 **Parca** (Frederic Branczyk / Polar Signals, 2021) is the open-source GWP-style system. Its distinctive choice is **whole-system profiling via eBPF** (§1.7) without application changes: a Parca Agent attaches a CPU-sampling eBPF probe to every process on a node, walks user-space stacks via a combination of frame pointers and DWARF unwinding in eBPF, and ships pprof-formatted profiles to a central store.
 
-The eBPF-side DWARF unwinder is worth naming specifically: Parca implements DWARF CFI evaluation *inside eBPF*, so the stack walk happens in-kernel at sample time without round-tripping to userspace. This lets Parca profile applications that don't emit frame pointers (the default for most production binaries before the Fedora/Ubuntu flip — see §13.1) while keeping sampling cost bounded.
+The eBPF-side DWARF unwinder is worth naming specifically: Parca implements DWARF CFI evaluation *inside eBPF*, so the stack walk happens in-kernel at sample time without round-tripping to userspace. This lets Parca profile applications that don't emit frame pointers (the default for most production binaries before the Fedora/Ubuntu flip — see §13.2) while keeping sampling cost bounded.
 
 The storage layer is **FrostDB**, a columnar database designed for profile ingestion and query. Profiles are decomposed into sample-value columns (CPU time, allocated bytes, goroutine counts) and metadata columns (function name, file, line, build ID). Queries are SQL-like aggregations over the columnar layout — the pprof ecosystem's answer to Dremel.
 
@@ -1001,10 +1045,12 @@ These techniques change the code path itself: patch a site, swap in a trap, or r
 | Hook function checked every instruction | background / contrast case | Per-instruction branch | Per-instruction call | Every instruction | Lua `debug.sethook`, CPython `sys.settrace` |
 | Bytecode opcode patching | §1.1 | Zero | Per-breakpoint dispatch | Per-instruction | Luau `LOP_BREAK` |
 | NOP→CALL / handler-pointer patching | §§1.3, 1.5, 1.6, 1.7 | Zero or one reserved NOP | Per-probe trampoline / handler call | Per-function / per-probe | ftrace, DTrace USDT, trapless kernel probes, eBPF uprobes |
+| Compiler-inserted patchable sleds + side table | §1.10 | Reserved NOP sled / code-size cost | Per-patched function trampoline | Per-function / custom typed event | LLVM XRay |
 | Jump target patching | §1.2 | One predicted branch | One call | Per-function | Erlang BeamAsm |
 | NOP padding + INT 3 swap | §1.4 | One reserved NOP | Trap + context switch | Per-instruction | Wasmtime Winch |
 | Return-address trampoline for paired entry/exit | §1.8 | One entry NOP, per-task shadow stack | One shared return handler | Per-function | ftrace `function_graph`, uftrace |
 | Load-time field-offset relocation via BTF | §1.9 | Zero at runtime; metadata at load | One-time patch on `BPF_PROG_LOAD` | Per-struct-field access | eBPF CO-RE (libbpf + BTF) |
+| Stable tracepoints vs dynamic typed probes | §1.11 | Zero until enabled / patchable entry cost | Per-event or per-BPF-program cost | Per-semantic-event / per-function | Linux `TRACE_EVENT`, kprobes, kretprobes, BPF `fentry`/`fexit` |
 | Compile-time trace instructions | §4.2 | One NOP / trace site | Per-trace-point call | Per-line / function | Ruby YARV |
 | In-place binary rewriting via instruction punning | §7.3 | Zero | Per-patched-site logic | Per-instruction | E9Patch |
 | PLT trampoline `int3` patching | §6.3 | Zero; requires lazy binding | Trap + arg decode per call | Per-library-symbol | ltrace |
@@ -1051,6 +1097,7 @@ The core idea is not "stop the program" but "emit structured events cheaply enou
 | Unified-logging persistent ring (one emission, three modalities) | §3.8 | Zero when subsystem disabled | Compile-time formatted payload memcpy | Per-signpost / per-log / per-activity | Apple `os_signpost` + Instruments |
 | Subsystem-embedded tracepoints for shared-memory IPC | §3.9 | Zero (NOP patched) | NOP→CALL tracepoint cost | Per-SQE / per-CQE | Linux io_uring tracepoints |
 | Database-engine query event bus | §3.10 | Zero when consumer off | Predicate eval + target write | Per-plan-node / per-statement | SQL Server XE, PG `auto_explain`, MySQL PS |
+| Language-runtime heap snapshots + telemetry | §3.11 | Zero until snapper enabled | Per-event memcpy + 0.1 s sampler | Per-opcode event, per-object in heap dump | MoarVM Telemetry + heap snapshots |
 | Lock-free event queue | §4.1 | Very low idle cost | Per-span overhead | Per-annotated span | Tracy, Spall |
 | Match-spec filtered tracing | §4.3 | Minimal pattern/filter cost | Per-matching-call | Per-function-call | Erlang `dbg` |
 | Ultra-low-overhead language tracer | §4.6 | Very low active-path cost | Per-call / syscall event cost | Per-call / syscall | HUGLO |
@@ -1094,18 +1141,19 @@ These techniques do not primarily intercept execution; they search the space aro
 | Virtual speedup (causal profiling) | §10.1 | ~17% | Multiple runs with perturbation | Per-line / progress point | Coz |
 | Coverage-guided fuzzing | §9.1 | Instrumentation cost | Thousands–millions of executions / sec | Per-edge / branch | AFL, libFuzzer |
 
-### 17.8. Stack Unwinding for Sampling
+### 17.8. Sampling Substrates and Stack Unwinding
 
-Every sampling profiler depends on this step. The trade-off axis is steady-state runtime tax vs cost at walk time.
+Every sampling profiler depends on two steps: a substrate that decides when and how samples are delivered, and an unwinder that converts interrupted register state into a call stack. The substrate trade-off is bias, delivery cost, and lost-sample behavior; the unwinding trade-off is steady-state runtime tax vs cost at walk time.
 
-| Mechanism | Discussed in | Steady-State Cost | Walk Cost | Key Trade-off | Representative implementations |
+| Mechanism | Discussed in | Steady-State Cost | Walk Cost / Delivery Cost | Key Trade-off | Representative implementations |
 |---|---|---|---|---|---|
-| Frame pointers (always) | §13.1 | 1–3% runtime tax | Pointer chase per frame | Simplicity + signal-handler safety; one reserved register | Fedora 38, Ubuntu 24.04, Go, PEP 831 |
-| DWARF `.eh_frame` / CFI | §13.2 | Zero | Turing-complete bytecode per frame (20–40× slower) | Exception-handling correctness, not sampling-friendly | GCC/Clang `-fomit-frame-pointer` default |
-| Build-validated flat unwind table | §13.3 | ~1.3 MB per build | Flat lookup (no bytecode) | 20–40× faster than DWARF; kernel-only | Linux ORC (Poimboeuf, `objtool`) |
-| Simplified userspace unwind format | §13.4 | ~8 bytes/row binary-searchable | ~FP-speed from signal handler | No callee-save recovery; fallback needed for exotic code | SFrame (binutils 2.40+, glibc 2.39+) |
-| Hardware branch ring for call stack | §13.5 | Branch ring enable cost | Zero (already in sample) | Stack depth capped at 16/32 frames | `perf --call-graph lbr` |
-| Language-policy "always FP" | §13.6 | 1–3% paid once on ABI | Pointer chase | Profilability pays compounding dividends | Go (amd64/arm64 since 1.7) |
+| Timer / signal / PMU-overflow sampling substrate | §13.1 | Zero until profiler armed; PMU/timer state while active | Signal handler or kernel ring-buffer record per sample | Bias, skid, throttling, lost samples, async-signal-safety | `perf_event_open`, `SIGPROF`, `setitimer`, async-profiler, pprof |
+| Frame pointers (always) | §13.2 | 1–3% runtime tax | Pointer chase per frame | Simplicity + signal-handler safety; one reserved register | Fedora 38, Ubuntu 24.04, Go, PEP 831 |
+| DWARF `.eh_frame` / CFI | §13.3 | Zero | Turing-complete bytecode per frame (20–40× slower) | Exception-handling correctness, not sampling-friendly | GCC/Clang `-fomit-frame-pointer` default |
+| Build-validated flat unwind table | §13.4 | ~1.3 MB per build | Flat lookup (no bytecode) | 20–40× faster than DWARF; kernel-only | Linux ORC (Poimboeuf, `objtool`) |
+| Simplified userspace unwind format | §13.5 | ~8 bytes/row binary-searchable | ~FP-speed from signal handler | No callee-save recovery; fallback needed for exotic code | SFrame (binutils 2.40+, glibc 2.39+) |
+| Hardware branch ring for call stack | §13.6 | Branch ring enable cost | Zero (already in sample) | Stack depth capped at 16/32 frames | `perf --call-graph lbr` |
+| Language-policy "always FP" | §13.7 | 1–3% paid once on ABI | Pointer chase | Profilability pays compounding dividends | Go (amd64/arm64 since 1.7) |
 
 ### 17.9. Visualization and Trace Interchange
 
@@ -1164,6 +1212,12 @@ References are grouped by the chapter that first cites them. Within each chapter
 11. Andrii Nakryiko — "BPF CO-RE reference guide" — https://nakryiko.com/posts/bpf-core-reference-guide/
 12. Kernel BPF Type Format (BTF) spec — https://docs.kernel.org/bpf/btf.html
 13. Brendan Gregg — "BPF binaries: BTF, CO-RE, and the future of BPF perf tools" — https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html
+14. LLVM XRay Instrumentation — https://llvm.org/docs/XRay.html
+15. LLVM XRay Example — https://llvm.org/docs/XRayExample.html
+16. LLVM XRayInstrumentation source — https://llvm.org/doxygen/XRayInstrumentation_8cpp_source.html
+17. Linux kprobe events documentation — https://docs.kernel.org/trace/kprobetrace.html
+18. Linux trace events documentation — https://docs.kernel.org/trace/events.html
+19. eBPF tracing program type — https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/
 
 ### Chapter 2 — Cooperative Safepoints and Managed Handoff
 
@@ -1216,6 +1270,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 36. SQL Server Extended Events engine — https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine
 37. SQL Server Extended Events targets — https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server
 38. MySQL Performance Schema — https://dev.mysql.com/doc/refman/en/performance-schema.html
+39. MoarVM Telemetry (Raku docs) — https://docs.raku.org/type/Telemetry
+40. MoarVM heapsnapshot.c — https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c
+41. moarperf web UI — https://github.com/timo/moarperf
 
 ### Chapter 4 — Instrumentation Profilers
 
@@ -1325,24 +1382,28 @@ References are grouped by the chapter that first cites them. Within each chapter
 10. Mace, Roelke, Fonseca — "Pivot Tracing" (SOSP 2015) PDF — https://sigops.org/s/conferences/sosp/2015/current/2015-Monterey/printable/122-mace.pdf
 11. Pivot Tracing ACM DOI — https://doi.org/10.1145/2815400.2815415
 
-### Chapter 13 — Stack Unwinding for Sampling Profilers
+### Chapter 13 — Sampling Profilers: Substrates and Stack Unwinding
 
-1. Fedora 38 frame-pointer change — https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer
-2. Ubuntu performance engineering with frame pointers — https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default
-3. Brendan Gregg: "The Return of the Frame Pointers" — https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html
-4. PEP 831 — frame pointers for Python — https://peps.python.org/pep-0831/
-5. Red Hat: Frame pointers — untangling unwinding — https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding
-6. Ian Lance Taylor: .eh_frame — https://www.airs.com/blog/archives/460
-7. Linux ORC unwinder docs — https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html
-8. LWN: "The ORCs are coming" — https://lwn.net/Articles/728339/
-9. LKML: ORC unwinder series (Poimboeuf) — https://lwn.net/Articles/727553/
-10. SFrame Specification — https://sourceware.org/binutils/docs/sframe-spec.html
-11. Oracle blog: Beyond .eh_frame — SFrame technical underpinnings — https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe
-12. LWN: SFrame — https://lwn.net/Articles/930622/
-13. MaskRay: Stack walking space and time trade-offs — https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs
-14. LBR call-stack perf patch (Liang) — https://lwn.net/Articles/619180/
-15. Go non-cooperative preemption proposal — https://go.googlesource.com/proposal/+/master/design/24543-non-cooperative-preemption.md
-16. Geisendörfer: Go tracer overhead via FP unwinding — https://blog.felixge.de/reducing-gos-execution-tracer-overhead-with-frame-pointer-unwinding/
+1. `perf_event_open(2)` — https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+2. Brendan Gregg — Linux perf examples — https://www.brendangregg.com/perf.html
+3. `setitimer(2)` — https://man7.org/linux/man-pages/man2/setitimer.2.html
+4. `signal-safety(7)` — https://man7.org/linux/man-pages/man7/signal-safety.7.html
+5. Fedora 38 frame-pointer change — https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer
+6. Ubuntu performance engineering with frame pointers — https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default
+7. Brendan Gregg: "The Return of the Frame Pointers" — https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html
+8. PEP 831 — frame pointers for Python — https://peps.python.org/pep-0831/
+9. Red Hat: Frame pointers — untangling unwinding — https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding
+10. Ian Lance Taylor: .eh_frame — https://www.airs.com/blog/archives/460
+11. Linux ORC unwinder docs — https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html
+12. LWN: "The ORCs are coming" — https://lwn.net/Articles/728339/
+13. LKML: ORC unwinder series (Poimboeuf) — https://lwn.net/Articles/727553/
+14. SFrame Specification — https://sourceware.org/binutils/docs/sframe-spec.html
+15. Oracle blog: Beyond .eh_frame — SFrame technical underpinnings — https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe
+16. LWN: SFrame — https://lwn.net/Articles/930622/
+17. MaskRay: Stack walking space and time trade-offs — https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs
+18. LBR call-stack perf patch (Liang) — https://lwn.net/Articles/619180/
+19. Go non-cooperative preemption proposal — https://go.googlesource.com/proposal/+/master/design/24543-non-cooperative-preemption.md
+20. Geisendörfer: Go tracer overhead via FP unwinding — https://blog.felixge.de/reducing-gos-execution-tracer-overhead-with-frame-pointer-unwinding/
 
 ### Chapter 14 — Continuous Profiling
 

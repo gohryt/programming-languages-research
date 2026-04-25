@@ -2,7 +2,7 @@
 
 Research on compilation techniques, intermediate representations, code generation, and runtime-compilation integration (JITs, regex, query engines, hot code swap).
 
-This document covers everything downstream of parsing: lowering, IR, optimization, codegen, runtime object models, and compiler-emitted debug metadata. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection as a runtime system is not. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`.
+This document covers everything downstream of parsing: lowering, IR, optimization, codegen, runtime object models, and compiler-emitted debug metadata. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocators, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`.
 
 ---
 
@@ -30,7 +30,7 @@ Modern VMs typically have two or three execution tiers:
 2. **Baseline compiler**: fast compilation (~1ms), moderate execution speed. Good for warm code.
 3. **Optimizing compiler**: slow compilation (~100ms), fast execution. Good for hot loops.
 
-V8 (JavaScript): Ignition (interpreter) → TurboFan (optimizing). SpiderMonkey (JavaScript): interpreter → baseline → IonMonkey. JVM HotSpot: interpreter → C1 (baseline) → C2 (optimizing).
+V8 (JavaScript): Ignition (interpreter) → Sparkplug (baseline) → Maglev (mid-tier optimizing) → TurboFan (optimizing). SpiderMonkey (JavaScript): interpreter → baseline → IonMonkey. JVM HotSpot: interpreter → C1 (baseline) → C2 (optimizing).
 
 **The interactive-language sweet spot (Jamie Brandon).** For interactive languages, the combined compile-time + run-time matters more than either alone. A program that compiles in 0.1s and runs in 1s is better than one that compiles in 0s and runs in 2s (interpreter) or compiles in 10s and runs in 0.5s (LLVM -O3). Brandon notes that the OCaml native-code compiler is about half the size of its interpreter, and yet performs one to two orders of magnitude better. This suggests the "naive compiler" sweet spot — fast compilation, reasonable execution, good tooling — is underexplored compared to both interpreters and optimizing compilers. Tiered execution (interpreted glue code + compiled hot paths) may be the practical answer for interactive languages. The debugging story for tiered systems remains unsolved (see `DEBUGGERS.md §7` on cross-tier DWARF mapping).
 
@@ -82,6 +82,10 @@ In bytecode interpreters, dispatch overhead (reading the next opcode and branchi
 
 To further reduce dispatch overhead, systems like GForth use "Dynamic Superinstructions." Instead of executing individual primitives (e.g., `dup`, `*`), the VM dynamically identifies common sequences of bytecodes and compiles them into a single "superinstruction" on the fly, copying the machine code routines into a contiguous block. This eliminates the dispatch boundaries between those instructions and allows the CPU to execute them as a single block of native code. It bridges the gap between a pure interpreter and a JIT compiler by performing ultra-lightweight native code stitching at runtime.
 
+Ertl's EuroForth 2023/2024 papers ("The Performance Effects of Virtual-Machine Instruction Pointer Updates," published as ECOOP 2024) quantify how IP-update dependency chains dominate critical paths on modern out-of-order cores; the paper introduces `l` (loop), `c`/`ci` (combined+immediate), and `b` (branch) instruction-combining optimizations that reduce these chains for up to 2× speedups on dispatch-bound benchmarks.
+
+Source: http://www.euroforth.org/ef24/papers/ and https://www.complang.tuwien.ac.at/anton/euroforth/
+
 ### 1.8. Register-Based vs Stack-Based Bytecode
 
 The two dominant bytecode designs make different trade-offs between code size and dispatch count:
@@ -90,7 +94,7 @@ The two dominant bytecode designs make different trade-offs between code size an
 
 **Register-based** (Lua 5, Dalvik, V8 Ignition, LuaJIT): operations reference named virtual registers. Instructions are wider (typically 3-4 bytes with opcode + operand fields), but the same computation uses far fewer instructions. Ierusalimschy's "The Implementation of Lua 5.0" (2005) reported a 50% reduction in executed instructions when Lua switched from stack to register bytecode, yielding significant interpreter speedups despite larger bytecode.
 
-Shi et al. (VEE 2008, "Virtual Machine Showdown: Stack Versus Registers") measured the trade-off precisely: register-based VMs execute ~47% fewer VM instructions but their code is ~25% larger. On modern CPUs, dispatch cost dominates, so register-based wins — which is why every major new bytecode design since 2005 has been register-based. WebAssembly is the notable exception: its stack discipline enables single-pass validation and structured control flow, which are worth more than dispatch reduction in its target environment.
+Shi et al. (VEE 2008, "Virtual Machine Showdown: Stack Versus Registers") measured the trade-off precisely: register-based VMs execute ~47% fewer VM instructions but their code is ~25% larger. On modern CPUs, dispatch cost often dominates, so many dynamic-language VMs have favored register bytecode since Lua 5 and Dalvik. WebAssembly and several managed runtimes remain important counterexamples: stack discipline can enable compact encoding, single-pass validation, and structured control flow that are worth more than dispatch reduction in their target environments.
 
 Source: https://www.lua.org/doc/jucs05.pdf and https://static.usenix.org/events/vee08/full_papers/shi/shi.pdf
 
@@ -190,7 +194,7 @@ Mapping unbounded virtual registers to a small fixed set of physical registers i
 
 Chaitin (1981) formulated register allocation as graph coloring: build an "interference graph" where nodes are live ranges and edges connect simultaneously-live ranges, then color the graph with K colors (K = number of physical registers). If a node cannot be colored, it is "spilled" to memory.
 
-Graph coloring produces excellent code but is expensive: the interference graph can be quadratic in the number of live ranges, and coloring is NP-complete in general (though heuristics work well in practice). GCC and LLVM both use graph-coloring register allocators.
+Graph coloring produces excellent code but is expensive: the interference graph can be quadratic in the number of live ranges, and coloring is NP-complete in general (though heuristics work well in practice). GCC's IRA/LRA lineage uses graph-coloring ideas, while LLVM's production allocators are better described as live-interval, greedy, splitting, and linear-scan-influenced rather than classical Chaitin-style graph coloring.
 
 ### 4.2. Linear Scan — Fast Allocation for JITs
 
@@ -238,7 +242,7 @@ Bidirectional lookup (generated→original and original→generated) is implemen
 
 ### 5.4. Design Principle — Delta Encoding and Regularity
 
-All four encodings (JVM, CPython, Lua, DWARF, source maps) exploit the same observation: consecutive machine instructions usually correspond to consecutive or nearby source positions. This regularity is captured by:
+All five encodings (JVM, CPython, Lua, DWARF, source maps) exploit the same observation: consecutive machine instructions usually correspond to consecutive or nearby source positions. This regularity is captured by:
 - **Run-length encoding** (Lua Compact Debug)
 - **Adaptive width encoding** (LuaJIT)
 - **State-machine special opcodes** (DWARF)
@@ -351,6 +355,14 @@ Two architectural details worth naming:
 The broader lesson: if a language needs to target multiple runtimes (managed and native), a shared IR with per-target backends beats duplicating the compilation pipeline. Ballerina's BIR is the cleanest modern example.
 
 Source: https://medium.com/ballerina-techblog/peering-into-the-ballerina-intermediate-representation-8e97361a070e and http://dl.lib.uom.lk/handle/123/16182
+
+### 6.8. RakuAST — Class-Based AST as Compiler-Extensibility Substrate
+
+Stefan Seifert's **RakuAST** (TPRF grant from 2020 onward, ~58% of 2025 Rakudo commits) replaces Rakudo's QAST-based frontend with a Raku-class-based AST whose nodes are themselves first-class Raku objects under the `RakuAST::` package — `RakuAST::StatementList`, `RakuAST::Call::Name`, etc. The defining move: `.AST` parses source into an object tree, `.DEPARSE` round-trips back to source, and compilation goes through `IMPL-TO-QAST` lowering — RakuAST sits *above* QAST rather than replacing it, with QAST kept as the lowering target. This is the same architectural choice as Rust's HIR/THIR/MIR cascade (§6.4): multiple ASTs/IRs at different abstraction levels, each tuned to its phase.
+
+The user-facing payoff is macro support: because AST nodes are Raku classes, user-level macros can construct, traverse, and rewrite syntax with the same tools used to program any other object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) variables become available, intended for the MoarVM runtime debugger and packaging verification. RakuAST is activated via `RAKUDO_RAKUAST=1` and is the prerequisite for the Raku 6.e language level. The lesson for new-language design: if AST nodes are language-level objects, macros, source round-tripping, and tooling all become library code rather than compiler-internal mechanisms — at the cost of every AST traversal going through full language object dispatch (heap-allocated nodes, GC pressure during compilation), so RakuAST traversal is materially slower than direct QAST manipulation. Cross-references `PARSERS.md §6.3` (Rakudo grammars) and §14.5 (MoarVM new-disp) — RakuAST is the frontend that emits dispatch-program code.
+
+Source: https://docs.raku.org/type/RakuAST and https://news.perlfoundation.org/post/grant-rakuast-2020-12 and https://github.com/lizmat/articles/blob/main/review-of-2025.md
 
 ---
 
@@ -627,7 +639,7 @@ Compile-time code execution and program generation sit between parsing and lower
 
 Zig's **`comptime`** is the most distinctive modern take on compile-time evaluation. Any expression prefixed with `comptime` is evaluated during compilation; any function parameter marked `comptime` must be known at compile time and the function is specialized for each distinct value.
 
-What makes it original is the uniformity. Generics are `comptime` parameters to functions that return types. Macros are just `comptime` functions returning code. Conditional compilation is `comptime if` branching. There are no template parameters, no macro language, no preprocessor — just the same Zig language running at compile time with restrictions on which operations are allowed.
+What makes it original is the uniformity. Generics are `comptime` parameters to functions that return types. Conditional compilation is `comptime if` branching. Reflection over types and values happens through ordinary compile-time execution. Zig deliberately does **not** have a macro system in the AST-rewriting sense: `comptime` functions compute values, types, and specialized declarations, but they do not receive and return arbitrary syntax trees. There are no template parameters, no macro language, no preprocessor — just the same Zig language running at compile time with restrictions on which operations are allowed.
 
 ```zig
 fn List(comptime T: type) type {
@@ -710,19 +722,19 @@ Two languages converged on full compile-time function evaluation from different 
 
 **D's CTFE** (Compile-Time Function Evaluation) executes arbitrary pure D functions at compile time when their arguments are known. Template arguments, `static if` conditions, and `enum` initializers can all invoke CTFE transparently. The implementation runs a simplified interpreter over D's frontend AST. The rule is pragmatic: "if it's pure and the arguments are known, it runs at compile time."
 
-**C++ `constexpr` / `consteval`** followed a more conservative trajectory: C++11 introduced `constexpr` for simple expressions, each standard expanded what's allowed (C++14 added statements, C++17 added more library support, C++20 added `consteval` for mandatory compile-time, C++23 added lift-time memory allocation with caveats). By C++26, `constexpr` covers nearly all of pure C++.
+**C++ `constexpr` / `consteval`** followed a more conservative trajectory: C++11 introduced `constexpr` for simple expressions, and each standard expanded what's allowed (C++14 added statements, C++17 added more library support, C++20 added `consteval` for mandatory compile-time and limited dynamic allocation during constant evaluation, and C++23 expanded library and language support further). C++26 continues that trajectory, but "nearly all of pure C++" remains an implementation- and proposal-status-sensitive claim rather than a settled portability guarantee.
 
-The interesting difference: D bet on a dynamic interpreter early and scaled up; C++ layered formal rules incrementally and caught up. The end state is similar — both let you run most of the language at compile time — but the path dependencies show. C++ compile-time evaluation is typically faster (JIT-style or AOT-compiled) but has tighter rules; D's is more permissive but can be slower on big compile-time programs.
+The interesting difference: D bet on a dynamic interpreter early and scaled up; C++ layered formal rules incrementally and caught up. The end state is similar — both let you run much of the language at compile time — but the path dependencies show. Mainstream C++ `constexpr` evaluation is usually implemented by an interpreter/evaluator inside the compiler rather than by JIT- or AOT-compiling the compile-time program; its advantage is tighter integration with the type system and optimizer, while D's CTFE is often more permissive but can be slower on large compile-time workloads.
 
 Source: https://dlang.org/articles/ctarguments.html and https://en.cppreference.com/w/cpp/language/constexpr
 
-### 12.8. Nim Typed Macros
+### 12.8. Nim Macros and Templates
 
-Nim's macro system is notable for operating on the **typed AST** rather than raw tokens. A macro receives an already-type-checked expression, can inspect type information, and produces a new typed expression that's re-integrated into the compilation. Unlike Rust proc macros (untyped tokens) or Template Haskell (partially typed), Nim macros sit between the two — they see types but operate on a simpler tree than the backend IR.
+Nim's macro system is notable for exposing the compiler's AST to user code while still being integrated with semantic analysis. Macros can operate on untyped syntax trees, typed syntax trees, or both depending on how their parameters are declared. This gives Nim a spectrum: templates perform hygienic-ish syntactic substitution before full semantic checking, untyped macros can introduce new syntax-shaped code early, and typed macros can inspect resolved symbols and type information.
 
-The advantage: macro output errors are reported at the macro's call site with type information intact, not deferred to a later pass. Macros can be generic over types, compose cleanly, and produce code that's indistinguishable from hand-written Nim in diagnostics.
+The advantage: macro authors can choose the phase they need. A typed macro can produce diagnostics with type information intact, while an untyped macro or template can generate declarations and bindings that become visible to later semantic analysis. This is more flexible than Rust proc macros over token streams, but less isolated from compiler internals.
 
-The cost is lexical: typed macros run after type inference, so they can't introduce new top-level declarations or bindings visible elsewhere. Nim addresses this with `template` (simpler, pre-typecheck) and `macro` (post-typecheck) as a two-tier system — a design choice that mirrors Scala 3's inline/quoted split.
+The cost is phase complexity. Because Nim exposes several expansion modes, users must understand when names are resolved, when generated declarations become visible, and which AST shape a macro receives. The design is powerful, but it is not simply "macros over an already-type-checked AST"; it is a multi-phase metaprogramming system spanning templates, untyped macros, and typed macros.
 
 Source: https://nim-lang.org/docs/macros.html
 
@@ -853,6 +865,8 @@ The lego JIT survives alongside MoarVM's newer expression JIT because many MoarV
 
 The broader design pattern: two JITs with different complexity/throughput trade-offs, dispatched per opcode, is a reasonable engineering compromise when a VM's instruction set is large and heterogeneous. The cost is maintaining two codegen paths; the benefit is that simple instructions don't pay the overhead of the more sophisticated backend.
 
+Bart Wiegmans's June 2023 retrospective is the postmortem: the unordered IR of the expression JIT prevents cross-basic-block optimization, and "failing to deprecate the lego JIT" is named as a mistake. No significant JIT codegen work has shipped since — the 2026.03 MoarVM release notes contain library bumps but no JIT items. As a production fact: **MoarVM on AArch64 (Apple Silicon, ARM64 Linux/macOS) runs the interpreter only** — there is no native JIT backend. Spesh (§14.4) optimizations are still active and Homebrew/distro packages support ARM64, but native code generation is x86-64-only.
+
 Source: https://github.com/MoarVM/MoarVM/blob/master/docs/jit/overview.org and http://brrt-to-the-future.blogspot.com/2023/06/retrospective-of-moarvm-jit.html
 
 ### 13.6. Virgil — Self-Hosted Lightweight Whole-Program Compiler
@@ -954,6 +968,14 @@ The broader principle: many language features that appear to require dedicated V
 
 Source: https://6guts.wordpress.com/2021/09/29/the-new-moarvm-dispatch-mechanism-is-here/ and https://6guts.wordpress.com/2021/04/15/raku-multiple-dispatch-with-the-new-moarvm-dispatcher/ and https://gist.github.com/jnthn/e81634dec57acdea87fcb2b92c722959
 
+### 14.6. MoarVM ThreadPoolAwaiter — Continuations for Non-Blocking await
+
+Raku's `Promise`, `Supply`, `Channel`, and `await` desugar onto a single `ThreadPoolScheduler` plus a fixed set of MoarVM primitives (threads, mutexes, condvars, semaphores, async sockets via libuv). There are no green threads — every Raku thread is an OS thread. The non-trivial design point is **non-blocking `await`**: rather than parking a worker on a blocked future, the `ThreadPoolAwaiter` uses MoarVM **first-class continuations** (the `THREAD_POOL_PROMPT` sentinel) to capture the awaiting code as a continuation, which is re-queued on the pool when the awaitable resolves. A blocked `await` therefore does not pin a worker thread.
+
+Fall-back to true blocking is explicit: if the thread holds locks (`nqp::threadlockcount`) or `$*RAKUDO-AWAIT-BLOCKING` is set, the continuation capture is skipped. `Supply` / `react` / `whenever` are CPS-transformed at compile time onto Promise chains; `Channel` backpressure uses `ConcBlockingQueue` (a MoarVM REPR). This is the cleanest production example of using delimited continuations as the *implementation primitive* for async/await on an OS-thread runtime — distinct from goroutines (Go), virtual threads (Project Loom), or fibers (Ruby's Fiber). The new-disp dispatch programs (§14.5) interact directly with this: a continuation that captures across a dispatch site sees the dispatch program's resumption metadata, so resumed `await`s land in the right specialized frame.
+
+Source: https://github.com/rakudo/rakudo/blob/nom/src/core/ThreadPoolScheduler.pm and https://github.com/MoarVM/MoarVM/blob/master/src/core/threads.c and https://docs.raku.org/language/concurrency.html
+
 ---
 
 ## 15. Domain-Specific & AI-Oriented Compilation
@@ -1040,6 +1062,8 @@ Example: a balanced binary tree insertion written in pure functional style compi
 
 **Frame-Limited Reuse** (Lorenzen & Leijen, ICFP 2022) extends Perceus with a drop-guided reuse algorithm that is more robust to program transformations and prevents pathological heap growth.
 
+See `MEMORY.md §3.2` for the formal frame-bounded analysis, the FIP/FP² (Functional but In-Place) calculus and `fip` keyword certifying zero allocation plus constant stack, and the TRMC with first-class constructor contexts (POPL 2023, JFP 2024) generalising tail-recursion modulo context to CPS, monoids, and evaluation contexts. Roc's combination of Morphic borrow-inference with Perceus reuse is covered in `MEMORY.md §3.4` (extending §1.6 above).
+
 Source: https://www.microsoft.com/en-us/research/wp-content/uploads/2020/11/perceus-tr-v1.pdf
 
 ### 16.2. Region-Based Memory Management — MLKit, Cyclone
@@ -1053,6 +1077,8 @@ Region-based memory management groups allocations into regions (arenas with comp
 The connection to Rust: Rust's ownership and borrowing system is directly descended from region-based type systems. The key difference is that Rust uses affine types (values can be used at most once) to enable compile-time deallocation without region inference, while MLKit uses region inference to avoid annotations.
 
 The design spectrum: explicit lifetimes (Rust-style, more control, more annotation), inferred regions (MLKit-style, less annotation, less control), or reference counting (Perceus-style, zero annotation, runtime cost). All three avoid garbage collection pauses.
+
+See `MEMORY.md §§2.1–2.3` for the formal foundations summarised here: Cyclone's lexically-scoped region annotations on pointer types with bidirectional type-checking and effect inference; MLKit's Tofte–Talpin stack-of-regions semantics, Algorithm R, and the "region-stuck" pathology with its standard fixes; and post-2020 extensions including Elsman & Hallenberg (JFP 2021) on tag-free generational GC layered on regions, plus Elsman & Henriksen (PLDI 2023) on parallel region inference for multicore. The broader region-based-memory landscape — Verona's per-region pluggable strategies and behaviour-oriented concurrency, Encore's capabilities-as-regions for active objects, Vale's region-borrowing prototype, ASAP, Boyapati's single-owner regions for RTSJ, and RC-Immix runtime region colouring — is surveyed in `MEMORY.md §§2.4–2.9`.
 
 Source: https://elsman.com/mlkit/ and https://www.cs.umd.edu/projects/cyclone/papers/cyclone-regions.pdf
 
@@ -1075,7 +1101,7 @@ Benchmark overhead from bare generational references is 2–10.84% on a terrain-
 - **Isolates** are regions where nothing inside points out and nothing outside points in, except the owning reference. Zero-cost iteration over isolate-owned data.
 - **Cells** are isolates with some of the aliasing restrictions relaxed and moved to runtime.
 
-**Hybrid-Generational Memory** adds a further layer (Watkins & Ovadia): static analysis that proves objects live from surrounding scope (skipping the check entirely) plus **scope tethering** — a 1-bit flag per allocation that a local reference can set to keep the allocation alive, letting all generation checks within that scope be skipped.
+**Hybrid-Generational Memory** was an earlier design layer (Watkins & Ovadia): static analysis that proves objects live from surrounding scope (skipping the check entirely) plus **scope tethering** — a 1-bit flag per allocation that a local reference can set to keep the allocation alive, letting all generation checks within that scope be skipped. HGM was effectively abandoned after ~32 iterations; Ovadia's stated conclusion is that regions + generational references subsume it. See `MEMORY.md §2.6` for that status, the July 2023 region-borrowing prototype, and the August 2025 **Group Borrowing** proposal (Nick Smith) — a draft zero-overhead alternative to aliasable-xor-mutable adding mutable aliasing without RC/GC/generational refs.
 
 The compilation story is where this pays off for a language-design audience. The Vale compiler has a dedicated pass that merges generational-reference semantics with region-borrowing analysis: it tracks which references point into immutable regions, which are covered by scope tethering, and which still need runtime checks. Only the residual set compiles to generation-check emission. The result is a gradient between "generational refs everywhere" (easy, 10% cost) and "region-borrowed optimal paths" (zero runtime cost) that the programmer can opt into per function.
 
@@ -1146,7 +1172,7 @@ Interactive tooling — language servers, IDE diagnostics, watch-mode builds —
 
 Traditional compilers execute a fixed sequence of passes (parse → type-check → lower → optimize → codegen). Query-based compilers invert this: computation is organized as a set of memoized functions ("queries") that compute results on demand. When a query is invoked, the system checks if a valid cached result exists; if not, it computes the result and caches it, tracking which inputs were read.
 
-**rustc** is transitioning to a query-based architecture. Instead of running type inference as a monolithic pass, the compiler defines queries like `type_of(DefId) → Type`, `mir_built(DefId) → Mir`, `codegen_unit(Symbol) → CodegenUnit`. Each query is computed on demand and memoized. When the user changes a file, the system invalidates only the queries whose inputs changed, recomputing the minimum necessary.
+**rustc** is built around a query-based architecture. Instead of running type inference as a monolithic pass, the compiler defines queries like `type_of(DefId) → Type`, `mir_built(DefId) → Mir`, `codegen_unit(Symbol) → CodegenUnit`. Each query is computed on demand and memoized. When an input changes, incremental compilation invalidates the affected query results and reuses the rest where dependency tracking can prove they remain valid.
 
 **Salsa** (Matsakis et al.) is the incremental computation framework used by rust-analyzer. It provides:
 - **Automatic dependency tracking**: queries automatically track which other queries they read; no manual dependency declarations needed.
@@ -1154,7 +1180,7 @@ Traditional compilers execute a fixed sequence of passes (parse → type-check �
 - **Cycle detection**: handles mutually recursive queries gracefully.
 - **Parallel execution**: Salsa 2.0+ supports parallel query evaluation, enabling parallel autocomplete and diagnostics in rust-analyzer.
 
-The latest Salsa version (used in rust-analyzer since 2024–2025) supports persistent caches, near-instant crate graph updates, and parallel completion. The migration yielded major performance wins: David Barsky and Lukas Wirth reported significant improvements in rust-analyzer responsiveness.
+Recent Salsa work and rust-analyzer integration focus on faster revision tracking, better parallelism, and avoiding unnecessary recomputation during crate-graph and source edits. Persistent on-disk caching is a harder, more application-specific layer than ordinary in-memory query reuse, so it should be treated as a possible architecture extension rather than a default Salsa guarantee. The migration yielded major performance wins: David Barsky and Lukas Wirth reported significant improvements in rust-analyzer responsiveness.
 
 Source: https://rustc-dev-guide.rust-lang.org/query.html and https://github.com/salsa-rs/salsa
 
@@ -1294,9 +1320,9 @@ Source: https://www.pcre.org/current/doc/html/pcre2jit.html
 
 V8's **irregexp** is the JavaScript regex engine, and since 2019 it uses a hybrid compilation strategy: patterns are first compiled to an intermediate bytecode interpreter, and hot patterns are then JIT-compiled to native code via V8's regex-specific compiler. Originally irregexp compiled directly to native, but V8 moved the default to interpreted bytecode for cold-start latency, with JIT as an optimization trigger.
 
-In 2024, V8 began migrating regex compilation to **WebAssembly** — regex patterns compile to a Wasm module, which then benefits from V8's Wasm pipeline (Liftoff for fast baseline, Turbofan for optimization). This avoids maintaining a separate regex-specific JIT while gaining Wasm's tiered compilation for free. The approach is experimental but illustrates how a general JIT can subsume domain-specific JITs when the bytecode mapping is clean.
+V8's public regexp architecture remains centered on irregexp's own bytecode interpreter, tier-up to native code for hot patterns, and a separate non-backtracking fallback engine for eligible expressions. That fallback trades full JavaScript regexp generality for guaranteed linear behavior on patterns that avoid features such as backreferences and lookaround. This is not a general migration of regexp compilation to WebAssembly; it is a tiered regexp engine plus a restricted safe engine for ReDoS-sensitive cases.
 
-Like PCRE, JavaScript regex semantics include backtracking, so worst-case exponential time is possible. V8 adds per-pattern timeout heuristics to mitigate ReDoS attacks.
+Like PCRE, full JavaScript regex semantics include backtracking, so worst-case exponential time is possible for some patterns. V8 mitigates this for selected expressions by falling back to the non-backtracking engine when excessive backtracking is detected or when explicitly requested by flags.
 
 Source: https://v8.dev/blog/regexp-tier-up and https://v8.dev/blog/jsregexp
 
@@ -1720,7 +1746,7 @@ Source: https://www.akkadia.org/drepper/tls.pdf
 
 ## 30. .NET ReadyToRun and AOT+JIT Hybrids
 
-Pure AOT and pure JIT are extremes, each sacrificing something valuable — AOT gives up profile-driven runtime specialization, JIT pays compile latency on every first call. Entries below stake out the productive middle by *shipping pre-compiled native code alongside the IL, so the runtime can skip JIT for already-compiled methods but still re-optimize them later from profile data*: .NET's ReadyToRun format with CrossGen2 as its cross-targeting AOT compiler, JVM HotSpot's `jaotc` (deprecated in favor of GraalVM Native Image), and GraalVM Native Image itself — which goes further and gives up the JIT fallback entirely for smaller binaries and faster startup. Each picks a different answer to "what runtime flexibility do you trade away for startup latency?"
+Pure AOT and pure JIT are extremes, each sacrificing something valuable — AOT gives up profile-driven runtime specialization, JIT pays compile latency on every first call. Entries below stake out the productive middle by *shipping pre-compiled native code alongside the IL, so the runtime can skip JIT for already-compiled methods but still re-optimize them later from profile data*. .NET's ReadyToRun format with CrossGen2 is the production example; HotSpot's removed `jaotc` is a cautionary example; GraalVM Native Image goes further and gives up the JIT fallback entirely for smaller binaries and faster startup. Each picks a different answer to "what runtime flexibility do you trade away for startup latency?"
 
 ### 30.1. .NET ReadyToRun (R2R)
 
@@ -1734,7 +1760,19 @@ R2R is the production default for most .NET framework assemblies. Application de
 
 Source: https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/readytorun-format.md
 
-The design pattern — ship AOT code with IL fallback for re-optimization — is a useful middle ground whenever startup matters. Java's HotSpot has a similar capability via AOT (`jaotc`, introduced JDK 9, deprecated in JDK 17 in favor of GraalVM Native Image). GraalVM Native Image goes further: pure AOT, no JIT fallback, smaller binaries, but no runtime specialization. The trade-offs between these designs are the active frontier of managed-runtime compilation.
+### 30.2. HotSpot `jaotc` — Deprecated AOT Experiment
+
+HotSpot's `jaotc` shipped in JDK 9 as an experimental AOT compiler based on Graal. It could precompile Java classes into a shared library that the JVM loaded at startup, reducing some first-use JIT latency while retaining the ordinary JVM runtime. The idea matched the same hybrid pattern as ReadyToRun: use AOT code as a startup accelerator, then let the managed runtime remain in charge.
+
+The experiment did not become the mainstream Java deployment path. `jaotc` and the experimental Graal JIT were removed from the JDK distribution in JDK 16/17-era cleanup, while GraalVM continued outside the main JDK. The lesson is that an AOT+JIT hybrid must justify its maintenance cost against simpler levers: class-data sharing, faster tiered JITs, profile-guided warmup, and full native-image deployment.
+
+### 30.3. GraalVM Native Image — Closed-World AOT
+
+GraalVM Native Image takes the more radical trade: closed-world analysis at build time, whole-program AOT compilation, and a native executable with fast startup and low memory footprint. Unlike ReadyToRun, there is no ordinary JIT fallback for arbitrary methods at runtime. Reflection, dynamic class loading, proxies, serialization, and resource access must be declared or discovered during image building.
+
+The benefit is excellent startup latency and deployment simplicity for CLIs, serverless functions, and microservices. The cost is reduced dynamism, longer builds, larger build-time memory use, and the need to model runtime reflection ahead of time. For a new language, Native Image is the reminder that AOT is not just a backend decision: it shapes the semantics of reflection, loading, initialization, and dynamic code generation.
+
+The design pattern — ship AOT code with IL fallback for re-optimization, or choose closed-world AOT and remove the fallback entirely — is a useful spectrum whenever startup matters. The trade-offs between these designs are the active frontier of managed-runtime compilation.
 
 ---
 
@@ -1766,7 +1804,7 @@ Source: https://astral.sh/blog/ty
 
 What makes Factor especially worth adding here is that it shows how a compiler can start from a stack-effect language and still end up with a modern register-oriented optimizer without pretending the source language was expression-oriented all along. The **stack checker** is also part of the compiler story: abstract interpretation of stack effects is doing real frontend work, not just linting.
 
-**Trade-offs:** a self-hosting, strongly optimizing compiler that elegantly demonstrates industrial architecture for a concatenative language — the cost is a niche ecosystem of little relevance to readers focused on conventional syntax.
+Factor demonstrates a self-hosting, strongly optimizing compiler with industrial architecture for a concatenative language — the cost is a niche ecosystem of little relevance to readers focused on conventional syntax.
 
 Source: https://factorcode.org/slava/dls.pdf and https://concatenative.org/wiki/view/Factor/Optimizing%20compiler
 
@@ -1788,7 +1826,7 @@ If the question is "what is the strongest open, portable, well-documented Forth 
 
 Gforth matters beyond Forth because it is one of the cleanest long-running laboratories for VM implementation techniques: direct/indirect threading hybrids, superinstruction formation, stack caching, and careful benchmarking.
 
-**Trade-offs:** the strongest documented open threaded engine — open source, ANS-oriented, and extremely instructive — but outrun by good commercial native-code Forths when absolute peak performance is the priority.
+Gforth is the strongest documented open threaded engine — open source, ANS-oriented, and extremely instructive — but outrun by good commercial native-code Forths when absolute peak performance is the priority.
 
 Source: https://gforth.org/manual/Performance.html and https://www.complang.tuwien.ac.at/forth/gforth/Docs-html/Dynamic-Superinstructions.html
 
@@ -1798,7 +1836,7 @@ If the question is "which Forth is usually named when people want the *fastest d
 
 This should be read as a **vendor claim**, not a neutral standards-body ranking, but it lines up with the reputation VFX has in practitioner discussions: if peak speed matters and commercial tooling is acceptable, VFX is usually in the first sentence.
 
-**Trade-offs:** native code, a serious optimizer, and large-codebase credibility make it the usual top pick for "fastest serious desktop Forth," with the caveat that it is commercial/closed and much of the public benchmark evidence is uneven and vendor-hosted.
+Native code, a serious optimizer, and large-codebase credibility make VFX the usual top pick for "fastest serious desktop Forth," with the caveat that it is commercial/closed and much of the public benchmark evidence is uneven and vendor-hosted.
 
 Source: https://www.mpeforth.com/software/pc-systems/vfx-forth-common-features/ and https://vfxforth.com/
 
@@ -1808,7 +1846,7 @@ Source: https://www.mpeforth.com/software/pc-systems/vfx-forth-common-features/ 
 
 The implementation angle is worth calling out because subroutine threading is often dismissed as "just compile calls," but SwiftForth shows how much mileage you can get once you combine that with direct substitution and selective inlining.
 
-**Trade-offs:** a clear execution model, fast in practice, commercially supported, and a good exemplar of subroutine-threaded design — with less published detail on deep optimizer internals than VFX or Gforth, and a commercial license.
+SwiftForth offers a clear execution model, fast in practice, commercially supported, and a good exemplar of subroutine-threaded design — with less published detail on deep optimizer internals than VFX or Gforth, and a commercial license.
 
 Source: https://www.forth.com/swiftforth/
 
@@ -1818,9 +1856,11 @@ For microcontrollers, **Mecrisp** and **Mecrisp-Stellaris** sit in a different l
 
 The design is especially original because it is not merely "a small Forth." It combines tiny-system practicality with real compiler behavior instead of falling back to a purely interpreted core.
 
-**Trade-offs:** an excellent embedded story — tiny footprint, native code, direct-to-flash workflow, and an unusually strong fit for MCU work — offset by architecture-specificity and little relevance to large desktop-hosted applications.
+**Mecrisp-Quintus** (Matthias Koch, with Krzysztof Klaus) is the RISC-V / MIPS sibling, and adds a distinctive twist: a loadable **"Acrobatics"** extension — an inlining + dual-stack register allocator *written in Forth itself*, loaded on top of the base RV32 native compiler. The compiler-as-loadable-Forth-program inverts the usual host/target relationship and is itself a piece of metacompilation (§33.10).
 
-Source: https://mecrisp.sourceforge.net/
+Mecrisp delivers an excellent embedded story — tiny footprint, native code, direct-to-flash workflow, and an unusually strong fit for MCU work — offset by architecture-specificity and little relevance to large desktop-hosted applications.
+
+Source: https://mecrisp.sourceforge.net/ and https://github.com/hansfbaier/mecrisp-quintus
 
 ### 33.5. zeptoforth — Native/Inlined Cortex-M Forth with an RTOS Mindset
 
@@ -1828,7 +1868,7 @@ Source: https://mecrisp.sourceforge.net/
 
 It is not the safest universal answer to "fastest Forth," but it is one of the more original *modern embedded* implementations because it mixes a native/inlining model with a richer systems environment.
 
-**Trade-offs:** a modern MCU focus with flash/RAM flexibility, a richer runtime model than most tiny Forths, and explicit inline control — at the cost of a less standardized benchmark story than Gforth or VFX and a narrower hardware domain.
+zeptoforth has a modern MCU focus with flash/RAM flexibility, a richer runtime model than most tiny Forths, and explicit inline control — at the cost of a less standardized benchmark story than Gforth or VFX and a narrower hardware domain.
 
 Source: https://hackaday.io/project/170826-zeptoforth and https://github.com/tabemann/zeptoforth/discussions/190
 
@@ -1838,7 +1878,7 @@ Marcel Hendrix's **iForth** site is valuable less because it settles the winner 
 
 That makes it a useful "original sides" entry: a Forth lineage where benchmarking, metacompilation, and parallel/compiler experimentation are treated as first-class implementation topics rather than side notes.
 
-**Trade-offs:** rich historical and performance material, benchmark-oriented, with an interesting lineage from transputer work — though it is not the cleanest answer for a single modern production winner.
+iForth offers rich historical and performance material, benchmark-oriented, with an interesting lineage from transputer work — though it is not the cleanest answer for a single modern production winner.
 
 Source: https://iforth.nl/
 
@@ -1848,7 +1888,7 @@ Source: https://iforth.nl/
 
 The interesting point is not merely performance; it is that source notation, compiler size, and machine model are treated as one co-designed object. That is a much rarer design stance than in mainstream compiler work.
 
-**Trade-offs:** a radically original, tiny, fast compile path that is historically important for language/hardware co-design — but idiosyncratic enough that it is not a general recommendation for most users.
+colorForth is a radically original, tiny, fast compile path that is historically important for language/hardware co-design — but idiosyncratic enough that it is not a general recommendation for most users.
 
 Source: https://www.ultratechnology.com/color4th.html and https://www.forth.com/resources/forth-programming-language/
 
@@ -1888,53 +1928,70 @@ Why this is distinct from §28's bootstrapping story: §28 focused on breaking t
 
 Source: https://github.com/larsbrinkhoff/lbForth and https://gforth.org/manual/Cross-Compiler.html
 
+### 33.11. Open Firmware / fcode and BootSafe — Forth as Privileged Boot Environment
+
+IEEE 1275 Open Firmware (Sun OpenBoot, Apple PowerPC, OLPC XO, IBM POWER) ships an fcode interpreter that runs *before* the OS, with full machine access. The fcode evaluator can mutate the device tree, persist NVRAM scripts, and bypass typical OS controls — Mudge's Phrack 53 article ("FORTH Hacking on Sparc Hardware") and the SANS GIAC "OpenBoot Credentials Hack" paper document concrete bypasses against Solaris.
+
+The only serious *formal* security work is Cornell's **BootSafe** (Hunt, Erlingsson, Kozen, ACSAC 2007): a Java-to-fcode certifying compiler plus an ECC-style fcode verifier that runs inside the Open Firmware kernel — a typed-assembly-language–style proof-carrying-fcode design enforcing memory safety on loaded option-ROM drivers. The verifier reconstructs typing for fcode tokens before the evaluator dispatches them, rejecting drivers that fail the proof. The design pattern — verifier-in-the-evaluator, tied to a certifying compiler — is the closest Forth-ecosystem analogue to the BPF verifier (§22.1) or to Wasm validation (§24.1), and is the rare instance of formal memory safety applied to a stack-language interpreter at the trust boundary between firmware and OS. BootSafe never shipped beyond research, and Open Firmware's broader trust surface (NVRAM scripts, password bypasses, full device-tree mutation from the `ok` prompt) limits what any in-evaluator verifier can deliver against a determined attacker.
+
+Source: https://www.cs.cornell.edu/~kozen/Papers/acsac.pdf and https://github.com/MitchBradley/openfirmware and https://www.giac.org/paper/gcih/182/
+
+### 33.12. Static Stack-Effect Verification — Ertl 2021, StrongForth, typeforth
+
+Three concrete static stack-effect checkers establish that compile-time stack discipline can be a *safety* mechanism, not just documentation. Anton Ertl's "Practical Considerations in a Static Stack Checker" (EuroForth 2021) introduces **anchors** — placeholder stack signatures for words with statically-unknown effects (`execute`, `r>`) — together with a single-pass control-flow-join algorithm. Anchors are what made stack checking practical: earlier checkers either rejected too many programs (no `execute`) or too few (no flow merge). **StrongForth** (Stephan Becher) goes further, providing full strong static type-checking with overloading by stack signature; the compile-time data-type heap shadows the runtime data stack. **typeforth** is a modern minimal implementation storing 16-bit type IDs in word flag cells, treating branching as checkpoint+merge of the typestack, with a `nocheck` escape hatch.
+
+The theoretical anchor is Stoddart & Knaggs (1992) "Type Inference in Stack Based Languages" plus Pöial's EuroForth 1993 stack-effect inference algebra. Factor (§32) carries the most fully-realized version into a production concatenative language with a full optimizing compiler; the Forth lineage above shows that the same discipline can be retrofitted onto an ANS Forth and used as an opt-in safety pass without redesigning the language — at the cost of fragile anchor signatures for `execute`-style words (which understate actual behavior to keep the checker tractable) and the usual opt-in gap, where unannotated code gets no guarantee.
+
+Source: https://repositum.tuwien.at/handle/20.500.12708/152198 and https://www.stephan-becher.de/strongforth/ and https://github.com/typeforth/typeforth
+
+### 33.13. FreeForth — Compile-Time Register Renaming for Stack Operations
+
+Christophe Lavarenne's **FreeForth** (and the maintained FreeForth2 by dan4thewin) is a subroutine-threaded i386 Forth with one genuinely novel codegen trick: the top two stack cells live in two registers, and `swap` is implemented by *renaming the registers at compile time* — no machine instructions emitted at all. Tail-call→jump conversion and pop-less conditional jumps follow the same renaming scheme, and there is no separate interpret mode (everything goes through compiled anonymous functions).
+
+The pattern generalizes: when a stack machine's top-of-stack lives in registers, every primitive that swaps or rotates the top *N* items can be a compile-time renaming rather than an emit-store-emit-load sequence. For a small fixed *N* (typically 2 or 3), this collapses an entire class of stack-shuffling overhead. FreeForth is the cleanest existing example of the technique in a Forth, and it transfers directly to any other stack-VM frontend that pins TOS to registers — with the limitation that the technique only handles shuffles of a fixed small N (typically 2 or 3 regs), and procedure boundaries still pay normal stack save/restore cost.
+
+Source: http://christophe.lavarenne.free.fr/ff/ and https://github.com/dan4thewin/FreeForth2
+
+### 33.14. mcp_forth — Embeddable Multi-Backend MCU Codegen
+
+Liam Howatt's **mcp_forth** (2024) is an embeddable native-codegen Forth targeting x86-32, Xtensa (ESP32-S3), and a portable bytecode VM, designed to *self-compile inside* MCUs with 100 KB–10 MB RAM and to drive peripherals as small as 8 KB. The architecture is unusual because most embeddable language runtimes pick one of those points (interpreter on tiny MCUs, native codegen on large ones); mcp_forth covers the spectrum with a shared front-end and pluggable back-ends. The specific value for new-language design is the existence proof: "compile inside an ESP32-S3" is achievable with a small enough compiler core, even one that is not extracted from a larger toolchain. Sits next to Mecrisp (§33.4) and zeptoforth (§33.5) as a third design point in the embedded Forth space — multi-backend rather than single-target. The cost is the inverse of Mecrisp's: no single backend gets the depth of optimization a single-target Forth can deliver, and per-target maturity varies.
+
+Source: https://github.com/liamHowatt/mcp_forth
+
 ---
 
 ## 34. Summary of Compiler Techniques
 
 | Technique | Space Cost | Time Cost | Key Trade-off | Examples |
 |---|---|---|---|---|
-| Bytecode-to-source side table | 2–10 bytes/entry | O(log N) lookup | Separate from code, optional | JVM, DWARF, JS Source Maps (§5.1) |
-| Delta/RLE line info | ~1 byte/line | O(N) decode, O(log N) search | Compact but sequential decode | DWARF, Lua Compact Debug (§5.2) |
 | Copy-and-patch stencils | Stencil library (~MB) | memcpy + patch per instruction | Compilation speed vs code quality | CPython 3.13 JIT (§1.1) |
+| Futamura projection | Interpreter + PE | JIT compilation cost | Compiler from interpreter for free | Truffle/Graal (§1.3) |
+| Sea of Nodes IR | Graph structure | Enables global optimization | Complex to implement/debug | HotSpot C2, V8 TurboFan (§1.4) |
+| E-graph optimization | Equivalence classes | Avoids phase-ordering | Memory for explored rewrites | Cranelift, egg (§1.4) |
+| Nanopass framework | AST boilerplate | Fast single-task passes | Formal ILs per pass | Chez Scheme (§1.5) |
+| Surgical monomorphization | Lambda set tags | Compile-time defunctionalization | Avoids code bloat | Roc (§1.6) |
+| Dynamic superinstructions | On-the-fly code stitching | Eliminates dispatch overhead | Basic template copying | GForth (§1.7) |
+| Register vs stack bytecode | Wider instructions | ~47% fewer ops executed | Dispatch overhead vs code size | Lua 5, Dalvik, V8 Ignition (§1.8) |
+| Specializing adaptive interpreter | Per-site type counters | 10–60% speedup without JIT | Interpreter complexity | CPython 3.11+, Brunthaler quickening (§1.9) |
 | Arena allocation | One large region | ~2ns per allocation | No individual free | bumpalo, every compiler (§2.1) |
 | String interning | Hash table + buffer | One hash per new string | O(1) equality after intern | rustc Symbol, V8 (§2.2) |
 | Hash consing | Hash table + structure | One hash per construction | O(1) structural equality | BDDs, type representations (§2.2) |
 | Struct-of-arrays | Parallel arrays | Better cache for columnar access | Worse for per-node access | Zig AST, ECS (§2.3) |
 | Qualifiers in pointer bits | 0 extra bytes | Mask on access | Requires aligned allocation | Cuik, Clang (§2.4) |
-| Sea of Nodes IR | Graph structure | Enables global optimization | Complex to implement/debug | HotSpot C2, V8 TurboFan (§1.4) |
-| E-graph optimization | Equivalence classes | Avoids phase-ordering | Memory for explored rewrites | Cranelift, egg (§1.4) |
-| Futamura projection | Interpreter + PE | JIT compilation cost | Compiler from interpreter for free | Truffle/Graal (§1.3) |
-| Nanopass framework | AST boilerplate | Fast single-task passes | Formal ILs per pass | Chez Scheme (§1.5) |
-| Surgical monomorphization | Lambda set tags | Compile-time defunctionalization | Avoids code bloat | Roc (§1.6) |
-| Macroassembler JIT (DynASM) | Direct code emission | Zero IL overhead | Human handles regalloc | LuaJIT (§13.4) |
-| Dynamic superinstructions | On-the-fly code stitching | Eliminates dispatch overhead | Basic template copying | GForth (§1.7) |
 | NaN boxing | 0 extra bytes | Mask/check on access | 48-bit pointer limit | SpiderMonkey, LuaJIT (§3.1) |
 | Tagged pointers | 0 extra bytes | Mask on access | Reduced integer range | V8, OCaml, Ruby (§3.2) |
 | Graph coloring regalloc | Interference graph | NP-complete (heuristic) | Best code, slow compilation | GCC, LLVM (§4.1) |
 | Linear scan regalloc | Live intervals | O(N log N) | 15–68x faster, slightly worse code | V8 Liftoff, HotSpot C1 (§4.2) |
+| Bytecode-to-source side table | 2–10 bytes/entry | O(log N) lookup | Separate from code, optional | JVM, DWARF, JS Source Maps (§5.1) |
+| Delta/RLE line info | ~1 byte/line | O(N) decode, O(log N) search | Compact but sequential decode | DWARF, Lua Compact Debug (§5.2) |
 | CPS IR | Explicit continuations | All control flow explicit | Syntactic overhead | SML/NJ, Chez Scheme (§6.1) |
 | ANF IR | Let-bound intermediates | Simpler than CPS, same power | Less expressive control | GHC Core, OCaml (§6.1) |
 | MLIR multi-level IR | Dialect per abstraction | Progressive lowering, composable | Learning curve, framework weight | TensorFlow, Triton, IREE (§6.2) |
-| QBE backend | ~14K lines C99 | ~50–70% LLVM perf, instant compile | Limited targets, fewer opts | cproc (§13.1) |
-| Cranelift + ISLE | DSL-driven lowering | Fast compile, e-graph mid-end | Less mature than LLVM | Wasmtime, rustc debug (§13.2) |
-| TPDE single-pass | Adapter-based framework | 10x faster than LLVM -O0 | No cross-function opts | LLVM IR fast mode (§13.3) |
-| Trace-based JIT | Trace recording | Auto-inlining, cross-function opt | Trace explosion on branchy code | LuaJIT, PyPy (§14.1) |
-| OSR / Deoptimization | Stack frame mapping | Tier switch mid-execution | Complex frame reconstruction | V8, HotSpot, SpiderMonkey (§14.2) |
-| Polyhedral compilation | Parametric polyhedra | Optimal loop tiling/fusion | Restricted to affine loops | Halide, Tiramisu, Triton (§15.1) |
-| Enzyme AD | LLVM IR differentiation | Language-agnostic, GPU support | Requires LLVM integration | Julia, C/C++, Rust (§15.2) |
-| Perceus ref counting | Linear resource calculus | Garbage-free, in-place reuse | No cycles without extension | Koka (§16.1) |
-| Region-based memory | Region inference | Bulk deallocation, no GC pauses | Less control than ownership | MLKit, Cyclone (§16.2) |
-| Hidden classes / IC | Shape transition chains | 60–100x faster monomorphic access | Megamorphic cliff | V8, SpiderMonkey, JSC (§17.1) |
-| Query-based compilation | Memoized demand-driven | Minimal recompilation | Architectural complexity | rustc, Salsa, rust-analyzer (§18.1) |
-| Bidirectional typing | Synth + check modes | Reduced annotations, better errors | Undecidable full inference still | GHC, Agda, Lean (§19.1) |
-| Algebraic effects | Evidence-passing handlers | Composable effects, no monads | Requires language co-design | Koka, Multicore OCaml (§19.2) |
-| Wasm streaming compile | Structured binary format | Compile during download | No arbitrary goto | V8, SpiderMonkey (§24.1) |
-| Salsa incremental type checking | Memoized query graph | 80x faster incremental vs Pyright | Requires query-based architecture | ty, rust-analyzer (§31.1) |
-| Register vs stack bytecode | Wider instructions | ~47% fewer ops executed | Dispatch overhead vs code size | Lua 5, Dalvik, V8 Ignition (§1.8) |
-| Specializing adaptive interpreter | Per-site type counters | 10–60% speedup without JIT | Interpreter complexity | CPython 3.11+, Brunthaler quickening (§1.9) |
 | Turboshaft linear IR | Flat op buffer + indices | 30–40% faster compile than SoN | Less global freedom than graph IRs | V8 Turboshaft (§6.3) |
 | Multi-level IR pipeline | HIR/THIR/MIR stages | Per-phase optimality | Translation layer cost | rustc (§6.4) |
+| Parametric MLIR dialect | Unresolved parameters in IR | Serializable pre-instantiation IR | Requires elaborator pass | Mojo KGEN + POP (§6.6) |
+| Dual-backend shared IR | Single IR, multiple targets | Target-neutral IR, cached for incremental | Forces IR target-agnosticism | Ballerina BIR (JVM + LLVM) (§6.7) |
+| Class-based AST as compiler frontend | Raku objects per node | Round-trip + user-level macros | Lowering still goes through QAST | RakuAST (§6.8) |
 | Braun SSA construction | Block-local def maps | On-the-fly, no dominators | Extends to irreducible CFGs | Cranelift, Firm (§7.2) |
 | Out-of-SSA parallel copies | Copy-insertion + seq | Correct swap resolution | Register pressure on cycles | Sreedhar, Boissinot (§7.3) |
 | Global Value Numbering | Hash of canonicalized ops | 5–15% scalar speedup | Cross-block via φ handling | LLVM GVN (§8.1) |
@@ -1948,6 +2005,7 @@ Source: https://github.com/larsbrinkhoff/lbForth and https://gforth.org/manual/C
 | Polly (polyhedral in LLVM) | ISL polyhedra | 2–10x on affine loops | Analysis restrictions | LLVM Polly (§8.8) |
 | Superoptimization | Stochastic / SAT search | Best-known code fragments | Minutes to hours per sequence | STOKE, Souper, Denali (§8.9) |
 | BURG tree tiling | Rule-based tree match | Linear-time selector | Tree-local only | iburg, small backends (§9.1) |
+| BURS tiler + DynASM + linear IR | Tile-table lookup per node | Production BURS for dynamic JIT | Tile-DSL + Perl generator | MoarVM expression JIT (§9.1) |
 | SelectionDAG / GlobalISel | DAG / CFG-level patterns | Handles multi-node idioms | DAG per block adds compile cost | LLVM backends (§9.2) |
 | List scheduling | Greedy ready-list heuristics | Near-linear, good ILP | Heuristic, not optimal | LLVM MachineScheduler, GCC (§9.3) |
 | Trace / superblock scheduling | Profile-picked trace | Cross-block ILP | Compensation code at exits | Multiflow TRACE, LLVM hyperblock (§9.4) |
@@ -1965,9 +2023,45 @@ Source: https://github.com/larsbrinkhoff/lbForth and https://gforth.org/manual/C
 | Scala 3 inline + quoted macros | Two-tier system | Typed, composable macros | Verbosity vs whitebox | Scala 3 (§12.6) |
 | Full CTFE (D / C++ constexpr) | Interpreter of language subset | Pure fns at compile time | Tight rules (C++) vs speed (D) | D, C++20+ (§12.7) |
 | Nim typed macros | Post-typecheck AST | Clean error reporting | Can't introduce top-level binds | Nim (§12.8) |
+| CREATE / DOES> defining words | Dictionary entry + deferred action | Compile-time codegen, zero macro infra | Scoped to defining-word patterns | Forth (every dialect) (§12.9) |
+| Three-stage comptime pipeline | Parse → interpret → elaborate | Compile-time work as MLIR pass | Pipeline complexity vs macro expander | Mojo `@parameter` (§12.10) |
+| `#run` + AST mutation + build-as-code | Compiler-as-library API | Metaprogramming = ordinary code | Compiler must be library-first | Jai (§12.11) |
+| QBE backend | ~14K lines C99 | ~50–70% LLVM perf, instant compile | Limited targets, fewer opts | cproc (§13.1) |
+| Cranelift + ISLE | DSL-driven lowering | Fast compile, e-graph mid-end | Less mature than LLVM | Wasmtime, rustc debug (§13.2) |
+| TPDE single-pass | Adapter-based framework | 10x faster than LLVM -O0 | No cross-function opts | LLVM IR fast mode (§13.3) |
+| Macroassembler JIT (DynASM) | Direct code emission | Zero IL overhead | Human handles regalloc | LuaJIT (§13.4) |
+| Template-based direct-emit JIT | One hand-written template per opcode | Simple, fast compile, no IR | Per-opcode maintenance cost | MoarVM lego JIT (§13.5) |
+| Reachability-first whole-program compile | Lazy codegen of reached code | 50–300x faster than rustc/TinyGo | Whole-program only, no sep-compile | Virgil (Aeneas) (§13.6) |
+| Trace-based JIT | Trace recording | Auto-inlining, cross-function opt | Trace explosion on branchy code | LuaJIT, PyPy (§14.1) |
+| OSR / Deoptimization | Stack frame mapping | Tier switch mid-execution | Complex frame reconstruction | V8, HotSpot, SpiderMonkey (§14.2) |
 | Basic Block Versioning | Per-block specialized variants | Type specialization without tracing | Code duplication | Ruby YJIT (§14.3) |
+| Worker-thread specialization | Async log/plan/install | No pause-for-compile latency | Specializations arrive later | MoarVM spesh (§14.4) |
+| Lazy stack-unwind deopt | Mark frames, deopt on return | Skips work for frames that unwind | Slight complication in unwinder | MoarVM spesh (§14.4) |
+| Uninlining on guard failure | Inliner records resume-init | Reconstructs pre-inlining stack | Per-inline metadata cost | MoarVM spesh (§14.4) |
+| Dispatcher programs (guards+delegate+resume) | Recorded dispatch bytecode | One mechanism for all dispatch kinds | Requires NQP-style dispatcher substrate | MoarVM new-disp (§14.5) |
+| Continuation-captured await | First-class continuations | Non-blocking on OS-thread runtime | Requires VM continuation primitive | MoarVM ThreadPoolAwaiter (§14.6) |
+| Polyhedral compilation | Parametric polyhedra | Optimal loop tiling/fusion | Restricted to affine loops | Halide, Tiramisu, Triton (§15.1) |
+| Enzyme AD | LLVM IR differentiation | Language-agnostic, GPU support | Requires LLVM integration | Julia, C/C++, Rust (§15.2) |
+| NVRTC runtime PTX compile | CUDA source → PTX → SASS | Dynamic kernel specialization | Two-stage compile | PyTorch, JAX, XLA (§15.3) |
+| SPIR-V portable GPU IR | Binary SSA IR | Vendor-independent GPU codegen | Driver-level lowering | Vulkan, OpenCL, Mesa (§15.4) |
+| Mesa NIR / XLA / Triton | Multi-stage GPU pipelines | Specialized backends per stage | Ecosystem fragmentation | Mesa, TensorFlow, OpenAI (§15.5) |
+| Perceus ref counting | Linear resource calculus | Garbage-free, in-place reuse | No cycles without extension | Koka (§16.1) |
+| Region-based memory | Region inference | Bulk deallocation, no GC pauses | Less control than ownership | MLKit, Cyclone (§16.2) |
+| Generational references | 48-bit gen per alloc + per-ref | 2–10% cost, no GC/RC/borrow checker | Runtime check on every deref | Vale (§16.3) |
+| Immutable region borrowing | Freeze region, pre-check once | Zero generation checks while frozen | `pure`/region annotation burden | Vale regions (§16.3) |
+| Hybrid-generational memory | Static analysis + scope tethering | Elides most runtime checks | 1-bit tether flag per alloc | Vale HGM (§16.3) |
+| Hidden classes / IC | Shape transition chains | 60–100x faster monomorphic access | Megamorphic cliff | V8, SpiderMonkey, JSC (§17.1) |
+| Polymorphic Inline Caches | Type-chain dispatch stubs | O(1) for <10 types | Megamorphic cliff | SELF, V8 ICs, Julia (§17.2) |
+| Query-based compilation | Memoized demand-driven | Minimal recompilation | Architectural complexity | rustc, Salsa, rust-analyzer (§18.1) |
+| Parallel codegen units | Split per-function compile | Near-linear core scaling | Lost cross-module inlining | rustc CGUs, LLVM parallel (§18.2) |
+| Content-addressed code by hash | Hash-keyed codebase DB | Distributed compute, renames free | Ecosystem friction (no text files) | Unison (§18.3) |
+| Bidirectional typing | Synth + check modes | Reduced annotations, better errors | Undecidable full inference still | GHC, Agda, Lean (§19.1) |
+| Algebraic effects | Evidence-passing handlers | Composable effects, no monads | Requires language co-design | Koka, Multicore OCaml (§19.2) |
+| Hindley-Milner + Algorithm W | Unification + generalization | Near-linear principal types | Exponential worst case | ML, OCaml, Haskell (§19.3) |
+| Type classes via dictionaries | Extra dict parameters | Ad-hoc polymorphism | Dispatch cost (fixed by specialization) | Haskell, Scala implicits (§19.4) |
+| OutsideIn(X) constraint solver | Local-only GADT equalities | Decidable modern type systems | Solver complexity | GHC (§19.5) |
 | PCRE-JIT | Hand-written pattern templates | 4–15x over bytecode | Inherits backtracking blowup | PCRE2 (§20.1) |
-| irregexp tiered + Wasm | Bytecode + Wasm via V8 | Reuses JIT pipeline | Backtracking semantics | V8 JavaScript (§20.2) |
+| irregexp tiered engine | Bytecode + native tier-up + restricted linear fallback | Fast common case, safe subset available | Full JS regex keeps backtracking semantics | V8 JavaScript (§20.2) |
 | NFA + lazy DFA regex | Thompson NFA + DFA cache | O(nm) guaranteed | No backrefs/lookaround | RE2, Rust regex (§20.3) |
 | Regex derivatives | Similarity canonicalization | Compact DFA | Needs canonical form | Owens-Reppy-Turon (§20.4) |
 | Produce/consume SQL codegen | LLVM IR per query | 10x over iterator model | Compile latency | HyPer, Umbra (§21.1) |
@@ -1976,17 +2070,11 @@ Source: https://github.com/larsbrinkhoff/lbForth and https://gforth.org/manual/C
 | LLVM expression JIT library | Per-expression native code | Caches by signature | Narrow scope (no joins) | Apache Arrow Gandiva (§21.5) |
 | BPF verifier + in-kernel JIT | Static analysis + native emit | Safe user code in kernel | Restricted source language | Linux BPF/eBPF (§22.1) |
 | Hot module reload | Two versions simultaneously | Uptime under upgrade | Requires process-isolated model | Erlang BEAM (§23.1) |
-| Runtime method table patch | Re-JIT on change | Interactive development | Process-local, not distributed | Julia Revise.jl, Common Lisp (§23.2) |
+| Runtime method table patch | Re-JIT on change | Interactive development | Process-local, not distributed | Julia Revise.jl (§23.2), Common Lisp (§23.3) |
 | Edit-and-Continue / HotSwap | IL-level method replace | Iterative debug workflow | Restricted to debug builds | .NET EnC, JVM JVMTI (§23.4) |
 | dlopen live reload | Swap shared library ptrs | Language-agnostic | Manual state/code separation | Game engines, Handmade Hero (§23.5) |
-| NVRTC runtime PTX compile | CUDA source → PTX → SASS | Dynamic kernel specialization | Two-stage compile | PyTorch, JAX, XLA (§15.3) |
-| SPIR-V portable GPU IR | Binary SSA IR | Vendor-independent GPU codegen | Driver-level lowering | Vulkan, OpenCL, Mesa (§15.4) |
-| Mesa NIR / XLA / Triton | Multi-stage GPU pipelines | Specialized backends per stage | Ecosystem fragmentation | Mesa, TensorFlow, OpenAI (§15.5) |
-| Polymorphic Inline Caches | Type-chain dispatch stubs | O(1) for <10 types | Megamorphic cliff | SELF, V8 ICs, Julia (§17.2) |
-| Parallel codegen units | Split per-function compile | Near-linear core scaling | Lost cross-module inlining | rustc CGUs, LLVM parallel (§18.2) |
-| Hindley-Milner + Algorithm W | Unification + generalization | Near-linear principal types | Exponential worst case | ML, OCaml, Haskell (§19.3) |
-| Type classes via dictionaries | Extra dict parameters | Ad-hoc polymorphism | Dispatch cost (fixed by specialization) | Haskell, Scala implicits (§19.4) |
-| OutsideIn(X) constraint solver | Local-only GADT equalities | Decidable modern type systems | Solver complexity | GHC (§19.5) |
+| Wasm streaming compile | Structured binary format | Compile during download | No arbitrary goto | V8, SpiderMonkey (§24.1) |
+| Sidetable-driven in-place interpreter | Validation-emitted sidetable | Fast startup, no rewriting | Requires validator to emit structure | Virgil wizard Wasm (§24.2) |
 | CompCert verified compilation | Coq proofs per pass | Zero miscompilation bugs | ~15% slower than GCC | Airbus, safety systems (§25.1) |
 | CakeML full-stack verification | HOL4 + self-hosting | Verified down to machine code | ML subset, slower than MLton | Research, bootstrap (§25.2) |
 | Translation validation | SMT equivalence per run | Finds bugs, no full proof | Per-compilation cost | Alive2, Crellvm (§25.4) |
@@ -1997,29 +2085,19 @@ Source: https://github.com/larsbrinkhoff/lbForth and https://gforth.org/manual/C
 | Full LTO | Merged bitcode module | Max cross-module opt | Serial link bottleneck | GCC -flto, Clang -flto=full (§27.1) |
 | ThinLTO | Summaries + parallel opt | Near LTO quality, scalable | Summary overhead | Clang/LLVM default (§27.1) |
 | Modern parallel linkers | Lock-free symbol resolution | 2–10x faster than ld.bfd | Per-platform tuning | mold, lld, wild (§27.2) |
-| Stage0 / minimal bootstrap | 357-byte hex0 seed | Fully auditable chain | Slow, multi-stage build | GNU Mes, Bootstrappable Builds (§28.3) |
 | Alternative-compiler bootstrap | Scoped second implementation | Breaks self-hosting cycle | Duplicated parsing work | mrustc (Rust from C++) (§28.2) |
+| Stage0 / minimal bootstrap | 357-byte hex0 seed | Fully auditable chain | Slow, multi-stage build | GNU Mes, Bootstrappable Builds (§28.3) |
 | Itanium C++ mangling | Structured name encoding | Unambiguous linker symbols | Verbose, demangling needed | GCC, Clang, Rust v0 (§29.2) |
 | TLS model selection | Exec / init / general-dynamic | Speed-vs-flexibility per access | Per-symbol model choice | ELF, Mach-O, COFF (§29.4) |
 | R2R AOT+JIT hybrid | Pre-native with IL fallback | Fast startup + re-spec | AOT less optimized than JIT | .NET CrossGen2 (§30.1) |
-| CREATE / DOES> defining words | Dictionary entry + deferred action | Compile-time codegen, zero macro infra | Scoped to defining-word patterns | Forth (every dialect) (§12.9) |
-| BURS tiler + DynASM + linear IR | Tile-table lookup per node | Production BURS for dynamic JIT | Tile-DSL + Perl generator | MoarVM expression JIT (§9.1) |
-| Template-based direct-emit JIT | One hand-written template per opcode | Simple, fast compile, no IR | Per-opcode maintenance cost | MoarVM lego JIT (§13.5) |
-| Worker-thread specialization | Async log/plan/install | No pause-for-compile latency | Specializations arrive later | MoarVM spesh (§14.4) |
-| Lazy stack-unwind deopt | Mark frames, deopt on return | Skips work for frames that unwind | Slight complication in unwinder | MoarVM spesh (§14.4) |
-| Uninlining on guard failure | Inliner records resume-init | Reconstructs pre-inlining stack | Per-inline metadata cost | MoarVM spesh (§14.4) |
-| Dispatcher programs (guards+delegate+resume) | Recorded dispatch bytecode | One mechanism for all dispatch kinds | Requires NQP-style dispatcher substrate | MoarVM new-disp (§14.5) |
+| Deprecated JVM AOT hybrid | Shared-library native image loaded by HotSpot | Startup experiment with JVM fallback | Removed from mainline JDK | HotSpot `jaotc` (§30.2) |
+| Closed-world native image | Whole-program AOT executable | Fast startup, low memory | Reduced reflection/loading dynamism | GraalVM Native Image (§30.3) |
+| Salsa incremental type checking | Memoized query graph | 80x faster incremental vs Pyright | Requires query-based architecture | ty, rust-analyzer (§31.1) |
 | Forth metacompilation | 2-phase host-seed + self-host | Retarget to N archs from ~1 file/arch | Forth-only idiom | lbForth, Gforth cross (§33.10) |
-| Parametric MLIR dialect | Unresolved parameters in IR | Serializable pre-instantiation IR | Requires elaborator pass | Mojo KGEN + POP (§6.6) |
-| Dual-backend shared IR | Single IR, multiple targets | Target-neutral IR, cached for incremental | Forces IR target-agnosticism | Ballerina BIR (JVM + LLVM) (§6.7) |
-| Three-stage comptime pipeline | Parse → interpret → elaborate | Compile-time work as MLIR pass | Pipeline complexity vs macro expander | Mojo `@parameter` (§12.10) |
-| Generational references | 48-bit gen per alloc + per-ref | 2–10% cost, no GC/RC/borrow checker | Runtime check on every deref | Vale (§16.3) |
-| Immutable region borrowing | Freeze region, pre-check once | Zero generation checks while frozen | `pure`/region annotation burden | Vale regions (§16.3) |
-| Hybrid-generational memory | Static analysis + scope tethering | Elides most runtime checks | 1-bit tether flag per alloc | Vale HGM (§16.3) |
-| `#run` + AST mutation + build-as-code | Compiler-as-library API | Metaprogramming = ordinary code | Compiler must be library-first | Jai (§12.11) |
-| Reachability-first whole-program compile | Lazy codegen of reached code | 50–300x faster than rustc/TinyGo | Whole-program only, no sep-compile | Virgil (Aeneas) (§13.6) |
-| Sidetable-driven in-place interpreter | Validation-emitted sidetable | Fast startup, no rewriting | Requires validator to emit structure | Virgil wizard Wasm (§24.2) |
-| Content-addressed code by hash | Hash-keyed codebase DB | Distributed compute, renames free | Ecosystem friction (no text files) | Unison (§18.3) |
+| Proof-carrying fcode verifier | Verifier inside evaluator | Memory-safe option-ROM drivers | OF-specific design | BootSafe (§33.11) |
+| Static stack-effect verification | Per-word signature | Compile-time discipline as safety | Anchors required for `execute`-style | Ertl 2021, StrongForth, typeforth (§33.12) |
+| Compile-time register renaming for stack ops | Two TOS regs | Zero-cost `swap` / rotate | Fixed N TOS regs only | FreeForth (§33.13) |
+| Multi-backend embeddable MCU codegen | Shared frontend + pluggable backends | Compiles inside 100 KB–10 MB MCU | Multi-target maintenance | mcp_forth (§33.14) |
 
 ---
 
@@ -2040,6 +2118,8 @@ References are grouped by the chapter that first cites them. Within each chapter
 9. Virtual Machine Showdown: Stack Versus Registers (Shi et al., VEE 2008) — https://static.usenix.org/events/vee08/full_papers/shi/shi.pdf
 10. CPython PEP 659: Specializing Adaptive Interpreter — https://peps.python.org/pep-0659/
 11. Efficient Interpretation by Inline Caching and Quickening (Brunthaler, ECOOP 2010) — https://publications.cispa.saarland/1069/1/ecoop10.pdf
+12. EuroForth 2024 proceedings (Ertl IP-update papers) — http://www.euroforth.org/ef24/papers/
+13. Anton Ertl EuroForth collection — https://www.complang.tuwien.ac.at/anton/euroforth/
 
 ### Chapter 2 — Memory Management in Compilers
 
@@ -2053,6 +2133,14 @@ References are grouped by the chapter that first cites them. Within each chapter
 
 1. Linear Scan Register Allocation — https://web.cs.ucla.edu/~palsberg/course/cs132/linearscan.pdf
 2. Efficient Global Register Allocation — https://arxiv.org/pdf/2011.05608
+
+### Chapter 5 — Compiler-Emitted Source Position Metadata
+
+1. JVM `LineNumberTable` and `LocalVariableTable` attributes — https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html
+2. PEP 657 — Include Fine-Grained Error Locations in Tracebacks — https://peps.python.org/pep-0657/
+3. Lua debug information and line tables — https://www.lua.org/manual/5.4/manual.html#4.7
+4. DWARF Debugging Standard — https://dwarfstd.org/
+5. ECMA-426 Source Map Format — https://tc39.es/ecma426/
 
 ### Chapter 6 — Intermediate Representations Beyond SSA
 
@@ -2070,6 +2158,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 12. Mojo POP Dialect Internal Docs — https://github.com/modular/modular/blob/main/mojo/stdlib/docs/internal/pop_dialect.md
 13. Peering into the Ballerina Intermediate Representation (Piyasekara, 2024) — https://medium.com/ballerina-techblog/peering-into-the-ballerina-intermediate-representation-8e97361a070e
 14. JVM Compiler Backend for Ballerina IR (dissertation) — http://dl.lib.uom.lk/handle/123/16182
+15. RakuAST documentation — https://docs.raku.org/type/RakuAST
+16. Perl Foundation RakuAST grant — https://news.perlfoundation.org/post/grant-rakuast-2020-12
+17. lizmat 2025 Raku year review — https://github.com/lizmat/articles/blob/main/review-of-2025.md
 
 ### Chapter 7 — SSA Construction and Destruction
 
@@ -2158,6 +2249,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 9. The new MoarVM dispatch mechanism is here (jnthn, 2021) — https://6guts.wordpress.com/2021/09/29/the-new-moarvm-dispatch-mechanism-is-here/
 10. Raku multiple dispatch with the new MoarVM dispatcher (jnthn, 2021) — https://6guts.wordpress.com/2021/04/15/raku-multiple-dispatch-with-the-new-moarvm-dispatcher/
 11. New MoarVM dispatch design gist — https://gist.github.com/jnthn/e81634dec57acdea87fcb2b92c722959
+12. Rakudo ThreadPoolScheduler — https://github.com/rakudo/rakudo/blob/nom/src/core/ThreadPoolScheduler.pm
+13. MoarVM threads.c — https://github.com/MoarVM/MoarVM/blob/master/src/core/threads.c
+14. Raku concurrency docs — https://docs.raku.org/language/concurrency.html
 
 ### Chapter 15 — Domain-Specific & AI-Oriented Compilation
 
@@ -2310,3 +2404,13 @@ References are grouped by the chapter that first cites them. Within each chapter
 14. HN: I had my third go at Forth this year — https://news.ycombinator.com/item?id=22802449
 15. lbForth (Lars Brinkhoff) — https://github.com/larsbrinkhoff/lbForth
 16. Gforth Cross-Compiler Manual — https://gforth.org/manual/Cross-Compiler.html
+17. Mecrisp-Quintus (Hans Baier port) — https://github.com/hansfbaier/mecrisp-quintus
+18. BootSafe — Hunt, Erlingsson, Kozen (ACSAC 2007) — https://www.cs.cornell.edu/~kozen/Papers/acsac.pdf
+19. Mitch Bradley Open Firmware — https://github.com/MitchBradley/openfirmware
+20. SANS GIAC OpenBoot Credentials Hack — https://www.giac.org/paper/gcih/182/
+21. Ertl — Practical Considerations in a Static Stack Checker (EuroForth 2021) — https://repositum.tuwien.at/handle/20.500.12708/152198
+22. StrongForth (Becher) — https://www.stephan-becher.de/strongforth/
+23. typeforth — https://github.com/typeforth/typeforth
+24. FreeForth (Lavarenne) — http://christophe.lavarenne.free.fr/ff/
+25. FreeForth2 (dan4thewin) — https://github.com/dan4thewin/FreeForth2
+26. mcp_forth (Liam Howatt) — https://github.com/liamHowatt/mcp_forth
