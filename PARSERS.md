@@ -104,9 +104,9 @@ CPython has shipped `pegen`, its PEG parser generator, as the default parser sin
 Source: https://we-like-parsers.github.io/pegen/peg_parsers.html and https://peps.python.org/pep-0617/
 ### 2.4. Pest — PEG Without Packrat Memoisation
 
-pest is a Rust PEG parser generator (see §2.3 for the PEG formalism) emphasising accessibility and speed over theoretical guarantees. Its documentation is explicit that matching is "greedy, without backtracking" in the sense of ordered-choice PEG semantics, and that generated parsers read like direct recursive-descent code rather than table-driven state machines.
+pest is a Rust PEG parser generator (see §2.3 for the PEG formalism) emphasising accessibility and speed over theoretical guarantees. It follows PEG ordered-choice semantics: alternatives are tried in order, and a later alternative is considered only if the earlier one fails. However, repetitions and predicates are greedy and do not perform regex-style backtracking to make later expressions succeed. Generated parsers read like direct recursive-descent code rather than table-driven state machines.
 
-Pest does not advertise packrat linear-time guarantees the way rust-peg's `#[cache]` attribute and peginator's opt-in memoisation do. In practice pest behaves like a simple PEG recursive-descent interpreter of the grammar, which trades worst-case complexity guarantees for smaller memory footprint and strong performance on typical inputs. For pathological inputs or grammars with deep ambiguity, a memoising alternative (pegen in CPython 3.9+, rust-peg with `#[cache]`) is the safer choice.
+Pest does not advertise packrat linear-time guarantees the way rust-peg's `#[cache]` attribute and peginator's opt-in memoisation do. In practice pest behaves like a simple PEG recursive-descent interpreter of the grammar, which trades worst-case complexity guarantees for smaller memory footprint and strong performance on typical inputs. For pathological inputs or grammars with costly ordered-choice/backtracking patterns, a memoising alternative (pegen in CPython 3.9+, rust-peg with `#[cache]`) is the safer choice.
 
 pest offers readable grammars, good error messages, and fast common-case parsing — offset by the absence of an explicit packrat complexity guarantee, which can matter for adversarial inputs.
 
@@ -212,7 +212,7 @@ Source: https://arxiv.org/abs/1902.08318 and https://simdjson.org/
 
 100% ECMAScript-compliant JavaScript parser. Key design: location tracking is opt-in via boolean flags (`ranges`, `loc`). When both are off, AST nodes carry zero location overhead. When on, the parser captures its current position into nodes.
 
-This is a useful pattern for multi-pass architectures: the first pass can parse without locations (fast), and a second pass can re-parse specific regions with locations enabled (only for diagnostics or tooling). The cost of location tracking is not just storage — it's also the cost of maintaining line/column state during scanning, which involves checking for newlines on every character advance.
+This is a useful pattern when different consumers have different needs: a bundler or syntax-only pass can parse without `ranges`/`loc`, while diagnostics, transforms, and tooling can enable them. Re-parsing only a specific region is safe only when the parser can reconstruct the surrounding syntactic and option context; otherwise a full-file reparse with locations enabled is the conservative design. The cost of location tracking is not just storage — it's also the cost of maintaining line/column state during scanning, which involves checking for newlines on every character advance.
 
 Source: https://github.com/nicolo-ribaudo/meriyah
 ### 2.16. Scannerless Parsing — No Separate Lexer
@@ -377,12 +377,12 @@ Source: https://github.com/RealNeGate/Cuik
 
 The red-green tree pattern splits the syntax tree into two layers:
 
-- **Green tree**: immutable, position-free, structure-only. Nodes store their kind and width (character count). Children are referenced by index. Because nodes carry no absolute position, structurally identical subtrees can be shared — even across different files or across edits.
+- **Green tree**: immutable, position-free, structure-only. Nodes store their kind and width (character count). Children are referenced by index. Because nodes carry no absolute position, unchanged subtrees can be reused across edits. Implementations that intern or hash-cons green nodes may also share identical subtrees across files, but that is a storage policy rather than an automatic property of the representation.
 - **Red tree**: ephemeral, position-aware, computed on demand. Wraps green nodes with absolute text ranges computed by summing widths from the root. Red nodes are created lazily as the user navigates the tree.
 
 The power is incremental reparsing: when the user edits a file, the parser produces a new green tree that shares most of its nodes with the old tree. Only the edited region and its ancestors are rebuilt. The red tree is discarded entirely — it's cheap to recompute.
 
-rust-analyzer's rowan library demonstrates this at scale: it provides sub-millisecond reparsing for most edits on files of any size, while supporting full-fidelity syntax trees (every character of the source is represented, including whitespace and comments).
+rust-analyzer's rowan library demonstrates this at scale: it provides sub-millisecond reparsing for most edits on files of any size. rowan is infrastructure for lossless green trees; whether byte-exact round-tripping is guaranteed depends on the language's token/trivia model and printer.
 
 Source: https://ericlippert.com/2012/06/08/red-green-trees/ and https://github.com/rust-analyzer/rowan
 
@@ -390,7 +390,7 @@ Source: https://ericlippert.com/2012/06/08/red-green-trees/ and https://github.c
 
 Zig's AST references tokens by index, not by source byte offset. The AST nodes form a flat array (struct-of-arrays layout for cache efficiency). When lowered to ZIR (Zig Intermediate Representation), each instruction stores a `node_offset` relative to its parent declaration rather than an absolute token index.
 
-The consequence: after ZIR generation, the AST, token list, and source text can all be freed. The ZIR is self-contained. This is critical for Zig's compilation model, where the compiler processes many files and needs to minimize peak memory usage. The relative offsets can be resolved back to source positions by walking the declaration tree — an O(depth) operation done only for error reporting.
+The consequence is a two-stage position strategy. During parsing, AST nodes reference token indices, so the token table and source manager are needed to resolve positions. After ZIR generation, the AST and token list can be discarded to reduce peak memory; diagnostics then rely on compact relative source-location references plus retained or reloadable source metadata. The relative offsets can be resolved back to source positions by walking the declaration tree — an O(depth) operation done only for error reporting.
 
 Source: https://github.com/ziglang/zig/blob/master/src/Zir.zig
 
@@ -454,7 +454,7 @@ Source: https://jeffreykegler.github.io/Ocean-of-Awareness-blog/individual/2011/
 
 ### 4.6. HTML5 — Recovery as Specification
 
-The HTML Standard takes error recovery further than any other approach surveyed: the specification itself *is* the recovery algorithm. Every byte sequence, syntactically valid or not, must produce a well-defined DOM tree, and two conformant parsers must produce bit-identical trees on identical input. The tree construction algorithm is a state machine of "insertion modes" (`initial`, `before html`, `in head`, `in body`, `in table`, `in cell`, and roughly two dozen others) maintained alongside a stack of open elements and a list of active formatting elements. The adoption agency algorithm handles misnested tags like `<b><i></b></i>` deterministically; specific token sequences inside `<table>` are hoisted out (foster parenting); unknown tags are inserted as unknown elements rather than rejected. Over fifty distinct parse errors are named, each with a mandated recovery action.
+The HTML Standard takes error recovery further than any other approach surveyed: the specification itself *is* the recovery algorithm. Every byte sequence, syntactically valid or not, must produce a well-defined DOM tree, and two conformant parsers must produce the same spec-equivalent DOM structure on identical input. The tree construction algorithm is a state machine of "insertion modes" (`initial`, `before html`, `in head`, `in body`, `in table`, `in cell`, and roughly two dozen others) maintained alongside a stack of open elements and a list of active formatting elements. The adoption agency algorithm handles misnested tags like `<b><i></b></i>` deterministically; specific token sequences inside `<table>` are hoisted out (foster parenting); unknown tags are inserted as unknown elements rather than rejected. Over fifty distinct parse errors are named, each with a mandated recovery action.
 
 This is categorically different from tree-sitter's best-effort parallel exploration (§4.2) and from panic-mode skipping (§4.1): there is no "error node" or "unresolved region" — every byte contributes to the tree under rules as tight as the grammar itself. The consequence is that HTML's parser is complex (the parsing chapter is the longest in the HTML Standard) but interoperable: Chromium, Gecko, and WebKit implement the same specification and produce identical DOMs on the same bytes. CSS Syntax Level 3's **Forgiving Selector Parsing** applies a smaller-scale version of the same idea to `:is()` and `:where()`: unrecognised selectors inside the list are discarded rather than invalidating the whole selector.
 
@@ -561,7 +561,7 @@ Ruff initially used the RustPython parser, then a LALRPOP-generated parser. In v
 The motivations mirror broader trends:
 - **Control and flexibility**: Python has syntactic ambiguities (e.g., parenthesized `with` items) that are awkward to encode in a parser generator's grammar DSL but straightforward in hand-written code.
 - **Performance**: the generated parser was a black box — hot paths and cold paths couldn't be distinguished, and domain-specific optimizations were impossible. The hand-written parser allows fine-grained control over allocation, lookahead, and branch prediction.
-- **Error recovery**: a hand-written parser can implement context-sensitive error recovery (inserting missing colons, recovering from invalid assignment targets) that a generated parser cannot express. Ruff now produces structured error messages like "Expected 'def', 'with' or 'for' to follow 'async', found 'while'" instead of generic "Unexpected token" errors.
+- **Error recovery**: a hand-written parser can implement context-sensitive error recovery (inserting missing colons, recovering from invalid assignment targets) directly in local control flow. Generated parsers can support sophisticated recovery too, but often require generator-specific hooks, grammar annotations, or external repair algorithms; in Ruff's previous setup, these recoveries were awkward or impractical. Ruff now produces structured error messages like "Expected 'def', 'with' or 'for' to follow 'async', found 'while'" instead of generic "Unexpected token" errors.
 - **Error resilience for editors**: since Ruff runs as an editor tool, it must produce useful results on syntactically invalid code. The hand-written parser lays the foundation for continuing analysis past syntax errors — critical for the language server use case.
 
 Source: https://astral.sh/blog/ruff-v0.4.0
@@ -622,7 +622,7 @@ The more unusual part is that Menhir goes further with an **inspection API** (in
 
 The error-message story deserves its own mention. François Pottier's "Reachability and Error Diagnosis in LR(1) Parsers" (CC 2016) is the theoretical backbone: given an LR(1) automaton, enumerate every state in which an error can be detected, and compute a minimal input sentence that drives the parser to that state. This lets a grammar author maintain a `.messages` file pairing each erroneous sentence with a hand-written diagnostic, with coverage *verified* by the tool as the grammar evolves. Menhir's `--compile-errors` workflow turns that into routine practice, and the CompCert C parser has used it in production. This is qualitatively different from ANTLR4's (§2.19) built-in default messages: Menhir demands per-error-state prose but rewards it with diagnostics that read like they were written by the language designer.
 
-Menhir combines strong theory behind a practical LR(1) generator with persistent incremental states, unusually rich tooling hooks, and serious error-message infrastructure — offset by OCaml-centricity, larger generated tables/code when advanced APIs are enabled, and a GLR mode that currently drops some of those APIs.
+Menhir combines strong theory behind a practical LR(1) generator with persistent incremental states, unusually rich tooling hooks, and serious error-message infrastructure — offset by OCaml-centricity and larger generated tables/code when advanced APIs are enabled.
 
 Source: https://gallium.inria.fr/~fpottier/menhir/manual.html
 
@@ -738,8 +738,8 @@ Rows are grouped by family. Within a group, order roughly follows the body text.
 | Compact token positions | usually one or a few `token.Pos` fields/node | O(1) access, structural `End()` where possible | Much smaller than full spans, but not uniformly one field | Go `token.Pos` (§1.1) |
 | Bit-packed source range | 8 bytes/range | O(1) access | File count/size limits | Cuik (§1.1) |
 | Width-only green nodes | no absolute offsets; width still stored | O(depth) to resolve | Enables incremental reparse | Roslyn, rowan (§1.2) |
-| Token-indexed AST | 4 bytes/node | O(1) via token table | Source can be freed after IR gen | Zig (§1.2) |
-| Full-fidelity green/red tree | Trivia preserved | Round-trip exact source | Plugin/macro substrate | SwiftSyntax, Roslyn (§7.6) |
+| Token-indexed AST / relative IR locations | compact indices/offsets, not full spans | O(1) via token table during parsing; later via retained/reloadable source metadata | Separates parse-time AST positions from post-lowering diagnostic locations | Zig (§1.2, §3.3) |
+| Full-fidelity syntax tree / red-green tree | Trivia preserved in syntax model | O(depth) position resolution; incremental reuse | Exact round-trip depends on token/trivia model and printer contract; SwiftSyntax makes this a first-party API guarantee | SwiftSyntax, Roslyn, rowan-style systems (§3.2, §7.6) |
 
 ### 9.2. Expression and operator parsing
 
@@ -763,18 +763,18 @@ Rows are grouped by family. Within a group, order roughly follows the body text.
 | Technique | Space Cost | Time Cost | Key Trade-off | Examples |
 |---|---|---|---|---|
 | GLL parsing | GSS + SPPF | O(n³) worst, often O(n) on deterministic subsets | Handles all CFGs, no restrictions | Iguana (§2.6) |
-| Tomita GLR + GSS | Graph-structured stack + SPPF | O(n³) worst, O(n) on LR parts | Arbitrary CFG, ambiguity as output | SGLR, tree-sitter, Lezer (§2.7) |
+| Tomita GLR + GSS | Graph-structured stack + SPPF | O(n³) worst, O(n) on LR parts | Arbitrary CFG, ambiguity as output | classic GLR, SGLR (§2.7) |
 | Earley + Leo | Earley items per position | O(n) on LR(k), O(n³) worst | Any CFG, ambiguity as output | Lark, Marpa (§2.8) |
 | CYK / Valiant | O(n²) table / matrix | O(n³) / O(n^2.81) | Theoretical anchors for general CFG | textbooks, NLP (§2.9) |
-| Parsing with derivatives | Brzozowski's extension | Parses arbitrary CFGs elegantly | Requires memoization/laziness | functional parsers (§2.10) |
+| Parsing with derivatives | Brzozowski's extension | Naive exponential; practical variants depend on memoization, laziness, and grammar restrictions | Elegant functional formulation, but complexity control is nontrivial | functional parsers (§2.10) |
 | Ambiguity + SPPF | Packed forest | Polynomial sharing of many parses | Ambiguity becomes downstream policy | GLR, GLL, Earley, Lark (§2.27) |
 
 ### 9.5. Incremental and editor-oriented
 
 | Technique | Space Cost | Time Cost | Key Trade-off | Examples |
 |---|---|---|---|---|
-| Incremental LR (tree-sitter) | Full syntax tree | O(edit size) reparse | Always-valid tree, even with errors | Neovim, Helix, Zed (§2.11) |
-| Lezer parser | Compact JS tree | Incremental LR | No Wasm overhead | CodeMirror 6 (§2.12) |
+| Incremental LR with selective GLR conflicts (tree-sitter) | Full syntax tree | Usually proportional to changed region; worst case can reparse more | Editor-usable tree over invalid input, with explicit `ERROR` or missing nodes | Neovim, Helix, Zed (§2.11) |
+| Lezer parser | Compact JS tree | Incremental reparse; linear full parse | No Wasm overhead | CodeMirror 6 (§2.12) |
 | Resilient LL + rowan | Event stream + ERROR nodes | Linear, constant recovery cost | Always produces a tree; per-production recovery | rust-analyzer, Typst, Lelwel (§7.8) |
 
 ### 9.6. Lexing and tokenization
@@ -792,9 +792,9 @@ Rows are grouped by family. Within a group, order roughly follows the body text.
 
 | Technique | Space Cost | Time Cost | Key Trade-off | Examples |
 |---|---|---|---|---|
-| Hand-written recursive descent | Direct Rust/C code | 2x+ faster than generated, full control | More code to maintain | Ruff, GCC, Clang, Go, Rust (§2.24, §5.2) |
+| Hand-written recursive descent | Direct Rust/C code | Can outperform generated parsers in tuned production cases; linear on designed grammar | More code to maintain | Ruff, GCC, Clang, Go, Rust (§2.24, §5.2) |
 | Deterministic LL/LR | Parse stack or call stack | Linear for accepted grammar class | Static conflicts vs grammar restrictions | LL(1), LALR(1), LR(1), IELR(1) (§2.25) |
-| Library-shaped RD parser | Typed node hierarchy | As fast as hand-written | Macro/DSL substrate, no grammar file | syn (Rust) (§7.5) |
+| Library-shaped RD parser | Typed node hierarchy | Hand-written RD performance; extra API/compile-time costs depend on use | Macro/DSL substrate, no grammar file | syn (Rust) (§7.5) |
 | Parser combinators | Host-language values | Runtime composition cost | Typed in host, no generator; slower than RD | Parsec, nom, chumsky, winnow (§2.18) |
 | ALL(*) adaptive LL | Lazy prediction DFAs | Linear on practical grammars, O(n⁴) worst | No grammar conflict engineering | ANTLR4 (§2.19) |
 | Scannerless parsing | Single grammar | Slower (more ambiguity) | Composable grammars, no lexer hack | SGLR, Rascal (§2.16) |
@@ -815,7 +815,7 @@ Rows are grouped by family. Within a group, order roughly follows the body text.
 | Insertion-only error correction | 1 byte per parser state | Per-error-site | Always produces valid output | Röhrich (1980) (§4.3) |
 | Typed holes | Language-level feature | Per-hole type inference | Requires language co-design | Hazel (§4.4) |
 | Ruby Slippers recovery | Programmable token injection | Handler per recovery point | Recovery as API, not heuristic | Marpa (§4.5) |
-| Recovery-as-specification | Insertion-mode state machine | Linear | Bit-identical DOM on any input; huge spec | HTML5, CSS forgiving selectors (§4.6) |
+| Recovery-as-specification | Insertion-mode state machine | Linear | Spec-equivalent DOM structure on any input; huge spec | HTML5, CSS forgiving selectors (§4.6) |
 | LR(1) error-state messages | `.messages` file + enumeration | Compile-time verified coverage | Author-written diagnostics tied to states | Menhir + Pottier CC 2016 (§7.3) |
 | Minimum-distance repair | Search over insert/delete/substitute repairs | Per-error search with timeout | Better diagnostics, fewer cascades | Burke–Fisher, CPCT+ (§4.7) |
 

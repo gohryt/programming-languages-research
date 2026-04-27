@@ -77,9 +77,9 @@ Standard Kprobes in Linux rely heavily on double traps, leading to severe penalt
 
 Source: https://research.ibm.com/publications/fast-trapless-kernel-probes-everywhere
 
-### 1.7. eBPF uprobes — Zero-Overhead User-Space Monitoring
+### 1.7. eBPF uprobes — Near-Zero-Disabled-Overhead User-Space Monitoring
 
-While kernel probes trace the OS, `uprobes` attach to user-space functions, offering near-zero overhead when disabled. This is highly effective for profiling closed-source drivers like NVIDIA's CUDA Runtime API (`libcudart.so`). Tools can trace exact function arguments and timing (e.g., `cuMemAlloc`, `cuLaunchKernel`) using `uprobe` and `uretprobe` directly from user space without modifying the target process or requiring a context switch to a traditional debugger.
+While kernel probes trace the OS, `uprobes` attach to user-space functions, offering near-zero overhead when no probe is attached. When enabled, they are commonly trap/breakpoint-style dynamic probes rather than the same NOP-to-CALL patching mechanism used by ftrace function entry. This is highly effective for profiling closed-source drivers like NVIDIA's CUDA Runtime API (`libcudart.so`). Tools can trace exact function arguments and timing (e.g., `cuMemAlloc`, `cuLaunchKernel`) using `uprobe` and `uretprobe` directly from user space without modifying the target process or requiring a context switch to a traditional debugger.
 
 Source: https://medium.com/@kcl17/inside-cuda-building-ebpf-uprobes-for-gpu-monitoring-449519b236ed
 
@@ -99,9 +99,9 @@ Every eBPF tracer that reads kernel data structures — bpftrace (§3.6), Parca 
 
 **CO-RE (Compile Once — Run Everywhere)**, driven by Andrii Nakryiko's libbpf work in 2019–2020, replaced this with load-time relocation against **BTF (BPF Type Format)**. BTF is a deduplicated type-info section (`.BTF` in vmlinux, exposed at `/sys/kernel/btf/vmlinux`) describing every struct layout of the *running* kernel, generated at kernel build time by `pahole` lifting DWARF into the compact BTF encoding. A BPF object file carries its own BTF plus a CO-RE relocation table. At `BPF_PROG_LOAD` time, libbpf walks the relocation table, matches each local type descriptor against the running kernel's BTF, computes the actual field offset, and **patches the `ldx`/`stx` instructions in place** before handing the program to the verifier.
 
-The payoff is a one-shot relocation with zero steady-state tax: the patched program then runs through the same NOP-patched kprobe/tracepoint path as §1.3, with a normal memory load — no interpretive dispatch, no version dispatch table. Portability is *field-level*: the loader can adjust offsets, bitfield positions, array indices, and even widen or narrow load sizes. It cannot invent missing fields — those require `bpf_core_field_exists()` guards in the program source — but for everything short of that it is transparent.
+The payoff is a one-shot relocation with zero steady-state tax: the relocated program then executes as ordinary BPF code at its chosen attachment point, with normal memory loads and no per-event version dispatch or offset-lookup cost. Portability is *field-level*: the loader can adjust offsets, bitfield positions, array indices, and even widen or narrow load sizes. It cannot invent missing fields — those require `bpf_core_field_exists()` guards in the program source — but for everything short of that it is transparent.
 
-The broader consequence is an entire tooling category becoming viable. Distributable precompiled BPF binaries (the modern bcc tools, Parca Agent, Pyroscope eBPF profiler) only became practical once CO-RE removed the runtime-clang dependency; bpftrace one-liners became kernel-version-portable for the same reason. For a new language targeting kernel observability, CO-RE demonstrates a reusable pattern: **ship a compact typed description of the target alongside the emitted code, and let the loader patch the offsets**. The same technique generalizes to userspace uprobes (BTF for the target binary) and would generalize to any instrumentation surface whose layout drifts across versions.
+The broader consequence is an entire tooling category becoming viable. Distributable precompiled BPF binaries (the modern bcc tools, Parca Agent, Pyroscope eBPF profiler) only became practical once CO-RE removed the runtime-clang dependency; bpftrace one-liners became kernel-version-portable for the same reason. For a new language targeting kernel observability, CO-RE demonstrates a reusable pattern: **ship a compact typed description of the target alongside the emitted code, and let the loader patch the offsets**. The same idea can generalize to userspace uprobes where equivalent type metadata is available for the target binary, and to any instrumentation surface whose layout drifts across versions.
 
 Source: https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html and https://nakryiko.com/posts/bpf-core-reference-guide/ and https://docs.kernel.org/bpf/btf.html and https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html
 
@@ -155,7 +155,7 @@ Source: https://shipilev.net/jvm/anatomy-quarks/22-safepoint-polls/
 
 CPython's traditional `sys.settrace()` has measurable overhead even when idle, because the interpreter's evaluation loop must check the trace function pointer on every instruction.
 
-PEP 768 (accepted March 2025) introduces a zero-overhead alternative. A `debugger_pending_call` field is added to `PyThreadState`, and a check is inserted into the existing `eval_breaker` path — a branch the interpreter already takes for signals and periodic tasks. Since `debugger_pending_call` is never set during normal execution, the CPU's branch predictor eliminates it entirely.
+PEP 768 (accepted March 2025) introduces an effectively zero-hot-path-overhead alternative. A `debugger_pending_call` field is added to `PyThreadState`, and a check is inserted into the existing `eval_breaker` path — a branch the interpreter already takes for signals and periodic tasks. Since `debugger_pending_call` is never set during normal execution, the common path keeps using the existing predicted branch rather than adding an independent tracing branch to every bytecode dispatch.
 
 An external debugger attaches by:
 1. Locating `PyRuntime` in the target process via ELF/Mach-O section offsets.
@@ -163,7 +163,7 @@ An external debugger attaches by:
 3. Setting `debugger_pending_call = 1` and arming the `eval_breaker`.
 4. The interpreter picks it up at the next safe point and executes the script.
 
-Rather than injecting code at arbitrary points, the debugger signals the interpreter to execute code at the next safe opportunity. This works *with* the interpreter's natural execution flow rather than against it. The check piggybacks on an existing branch, adding zero new branches to the hot path.
+Rather than injecting code at arbitrary points, the debugger signals the interpreter to execute code at the next safe opportunity. This works *with* the interpreter's natural execution flow rather than against it. The check piggybacks on an existing branch, adding no new independent branch to the hot path.
 
 PyPy independently implemented the same mechanism after seeing the PEP, confirming its generality.
 
@@ -297,9 +297,9 @@ Source: https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/
 
 This breaks every traditional tracing assumption. `strace` (§6.2) sees at most one `io_uring_enter` per batch — or nothing at all with SQPOLL — and cannot decode the individual SQEs that submission carried; `strace` issue #109 is the canonical "strace cannot trace io_uring" bug. Kernel kprobes attached to VFS functions see the operations fire but without the io_uring dispatch context needed to attribute them. The "trace at the syscall boundary" discipline is structurally blind here.
 
-The only viable answer is **first-party tracepoints inside the io_uring subsystem itself**: `io_uring_submit_sqe` (per-SQE, where strace sees one batched enter), `io_uring_complete` (per-CQE), plus `io_uring_queue_async_work`, `io_uring_link`, `io_uring_poll_arm`/`_poll_wake`, `io_uring_cqring_wait`, `io_uring_cqe_overflow`, and about a dozen others defined in `include/trace/events/io_uring.h`. Tools consume them via `perf trace`, bpftrace (§3.6), and specialized io_uring analyzers; causal reconstruction across submit and complete is a join on the `user_data` cookie each SQE carries. Cost when on is the standard NOP-patched tracepoint cost (§1.3), zero when off — the expensive axis is *volume*, since busy rings emit millions of CQEs per second, so consumers typically aggregate in-kernel via bpftrace maps rather than streaming raw events.
+The robust production answer is **first-party tracepoints inside the io_uring subsystem itself**: `io_uring_submit_sqe` (per-SQE, where strace sees one batched enter), `io_uring_complete` (per-CQE), plus `io_uring_queue_async_work`, `io_uring_link`, `io_uring_poll_arm`/`_poll_wake`, `io_uring_cqring_wait`, `io_uring_cqe_overflow`, and about a dozen others defined in `include/trace/events/io_uring.h`. External probes can observe fragments of the path, but without subsystem-provided semantic events they are unstable and cannot reliably reconstruct per-SQE/per-CQE causality. Tools consume the tracepoints via `perf trace`, bpftrace (§3.6), and specialized io_uring analyzers; causal reconstruction across submit and complete is a join on the `user_data` cookie each SQE carries. Cost when on is the standard NOP-patched tracepoint cost (§1.3), zero when off — the expensive axis is *volume*, since busy rings emit millions of CQEs per second, so consumers typically aggregate in-kernel via bpftrace maps rather than streaming raw events.
 
-The broader structural lesson is the one worth carrying forward: **shared-memory-queue IPC is a tracing blindspot that requires cooperation from the subsystem being traced**. Any transport where the syscall boundary is crossed once per *batch* rather than per *operation* — DPDK, SPDK, RDMA verbs, Vulkan command buffers, GPU submit queues — has the same property. The operation semantics live entirely in user/kernel shared memory; there is no externally attachable probe site that can see intra-ring transitions without subsystem cooperation. This is the inverse of the DTrace/eBPF "probe anything" promise of §3.6 and a strong argument for language/runtime tracepoints (§3.1 / §3.3 / §3.5) as a *primary* design target rather than an afterthought.
+The broader structural lesson is the one worth carrying forward: **shared-memory-queue IPC is a tracing blindspot that requires cooperation from the subsystem being traced**. Any transport where the syscall boundary is crossed once per *batch* rather than per *operation* — DPDK, SPDK, RDMA verbs, Vulkan command buffers, GPU submit queues — has the same property. The operation semantics live primarily in user/kernel shared memory; externally attached probes can be useful for expert diagnosis, but stable causality requires first-party semantic tracepoints. This is the inverse of the DTrace/eBPF "probe anything" promise of §3.6 and a strong argument for language/runtime tracepoints (§3.1 / §3.3 / §3.5) as a *primary* design target rather than an afterthought.
 
 Source: https://kernel.dk/io_uring.pdf and https://kernel.dk/axboe-kr2022.pdf and https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h and https://lwn.net/Articles/1063853/ and https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
 
@@ -343,11 +343,11 @@ Both demonstrate that with careful engineering, instrumentation overhead can be 
 
 Source: https://github.com/wolfpld/tracy and https://gravitymoth.com/spall/spall-web.html
 
-### 4.2. Ruby YARV — Trace Instructions
+### 4.2. Ruby YARV — Historical Trace Instructions and TracePoint
 
-YARV bytecode includes `trace` instructions at compile time at line boundaries, method entries, and returns. The TracePoint API enables or disables them at runtime. When disabled, trace instructions behave as NOPs. When enabled, they call registered callbacks.
+Older YARV designs included `trace` instructions at compile time at line boundaries, method entries, and returns. The TracePoint API enabled or disabled them at runtime: when disabled, trace instructions behaved as NOPs; when enabled, they called registered callbacks.
 
-Compile-time insertion of trace points with a runtime toggle. The cost when disabled is one NOP per trace point — negligible but not zero. At last count, YARV had 202 instructions, but that number shrinks significantly if you factor out tracepoint and specialized instructions, suggesting the trace infrastructure is a substantial portion of the instruction set.
+This is best treated as the historical bytecode-level design point rather than a blanket description of modern Ruby internals. Ruby issue #14104 documents work to remove trace instructions, so the durable lesson is not "Ruby still uses trace opcodes everywhere," but that compile-time insertion of trace points with a runtime toggle has a measurable disabled cost — negligible per point, but not literally zero — and can become a substantial part of an interpreter's instruction-set surface. Modern Ruby TracePoint should therefore be read as the user-facing tracing abstraction, with implementation details varying by version.
 
 Source: https://docs.ruby-lang.org/en/master/TracePoint.html and https://bugs.ruby-lang.org/issues/14104
 
@@ -517,9 +517,9 @@ Source: https://pchaigno.github.io/strace/2019/10/02/introducing-strace-seccomp-
 
 ### 6.3. ltrace — PLT Patching for Library-Call Tracing
 
-`ltrace` is strace's analogue for library calls. Its mechanism is direct: overwrite the first instruction of each PLT (Procedure Linkage Table) trampoline with `int3` using `PTRACE_POKETEXT`. When the program resolves a dynamic symbol lazily and jumps through the PLT, it traps into ltrace, which decodes arguments per the library's ABI, rewrites the original instruction back, single-steps, and reinstalls the `int3`.
+`ltrace` is strace's analogue for library calls. Its classic mechanism is direct: overwrite the first instruction of each recognizable PLT (Procedure Linkage Table) trampoline with `int3` using `PTRACE_POKETEXT`. When the program reaches that trampoline, it traps into ltrace, which decodes arguments per the library's ABI, rewrites the original instruction back, single-steps, and reinstalls the `int3`.
 
-The critical prerequisite is **lazy binding** — the PLT must actually be traversed on each call. Modern distro toolchains default to `-Wl,-z,now` (BIND_NOW), resolving every symbol at program start and bypassing the PLT entirely after that. On those systems ltrace simply doesn't work, and the replacement path is eBPF uprobes (§1.7) attached to library symbols directly. This is a rare case where a classic Unix tool's mechanism was made obsolete not by better design but by a link-time default flip driven by security hardening.
+The critical prerequisite is not lazy binding alone, but dynamically linked call sites that still pass through recognizable PLT/GOT stubs ltrace can patch or intercept. Lazy binding makes first-call interception straightforward, but `BIND_NOW` by itself does not necessarily remove all PLT calls. The broader problem is modern linking and hardening: `-fno-plt`, static linking, direct binding, symbol visibility, IFUNCs, PIE/toolchain changes, and ptrace restrictions all make ltrace fragile. The modern replacement path is eBPF uprobes (§1.7) attached to library symbols directly. This is a rare case where a classic Unix tool's mechanism became unreliable because the linking model around it changed.
 
 Source: https://packagecloud.io/blog/how-does-ltrace-work/
 
@@ -727,7 +727,7 @@ Source: https://thume.ca/2021/03/14/iforests/
 
 **Perfetto** (Google, 2018, open-source) is a production system-wide tracing platform with three layers: an instrumentation **SDK** (C++, with bindings and language-level tracing libraries), a **tracing service** that multiplexes producer processes into per-CPU ring buffers, and a **web UI** (ui.perfetto.dev) that renders the resulting protobuf-formatted traces. The service is the Linux-ported descendant of Android's systrace / atrace substrate; the UI is what ate the older Chrome `chrome://tracing` viewer. Because the wire format is a well-defined protobuf, any tool that can produce Perfetto protos — kernel ftrace converters, eBPF probes, custom application instrumentation — gets a zoomable, searchable timeline without writing rendering code.
 
-The **Fuchsia Trace Format (FTF)** is the other half of the story: a compact binary event format designed for sub-10ns-per-span emission, now adopted as Perfetto's low-overhead alternative to JSON. The combination — FTF at the producer for speed, Perfetto protos or JSON for interchange, Perfetto UI for rendering — makes "universal viewer" a real claim rather than a marketing one. Any timestamped event data can reach the timeline with a trivial exporter.
+The **Fuchsia Trace Format (FTF)** is the other half of the story: a compact binary event format from Fuchsia's tracing stack, designed for very low-overhead producer-side event emission. Perfetto's native interchange/storage format is protobuf `TracePacket`; Chrome trace JSON is the older import-friendly format. FTF can participate in the same viewer/exporter ecosystem through conversion/import paths, but it should not be confused with Perfetto's native wire format. The combination — cheap producer formats where needed, Perfetto protos for interchange, Perfetto UI for rendering — makes "universal viewer" a real claim rather than a marketing one. Any timestamped event data can reach the timeline with a small exporter.
 
 The "universal-viewer pattern" this enables is architectural. Tristan Hume's "All My Favorite Tracing Tools" illustrates it by composing several data sources against a single viewer: eBPF probes on kernel network-packet paths recording every packet's metadata into a ring buffer at 1 million packets/second with no measurable overhead; userspace event correlation via the "syscall-abuse" trick (calling a syscall with a fast error path like `faccessat2` with invalid arguments, then tracing that syscall in eBPF, for ~700ns-per-event correlation markers with no dedicated library); Fuchsia Trace Format at sub-10ns when spans need to stay cheap. Every data source, one timeline.
 
@@ -852,7 +852,7 @@ DWARF Call Frame Information (CFI) — shipped in every ELF binary's `.eh_frame`
 
 The design win: zero steady-state cost. Registers and instructions are unperturbed; the metadata is read only when unwinding actually happens.
 
-The design cost: the bytecode is **Turing-complete**, and every frame requires interpreting its FDE (Frame Description Entry) program. In practice, walking a DWARF stack from a signal handler is so slow that it can dominate the profile of the profiler itself. Red Hat's unwinder deep-dive reports DWARF walking is roughly 20–40× slower than frame-pointer walks. Ian Lance Taylor's `.eh_frame` series explains why: the bytecode was designed for exception-handling correctness, not sampler-friendly speed.
+The design cost: the unwind rules are an expressive stack-machine / interpreted program, and every frame requires evaluating its FDE (Frame Description Entry) instructions. In practice, walking a DWARF stack from a signal handler is so slow that it can dominate the profile of the profiler itself. Red Hat's unwinder deep-dive reports DWARF walking is roughly 20–40× slower than frame-pointer walks. Ian Lance Taylor's `.eh_frame` series explains why: the bytecode was designed for exception-handling correctness, not sampler-friendly speed.
 
 Source: https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding and https://www.airs.com/blog/archives/460
 
@@ -920,9 +920,9 @@ Source: https://github.com/google/pprof/blob/main/proto/profile.proto and https:
 
 ### 14.3. Parca — Open-Source GWP via eBPF
 
-**Parca** (Frederic Branczyk / Polar Signals, 2021) is the open-source GWP-style system. Its distinctive choice is **whole-system profiling via eBPF** (§1.7) without application changes: a Parca Agent attaches a CPU-sampling eBPF probe to every process on a node, walks user-space stacks via a combination of frame pointers and DWARF unwinding in eBPF, and ships pprof-formatted profiles to a central store.
+**Parca** (Frederic Branczyk / Polar Signals, 2021) is the open-source GWP-style system. Its distinctive choice is **whole-system profiling via eBPF** (§1.7) without application changes: a Parca Agent attaches a CPU-sampling eBPF probe to every process on a node, walks user-space stacks via a combination of frame pointers and preprocessed unwind metadata, and ships pprof-formatted profiles to a central store.
 
-The eBPF-side DWARF unwinder is worth naming specifically: Parca implements DWARF CFI evaluation *inside eBPF*, so the stack walk happens in-kernel at sample time without round-tripping to userspace. This lets Parca profile applications that don't emit frame pointers (the default for most production binaries before the Fedora/Ubuntu flip — see §13.2) while keeping sampling cost bounded.
+The eBPF-side unwinder is worth naming specifically: Parca / Polar Signals preprocesses userspace unwind metadata into bounded tables that an eBPF program can consult at sample time. This lets many non-frame-pointer binaries be unwound in-kernel without interpreting arbitrary DWARF CFI bytecode inside eBPF, which would be difficult to square with verifier constraints and the complexity described in §13.3.
 
 The storage layer is **FrostDB**, a columnar database designed for profile ingestion and query. Profiles are decomposed into sample-value columns (CPU time, allocated bytes, goroutine counts) and metadata columns (function name, file, line, build ID). Queries are SQL-like aggregations over the columnar layout — the pprof ecosystem's answer to Dremel.
 
@@ -1044,16 +1044,19 @@ These techniques change the code path itself: patch a site, swap in a trap, or r
 |---|---|---|---|---|---|
 | Hook function checked every instruction | background / contrast case | Per-instruction branch | Per-instruction call | Every instruction | Lua `debug.sethook`, CPython `sys.settrace` |
 | Bytecode opcode patching | §1.1 | Zero | Per-breakpoint dispatch | Per-instruction | Luau `LOP_BREAK` |
-| NOP→CALL / handler-pointer patching | §§1.3, 1.5, 1.6, 1.7 | Zero or one reserved NOP | Per-probe trampoline / handler call | Per-function / per-probe | ftrace, DTrace USDT, trapless kernel probes, eBPF uprobes |
+| Function-entry patching / BPF trampolines | §§1.3, 1.11 | Reserved call/NOP site or static-key cost | Per-probe trampoline / BPF program call | Per-function entry/exit | ftrace, BPF `fentry`/`fexit` |
+| Static tracepoints / USDT probes | §§1.5, 1.11 | NOP-like site, static key, or cheap is-enabled guard | Per-event argument capture + handler/probe dispatch | Per-semantic probe | DTrace USDT, Linux `TRACE_EVENT` |
+| Dynamic breakpoint-style probes | §§1.7, 1.11 | Near-zero when no probe attached | Trap/breakpoint + argument decode or BPF program | Per-instruction / per-symbol | kprobes, kretprobes, eBPF uprobes |
+| Trapless kernel probes | §1.6 | Reserved NOP/layout cost | Probe handler without double-trap path | Per-kernel probe site | USENIX ATC 2024 trapless probes |
 | Compiler-inserted patchable sleds + side table | §1.10 | Reserved NOP sled / code-size cost | Per-patched function trampoline | Per-function / custom typed event | LLVM XRay |
 | Jump target patching | §1.2 | One predicted branch | One call | Per-function | Erlang BeamAsm |
 | NOP padding + INT 3 swap | §1.4 | One reserved NOP | Trap + context switch | Per-instruction | Wasmtime Winch |
 | Return-address trampoline for paired entry/exit | §1.8 | One entry NOP, per-task shadow stack | One shared return handler | Per-function | ftrace `function_graph`, uftrace |
 | Load-time field-offset relocation via BTF | §1.9 | Zero at runtime; metadata at load | One-time patch on `BPF_PROG_LOAD` | Per-struct-field access | eBPF CO-RE (libbpf + BTF) |
 | Stable tracepoints vs dynamic typed probes | §1.11 | Zero until enabled / patchable entry cost | Per-event or per-BPF-program cost | Per-semantic-event / per-function | Linux `TRACE_EVENT`, kprobes, kretprobes, BPF `fentry`/`fexit` |
-| Compile-time trace instructions | §4.2 | One NOP / trace site | Per-trace-point call | Per-line / function | Ruby YARV |
+| Historical compile-time trace instructions | §4.2 | One NOP / trace site in versions using trace opcodes | Per-trace-point call | Per-line / function | Ruby YARV historical design; TracePoint abstraction |
 | In-place binary rewriting via instruction punning | §7.3 | Zero | Per-patched-site logic | Per-instruction | E9Patch |
-| PLT trampoline `int3` patching | §6.3 | Zero; requires lazy binding | Trap + arg decode per call | Per-library-symbol | ltrace |
+| PLT/GOT trampoline interception | §6.3 | Zero when unattached; requires recognizable dynamic-call stubs | Trap + arg decode per intercepted call | Per-library-symbol | ltrace; fragile under modern linking/hardening |
 
 ### 17.2. Cooperative Safepoints and Managed Handoff
 
@@ -1062,9 +1065,10 @@ These do not trap at arbitrary instructions. Instead, the runtime arranges for t
 | Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
 |---|---|---|---|---|---|
 | Memory-protection polling page | §2.1 | One cached load | SIGSEGV + handler | Per-safepoint | HotSpot JVM |
-| Existing-branch piggyback (`eval_breaker` style) | §2.2 | Zero (reuses an existing branch) | One extra check + script execution | Per-safe-point | CPython PEP 768, PyPy analogue |
+| Existing-branch piggyback (`eval_breaker` style) | §2.2 | Effectively zero hot-path overhead; reuses an existing branch | One extra slow-path check + script execution | Per-safe-point | CPython PEP 768, PyPy analogue |
 | Compile-time safepoint / root discipline | §2.3 | Zero between safepoints | Explicit safepoint / GC work | Per-safepoint region | Rust `zerogc` |
-| Safepoint-biased sampling with async side-door | §2.4 | Unsupported JVMTI back-door | Signal-handler stack walk, SIGSEGV fallback | Per-signal sample | AsyncGetCallTrace, async-profiler, JEP 509 |
+| Safepoint-only managed stack sampling | §2.4 | No async stack-walk support | Samples only at safepoints; structurally biased | Per-safepoint sample | JVMTI `GetStackTrace`-style profilers |
+| Async managed stack walking | §2.4 | No steady-state cost until profiler attached | Signal/CPU-timer sample + async-safe stack walk; failed samples reported where supported | Per-signal or per-thread-timer sample | AGCT/async-profiler; JEP 509/JFR CPU-time profiling |
 
 ### 17.3. Hardware and Out-of-Process Observation
 
@@ -1073,13 +1077,14 @@ These techniques avoid or minimize software interposition in the target by leani
 | Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
 |---|---|---|---|---|---|
 | External memory reading / sampling | §6.1 | Zero on target | Sampling interval + read cost | Per-sample | py-spy, rbspy |
-| ptrace syscall tracing | §6.2 | N/A (always on when attached) | Two stops per syscall; 1.5× with seccomp-bpf filter | Per-syscall | strace + `--seccomp-bpf` |
+| ptrace syscall tracing | §6.2 | N/A (always on when attached) | Plain ptrace: two stops per syscall; with `--seccomp-bpf`, only selected syscalls take the ptrace path, benchmarked around 1.5× on filtered workloads | Per-syscall | strace + `--seccomp-bpf` |
 | Post-mortem minidump | §6.4 | Zero until crash | Out-of-process snapshot on crash | Once per crash | Breakpad, Crashpad |
-| Hardware branch history / PT-style tracing | §§5.1, 5.2 | Very low bandwidth cost | Post-hoc decode / trace handling | Every branch or recent-branch window | Intel PT, magic-trace, LBR |
+| Hardware branch history / PT-style tracing | §§5.1, 5.2 | Zero / hardware facility disabled | PT bandwidth + decode cost, or LBR capture/read cost | Every branch or recent-branch window | Intel PT, magic-trace, LBR |
 | Dedicated hardware trace fabric | §5.3 | Zero software overhead | Trace bandwidth / sink limits | Instruction flow | Arm CoreSight ETM/PTM |
 | Side-channel execution sensing | §5.4 | Zero runtime overhead | Offline waveform classification | Code path / phase | ZoP |
 | Precise PMU sampling (hardware record at retirement) | §5.5 | Zero (MSRs clear) | Per-event record memcpy into PEBS/SPE buffer | Per-retired-instruction with true PC | Intel PEBS, AMD IBS, ARM SPE |
-| Single-pin application instrumentation trace | §5.6 | Zero (TRCENA clear) | One store per event; SWO-link-bandwidth-capped | Application-chosen markers | Arm Cortex-M ITM/SWO, SEGGER RTT |
+| Single-pin application instrumentation trace | §5.6 | Zero (TRCENA clear) | One store per event; SWO-link-bandwidth-capped | Application-chosen markers | Arm Cortex-M ITM/SWO |
+| RAM-ring-buffer debug-probe polling | §5.6 | Zero when unused except reserved RAM | Firmware writes to RAM buffer; probe polls over SWD/J-Link background memory access | Application logs / markers | SEGGER RTT |
 
 ### 17.4. Buffered Event Emission and Production-Safe Pipelines
 
@@ -1091,7 +1096,7 @@ The core idea is not "stop the program" but "emit structured events cheaply enou
 | Per-CPU kernel trace sessions | §3.2 | Zero until providers are enabled | Lock-free event buffering | Per-event | ETW |
 | Runtime diagnostics port + circular buffer | §3.3 | Zero until session attached | Runtime event buffering | Per-event | .NET EventPipe |
 | Runtime-native scheduler event log | §3.4 | Low idle cost | Post-hoc analysis cost | Scheduler / GC / user events | GHC eventlog + ThreadScope |
-| Partitioned execution trace + flight recorder | §3.5 | <1% with FP unwinding; zero when off | Per-generation serialization | Scheduler / GC / user events | Go `runtime/trace`, FlightRecorder (Go 1.25) |
+| Partitioned execution trace + flight recorder | §3.5 | Zero when tracing disabled | Active tracing overhead reported below 1% in Go's optimized frame-pointer-based path; per-generation serialization | Scheduler / GC / user events | Go `runtime/trace`, FlightRecorder (Go 1.25) |
 | Safety-constrained query DSL with aggregations | §3.6 | Zero until probe installed | Per-probe aggregation update (per-CPU local) | Per-probe | DTrace D, bpftrace |
 | Lockless per-CPU ring buffer + CTF wire format | §3.7 | Zero when session off | CAS-only local producer + CTF write | Per-event | LTTng + liblttng-ust |
 | Unified-logging persistent ring (one emission, three modalities) | §3.8 | Zero when subsystem disabled | Compile-time formatted payload memcpy | Per-signpost / per-log / per-activity | Apple `os_signpost` + Instruments |
@@ -1138,7 +1143,7 @@ These techniques do not primarily intercept execution; they search the space aro
 
 | Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
 |---|---|---|---|---|---|
-| Virtual speedup (causal profiling) | §10.1 | ~17% | Multiple runs with perturbation | Per-line / progress point | Coz |
+| Virtual speedup (causal profiling) | §10.1 | Zero when not running Coz | ~17% mean overhead plus repeated perturbation runs | Per-line / progress point | Coz |
 | Coverage-guided fuzzing | §9.1 | Instrumentation cost | Thousands–millions of executions / sec | Per-edge / branch | AFL, libFuzzer |
 
 ### 17.8. Sampling Substrates and Stack Unwinding
@@ -1149,7 +1154,7 @@ Every sampling profiler depends on two steps: a substrate that decides when and 
 |---|---|---|---|---|---|
 | Timer / signal / PMU-overflow sampling substrate | §13.1 | Zero until profiler armed; PMU/timer state while active | Signal handler or kernel ring-buffer record per sample | Bias, skid, throttling, lost samples, async-signal-safety | `perf_event_open`, `SIGPROF`, `setitimer`, async-profiler, pprof |
 | Frame pointers (always) | §13.2 | 1–3% runtime tax | Pointer chase per frame | Simplicity + signal-handler safety; one reserved register | Fedora 38, Ubuntu 24.04, Go, PEP 831 |
-| DWARF `.eh_frame` / CFI | §13.3 | Zero | Turing-complete bytecode per frame (20–40× slower) | Exception-handling correctness, not sampling-friendly | GCC/Clang `-fomit-frame-pointer` default |
+| DWARF `.eh_frame` / CFI | §13.3 | Zero | Expressive interpreted unwind program per frame (20–40× slower) | Exception-handling correctness, not sampling-friendly | GCC/Clang `-fomit-frame-pointer` default |
 | Build-validated flat unwind table | §13.4 | ~1.3 MB per build | Flat lookup (no bytecode) | 20–40× faster than DWARF; kernel-only | Linux ORC (Poimboeuf, `objtool`) |
 | Simplified userspace unwind format | §13.5 | ~8 bytes/row binary-searchable | ~FP-speed from signal handler | No callee-save recovery; fallback needed for exotic code | SFrame (binutils 2.40+, glibc 2.39+) |
 | Hardware branch ring for call stack | §13.6 | Branch ring enable cost | Zero (already in sample) | Stack depth capped at 16/32 frames | `perf --call-graph lbr` |
@@ -1161,7 +1166,7 @@ Enabling layers. They usually do not capture execution by themselves, but they a
 
 | Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
 |---|---|---|---|---|---|
-| Universal trace-view interchange | §11.2 | UI-side cost | Rendering / conversion cost | Per-event visualization | Perfetto exporters, Fuchsia Trace Format |
+| Universal trace-view interchange | §11.2 | UI-side cost | Rendering / conversion cost | Per-event visualization | Perfetto protobuf exporters; Fuchsia Trace Format via conversion/import paths |
 | Alphabetically-merged stack histogram | §11.3 | Post-processing only | Linear in folded-stack input | Per-sample (time discarded) | Flame graphs, speedscope, pprof `-http` |
 | Scheduler-event sampling (blocked time) | §11.4 | Zero until probe installed | Per-context-switch eBPF aggregation | Per-blocked-period | Off-CPU flame graphs |
 | Profile interchange format | §14.2 | N/A | Format conversion | Per-sample | pprof `profile.proto` |
@@ -1175,7 +1180,7 @@ Designs whose distinguishing property is operating at always-on scale, across fl
 | Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
 |---|---|---|---|---|---|
 | Fleet-sampled profiling with build-ID attribution | §14.1 | Zero per machine when not sampled | ~1–5% CPU per sampled machine | Per-function × binary-version aggregate | Google-Wide Profiling (GWP) |
-| Whole-system eBPF continuous profiler | §14.3 | eBPF probe overhead | In-kernel DWARF unwind + pprof upload | Per-process CPU sample | Parca + FrostDB |
+| Whole-system eBPF continuous profiler | §14.3 | eBPF probe overhead | In-kernel table-driven unwinding + pprof upload | Per-process CPU sample | Parca + FrostDB |
 | Multi-tenant profile store with trace correlation | §14.4 | Zero until session | ~1–5% CPU + profile-span tagging | Per-span profile jump | Grafana Pyroscope / Phlare, Datadog, GCP Profiler |
 | GPU annotation API | §15.1 | No-op stub when no tool attached | Pointer-push per range | Per-range / marker | NVTX, ROC-TX |
 | Cross-clock-domain GPU trace substrate | §15.2 | Zero until CUPTI session | Four-timestamp buffered record per kernel | Per-kernel-launch | CUPTI Activity API + Nsight Systems |

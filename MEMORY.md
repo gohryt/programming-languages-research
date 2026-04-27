@@ -110,7 +110,7 @@ Source: https://arxiv.org/abs/2104.00480 and https://granule-project.github.io/ 
 
 ## 2. Region-Based Memory Management
 
-Region systems group allocations into compile-time-bounded lifetimes so that bulk deallocation replaces per-object reclamation. The axis across entries is *who specifies the region structure*: programmer (Cyclone, Encore), full inference (MLKit, ASAP), capability annotations (Verona, Pony), or opt-in projection on top of generational refs (Vale). The trade-off is annotation burden vs. inference power vs. expressiveness across concurrency. Compile-time RC and tracing GC sit at the two endpoints of "no annotation" approaches; regions are the structurally distinct middle ground.
+This chapter covers both classic region systems, where lifetimes enable bulk deallocation, and newer region-like designs where regions act as isolation domains, borrowing/projection scopes, or allocator/runtime layout units. The axis across entries is *who specifies the region structure*: programmer (Cyclone, Encore), full inference (MLKit, ASAP), capability annotations (Verona, Pony), opt-in projection on top of generational refs (Vale), or runtime layout policy (RC-Immix). The trade-off is annotation burden vs. inference power vs. expressiveness across concurrency and runtime implementation. Compile-time RC and tracing GC sit at the two endpoints of "no annotation" approaches; regions are the structurally distinct middle ground.
 
 ### 2.1. Cyclone — Explicit Regions and Outlives Subtyping
 
@@ -252,7 +252,7 @@ Source: https://open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2759r0.pdf and htt
 
 Local-only static analysis identifying generalized "Owner"/"Pointer" types via type categories to detect dangling/use-after-free at compile time without whole-program annotation. Acyclic CFG analysis with ~5% compile-time overhead; identifies Owner (e.g. `unique_ptr`, `string`) vs. Pointer (e.g. `string_view`, iterators) generically; uses `gsl::Owner`, `gsl::Pointer`, `clang::lifetimebound` attributes to refine.
 
-Partially shipped in MSVC (warnings 26486–26489 in C++ Core Check) since 2019; **upstreamed to Clang trunk** as `-Wlifetime-safety` (Clang 23+). Per SG23 Wrocław direction, P1179 is being pursued as a TS/whitepaper (P3465R1) ahead of merging into a standardized lifetime profile.
+Partially shipped in MSVC (warnings 26486–26489 in C++ Core Check) since 2019; **upstreamed to Clang trunk** as `-Wlifetime-safety` (Clang 23+). As of early 2026, lifetime/profile work is not normative C++26. The active path is a non-normative language-safety white paper plus compiler experiments and flags, with possible later standardization into a lifetime profile.
 
 Source: https://wg21.link/p1179 and http://clang.llvm.org/docs/LifetimeSafety.html and https://devblogs.microsoft.com/cppblog/lifetime-profile-update-in-visual-studio-2019-preview-2/
 
@@ -296,7 +296,7 @@ Source: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf and
 
 ### 4.8. Hardened libc++ / MSVC STL / libstdc++ — P3471
 
-The *only* normative C++26 memory-safety addition: bounds/precondition checks in standard containers/iterators with controlled performance overhead. **libc++** uses `_LIBCPP_HARDENING_MODE` ∈ {`none`, `fast`, `extensive`, `debug`}; `_LIBCPP_ABI_BOUNDED_ITERATORS` makes iterator types carry bounds for `span`/`string_view`. Shipped 2024. **MSVC STL** ships `_MSVC_STL_HARDENING=1` opt-in (VS 2022 17.14, May 2025); uses `__fastfail`/`__builtin_verbose_trap` for ~29-byte trap codegen; default in a future release. **libstdc++** is actively implementing.
+The clearest normative C++26 standard-library hardening / bounds-checking memory-safety addition: bounds/precondition checks in standard containers/iterators with controlled performance overhead. **libc++** uses `_LIBCPP_HARDENING_MODE` ∈ {`none`, `fast`, `extensive`, `debug`}; `_LIBCPP_ABI_BOUNDED_ITERATORS` makes iterator types carry bounds for `span`/`string_view`. Shipped 2024. **MSVC STL** ships `_MSVC_STL_HARDENING=1` opt-in (VS 2022 17.14, May 2025); uses `__fastfail`/`__builtin_verbose_trap` for ~29-byte trap codegen; default in a future release. **libstdc++** is actively implementing.
 
 Google reports significant CVE-class elimination from rolling out `fast` mode in production. Standardized as P3471R4 in C++26; vendor-shipping but mostly opt-in. The pragmatic C++ safety story is: Profiles for the language layer is unfinished; library hardening is what's actually shipping.
 
@@ -312,13 +312,13 @@ Source: https://open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4282.pdf and https
 
 ## 5. Hardware-Assisted Memory Safety
 
-Hardware mechanisms add silicon-enforced memory-safety primitives that software-only solutions cannot deliver at acceptable cost. The axis across entries is *what the hardware enforces*: bounded addressing (CHERI capabilities), per-allocation tagging (ARM MTE, SPARC ADI), pointer integrity (ARM PAC), control-flow integrity (Intel CET), or per-page protection groups (MPK). The deployment story is uneven — PAC, CET, and MPK are mainstream; MTE is present on selected consumer devices with device- and OS-specific enablement policies; Apple MIE is an announced production memory-tagging architecture with release-specific coverage; CHERI is mature in research/toolchain ecosystems and emerging embedded deployments; Intel MPX is a cautionary tale of hardware safety done badly.
+Hardware mechanisms add silicon-enforced memory-safety primitives that software-only solutions cannot deliver at acceptable cost. The axis across entries is *what the hardware enforces*: bounded addressing (CHERI capabilities), per-allocation tagging (ARM MTE, SPARC ADI), pointer integrity (ARM PAC), control-flow integrity (Intel CET), or per-page protection groups (MPK). This chapter also includes HWASan as a software-tagged predecessor and design analogue of MTE rather than as a silicon-enforced mechanism. The deployment story is uneven — PAC, CET, and MPK are mainstream; MTE is present on selected consumer devices with device- and OS-specific enablement policies; Apple MIE is an announced production memory-tagging architecture with release-specific coverage; CHERI is mature in research/toolchain ecosystems and emerging embedded deployments; Intel MPX is a cautionary tale of hardware safety done badly.
 
 ### 5.1. ARM MTE — 4-Bit Tags and Sync/Async Modes
 
 ARM's **Memory Tagging Extension** stores a 4-bit tag per 16-byte granule, both in pointer top bits (TBI) and in shadow tag memory; hardware checks on every load/store. SYNC / ASYNC / ASYMM modes trade precision for speed — SYNC traps immediately on tag mismatch with the faulting PC and exact address; ASYNC accumulates faults to a status register checked on context switch. Scudo allocator integration randomises tags on malloc/free for use-after-free and linear-overflow detection (cross-ref §7.5); stack tagging via the `AArch64StackTagging` compiler instrumentation pass.
 
-Overhead: Scudo + MTE SYNC ≈ 12% geomean SPECrate, MTE ASYNC ≈ 4% (NanoTag, 2025). Originally marketed as "near-zero" — real cost is non-trivial in SYNC. Shipping on Pixel 8/9 (opt-in), Apple A19 (always-on as MIE — see §5.2), upcoming flagship Android SoCs. The **TIKTAG attack** (2024) demonstrated speculative tag leakage on Pixel 8.
+Overhead: Scudo + MTE SYNC ≈ 12% geomean SPECrate, MTE ASYNC ≈ 4% (NanoTag, 2025). Originally marketed as "near-zero" — real cost is non-trivial in SYNC. Shipping on Pixel 8/9 (opt-in), Apple MIE on recent A-series devices with exact SoC coverage and default-on scope treated as time-sensitive (see §5.2), and upcoming flagship Android SoCs. The **TIKTAG attack** (2024) demonstrated speculative tag leakage on Pixel 8.
 
 Source: https://android.googlesource.com/platform/bionic/+/main/docs/mte.md and https://arxiv.org/pdf/2509.22027 and https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/
 
@@ -332,7 +332,7 @@ Source: https://security.apple.com/blog/memory-integrity-enforcement/ and https:
 
 ### 5.3. HWASan — Software-Tagged ASan via Top-Byte-Ignore
 
-**Hardware-Assisted AddressSanitizer** is compiler-instrumented MTE-style tagging using AArch64 Top-Byte-Ignore (8-bit tag in pointer upper byte) with software-managed shadow tag memory — works without MTE hardware. Smaller shadow than ASan (1/16 vs 1/8 memory), per-allocation tagged pointers, stack-tagging IR pass, outlined check sequences with custom calling convention to keep code small. Higher cost than MTE (everything is software) but lower than ASan; widely used in Android system builds for fuzzing and debug. Ships in Clang/LLVM upstream; default for Android system-image fuzzing pipeline; precursor to MTE deployments. The full ASan/MSan/TSan/UBSan family lives in `TRACERS.md §8`.
+**Hardware-Assisted AddressSanitizer** is compiler-instrumented MTE-style tagging using AArch64 Top-Byte-Ignore (8-bit tag in pointer upper byte) with software-managed shadow tag memory — works without MTE hardware. It is included here as the software-tagged predecessor and design analogue of MTE rather than as a silicon-enforced mechanism. Smaller shadow than ASan (1/16 vs 1/8 memory), per-allocation tagged pointers, stack-tagging IR pass, outlined check sequences with custom calling convention to keep code small. Higher cost than MTE (everything is software) but lower than ASan; widely used in Android system builds for fuzzing and debug. Ships in Clang/LLVM upstream; default for Android system-image fuzzing pipeline; precursor to MTE deployments. The full ASan/MSan/TSan/UBSan family lives in `TRACERS.md §8`.
 
 Source: https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
 
@@ -350,7 +350,7 @@ Source: https://docs.kernel.org/next/x86/shstk.html and https://www.phoronix.com
 
 ### 5.6. CHERI / Morello / CheriBSD
 
-Cambridge / SRI International's **CHERI** replaces 64-bit pointers with 128-bit unforgeable capabilities — address + bounds + permissions + 1-bit validity tag in tagged memory — enforced by the ISA. Hardware-enforced spatial *and* temporal safety for arbitrary C/C++; software compartmentalisation (sub-library c18n in CheriBSD 25.03 isolating malloc/syscall surface); pure-capability ABI (CheriABI). Overhead ~2.2–3.2% geomean for SPECint 2006 in pure-cap mode on optimised microarchitectures; Morello prototype much higher because store buffers were sized for 64-bit. Doubled pointer size = significant memory overhead.
+Cambridge / SRI International's **CHERI** replaces 64-bit pointers with 128-bit unforgeable capabilities — address + bounds + permissions + 1-bit validity tag in tagged memory — enforced by the ISA. It provides hardware-enforced spatial safety and strong pointer provenance/integrity for C/C++; temporal safety requires an accompanying revocation, quarantine, or allocation discipline. CHERI also supports software compartmentalisation (sub-library c18n in CheriBSD 25.03 isolating malloc/syscall surface) and a pure-capability ABI (CheriABI). Overhead ~2.2–3.2% geomean for SPECint 2006 in pure-cap mode on optimised microarchitectures; Morello prototype much higher because store buffers were sized for 64-bit. Doubled pointer size = significant memory overhead.
 
 Morello is a research prototype, not commercial. CheriBSD 25.03 is the reference OS. **Wind River joined the CHERI Alliance in April 2026** (porting VxWorks/Helix to CHERI on RISC-V). Production silicon still pending — Morello successor not announced. Programming-model details, including compartments, in §10.2 below.
 
@@ -412,15 +412,15 @@ Source: https://www.steveblackburn.org/pubs/papers/lxr-pldi-2022.pdf and https:/
 
 Portable, language-agnostic GC framework written in Rust providing a catalog of pluggable plans (NoGC, MarkSweep, SemiSpace, Immix, GenImmix, StickyImmix, LXR) accessed through a clean binding API. Cross-runtime architecture with separate bindings (mmtk-openjdk, mmtk-julia, mmtk-ruby, mmtk-v8); plans share allocators, barriers, and tracing infrastructure. First-class support for hierarchical Immix and reference-counting plans not available in any production runtime. **Drives Ruby's Modular GC** (Feature #20470) shipped in Ruby 3.4 (January 2025) — the first production-language adoption of the framework as a bundled gem.
 
-Production-bound in Ruby 3.4 (experimental, MarkSweep only currently, Immix in testing). Julia binding active. V8 binding stalled. OpenJDK binding most mature. The "GC as portable library" idea is what makes LXR-class research immediately transferable to multiple production runtimes.
+Shipped experimentally with Ruby 3.4 (MarkSweep only currently, Immix in testing). Julia binding active. V8 binding stalled. OpenJDK binding most mature. The "GC as portable library" idea is what makes LXR-class research immediately transferable to multiple production runtimes.
 
 Source: https://github.com/mmtk and https://railsatscale.com/2025-01-08-new-for-ruby-3-4-modular-garbage-collectors-and-mmtk/
 
 ### 6.4. ZGC — Colored Pointers and Self-Healing Load Barriers
 
-OpenJDK's **ZGC** is a concurrent region-based compacting collector using colored 64-bit pointers with metadata bits and load/store barriers to translate stale references on the fly, achieving sub-millisecond pauses independent of heap size up to 16 TB. Colored pointers — Marked0/Marked1/Remapped/Finalizable bits embedded in the high bits of 64-bit references; a load barrier resolves stale pointers without an STW remap phase. Self-healing barriers update the loaded reference back into the field, ensuring each barrier slow path fires at most once per location. **Generational ZGC** (JEP 439, JDK 21+) added a young generation with store barriers; in JDK 25 it became the *only* ZGC implementation (legacy non-generational mode removed).
+OpenJDK's **ZGC** is a concurrent region-based compacting collector using colored 64-bit pointers with metadata bits and load barriers to translate stale references on the fly, achieving sub-millisecond pauses independent of heap size up to 16 TB. Colored pointers — Marked0/Marked1/Remapped/Finalizable bits embedded in the high bits of 64-bit references; a load barrier resolves stale pointers without an STW remap phase. Self-healing barriers update the loaded reference back into the field, ensuring each barrier slow path fires at most once per location. **Generational ZGC** (JEP 439, JDK 21+) added a young generation with store barriers for young/old tracking; in JDK 25 it became the *only* ZGC implementation (legacy non-generational mode removed).
 
-Production since JDK 15; default-and-only ZGC in JDK 25 LTS; Linux/Windows/macOS.
+Production since JDK 15; generational ZGC is the only ZGC mode in JDK 25 LTS, which does not imply ZGC is the default JVM collector; Linux/Windows/macOS.
 
 Source: https://openjdk.org/jeps/439 and https://wiki.openjdk.java.net/display/zgc
 
@@ -434,7 +434,7 @@ Source: https://developers.redhat.com/blog/2019/06/27/shenandoah-gc-in-jdk-13-pa
 
 ### 6.6. G1 — Predictive Pause-Time Regional Collection
 
-The default JVM collector since JDK 9. Regional generational collector that divides the heap into ~2048 fixed-size regions and uses pause-time prediction to select a "collection set" of highest-yield regions, balancing throughput with a soft pause-time goal. Tracks per-region live-data and copy cost to fit collections within `-XX:MaxGCPauseMillis`. Mixed collections evacuate young + selected old regions concurrently with a SATB-marked old generation. Card-table + remembered-set mechanics scale to heaps in the tens of GB (practical ~32 GB) without colored pointers or load barriers.
+The default JVM collector since JDK 9. Regional generational collector that divides the heap into ~2048 fixed-size regions and uses pause-time prediction to select a "collection set" of highest-yield regions, balancing throughput with a soft pause-time goal. Tracks per-region live-data and copy cost to fit collections within `-XX:MaxGCPauseMillis`. Concurrent SATB marking identifies old regions; subsequent stop-the-world mixed collections evacuate young regions plus selected old regions chosen by the pause-time model. Card-table + remembered-set mechanics scale to heaps in the tens of GB (practical ~32 GB) without colored pointers or load barriers.
 
 Throughput-leaning workhorse; baseline pauses ~9–10 ms at idle, frequent multi-ms pauses under load. Does *not* hit sub-ms in practice — the latency story belongs to ZGC, Shenandoah, and C4.
 
@@ -660,7 +660,7 @@ Source: https://compcert.org/doc/html/compcert.common.Separation.html and https:
 
 The same operational aliasing models from §1.3 above also have a *formal* role: they define when unsafe Rust triggers UB so the compiler can soundly exploit aliasing for optimization. Stacked Borrows' optimization soundness was proven in Coq, justifying reordering memory accesses past unknown calls based on intraprocedural reasoning. Tree Borrows' Rocq mechanization (Villani et al., PLDI 2025) preserves all Stacked Borrows optimizations and additionally licenses read-read reorderings, while empirically rejecting 54% fewer real programs.
 
-The key role for language design: an aliasing model is simultaneously a *runtime checker* (Miri, `DEBUGGERS.md §8.8`), a *language-level discipline* (§1.3), and a *theorem about the compiler* (this section). All three views must agree. Tree Borrows is the current canonical model; Stacked Borrows is the predecessor still widely cited.
+The key role for language design: an aliasing model is simultaneously a *runtime checker* (Miri, `DEBUGGERS.md §8.8`), a *language-level discipline* (§1.3), and a *theorem about the compiler* (this section). All three views must agree. Stacked Borrows remains the established model for today's Miri-based checking; Tree Borrows is an experimentally implemented successor candidate with stronger acceptance and formal results.
 
 Source: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf
 
@@ -847,7 +847,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Stacked / Tree Borrows | None (operational model) | Defines UB for unsafe | Tree Borrows rejects 54% fewer programs | Miri (§1.3, §8.11) |
 | Pin/Unpin | Library-only | Address stability | Self-referential async state machines | Rust async (§1.4) |
 | View types (proposed) | Field lists in signature | Disjoint partial borrows | Pre-RFC | Rust (§1.5) |
-| Mutable value semantics | None | Inferred from projection nesting | No first-class refs at all | Hylo (§1.6) |
+| Mutable value semantics | No lifetime annotations; parameter conventions only | Inferred from projection nesting | No first-class refs at all | Hylo (§1.6) |
 | `owned`/`borrowed`/`inout` + ASAP destruction | Argument modifiers | Rust-style with sub-expression drop | Smaller live ranges than Rust | Mojo (§1.7) |
 | Law of exclusivity + noncopyable | Static + dynamic exclusivity | Opt-in linear types on ARC base | Layered linearity on GC/RC | Swift (§1.8) |
 | Pure linearity + capabilities | Linear annotations | Use-once mandatory | Capabilities double as authority | Austral (§1.9) |
@@ -874,7 +874,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Technique | Cycle Strategy | In-Place Mutation | Key Trade-off | Examples |
 |---|---|---|---|---|
 | SIL ARC + retain elision | Programmer `weak`/`unowned` | `is_unique` runtime check | ARC + ObjC bridge atomics | Swift (§3.1) |
-| Perceus + reuse + FIP + TRMC | Banned by linearity | Compile-time uniqueness | Pure functional source, imperative bin | Koka (§3.2) |
+| Perceus + reuse + FIP + TRMC | No general cyclic heap in pure source | Compile-time uniqueness | Pure functional source, imperative bin | Koka (§3.2) |
 | Lifetime-analysis borrow-check-lite | Banned (leak-detect at exit) | Compile-time | Cycle problem pushed to programmer | Lobster (§3.3) |
 | Morphic + lambda sets + Perceus | Banned by purity | Compile-time | Loop alias-analysis still tricky | Roc (§3.4) |
 | ARC + `=destroy`/`sink`/`lent` + ORC | ARC leaks; ORC trial-deletion | Hooks + cursor annotations | Two GC modes per project | Nim (§3.5) |
@@ -886,7 +886,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 |---|---|---|---|---|
 | Lifetime Profile P1179 | Local only | Recompile | Shipping in MSVC, Clang trunk | (§4.2) |
 | Stroustrup Profiles | No (per critics) | Recompile | Whitepaper for C++26 sidecar | (§4.3) |
-| Safe C++ + Circle | Yes | Viral `safe`, parallel `std2` | Withdrawn 2025 | (§4.4) |
+| Safe C++ + Circle | Yes | Viral `safe`, parallel `std2` | Not pursued after 2025 / effectively dead in WG21 | (§4.4) |
 | cppfront / Cpp2 alternative syntax | Defaults safer | Transpile | Personal project | (§4.5) |
 | Fil-C InvisiCaps + FUGC | Yes (runtime) | Recompile | Single-developer; ~1.5–4× slowdown | (§4.6) |
 | Hazard pointers + RCU | Concurrent reclamation | None (vocabulary) | Standardized C++26 | (§4.7) |
@@ -897,11 +897,11 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Technique | Granularity | Overhead | Deployment Status / Notes | Examples |
 |---|---|---|---|---|
 | ARM MTE 4-bit per 16B granule | Per-allocation | 4–12% (ASYNC/SYNC) | Shipping on selected Android/Arm devices; exact default policy is device- and OS-specific | (§5.1) |
-| Apple MIE (EMTE + TCE) | Per-allocation, system-wide | Reported as production-suitable by Apple | Apple-announced deployment; exact device coverage and third-party scope are time-sensitive | (§5.2) |
+| Apple MIE (EMTE + TCE) | Per-allocation; broad system coverage, exact scope release-specific | Reported as production-suitable by Apple | Apple-announced deployment; exact device coverage and third-party scope are time-sensitive | (§5.2) |
 | HWASan via TBI | Per-allocation | Higher than MTE, lower than ASan | Android system fuzzing | (§5.3) |
 | ARM PAC | Per-pointer integrity | Near-zero | Universal Apple silicon | (§5.4) |
 | Intel CET | Shadow stack + IBT | Near-zero | Tiger Lake+, Zen 3+ | (§5.5) |
-| CHERI capabilities | 128-bit per pointer | ~2–3% optimised | Morello/CheriBSD research and emerging commercial/toolchain work | (§5.6) |
+| CHERI capabilities | 128-bit per pointer | ~2–3% projected/optimized; Morello higher; pointer-size memory overhead significant | CheriBSD/Morello research; commercial production silicon still pending except embedded CHERIoT path | (§5.6) |
 | CHERIoT MCU CHERI | 64-bit cap over 32-bit addr | Designed for MCU budgets | Emerging embedded CHERI ecosystem; silicon availability is vendor- and date-specific | (§5.7) |
 | SoftBound/CETS/LowFat | Per-pointer software | 80–200% / single-digit% | Research only | (§5.8) |
 | MPK/POE | Per-page-group | ~20–26 cycles per switch | Skylake-SP+, Zen 3+, ARMv8.9 | (§5.9) |
@@ -979,8 +979,8 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Technique | Authority Mechanism | Concurrency Story | Production | Examples |
 |---|---|---|---|---|
 | Six rcaps + sendable subset | Type-system deny-properties | Static data-race freedom | Pony stable | (§10.1) |
-| 128-bit hardware capabilities | ISA-enforced unforgeable | Per-thread caps | CheriBSD | (§10.2) |
-| `__cheri_compartment` annotations | Hardware-checked compartments | Per-compartment isolation | CHERIoT silicon 2026 | (§10.3) |
+| 128-bit hardware capabilities | ISA-enforced unforgeable | Per-thread caps | CheriBSD reference OS / research toolchain | (§10.2) |
+| `__cheri_compartment` annotations | Hardware-checked compartments | Per-compartment isolation | Emerging CHERIoT silicon; vendor/date-specific | (§10.3) |
 | No globals + reference passing | Lambda-calculus security kernel | Eventual-send vats | Newspeak/E research | (§10.4) |
 | Resource handles in Wit IDL | Component Model worlds | Per-component | Cloudflare/Fastly/Fermyon | (§10.5) |
 | Objects-as-capabilities | Type-safe SIPs | Channel contracts | Research / influence-only | (§10.6) |

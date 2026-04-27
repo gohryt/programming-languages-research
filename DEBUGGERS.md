@@ -149,7 +149,7 @@ Source: https://criu.org/Main_Page and https://criu.org/Assisted_debugging
 
 Undo's UDB is a commercial time-travel debugger for Linux C/C++/Rust that differs from rr (§2.1) in four architecturally interesting ways, each addressing a limitation that bit rr users in practice.
 
-**JIT binary instrumentation** replaces rr's dependence on hardware performance counters. UDB inserts instrumentation at runtime into the instruction stream to measure progress deterministically, so it runs on CPUs where rr cannot — including systems where microcode updates broke PMU determinism, virtualized environments that expose inconsistent counters, and ARM64. The trade-off is higher recording slowdown (roughly 2–4×) versus rr's ~20%, but portability is effectively absolute.
+**JIT binary instrumentation** replaces rr's dependence on hardware performance counters. UDB inserts instrumentation at runtime into the instruction stream to measure progress deterministically, so it runs on CPUs where rr cannot — including systems where microcode updates broke PMU determinism, virtualized environments that expose inconsistent counters, and ARM64. The trade-off is higher recording slowdown (roughly 2–4×) versus rr's ~20%, but portability across supported Linux CPU and virtualization environments is much broader.
 
 **Deferred recording mode** lets the debugger attach to a suspect process *with recording disabled*, and activate recording (`urecord`) only when something interesting is about to happen. Combined with **time limits** (`set time-limits min/max bbcount|percent|bookmark`) that constrain how far forward/reverse commands can move, this makes long recordings actually navigable — you bound the history region in focus rather than dragging the debugger across hours of irrelevant history.
 
@@ -157,7 +157,7 @@ Undo's UDB is a commercial time-travel debugger for Linux C/C++/Rust that differ
 
 **LiveRecorder** is the CI/production variant: UDB attached to a running service emits portable recordings shippable to a developer's machine. 99% of program state is reconstructed on demand from the minimal recording of nondeterministic inputs. UDB presents as GDB-compatible (100% of GDB commands plus `reverse-*` and `ugo time|undo|redo`), so existing VS Code / CLion / Emacs integrations work unchanged.
 
-rr and UDB together map the design space for record/replay: rr's hardware-counter route is fastest on supported CPUs; UDB's JIT route is universal; both share the deterministic-replay-plus-reverse-execution core and produce traces that a GDB front-end can drive.
+rr and UDB together map the design space for record/replay: rr's hardware-counter route is fastest on supported CPUs; UDB's JIT route is more portable across CPUs and virtualized environments; both share the deterministic-replay-plus-reverse-execution core and produce traces that a GDB front-end can drive.
 
 Source: https://undo.io/products/udb/ and https://docs.undo.io/GettingStartedWithUDB.html
 
@@ -173,7 +173,7 @@ The design lesson: **deterministic replay must be negotiated with every nondeter
 
 Source: https://help.totalview.io/classicTV/current/HTML/Splash/tvgettingstartedug-gettingStarted.3.30.html and https://help.totalview.io/previous_releases/2024.2/HTML/TotalView/totalviewlhug-parallel-debugging-setup.19.46.html
 
-### 2.10. Magic Trace — Intel PT Circular Buffer as Omniscient Debugger
+### 2.10. Magic Trace — Intel PT Circular Buffer for Retrospective Control-Flow Debugging
 
 Jane Street's `magic-trace` (Tristan Hume, 2022) is a debugger built on **Intel Processor Trace with a circular buffer**. Unlike `perf`, which samples periodically, magic-trace records *all control flow* continuously into a ring buffer; a **trigger event** — `SIGUSR2`, a specific function call, or Ctrl+C — takes a snapshot of the last ~10 ms of execution. The snapshot is reconstructed into a call-stack timeline viewable in Perfetto UI (§2.12).
 
@@ -183,7 +183,7 @@ The original contribution is the *debugging framing* of Intel PT. The hardware h
 - **~2–10% overhead**, low enough to enable in production for services that cannot tolerate record/replay's 20%+ cost.
 - ~40 ns resolution per event, vastly finer than sampling profilers.
 
-This is the debugger face of the Intel PT story — the tracer angle lives in `TRACERS.md §5`. The philosophical move is important for this chapter: **hardware tracing + circular buffer + trigger-driven snapshot = low-overhead omniscient debugging for the last 10 ms**. You do not need full record/replay to answer most "what was happening right before the crash/slowdown/weird state" questions.
+This is the debugger face of the Intel PT story — the tracer angle lives in `TRACERS.md §5`. The philosophical move is important for this chapter: **hardware tracing + circular buffer + trigger-driven snapshot = low-overhead retrospective control-flow debugging for the last 10 ms**. It answers "what executed right before the crash/slowdown/weird state?" rather than arbitrary value-history questions, so it complements rather than replaces full record/replay or omniscient data debugging.
 
 Limitations: Intel only (Skylake or later), Linux only, VMs mostly unsupported. Works on any language the compiler emits stable call frames for, but stack-reconstruction quality depends on handling language-specific idioms — OCaml is handled; other languages vary.
 
@@ -219,7 +219,7 @@ Source: https://perfetto.dev/docs/analysis/perfetto-sql-getting-started and http
 
 ## 3. Omniscient / Time-Travel Debugging
 
-Omniscient debugging records every interesting event and makes the execution history queryable after the fact — inverting the breakpoint model. Entries differ on **what the recorded unit is and who pays the cost**: variable assignments (ODB), structurally-shared states (Toby Ho), immutable model updates (Elm, Redux DevTools), bytecode-woven event streams at production scale (Chronon, TOD, IntelliTrace, RevDebug), decorator-level single-function traces (PySnooper, snoop, viztracer), reflective runtime frames (Pharo, Common Lisp, Racket), and hypervisor-invisible recordings (HyperDbg). The common thread is Bil Lewis's original claim: **you don't need breakpoints if you record everything.**
+Omniscient debugging records every interesting event and makes the execution history queryable after the fact — inverting the breakpoint model. Entries differ on **what the recorded unit is and who pays the cost**: variable assignments (ODB), structurally-shared states (Toby Ho), immutable model updates (Elm, Redux DevTools), bytecode-woven event streams at production scale (Chronon, TOD, IntelliTrace, RevDebug), decorator-level single-function traces (PySnooper, snoop, viztracer), reflective runtime frames (Pharo, Common Lisp, Racket), and debugger-architecture outliers such as hypervisor-invisible hooks (HyperDbg). The common thread is Bil Lewis's original claim: **you don't need breakpoints if you record everything** — with HyperDbg included here as a time-travel-adjacent contrast rather than as a recording system.
 
 ### 3.1. Bil Lewis — ODB (Omniscient Debugger for Java)
 
@@ -391,7 +391,7 @@ Bret Victor's "Inventing on Principle" talk (2012) proposed that execution isn't
 
 This requires recording all state, but for a simple interpreter it is tractable. The visualization shows not just "what is the current value" but "how did this value evolve over the lifetime of the program."
 
-The deeper claim: the step-by-step debugging model is a legacy of hardware limitations. With sufficient recording, the entire execution history is available simultaneously. The UI should present time as a spatial dimension, not a sequential process. No one has fully delivered on this vision in a production tool, but it remains the aspirational end state for debugging UIs.
+The deeper claim: the step-by-step debugging model is a legacy of hardware limitations. With sufficient recording, the entire execution history is available simultaneously. The UI should present time as a spatial dimension, not a sequential process. No general-purpose programming environment has fully delivered the entire vision in production, but domain-specific and notebook-style systems have shipped important slices of it (§4.3).
 
 Source: https://vimeo.com/36579366
 
@@ -423,7 +423,7 @@ Source: https://dev.epicgames.com/documentation/en-us/unreal-engine/using-the-ga
 
 ### 4.5. GPU Frame Debuggers — RenderDoc, NVIDIA NSight, Microsoft PIX
 
-GPU execution is massively parallel, asynchronous, and unpausable — thousands of shader invocations fire per draw call, each with its own register state. Step-through debugging is meaningless. RenderDoc (open source, Baldur Karlsson), NVIDIA NSight Graphics, and Microsoft PIX converge on a different model: **capture an entire frame offline and inspect it as a queryable object.**
+GPU execution is massively parallel, asynchronous, and unpausable — thousands of shader invocations fire per draw call, each with its own register state. Live, global step-through debugging of GPU execution is usually meaningless; frame debuggers instead capture the frame and allow offline inspection, including step-through replay of selected shader invocations. RenderDoc (open source, Baldur Karlsson), NVIDIA NSight Graphics, and Microsoft PIX converge on this model: **capture an entire frame offline and inspect it as a queryable object.**
 
 A capture contains every API call issued during the frame — draws, dispatches, state-setting calls, resource updates — plus all bound textures, buffers, render targets, and shader blobs, plus the framebuffer at each boundary. The **Event Browser** is the primary navigation UI: a hierarchical tree of API events by EID (Event ID), with user-annotated sections collapsed into tree nodes. The **Pipeline State** panel inspects the entire graphics pipeline at the selected event — which shaders are bound, which textures, which vertex buffers, which rasterizer state — with drill-downs to the raw contents of every resource.
 
@@ -1067,9 +1067,9 @@ Rows grouped by chapter, in chapter order.
 | Compiled conditional breakpoint (INT3;NOP) | Zero until condition true | Single trap when fired | Requires source-level edit, not runtime toggle | Chris Wellons pattern (§1.2) |
 | Hardware debug registers (DR0–DR3) | Zero on unwatched access | Trap (~3μs on Linux) | Max 4 watchpoints × 8 bytes | GDB, Jane Street perftrace (§1.3) |
 | RISC-V PMP as debug primitive | Reuses security regs | PMP fault | Bare-metal embedded only | Raven DAC '22 (§1.4) |
-| Deterministic record + replay | N/A | ~20% record, 0 replay | Single-threaded scheduling, CPU counter brittleness | rr, rr.soft (§2.1) |
+| Deterministic record + replay | N/A | ~20% recording overhead; replay re-executes from checkpoints | Single-threaded scheduling, CPU counter brittleness | rr, rr.soft (§2.1) |
 | Omniscient post-hoc query DB | N/A | Minutes to build, 10s of GB | Not live; post-hoc only | Pernosco (§2.2) |
-| Fork + CoW snapshot | N/A | One fork per snappoint | Cannot step forward from snapshot | VS Snapshot Debugger (§2.3) |
+| Out-of-band production snapshot | N/A | Bounded snapshot collection overhead | Cannot step forward from snapshot; implementation/runtime-specific | VS Snapshot Debugger (§2.3) |
 | Full-system icount replay | N/A | 5–10× slowdown under TCG | Whole VM including kernel | QEMU (§2.4) |
 | Queryable execution database | N/A | Recording overhead | Windows-centric, object-model UX | WinDbg TTD (§2.5) |
 | Terminal session rewind | N/A | Per-step copy on branch | Command-level granularity only | devops-rewind (§2.6) |
@@ -1077,11 +1077,11 @@ Rows grouped by chapter, in chapter order.
 | JIT-instrumented record/replay | Cold process | ~2–4× recording slowdown | No PMU dependence; higher overhead than rr | UndoDB / LiveRecorder (§2.8) |
 | MPI-aware distributed record/replay | TotalView + replay license | Heavy per-rank record, RDMA-aware | Scales to thousands of ranks; heavy overhead | TotalView ReplayEngine (§2.9) |
 | Intel PT ring-buffer + trigger snapshot | Hardware tracing on | 2–10% continuous; snapshot on demand | Intel + Linux only; last ~10 ms only | Magic Trace (§2.10) |
-| Fork-checkpoint reverse execution | Periodic `fork()` per checkpoint | CoW divergence + replay-to-target | Bytecode/Unix only (OCaml); predates rr by ~20y | `ocamldebug`, `ocamlearlybird` (§2.11) |
+| Fork-checkpoint reverse execution | None outside debugger | Periodic `fork()` checkpoints; memory proportional to CoW divergence; replay-to-target | Bytecode/Unix only (OCaml); predates rr by ~20y | `ocamldebug`, `ocamlearlybird` (§2.11) |
 | Trace-as-SQL database | Trace ingested into SQLite tables | Per-query SQL evaluation | Needs trace stored in relational form | Perfetto TraceProcessor + PerfettoSQL (§2.12) |
 | Record every assignment | O(writes) storage | Per-assignment write | Not for long-running workloads | ODB (Bil Lewis) (§3.1) |
 | Structural-sharing state history | O(delta × steps) | Persistent structure sharing | Post-mortem replay, not live | Toby Ho / JSON-R (§3.2) |
-| Immutable-state timeline slider | Free (runtime shares structure) | Zero extra | Requires immutable-by-design language | Elm (§3.3) |
+| Immutable-state timeline slider | None unless history retained | Memory proportional to retained states/deltas; replay/render cost on scrub | Cheap with immutable state, but history retention is still bounded by policy | Elm (§3.3) |
 | Reflective debugger-as-IDE | Full reflective runtime | Live method edit + frame restart | Requires fully reflective VM | Pharo/Smalltalk (§3.4) |
 | Condition/restart system | Zero | Handler runs with signaling frame live | Language-level mechanism, not VM feature | Common Lisp (§3.5) |
 | Continuation marks | One allocation per annotated frame | Stack walk on read | Requires first-class stack annotations | Racket (§3.6) |
@@ -1092,7 +1092,7 @@ Rows grouped by chapter, in chapter order.
 | Action-log replay over pure state | Action history array | Action re-application on jump | Requires pure reducers + immutable state | Redux DevTools (cf. Elm §3.3) (§3.11) |
 | Post-execution inline visualization | N/A | Full-run recording | No pause/step — post-run only | WhiteBox (§4.1) |
 | Timeline scrubber (aspirational) | Full state capture | Viable only at small scale | UX vision, not production | Bret Victor demo (§4.2) |
-| Reactive notebook dataflow DAG | Per-cell static ref graph | Cell re-execution on dep change | Cannot see side-effect-mediated deps | Observable, Light Table, Eve (§4.3) |
+| Live coding and reactive dataflow environments | Per-cell/static dependency metadata where available | Re-evaluation or watch updates on dependency/runtime change | Observable fits the DAG model; Light Table and Eve are related but different live-programming designs | Observable, Light Table, Eve (§4.3) |
 | Dataflow arrows + cross-cell watch | Reactive dependency graph exists | Draw arrows per audit | Visual clutter on complex sheets | Excel Trace Precedents/Dependents + Watch Window, TraceModel (§4.3) |
 | In-game replicated debug overlay | Replication cost (already paid) | Per-frame draw on viewport | Debug category coupled to gameplay code | Unreal Gameplay Debugger + Visual Logger (§4.4) |
 | Capture-and-inspect GPU frame | On-demand capture | Full frame serialized to disk | Offline only; shader debug info must be preserved | RenderDoc, NSight, PIX — pixel history + shader debugger (§4.5) |
@@ -1105,14 +1105,14 @@ Rows grouped by chapter, in chapter order.
 | Client-vs-platform-authoritative remote | Single TCP session | Per-packet memory/reg access | gdbserver thin vs lldb-server + SBPlatform thick | gdbserver, lldb-server, debugserver (§5.6) |
 | Mirror-based reflection | Capability required | Mirror dispatch per meta-op | Language must be designed for it | Newspeak, Self; JDWP/JDI shares the shape (§5.7) |
 | Language-specific TCP debug protocol | Zero until client connects | Per-command dispatch, spesh-aware frame reconstruction | Protocol outlives the IDE if upstreamed | MoarVM remote debug (§5.8) |
-| Retroactive console.log | Fork pool + ring buffer | Low-logarithmic response | Requires upfront deterministic recording | Replay.io (§6.1) |
+| Retroactive console.log | Deterministic recording/checkpoint infrastructure already paid | Replay/evaluate expression at hit points across checkpoints/forks | Requires upfront deterministic recording | Replay.io (§6.1) |
 | Typed holes + live eval | Language-level holes | Per-hole type check | Requires language co-design | Hazel (§6.2) |
 | Compile-time macro print | Zero when removed | One formatter call per hit | Source-level only; not toggleable at runtime | Rust `dbg!`, Elixir `dbg/2`, icecream (§6.3) |
 | DWARF location expressions | Per-variable location list | O(PC range) lookup | Correctness bugs in optimized code | GCC, LLVM (§7.1) |
 | Cross-tier debug info mapping | Per-pass metadata | Propagation cost in every pass | Must be maintained by every compilation pass | LLVM `!dbg`, V8 TurboFan frame state (§7.2) |
 | Bytecode↔native source map | Per-bytecode entry | O(1) lookup | Only available where the mapping is emitted | JVM, HotSpot (§7.3) |
-| Build-ID-keyed HTTP symbol fetch | Build-ID in ELF | HTTP GET on first use | Network dependency; sanitizers can't use | debuginfod + `DEBUGINFOD_URLS` (§7.4) |
-| Delta debugging | Test oracle only | O(log input size) test runs | Needs fast pass/fail oracle | `git bisect`, `ddmin` (§8.1) |
+| Build-ID-keyed HTTP symbol fetch | Build-ID in ELF | HTTP GET on first use | Network dependency; sanitizer support depends on external symbolizer/distribution configuration | debuginfod + `DEBUGINFOD_URLS` (§7.4) |
+| Delta debugging | Test oracle only | Multiple oracle runs; often near-linear/log-like on easy cases, worst-case O(n²) for `ddmin` | Needs fast pass/fail oracle | `git bisect`, `ddmin` (§8.1) |
 | Dynamic program slicing | Execution trace | Post-hoc slice computation | Per-input; needs instrumented run | Weiser-derived tools (§8.2) |
 | Spectrum-based fault localization | Coverage per test | Per-line scoring | Needs passing + failing tests with coverage | Tarantula, Ochiai, DStar (§8.3) |
 | Sparse predicate sampling + population stats | Per-predicate counter + sampling mask | Per-sample increment | Needs many runs; finds bugs no single run can | CBI (Liblit) (§8.4) |
