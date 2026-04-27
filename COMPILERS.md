@@ -2,7 +2,7 @@
 
 Research on compilation techniques, intermediate representations, code generation, and runtime-compilation integration (JITs, regex, query engines, hot code swap).
 
-This document covers everything downstream of parsing: lowering, IR, optimization, codegen, runtime object models, and compiler-emitted debug metadata. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocators, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`.
+This document covers everything downstream of parsing: lowering, IR, optimization, codegen, runtime object models, and compiler-emitted debug metadata. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocator implementations, language-level allocator API models, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`.
 
 ---
 
@@ -116,7 +116,7 @@ Compilers allocate enormous numbers of small objects — AST nodes, IR instructi
 
 ### 2.1. Arena Allocation — Bump Allocators
 
-Arena (bump) allocation is the dominant memory management strategy in compilers. The pattern: allocate a large contiguous region, bump a pointer forward for each allocation, never free individual objects. When the compilation phase ends, free the entire arena at once.
+Arena (bump) allocation is the dominant memory management strategy in compilers. The pattern: allocate a large contiguous region, bump a pointer forward for each allocation, never free individual objects. When the compilation phase ends, free the entire arena at once. This section is about arenas as an implementation technique inside compilers; language-facing allocator API models (explicit allocator parameters, context allocators, temp allocators, allocator toolkits) are covered in `MEMORY.md §7.12`.
 
 Rust's `bumpalo` crate is the canonical implementation: allocation is a pointer bump + alignment check (~2ns). There is no per-object deallocation, no free list, no fragmentation. The trade-off: objects in the arena cannot be individually freed. This is acceptable in compilers because AST nodes, IR instructions, and type objects all have the same lifetime — they live for one compilation phase and die together.
 
@@ -360,7 +360,7 @@ Source: https://medium.com/ballerina-techblog/peering-into-the-ballerina-interme
 
 Stefan Seifert's **RakuAST** (TPRF grant from 2020 onward, ~58% of 2025 Rakudo commits) replaces Rakudo's QAST-based frontend with a Raku-class-based AST whose nodes are themselves first-class Raku objects under the `RakuAST::` package — `RakuAST::StatementList`, `RakuAST::Call::Name`, etc. The defining move: `.AST` parses source into an object tree, `.DEPARSE` round-trips back to source, and compilation goes through `IMPL-TO-QAST` lowering — RakuAST sits *above* QAST rather than replacing it, with QAST kept as the lowering target. This is the same architectural choice as Rust's HIR/THIR/MIR cascade (§6.4): multiple ASTs/IRs at different abstraction levels, each tuned to its phase.
 
-The user-facing payoff is macro support: because AST nodes are Raku classes, user-level macros can construct, traverse, and rewrite syntax with the same tools used to program any other object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) variables become available, intended for the MoarVM runtime debugger and packaging verification. RakuAST is activated via `RAKUDO_RAKUAST=1` and is the prerequisite for the Raku 6.e language level. The lesson for new-language design: if AST nodes are language-level objects, macros, source round-tripping, and tooling all become library code rather than compiler-internal mechanisms — at the cost of every AST traversal going through full language object dispatch (heap-allocated nodes, GC pressure during compilation), so RakuAST traversal is materially slower than direct QAST manipulation. Cross-references `PARSERS.md §6.3` (Rakudo grammars) and §14.5 (MoarVM new-disp) — RakuAST is the frontend that emits dispatch-program code.
+The user-facing payoff is macro support: because AST nodes are Raku classes, user-level macros can construct, traverse, and rewrite syntax with the same tools used to program any other object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) variables become available, intended for the MoarVM runtime debugger and packaging verification. RakuAST is activated via `RAKUDO_RAKUAST=1` and is the prerequisite for the Raku 6.e language level. The lesson for new-language design: if AST nodes are language-level objects, macros, source round-tripping, and tooling all become library code rather than compiler-internal mechanisms — at the cost of every AST traversal going through full language object dispatch (heap-allocated nodes, GC pressure during compilation), so RakuAST traversal is materially slower than direct QAST manipulation. See `PARSERS.md §6.3` for Rakudo grammars and `COMPILERS.md §14.5` for MoarVM new-disp; RakuAST is the frontend that emits dispatch-program code.
 
 Source: https://docs.raku.org/type/RakuAST and https://news.perlfoundation.org/post/grant-rakuast-2020-12 and https://github.com/lizmat/articles/blob/main/review-of-2025.md
 
@@ -932,7 +932,7 @@ Compared with tracing:
 - No method-level compilation unit — BBV doesn't wait for a whole method to be hot before compiling anything.
 - Specialization is driven by observed types, not by user-written type hints, and happens at block granularity.
 
-YJIT shipped in Ruby 3.1 (2021) and now delivers 2–3x speedups on Rails workloads with compilation overhead low enough for production opt-in and for some Rails deployments to enable it by default. The technique has since been adopted in experimental JITs for other dynamic languages.
+Status: production since Ruby 3.1 (2021). YJIT now delivers 2–3x speedups on Rails workloads with compilation overhead low enough for production opt-in, and some Rails deployments enable it by default. The technique has since been adopted in experimental JITs for other dynamic languages.
 
 Source: https://chrisseaton.com/truffleruby/basic-block-versioning/ and https://dl.acm.org/doi/10.1145/2816707.2816714
 
@@ -1048,7 +1048,7 @@ Source: https://docs.mesa3d.org/nir/ and https://www.tensorflow.org/xla
 
 ## 16. Advanced Memory Management
 
-Beyond tracing GC and manual management lies a design space of compile-time memory strategies that aim for GC-free runtime behavior without Rust's full borrow-checker discipline. The entries in this chapter differ on *where the safety argument lives*: Perceus inserts precise reference-count ops driven by a linear resource calculus, MLKit and Cyclone infer or annotate region lifetimes to enable bulk deallocation, and Vale combines per-allocation generation numbers with region-borrowing analysis to reduce check density. Each offers a different combination of annotation burden, runtime overhead, and expressive flexibility versus the Rust / GC baselines.
+Beyond tracing GC and manual management lies a design space of compile-time memory strategies that aim for GC-free runtime behavior without Rust's full borrow-checker discipline. The entries in this chapter differ on *where the safety argument lives*: Perceus inserts precise reference-count ops driven by a linear resource calculus, MLKit and Cyclone infer or annotate region lifetimes to enable bulk deallocation, and Vale combines per-allocation generation numbers with region-borrowing analysis to reduce check density. Each offers a different combination of annotation burden, runtime overhead, and expressive flexibility versus the Rust / GC baselines. The fuller language-design and runtime-management treatment of these same families lives in `MEMORY.md` (`§2` for regions, `§3` for compile-time RC, `§7.12` for allocator API models).
 
 ### 16.1. Perceus — Garbage-Free Reference Counting with Reuse
 
@@ -1762,9 +1762,9 @@ Source: https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/rea
 
 ### 30.2. HotSpot `jaotc` — Deprecated AOT Experiment
 
-HotSpot's `jaotc` shipped in JDK 9 as an experimental AOT compiler based on Graal. It could precompile Java classes into a shared library that the JVM loaded at startup, reducing some first-use JIT latency while retaining the ordinary JVM runtime. The idea matched the same hybrid pattern as ReadyToRun: use AOT code as a startup accelerator, then let the managed runtime remain in charge.
+Status: experimental in JDK 9; removed from the main JDK in the JDK 16/17-era cleanup. HotSpot's `jaotc`, based on Graal, could precompile Java classes into a shared library that the JVM loaded at startup, reducing some first-use JIT latency while retaining the ordinary JVM runtime. The idea matched the same hybrid pattern as ReadyToRun: use AOT code as a startup accelerator, then let the managed runtime remain in charge.
 
-The experiment did not become the mainstream Java deployment path. `jaotc` and the experimental Graal JIT were removed from the JDK distribution in JDK 16/17-era cleanup, while GraalVM continued outside the main JDK. The lesson is that an AOT+JIT hybrid must justify its maintenance cost against simpler levers: class-data sharing, faster tiered JITs, profile-guided warmup, and full native-image deployment.
+The experiment did not become the mainstream Java deployment path, while GraalVM continued outside the main JDK. The lesson is that an AOT+JIT hybrid must justify its maintenance cost against simpler levers: class-data sharing, faster tiered JITs, profile-guided warmup, and full native-image deployment.
 
 ### 30.3. GraalVM Native Image — Closed-World AOT
 

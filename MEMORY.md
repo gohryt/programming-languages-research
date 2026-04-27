@@ -2,7 +2,7 @@
 
 Research on compile-time and runtime memory disciplines — ownership and borrowing, region inference, reference-counting compilation, modern C++ safety initiatives, hardware tagging and capabilities, tracing GC architectures, allocators, formal verification of memory safety, concurrent reclamation, and capability-based authority.
 
-This document spans both compile-time analyses and runtime systems. The compile-time half (regions, ownership, RC compilation) extends `COMPILERS.md §16` (Perceus, MLKit/Cyclone basics, Vale generational references) rather than duplicating it — entries flagged with cross-references show what is added beyond the existing summary. The runtime half (tracing GC, allocators, hardware mechanisms, concurrent reclamation) is in scope here but explicitly *out of scope* for `COMPILERS.md`. Sanitizers as observability tools live in `TRACERS.md §8`; the operational aliasing model behind Miri lives in `DEBUGGERS.md §8.8` and is cross-linked from §8.11 here. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
+This document spans both compile-time analyses and runtime systems. The compile-time half (regions, ownership, RC compilation) extends `COMPILERS.md §16` (Perceus, MLKit/Cyclone basics, Vale generational references) rather than duplicating it — entries flagged with cross-references show what is added beyond the existing summary. The runtime half (tracing GC, allocators, hardware mechanisms, concurrent reclamation) is in scope here but explicitly *out of scope* for `COMPILERS.md`. Sanitizers as observability tools live in `TRACERS.md §8`; see `DEBUGGERS.md §8.8` for the operational aliasing model behind Miri, and see `MEMORY.md §8.11` for the formal-model side. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
 
 ---
 
@@ -78,7 +78,7 @@ Source: https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforc
 
 Fernando Borretti's **Austral** uses linearity (every linear value used *exactly* once) as the load-bearing safety primitive, not an opt-in. The linearity checker fits in roughly 600 lines of OCaml. Linear types double as **capabilities**: the entrypoint receives a `RootCapability` and APIs require passing capability values (`EnvCap`, `FileSystemCap`, etc.) — supply-chain attacks become a type error since capabilities cannot be forged or stashed in globals.
 
-Region-tagged borrows (`borrow` statement introducing a fresh region type `R`) re-enable shared/mutable references inside a lexical scope without losing the linearity invariant, by ensuring references cannot escape the region. The language is designed for "fits-in-head" simplicity: the linearity rules fit on one page; the compiler is small enough to be auditable. 1.0.0-alpha as of 2023.
+Region-tagged borrows (`borrow` statement introducing a fresh region type `R`) re-enable shared/mutable references inside a lexical scope without losing the linearity invariant, by ensuring references cannot escape the region. The language is designed for "fits-in-head" simplicity: the linearity rules fit on one page; the compiler is small enough to be auditable. Status: 1.0.0-alpha in 2023.
 
 Source: https://austral-lang.org/spec/spec.html and https://borretti.me/article/how-australs-linear-type-checker-works and https://borretti.me/article/how-capabilities-work-austral
 
@@ -94,7 +94,7 @@ Source: https://tutorial.ponylang.io/reference-capabilities/reference-capabiliti
 
 GHC's `-XLinearTypes` (Bernardy et al., POPL 2018; shipped GHC 9.0, February 2021) puts linearity on the *function arrow* (`a %1 -> b`), not on types. A linear function promises "if my result is consumed once, my argument is consumed once," but can still be applied to unrestricted values. The **multiplicity-polymorphic arrow** `a %m -> b` with `m :: Multiplicity` (`One` or `Many`) lets `map`, `(.)`, etc. be reused unmodified for both linear and non-linear callers — solving the "code duplication" problem that kept linear types out of mainstream FP for thirty years.
 
-All non-GADT data constructors are linear by default, so existing types like `(,)` and `[]` get useful linear types for free; existing programs continue to type-check. The implementation cost in GHC was ~1,150 lines. "Linear Constraints" (PACMPL 2021) layers an inferred `=∘` arrow on top for ergonomics. Still marked experimental in GHC 9.12.
+All non-GADT data constructors are linear by default, so existing types like `(,)` and `[]` get useful linear types for free; existing programs continue to type-check. The implementation cost in GHC was ~1,150 lines. "Linear Constraints" (PACMPL 2021) layers an inferred `=∘` arrow on top for ergonomics. Status: experimental in GHC 9.12.
 
 Source: https://arxiv.org/abs/1710.09756 and https://downloads.haskell.org/~ghc/latest/docs/users_guide/exts/linear_types.html
 
@@ -174,7 +174,7 @@ Source: https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf and ht
 
 ### 2.9. RC-Immix Region Coloring (Runtime Layout)
 
-Not a region *language* feature but a *runtime* layout technique. Shahriyar, Blackburn, Yang, McKinley (OOPSLA 2013) marry reference counting with Immix's mark-region heap (lines + blocks) for high-throughput RC. Per-line live-object counts (a coarse "region color") let the collector reclaim whole lines when the line count hits zero, avoiding free-list fragmentation. Proactive + reactive copying integrated with RC eliminates fragmentation; backup tracing handles cycles. Cross-references §6.2 (LXR), which extends this lineage with low-latency region-colored RC.
+Not a region *language* feature but a *runtime* layout technique. Shahriyar, Blackburn, Yang, McKinley (OOPSLA 2013) marry reference counting with Immix's mark-region heap (lines + blocks) for high-throughput RC. Per-line live-object counts (a coarse "region color") let the collector reclaim whole lines when the line count hits zero, avoiding free-list fragmentation. Proactive + reactive copying integrated with RC eliminates fragmentation; backup tracing handles cycles. See `MEMORY.md §6.2` for LXR, which extends this lineage with low-latency region-colored RC.
 
 Region granularity is independent of language-level region semantics — purely a layout/locality optimization. The lesson is that the same word means two different things in this chapter and chapter 6: programmer-visible regions vs. allocator-internal regions.
 
@@ -260,7 +260,7 @@ Source: https://wg21.link/p1179 and http://clang.llvm.org/docs/LifetimeSafety.ht
 
 Opt-in, scope-applicable bundles of guarantees (bounds, type, lifetime, arithmetic) that a conforming compiler must enforce — restrictions on existing C++ rather than new syntax, with the explicit goal of "fixing existing code by recompilation." Three retained syntactic constructs in P3589: `[[profiles::enforce(...)]]`, `[[profiles::suppress(...)]]`, and the post-Hagenberg `[[profiles::exempt]]` for whole-header opt-out. Initial profiles (P3081 R2): `std::type`, `std::bounds`, `std::lifetime`, plus aggregate `std::strict`. Each rule must be decidable at compile time (allowing injected runtime checks).
 
-Stroustrup's framing (P3651/P3704): profiles do not change valid-program semantics, are independent of new features, and trace back decades to Core Guidelines work. As of early 2026: did not make C++26 normatively. Forwarded into the parallel language safety white paper. Gabriel Dos Reis has an experimental implementation; broad VS analyzer support exists for ~4 Core Guidelines profiles already.
+Stroustrup's framing (P3651/P3704): profiles do not change valid-program semantics, are independent of new features, and trace back decades to Core Guidelines work. Status: not adopted normatively for C++26 as of early 2026; forwarded instead into the parallel language safety white paper. Gabriel Dos Reis has an experimental implementation, and broad VS analyzer support exists for ~4 Core Guidelines profiles already.
 
 Source: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3081r2.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3589r2.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3651r0.pdf
 
@@ -316,7 +316,7 @@ Hardware mechanisms add silicon-enforced memory-safety primitives that software-
 
 ### 5.1. ARM MTE — 4-Bit Tags and Sync/Async Modes
 
-ARM's **Memory Tagging Extension** stores a 4-bit tag per 16-byte granule, both in pointer top bits (TBI) and in shadow tag memory; hardware checks on every load/store. SYNC / ASYNC / ASYMM modes trade precision for speed — SYNC traps immediately on tag mismatch with the faulting PC and exact address; ASYNC accumulates faults to a status register checked on context switch. Scudo allocator integration randomises tags on malloc/free for use-after-free and linear-overflow detection (cross-ref §7.5); stack tagging via the `AArch64StackTagging` compiler instrumentation pass.
+ARM's **Memory Tagging Extension** stores a 4-bit tag per 16-byte granule, both in pointer top bits (TBI) and in shadow tag memory; hardware checks on every load/store. SYNC / ASYNC / ASYMM modes trade precision for speed — SYNC traps immediately on tag mismatch with the faulting PC and exact address; ASYNC accumulates faults to a status register checked on context switch. Scudo allocator integration randomises tags on malloc/free for use-after-free and linear-overflow detection; see `MEMORY.md §7.5`. Stack tagging is provided by the `AArch64StackTagging` compiler instrumentation pass.
 
 Overhead: Scudo + MTE SYNC ≈ 12% geomean SPECrate, MTE ASYNC ≈ 4% (NanoTag, 2025). Originally marketed as "near-zero" — real cost is non-trivial in SYNC. Shipping on Pixel 8/9 (opt-in), Apple MIE on recent A-series devices with exact SoC coverage and default-on scope treated as time-sensitive (see §5.2), and upcoming flagship Android SoCs. The **TIKTAG attack** (2024) demonstrated speculative tag leakage on Pixel 8.
 
@@ -420,7 +420,7 @@ Source: https://github.com/mmtk and https://railsatscale.com/2025-01-08-new-for-
 
 OpenJDK's **ZGC** is a concurrent region-based compacting collector using colored 64-bit pointers with metadata bits and load barriers to translate stale references on the fly, achieving sub-millisecond pauses independent of heap size up to 16 TB. Colored pointers — Marked0/Marked1/Remapped/Finalizable bits embedded in the high bits of 64-bit references; a load barrier resolves stale pointers without an STW remap phase. Self-healing barriers update the loaded reference back into the field, ensuring each barrier slow path fires at most once per location. **Generational ZGC** (JEP 439, JDK 21+) added a young generation with store barriers for young/old tracking; in JDK 25 it became the *only* ZGC implementation (legacy non-generational mode removed).
 
-Production since JDK 15; generational ZGC is the only ZGC mode in JDK 25 LTS, which does not imply ZGC is the default JVM collector; Linux/Windows/macOS.
+Status: production since JDK 15. Generational ZGC is the only ZGC mode in JDK 25 LTS, which does not imply ZGC is the default JVM collector; Linux/Windows/macOS.
 
 Source: https://openjdk.org/jeps/439 and https://wiki.openjdk.java.net/display/zgc
 
@@ -428,7 +428,7 @@ Source: https://openjdk.org/jeps/439 and https://wiki.openjdk.java.net/display/z
 
 Red Hat / OpenJDK's **Shenandoah** is a concurrent compacting collector that performs object relocation in parallel with the application, with pause times in low milliseconds independent of heap size. Evolved from Brooks-style forwarding-pointer indirection on every read (JDK 12) to **load reference barriers** (JDK 13) that fire only at reference-load definition sites, eliminating primitive-read overhead. Self-fixing barriers (JDK 14): the slow path CAS-updates the field back to the to-space copy, so each location pays the slow path at most once. Connection-matrix region tracking instead of card-table-style remembered sets; supports heaps up to ~4 TB; generational mode (JEP 404) introduced experimentally.
 
-Production-ready since JDK 15; default in Red Hat builds; widely used for latency-sensitive Java workloads.
+Status: production-ready since JDK 15; default in Red Hat builds; widely used for latency-sensitive Java workloads.
 
 Source: https://developers.redhat.com/blog/2019/06/27/shenandoah-gc-in-jdk-13-part-1-load-reference-barriers and https://developers.redhat.com/blog/2020/03/04/shenandoah-gc-in-jdk-14-part-1-self-fixing-barriers
 
@@ -492,7 +492,7 @@ Source: https://www.moarvm.org/features.html and https://github.com/MoarVM/MoarV
 
 ## 7. General-Purpose Allocators
 
-The space below tracing GC and above raw `mmap`. Entries differ on *what they optimize for*: raw throughput (mimalloc, snmalloc, rpmalloc), TLB efficiency at fleet scale (TCMalloc + Temeraire), tail latency under decay (jemalloc), security hardening (Scudo, hardened_malloc, PartitionAlloc), memory footprint (Mesh), or hard real-time predictability (TLSF). Arena/bump allocators are covered in `COMPILERS.md §2.1`.
+The space below tracing GC and above raw `mmap`. Entries differ on *what they optimize for*: raw throughput (mimalloc, snmalloc, rpmalloc), TLB efficiency at fleet scale (TCMalloc + Temeraire), tail latency under decay (jemalloc), security hardening (Scudo, hardened_malloc, PartitionAlloc), memory footprint (Mesh), hard real-time predictability (TLSF), or language-level allocator ergonomics (Zig's explicit allocator parameters, Odin/Jai context allocators, C3 temp pools, Beef allocator-aware `new`, Hare runtime heaps, D's composable allocator building blocks). Arena/bump allocators are covered in `COMPILERS.md §2.1`.
 
 ### 7.1. mimalloc — Three-List Sharding and Secure Mode
 
@@ -580,11 +580,43 @@ Most subsequent allocators (jemalloc, tcmalloc) cite Hoard as ancestor. Worth na
 
 Source: https://people.cs.umass.edu/~emery/pubs/berger-asplos2000.pdf and https://emeryberger.github.io/Hoard/
 
+### 7.12. Language-Level Allocator APIs — Zig, Odin, C3, Jai, Beef, Hare, D
+
+A separate design axis from allocator internals is **how a language routes allocation authority through ordinary code**. Zig, Odin, C3, Jai, Beef, Hare, and D are useful because they make allocation policy visible at the language/library boundary rather than treating `malloc` as ambient global state.
+
+**Zig** is the strictest mainstream example: there is no default global allocator in the standard-library style. Data structures and functions that allocate conventionally accept a `std.mem.Allocator` parameter, and allocation failure is an ordinary `error.OutOfMemory` path. The standard allocator palette is deliberately small and explicit: `page_allocator` makes an OS mapping per allocation and is thread-safe but syscall-heavy; `FixedBufferAllocator` allocates from caller-provided storage and never touches the heap; `ArenaAllocator` wraps a child allocator and frees everything at `deinit`; safety-oriented general-purpose/debug allocator variants detect leaks, double-free, and use-after-free with configurable metadata retention and thread safety; `SmpAllocator` is the high-throughput multithreaded option; `c_allocator` and `raw_c_allocator` bridge to libc. Zig's design chooses verbosity over hidden allocation: libraries do not secretly pick a heap policy, which makes embedded, kernel, testing, and arena-heavy programs much easier to reason about. The trade-off is API friction — allocator parameters percolate through call graphs.
+
+**Odin** chooses a different point: every scope has an implicit `context` containing `context.allocator` and `context.temp_allocator`, and built-ins such as `make`, dynamic arrays, maps, and some library routines use that context unless an allocator is passed explicitly. Dynamic arrays remember their allocator, while slices deleted with `delete` use the current context allocator. Odin's default temporary allocator is arena-based and is expected to be reset with `free_all(context.temp_allocator)` at a frame or request boundary; game-style loops make this lifetime obvious. `TEMP_ALLOCATOR_GUARD` / arena temp begin/end support nested scoped temporary lifetimes, and core/os exposes temp allocator guards to avoid collisions. Odin's standard library also has allocator wrappers such as tracking/counting/profiling allocators. The key trade-off: Odin gets ergonomic allocation-context propagation without allocator parameters everywhere, but because allocation can happen through the implicit context, lifetime discipline depends on conventions around when temp storage is reset.
+
+**C3** is close to Odin but more explicit about the temporary-allocation idiom. It exposes ordinary heap allocation through `mem`, temporary allocation through `tmem`, and an `@pool` macro that flushes temporary allocations at the end of a lexical scope. Standard-library functions that allocate generally accept an allocator, and many APIs have `t` / `temp_` convenience variants (`tmalloc`, `tnew`, `string::tformat`, `List.tinit`) that route into `tmem`. This makes temp allocation feel like a scoped region system embedded in the library. C3 also has debug support aimed specifically at allocator bugs: `VMEM_TEMP` uses virtual memory protection so use-after-pool turns into an immediate segfault, and `TrackingAllocator` records leaks/backtraces around any child allocator. C3's lesson is that arena-style temp allocation becomes much safer when paired with a debug mode that makes escaped temp pointers crash deterministically.
+
+**Jai** is closed beta, so the available evidence is weaker here than for Zig, Odin, or C3: most public descriptions come from community documentation and reverse-engineered notes rather than an official stable language reference. Even so, the broad shape is influential. Jai's context contains a current allocator, a temporary allocator, logger, formatting options, and other per-call operational state; the context is implicitly threaded through calls except for C-call boundaries. Temporary storage is a linear/bump allocator reset by `reset_temporary_storage`; `push_allocator(temp)` or double-comma shorthand routes ordinary allocations to temp storage for a scope. The main lesson is historical and ergonomic rather than algorithmic: allocator policy can be rebound for a subtree of calls without manually threading allocator parameters through every function.
+
+**Beef** blends object-language ergonomics with allocator control. `scope` allocates objects with lexical lifetime, `new` allocates through the workspace-selected global allocator, and `new:allocator` routes allocation through a custom allocator object. Custom allocators need at least `Alloc` and `Free`, with optional typed hooks. Core library types such as `String` and `List` conventionally allocate through the global allocator but expose overridable allocation/free hooks for custom policies. Beef also ships a debug allocator with real-time leak checking and hot-compilation support. This is a C#/C++-shaped design point: preserve `new` syntax, but make allocator selection a first-class part of allocation expressions and workspace configuration.
+
+**Hare** is simpler and more C-like. The runtime exposes `malloc`, `realloc`, `free_`, and `setheap`; `memory_heap` has freelists for blocks up to 2048 bytes plus a current chunk. `setheap` swaps the internal runtime heap, and the caller is responsible for ensuring that `free`/`delete` uses memory from the matching heap. Freestanding Hare programs can provide their own `malloc`, `free`, `ensure`, and `unensure` runtime functions, so the compiler's dynamic slice operations (`append`, `insert`, `delete`) can work without the full standard runtime. Hare's lesson is that a small language can still make the heap replaceable at the runtime boundary, but it does not attempt Zig/Odin-style allocator plumbing through most library APIs.
+
+**D**'s `std.experimental.allocator` is the most "allocator toolkit" design in this group. It provides a high-level allocator interface plus a large library of composable building blocks: `Region`, `InSituRegion`, `BorrowedRegion`, `SharedRegion`, `free_list`, `fallback_allocator`, `segregator`, `stats_collector`, `bucketizer`, `affix_allocator`, and more. `Region` is the canonical bump allocator: three pointers, allocate by alignment-adjust + pointer bump + bounds check, no general deallocation, `deallocateAll` to reuse the whole region, and optional in-place last-allocation deallocation/expansion. This is less about one blessed language policy and more about providing allocator combinators that expert users assemble into domain-specific heaps.
+
+For Mage, the reusable design space is clear:
+
+- **Zig model** — explicit allocator parameter everywhere allocation may occur. Best transparency and testability; highest API friction.
+- **Odin model** — implicit context allocator plus explicit override. Best ergonomics among officially documented systems here; requires strong conventions for temp lifetimes.
+- **C3 model** — heap + temp allocator as first-class named defaults, with scoped `@pool` and virtual-memory debug mode. Strong candidate for ergonomic arena lifetimes.
+- **Jai model** — implicit context allocator and temporary storage, but with weaker public documentation. Useful as influence, weaker as a direct blueprint.
+- **Beef model** — allocation expression chooses global, scoped, or custom allocator. Good when object construction syntax is central.
+- **Hare model** — runtime heap replacement at a small ABI boundary. Good for freestanding systems, weaker for per-subsystem policy.
+- **D model** — allocator building blocks and wrappers as a library. Good for experts, but less opinionated as a language-wide discipline.
+
+A practical Mage design could combine them: explicit allocator parameters for low-level library APIs; a scoped context allocator for high-level application code; a built-in temporary arena with lexical or frame reset; and debug allocator modes that make leaks, double-frees, and escaped temp allocations fail loudly.
+
+Source: https://zig.guide/standard-library/allocators/ and https://github.com/ziglang/zig/blob/master/lib/std/heap.zig and https://odin-lang.org/docs/overview/ and https://pkg.odin-lang.org/base/runtime/ and https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin and https://c3-lang.org/language-common/memory/ and https://c3-lang.org/misc-advanced/debugging/ and https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md and https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced and https://www.beeflang.org/docs/language-guide/memory/ and https://docs.harelang.org/rt and https://harelang.org/documentation/usage/freestanding.html and https://dlang.org/phobos/std_experimental_allocator.html and https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
+
 ---
 
 ## 8. Verified Memory Safety
 
-Formally verified memory safety treats safety as a theorem to prove rather than a property to argue. Entries differ on *what is verified* (type/memory safety only, full functional correctness, UB-free execution), *how much proof engineering is required* (3–5× for HACL\*, 10–30× for foundational Coq proofs), and *what production code has shipped*. HACL\*/EverCrypt is the deepest production deployment; CompCert is the compiler equivalent; Verus, Prusti, Creusot, Aeneas, RefinedRust are the modern Rust verification toolbox. Rust's operational aliasing model (Stacked/Tree Borrows) sits at the boundary between formal model and runtime enforcement; cross-references `DEBUGGERS.md §8.8` for the Miri side and §1.3 above for the language-level perspective.
+Formally verified memory safety treats safety as a theorem to prove rather than a property to argue. Entries differ on *what is verified* (type/memory safety only, full functional correctness, UB-free execution), *how much proof engineering is required* (3–5× for HACL\*, 10–30× for foundational Coq proofs), and *what production code has shipped*. HACL\*/EverCrypt is the deepest production deployment; CompCert is the compiler equivalent; Verus, Prusti, Creusot, Aeneas, RefinedRust are the modern Rust verification toolbox. Rust's operational aliasing model (Stacked/Tree Borrows) sits at the boundary between formal model and runtime enforcement; see `DEBUGGERS.md §8.8` for the Miri side and `MEMORY.md §1.3` for the language-level perspective.
 
 ### 8.1. RustBelt — Mechanized Soundness with Lifetime Logic
 
@@ -606,7 +638,7 @@ Source: https://iris-project.org/ and https://www.cambridge.org/core/journals/jo
 
 Lattuada, Hance, Cho, Brun, Subasinghe, Zhou, Howell, Parno, Hawblitzel deliver SMT-backed verification of full functional correctness for Rust, leveraging Rust's linear types as ghost permissions to verify both safe and unsafe code with low annotation overhead. **Linear ghost permissions** let ghost code carry capability tokens (e.g. raw-pointer permissions) borrow-checked exactly like real Rust. **Tri-modal language** separates `spec` (uncomputable, unrestricted), `proof` (linear, ghost), and `exec` (compiled) modes. SMT-tuning — per-function `rlimit`, isolated bit-vector reasoning, encoder optimizations — yields 3–61× speedups vs prior tools.
 
-Used at Google for kernel verification (Android pKVM/NRKernel), at Amazon, and inside Linux kernel verification work. Verified case studies include OS page tables, NUMA-aware data-structure replication, crash-safe storage, and a concurrent memory allocator (~6.1K LoC impl + 31K LoC proof). The most production-relevant Rust verifier as of 2026.
+Used at Google for kernel verification (Android pKVM/NRKernel), at Amazon, and inside Linux kernel verification work. Verified case studies include OS page tables, NUMA-aware data-structure replication, crash-safe storage, and a concurrent memory allocator (~6.1K LoC impl + 31K LoC proof). Status: the most production-relevant Rust verifier in this survey as of 2026.
 
 Source: https://www.microsoft.com/en-us/research/publication/verus-a-practical-foundation-for-systems-verification/ and https://github.com/verus-lang/verus and https://verus-lang.github.io/verus/guide/
 
@@ -660,7 +692,7 @@ Source: https://compcert.org/doc/html/compcert.common.Separation.html and https:
 
 The same operational aliasing models from §1.3 above also have a *formal* role: they define when unsafe Rust triggers UB so the compiler can soundly exploit aliasing for optimization. Stacked Borrows' optimization soundness was proven in Coq, justifying reordering memory accesses past unknown calls based on intraprocedural reasoning. Tree Borrows' Rocq mechanization (Villani et al., PLDI 2025) preserves all Stacked Borrows optimizations and additionally licenses read-read reorderings, while empirically rejecting 54% fewer real programs.
 
-The key role for language design: an aliasing model is simultaneously a *runtime checker* (Miri, `DEBUGGERS.md §8.8`), a *language-level discipline* (§1.3), and a *theorem about the compiler* (this section). All three views must agree. Stacked Borrows remains the established model for today's Miri-based checking; Tree Borrows is an experimentally implemented successor candidate with stronger acceptance and formal results.
+The key role for language design: an aliasing model is simultaneously a *runtime checker* (Miri; see `DEBUGGERS.md §8.8`), a *language-level discipline* (see `MEMORY.md §1.3`), and a *theorem about the compiler* (this section). All three views must agree. Stacked Borrows remains the established model for today's Miri-based checking; Tree Borrows is an experimentally implemented successor candidate with stronger acceptance and formal results.
 
 Source: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf
 
@@ -668,7 +700,7 @@ Source: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://i
 
 ## 9. Concurrent Memory Reclamation
 
-Mechanisms for safely reclaiming memory in lock-free data structures, where readers cannot easily be told "stop touching that pointer." The axis across entries is *who pays what cost*: hazard pointers add a per-protected-pointer fence to every read; RCU/QSBR have zero-cost readers but require cooperative quiescence; EBR has ~1 fence per pin but unbounded retention under stalls; HE/IBR/Hyaline/Stamp-It/NBR/VBR offer various combinations of bounded retention and EBR-grade throughput. C++26 standardizes hazard pointers and RCU as language-level primitives (cross-ref §4.7).
+Mechanisms for safely reclaiming memory in lock-free data structures, where readers cannot easily be told "stop touching that pointer." The axis across entries is *who pays what cost*: hazard pointers add a per-protected-pointer fence to every read; RCU/QSBR have zero-cost readers but require cooperative quiescence; EBR has ~1 fence per pin but unbounded retention under stalls; HE/IBR/Hyaline/Stamp-It/NBR/VBR offer various combinations of bounded retention and EBR-grade throughput. C++26 standardizes hazard pointers and RCU as language-level primitives; see `MEMORY.md §4.7`.
 
 ### 9.1. Hazard Pointers
 
@@ -774,7 +806,7 @@ Source: https://github.com/CTSRD-CHERI/cheri-c-programming and https://www.cl.ca
 
 CHERIoT extends the CHERI programming model with first-class **compartment annotations**: `__cheri_compartment`, `__cheri_libcall`, `__cheri_callback`. The compiler distinguishes intra-compartment direct calls, library calls (no security boundary, no mutable globals), and cross-compartment calls (sealed entry capabilities through a switcher). `CHERIOT_NO_AMBIENT_MALLOC` is a compile-time switch removing implicit allocator authority — pure ocap discipline at the C level. Sealing is used for unforgeable entry capabilities and authority-bearing handles, while allocator and revocation policy remain explicit runtime-design questions rather than automatic consequences of capability hardware alone.
 
-This is one of the cleanest existing C-language ocap designs, possible because CHERIoT made compartments a first-class hardware-checked boundary. Treat availability and deployment status as hardware- and vendor-specific (cross-ref §5.7).
+This is one of the cleanest existing C-language ocap designs, possible because CHERIoT made compartments a first-class hardware-checked boundary. Treat availability and deployment status as hardware- and vendor-specific; see `MEMORY.md §5.7`.
 
 Source: https://cheriot.org/book/language_extensions.html and https://cheriot.org/rtos/sealing/2025/11/06/sealing.html
 
@@ -828,7 +860,7 @@ Source: https://spritely.institute/goblins/
 
 ### 10.11. F\* / Steel — Capabilities as Separation-Logic Resources
 
-Steel is a concurrent separation logic embedded in F\*; capabilities are *separation-logic resources* (`slprop`) representing exclusive ownership of memory regions, threaded through Hoare quintuples. AC-matching tactics + SMT for frame inference; selectors abstracting resources for SMT-friendly specs; SteelCore soundness fully mechanized in F\*. Production verification work in Project Everest (HACL\*, EverParse, EverCrypt — cross-ref §8.9). The cleanest example of "capabilities as separation-logic resources" in a verified-systems language.
+Steel is a concurrent separation logic embedded in F\*; capabilities are *separation-logic resources* (`slprop`) representing exclusive ownership of memory regions, threaded through Hoare quintuples. AC-matching tactics + SMT for frame inference; selectors abstracting resources for SMT-friendly specs; SteelCore soundness fully mechanized in F\*. Production verification work appears in Project Everest (HACL\*, EverParse, EverCrypt; see `MEMORY.md §8.9`). The cleanest example of "capabilities as separation-logic resources" in a verified-systems language.
 
 Source: https://project-everest.github.io/assets/steel.pdf and https://github.com/FStarLang/steel
 
@@ -843,7 +875,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Technique | Annotation Cost | Inference Power | Key Trade-off | Examples |
 |---|---|---|---|---|
 | MIR-CFG NLL | Lifetime params on signatures | Liveness over CFG | Most production-mature; well-understood | Rust 1.31+ (§1.1) |
-| Polonius / Datalog reformulation | Same as NLL | Per-CFG-point loan liveness | Accepts more programs; alpha as of 2026 | rustc -Zpolonius (§1.2) |
+| Polonius / Datalog reformulation | Same as NLL | Per-CFG-point loan liveness | Accepts more programs; alpha-status as of 2026 | rustc -Zpolonius (§1.2) |
 | Stacked / Tree Borrows | None (operational model) | Defines UB for unsafe | Tree Borrows rejects 54% fewer programs | Miri (§1.3, §8.11) |
 | Pin/Unpin | Library-only | Address stability | Self-referential async state machines | Rust async (§1.4) |
 | View types (proposed) | Field lists in signature | Disjoint partial borrows | Pre-RFC | Rust (§1.5) |
@@ -941,7 +973,19 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Bounded-time O(1) | Moderate | Hard real-time | Worst-case bound | TLSF (§7.10) |
 | Per-processor + global; provable blowup | Foundational | Standard | First scalable malloc | Hoard (§7.11) |
 
-### 11.8. Verified memory safety
+### 11.8. Language-level allocator interfaces
+
+| Technique | Ergonomics | Transparency | Key Trade-off | Examples |
+|---|---|---|---|---|
+| Explicit allocator parameter API | Lower | Highest | No hidden allocation; API friction | Zig (§7.12) |
+| Context allocator + temp arena | High | Medium | Lifetime discipline via context reset | Odin (§7.12) |
+| Implicit context allocator + temporary storage | High | Medium | Strong model, but weaker public documentation here | Jai (§7.12) |
+| Scoped temp-pool allocator | High | Medium-high | Escaped temp pointers need debug support | C3 (§7.12) |
+| Allocation-expression allocator control | High for object-style code | Medium | Global, scoped, or custom allocation | Beef (§7.12) |
+| Runtime heap replacement | Moderate | Low-medium | Good freestanding story, weak per-library policy | Hare (§7.12) |
+| Composable allocator building blocks | Low for casual users | High for experts | Toolkit over one blessed policy | D `std.experimental.allocator` (§7.12) |
+
+### 11.9. Verified memory safety
 
 | System | What's Verified | Proof Cost | Production | Examples |
 |---|---|---|---|---|
@@ -957,7 +1001,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | CompCert memory model | Compiler correctness substrate | Foundational | Avionics DO-178C | (§8.10) |
 | Stacked/Tree Borrows | UB definition for unsafe Rust | Operational | Stacked Borrows established in Miri; Tree Borrows experimental | (§8.11) |
 
-### 11.9. Concurrent memory reclamation
+### 11.10. Concurrent memory reclamation
 
 | Technique | Reader Cost | Retention Bound | Composes With | Examples |
 |---|---|---|---|---|
@@ -974,7 +1018,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | NBR | EBR fast + signal handshake | Bounded (HP-grade) | Lock and lock-free DS | (§9.11) |
 | Folly hazptr | Production HP | Bounded | C++26 reference impl | (§9.12) |
 
-### 11.10. Capability-based memory
+### 11.11. Capability-based memory
 
 | Technique | Authority Mechanism | Concurrency Story | Production | Examples |
 |---|---|---|---|---|
@@ -1188,6 +1232,20 @@ References are grouped by the chapter that first cites them. Within each chapter
 21. Mesh repository — https://github.com/plasma-umass/Mesh
 22. TLSF reference implementation (Conte) — https://github.com/mattconte/tlsf
 23. Hoard project page — https://emeryberger.github.io/Hoard/
+24. Zig Guide — Allocators — https://zig.guide/standard-library/allocators/
+25. Zig `std.heap` source — https://github.com/ziglang/zig/blob/master/lib/std/heap.zig
+26. Odin overview — dynamic arrays, `make`, `delete`, and `context.allocator` — https://odin-lang.org/docs/overview/
+27. Odin runtime allocator API — https://pkg.odin-lang.org/base/runtime/
+28. Odin OS allocators and temp allocator guards — https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin
+29. C3 memory handling — heap allocator, temp allocator, and `@pool` — https://c3-lang.org/language-common/memory/
+30. C3 debugging allocators — `VMEM_TEMP` and `TrackingAllocator` — https://c3-lang.org/misc-advanced/debugging/
+31. The Way to Jai — Memory Allocators and Temporary Storage — https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md
+32. Jai Community Wiki — Advanced / context and temporary storage — https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced
+33. Beef memory guide — custom allocators, `scope`, and debug allocator — https://www.beeflang.org/docs/language-guide/memory/
+34. Hare runtime heap API — https://docs.harelang.org/rt
+35. Hare freestanding runtime allocation hooks — https://harelang.org/documentation/usage/freestanding.html
+36. D `std.experimental.allocator` — https://dlang.org/phobos/std_experimental_allocator.html
+37. D allocator regions — https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
 
 ### Chapter 8 — Verified Memory Safety
 

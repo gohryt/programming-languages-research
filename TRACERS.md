@@ -181,7 +181,7 @@ Safepoint polling (§2.1) is elegant as a stop-the-world mechanism, but it quiet
 
 **`AsyncGetCallTrace` (AGCT)** is Sun's undocumented back-door, exported so their own Studio profiler could sample outside safepoints. It walks Java frames directly from a signal handler, *without* the safepoint handshake — hence *async*, hence can crash if the JVM mutates the stack mid-walk. Andrei Pangin's **async-profiler** productionized it by installing a SIGSEGV handler, catching AGCT's failure cases, and chaining to the JVM's own deoptimization handler. Its other design trick is merging two sources: `perf_events` gives the native stack (kernel → libjvm → JIT code); AGCT gives the Java frames (including inlined methods). async-profiler walks the native stack until it hits JIT territory, then hands off to AGCT — one unified flame graph across kernel, JNI, JVM internals, and Java.
 
-**JEP 509 "JFR CPU-Time Profiling" (JDK 25, 2025)** is OpenJDK's supported path toward reducing this reliance on unsupported internals, but it should be treated as an experimental, Linux-focused step rather than a universal replacement for every AGCT use case. JFR grows a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased. The JEP explicitly names async-profiler's reliance on unsupported internals as motivation.
+**JEP 509 "JFR CPU-Time Profiling" (JDK 25, 2025)** is OpenJDK's supported path toward reducing this reliance on unsupported internals. Status: experimental and Linux-focused, not a universal replacement for every AGCT use case. JFR grows a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased. The JEP explicitly names async-profiler's reliance on unsupported internals as motivation.
 
 For a new language: design the async-safe stack-walk API *up front*. Retrofitting it cost OpenJDK roughly 15 years of tool-author workarounds. Go (§3.5) sidestepped the same problem by pairing unconditional frame pointers with Go 1.14's asynchronous preemption — SIGPROF samples can now land anywhere, not just at cooperative safepoints.
 
@@ -880,7 +880,7 @@ Cost: the branch ring buffer is continuously updated in hardware; enabling it ha
 
 LBR-based sampling sits at the "zero-cost walk" endpoint of the spectrum. It is complementary to frame pointers and SFrame — a production system can prefer LBR when branches fit, fall back to FP/SFrame when they don't.
 
-Source: https://lwn.net/Articles/619180/ and cross-reference §5.2 for the underlying LBR mechanism.
+Source: https://lwn.net/Articles/619180/ . See `TRACERS.md §5.2` for the underlying LBR mechanism.
 
 ### 13.7. Go's Unconditional Frame-Pointer Discipline
 
@@ -910,7 +910,7 @@ Source: https://research.google/pubs/google-wide-profiling-a-continuous-profilin
 
 ### 14.2. pprof `profile.proto` as Lingua Franca
 
-Go's pprof format — originally `runtime/pprof`'s output schema (§3.5), documented in `profile.proto` — became the *de-facto* industry wire format for profiles. Parca, Pyroscope / Grafana Phlare, Google Cloud Profiler, Polar Signals, and Datadog all ingest pprof. OpenTelemetry Profiling (in-progress as of 2026) converges on the same shape.
+Go's pprof format — originally `runtime/pprof`'s output schema (§3.5), documented in `profile.proto` — became the *de-facto* industry wire format for profiles. Parca, Pyroscope / Grafana Phlare, Google Cloud Profiler, Polar Signals, and Datadog all ingest pprof. Status: OpenTelemetry Profiling was still in progress as of 2026, and it converges on the same shape.
 
 The format's design is deliberately profile-type-agnostic: a generic `Sample → [Location] → Mapping` graph with arbitrary `value` dimensions (so CPU, heap, goroutine, block, mutex, and custom profiles all share one schema), a string table for interning, and gzip compression. This is the profiling equivalent of what OTLP did for traces and what CTF (§3.7) does for event streams: one interchange format that lets producers and consumers evolve independently.
 

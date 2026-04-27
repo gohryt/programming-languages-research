@@ -551,7 +551,7 @@ Source: https://bracha.org/mirrors.pdf and https://bracha.org/newspeak.pdf
 
 ### 5.8. MoarVM Remote Debug Protocol — Comma's Durable Artifact
 
-The (now-discontinued) **Comma IDE** drove substantial improvements to MoarVM's debug surface that survive Comma itself: a **TCP-based remote debug protocol** for Raku/MoarVM, plus an open-source Raku client library and CLI driver. The protocol shape mirrors the JDWP / DAP / CDP family (§§5.2, 5.4, 5.5) — connect to a port the running MoarVM listens on, exchange typed commands, receive event notifications. Distinctive features: stack-frame introspection that understands Raku's role in a multi-stage compilation pipeline (RakuAST nodes → QAST → MoarVM bytecode all addressable), and integration with MoarVM's spesh and inliner metadata so that debugging *specialized* code reconstructs the original frame layout (cross-ref `COMPILERS.md §14.4` on uninlining).
+Status: the **Comma IDE** is discontinued, but it drove substantial improvements to MoarVM's debug surface that survive Comma itself: a **TCP-based remote debug protocol** for Raku/MoarVM, plus an open-source Raku client library and CLI driver. The protocol shape mirrors the JDWP / DAP / CDP family (§§5.2, 5.4, 5.5) — connect to a port the running MoarVM listens on, exchange typed commands, receive event notifications. Distinctive features: stack-frame introspection that understands Raku's role in a multi-stage compilation pipeline (RakuAST nodes → QAST → MoarVM bytecode all addressable), and integration with MoarVM's spesh and inliner metadata so that debugging *specialized* code reconstructs the original frame layout (see `COMPILERS.md §14.4` on uninlining).
 
 The product itself shut down, but the durable artifact — a documented language-specific debug protocol contributed back to a small-team VM — is a useful pattern for new languages: even a single commercial tooling vendor can leave behind a debug protocol that outlives them, *if* the protocol is upstreamed into the runtime rather than kept inside the IDE binary. The lesson is symmetric to `TRACERS.md §3.11` (MoarVM Telemetry / heap snapshots): both originated as Comma-driven additions that became MoarVM mainline.
 
@@ -943,7 +943,7 @@ Agda's typed-hole UX and Coq's goal view are the same philosophy with syntactic 
 
 The deeper claim: **in a language where the primary object is a proof (not a program), the debugger is a goal-state viewer**. Every tactic is simultaneously a construction step and a diagnostic — miss a hypothesis, the goal state shows what was missed; apply an over-eager rewrite, the diff highlights what got rearranged incorrectly.
 
-Cross-reference: Hazel (§6.2) brings this philosophy to ordinary functional programs by letting incomplete expressions still typecheck and partially evaluate. InfoView is the proof-construction analogue; the underlying idea — **every editor state is meaningful; feedback is continuous** — is shared.
+See `DEBUGGERS.md §6.2` for Hazel's analogue in ordinary functional programming: incomplete expressions still typecheck and partially evaluate. InfoView is the proof-construction analogue; the underlying idea — **every editor state is meaningful; feedback is continuous** — is shared.
 
 Source: https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf and https://github.com/leanprover/vscode-lean4
 
