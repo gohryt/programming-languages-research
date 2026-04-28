@@ -2,7 +2,7 @@
 
 Research on compile-time and runtime memory disciplines — ownership and borrowing, region inference, reference-counting compilation, modern C++ safety initiatives, hardware tagging and capabilities, tracing GC architectures, allocators, formal verification of memory safety, concurrent reclamation, and capability-based authority.
 
-This document spans both compile-time analyses and runtime systems. The compile-time half (regions, ownership, RC compilation) extends `COMPILERS.md §16` (Perceus, MLKit/Cyclone basics, Vale generational references) rather than duplicating it — entries flagged with cross-references show what is added beyond the existing summary. The runtime half (tracing GC, allocators, hardware mechanisms, concurrent reclamation) is in scope here but explicitly *out of scope* for `COMPILERS.md`. Sanitizers as observability tools live in `TRACERS.md §8`; see `DEBUGGERS.md §8.8` for the operational aliasing model behind Miri, and see `MEMORY.md §8.11` for the formal-model side. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
+This document spans both compile-time analyses and runtime systems. The compile-time half (regions, ownership, RC compilation) extends `COMPILERS.md §16` (Perceus, MLKit/Cyclone basics, Vale generational references) rather than duplicating it — entries flagged with cross-references show what is added beyond the existing summary. The runtime half (tracing GC, allocators, hardware mechanisms, concurrent reclamation) is in scope here but explicitly *out of scope* for `COMPILERS.md`. Sanitizers as observability tools live in `TRACERS.md §8`; see `DEBUGGERS.md §8.8` for the operational aliasing model behind Miri, and see `MEMORY.md §8.11` for the formal-model side. Capability-based modularity at the binary boundary (Wasm Components, WASI worlds) is covered here from the authority angle and in `MODULES.md §13` from the module-system angle. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
 
 ---
 
@@ -340,7 +340,7 @@ Source: https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
 
 Cryptographic MAC (QARMA-based) over upper pointer bits, signed/verified by dedicated PAC instructions; enforces pointer integrity for CFI / ROP / JOP defence. Five keys (IA / IB / DA / DB / GA) with separate signing domains; Apple extends with up to 9 modifier types and hardware diversifiers in XNU; LR signing on call boundaries for backward-edge CFI. Universal on Apple silicon since A12 / M1; mandatory in iOS / macOS kernels; available on most ARMv8.3+ SoCs; Linux uses for in-kernel CFI on arm64. The **PACMAN attack** (2022) showed speculative bypass — mitigated in current Apple silicon. PAC sits at the "pointer integrity, not bounds" point — orthogonal to MTE.
 
-Source: https://www.usenix.org/system/files/usenixsecurity23-cai-zechao.pdf and https://projectzero.google/2019/02/examining-pointer-authentication-on.html
+Source: https://www.usenix.org/system/files/usenixsecurity23-cai-zechao.pdf and https://projectzero.google/2019/02/examining-pointer-authentication-on.html and https://cap.csail.mit.edu/sites/default/files/research-pdfs/PACMAN-%20Attacking%20ARM%20Pointer%20Authentication%20with%20Speculative%20Execution.pdf
 
 ### 5.5. Intel CET — Shadow Stacks and Indirect Branch Tracking
 
@@ -598,17 +598,17 @@ A separate design axis from allocator internals is **how a language routes alloc
 
 **D**'s `std.experimental.allocator` is the most "allocator toolkit" design in this group. It provides a high-level allocator interface plus a large library of composable building blocks: `Region`, `InSituRegion`, `BorrowedRegion`, `SharedRegion`, `free_list`, `fallback_allocator`, `segregator`, `stats_collector`, `bucketizer`, `affix_allocator`, and more. `Region` is the canonical bump allocator: three pointers, allocate by alignment-adjust + pointer bump + bounds check, no general deallocation, `deallocateAll` to reuse the whole region, and optional in-place last-allocation deallocation/expansion. This is less about one blessed language policy and more about providing allocator combinators that expert users assemble into domain-specific heaps.
 
-For Mage, the reusable design space is clear:
+The reusable design space is clear:
 
 - **Zig model** — explicit allocator parameter everywhere allocation may occur. Best transparency and testability; highest API friction.
 - **Odin model** — implicit context allocator plus explicit override. Best ergonomics among officially documented systems here; requires strong conventions for temp lifetimes.
-- **C3 model** — heap + temp allocator as first-class named defaults, with scoped `@pool` and virtual-memory debug mode. Strong candidate for ergonomic arena lifetimes.
-- **Jai model** — implicit context allocator and temporary storage, but with weaker public documentation. Useful as influence, weaker as a direct blueprint.
+- **C3 model** — heap + temp allocator as first-class named defaults, with scoped `@pool` and virtual-memory debug mode. Notable for ergonomic arena lifetimes.
+- **Jai model** — implicit context allocator and temporary storage, but with weaker public documentation. Useful as an influence, though less suitable as a primary reference.
 - **Beef model** — allocation expression chooses global, scoped, or custom allocator. Good when object construction syntax is central.
 - **Hare model** — runtime heap replacement at a small ABI boundary. Good for freestanding systems, weaker for per-subsystem policy.
 - **D model** — allocator building blocks and wrappers as a library. Good for experts, but less opinionated as a language-wide discipline.
 
-A practical Mage design could combine them: explicit allocator parameters for low-level library APIs; a scoped context allocator for high-level application code; a built-in temporary arena with lexical or frame reset; and debug allocator modes that make leaks, double-frees, and escaped temp allocations fail loudly.
+A practical language design can combine these approaches: explicit allocator parameters for low-level library APIs; a scoped context allocator for high-level application code; a built-in temporary arena with lexical or frame reset; and debug allocator modes that make leaks, double-frees, and escaped temp allocations fail loudly.
 
 Source: https://zig.guide/standard-library/allocators/ and https://github.com/ziglang/zig/blob/master/lib/std/heap.zig and https://odin-lang.org/docs/overview/ and https://pkg.odin-lang.org/base/runtime/ and https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin and https://c3-lang.org/language-common/memory/ and https://c3-lang.org/misc-advanced/debugging/ and https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md and https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced and https://www.beeflang.org/docs/language-guide/memory/ and https://docs.harelang.org/rt and https://harelang.org/documentation/usage/freestanding.html and https://dlang.org/phobos/std_experimental_allocator.html and https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
 
@@ -638,7 +638,7 @@ Source: https://iris-project.org/ and https://www.cambridge.org/core/journals/jo
 
 Lattuada, Hance, Cho, Brun, Subasinghe, Zhou, Howell, Parno, Hawblitzel deliver SMT-backed verification of full functional correctness for Rust, leveraging Rust's linear types as ghost permissions to verify both safe and unsafe code with low annotation overhead. **Linear ghost permissions** let ghost code carry capability tokens (e.g. raw-pointer permissions) borrow-checked exactly like real Rust. **Tri-modal language** separates `spec` (uncomputable, unrestricted), `proof` (linear, ghost), and `exec` (compiled) modes. SMT-tuning — per-function `rlimit`, isolated bit-vector reasoning, encoder optimizations — yields 3–61× speedups vs prior tools.
 
-Used at Google for kernel verification (Android pKVM/NRKernel), at Amazon, and inside Linux kernel verification work. Verified case studies include OS page tables, NUMA-aware data-structure replication, crash-safe storage, and a concurrent memory allocator (~6.1K LoC impl + 31K LoC proof). Status: the most production-relevant Rust verifier in this survey as of 2026.
+Used at Google for kernel verification (Android pKVM/NRKernel), at Amazon, and inside Linux kernel verification work. Verified case studies include OS page tables, NUMA-aware data-structure replication, crash-safe storage, and a concurrent memory allocator (~6.1K LoC impl + 31K LoC proof). Status: among the most production-relevant Rust verifiers in this survey as of 2026.
 
 Source: https://www.microsoft.com/en-us/research/publication/verus-a-practical-foundation-for-systems-verification/ and https://github.com/verus-lang/verus and https://verus-lang.github.io/verus/guide/
 
@@ -821,6 +821,8 @@ Source: https://erights.org/elib/capability/ode/ode-capabilities.html and https:
 ### 10.5. WASI / Wasm Component Model — Resource Handles
 
 WASIp2 (launched January 2024) is built on the Component Model and Wit IDL; modules have *zero ambient authority* and receive every system resource (filesystem dirs, sockets, clocks) as explicit capability handles passed through typed component-model "worlds." **Resource handles** in Wit are first-class typed references that owning components can transfer; the canonical ABI prohibits raw memory sharing across components. Host grants like `--dir /data::readonly` are positive enumerations at instantiation, not ACL lookups at use. **Virtualization/polyfill**: a component implementing `wasi:filesystem` can intercept and constrain another component's file access — capabilities compose like reference attenuation in E.
+
+> The *module-system* angle — components as a typed binary-level module substrate, WIT as the equivalent of ML signatures at the artifact boundary, and the Component Model's role as the most modern realization of capability-scoped modularity in mainstream tooling — is covered in `MODULES.md §13`.
 
 Production for serverless/edge (Cloudflare, Fastly, Fermyon); Preview 3 (`future`/`stream`) in progress. The most consequential modern deployment of ocap principles in industry tooling.
 
@@ -1294,22 +1296,21 @@ References are grouped by the chapter that first cites them. Within each chapter
 
 ### Chapter 10 — Capability-Based Memory and Authority
 
-1. Pony ocap angle (Deny Capabilities) — https://www.ponylang.io/media/papers/fast-cheap.pdf
-2. CHERI C/C++ programming — https://github.com/CTSRD-CHERI/cheri-c-programming
-3. CHERIoT compartments — https://cheriot.org/book/language_extensions.html
-4. CHERIoT sealing — https://cheriot.org/rtos/sealing/2025/11/06/sealing.html
-5. E ocap ode — https://erights.org/elib/capability/ode/ode-capabilities.html
-6. Newspeak paper — https://bracha.org/newspeak.pdf
-7. WASIp2 docs — https://github.com/WebAssembly/WASI/blob/main/docs/Preview2.md
-8. Joe Duffy Objects-as-Capabilities — https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/
-9. Singularity project — https://www.microsoft.com/en-us/research/project/singularity/
-10. seL4 capabilities tutorial — https://docs.sel4.systems/Tutorials/capabilities.html
-11. seL4 CACM paper — https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/
-12. Cap'n Proto RPC — https://capnproto.org/rpc.html
-13. Spritely Goblins CapTP — https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html
-14. Joe-E NDSS 2010 — https://people.eecs.berkeley.edu/~daw/papers/joe-e-ndss10.pdf
-15. Spritely Goblins — https://spritely.institute/goblins/
-16. Steel paper — https://project-everest.github.io/assets/steel.pdf
-17. Pony recovering capabilities tutorial — https://tutorial.ponylang.io/reference-capabilities/recovering-capabilities.html
-18. Cambridge CTSRD CHERI project — https://www.cl.cam.ac.uk/research/security/ctsrd/
-19. Steel repository — https://github.com/FStarLang/steel
+1. CHERI C/C++ programming — https://github.com/CTSRD-CHERI/cheri-c-programming
+2. CHERIoT compartments — https://cheriot.org/book/language_extensions.html
+3. CHERIoT sealing — https://cheriot.org/rtos/sealing/2025/11/06/sealing.html
+4. E ocap ode — https://erights.org/elib/capability/ode/ode-capabilities.html
+5. Newspeak paper — https://bracha.org/newspeak.pdf
+6. WASIp2 docs — https://github.com/WebAssembly/WASI/blob/main/docs/Preview2.md
+7. Joe Duffy Objects-as-Capabilities — https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/
+8. Singularity project — https://www.microsoft.com/en-us/research/project/singularity/
+9. seL4 capabilities tutorial — https://docs.sel4.systems/Tutorials/capabilities.html
+10. seL4 CACM paper — https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/
+11. Cap'n Proto RPC — https://capnproto.org/rpc.html
+12. Spritely Goblins CapTP — https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html
+13. Joe-E NDSS 2010 — https://people.eecs.berkeley.edu/~daw/papers/joe-e-ndss10.pdf
+14. Spritely Goblins — https://spritely.institute/goblins/
+15. Steel paper — https://project-everest.github.io/assets/steel.pdf
+16. Pony recovering capabilities tutorial — https://tutorial.ponylang.io/reference-capabilities/recovering-capabilities.html
+17. Cambridge CTSRD CHERI project — https://www.cl.cam.ac.uk/research/security/ctsrd/
+18. Steel repository — https://github.com/FStarLang/steel

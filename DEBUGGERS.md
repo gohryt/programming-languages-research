@@ -2,13 +2,13 @@
 
 Research on debugger implementations — user-facing bug-finding tools that pause, inspect, step, replay, or time-travel through program execution.
 
-This document covers breakpoint mechanisms from the debugger's side, record/replay and checkpointing, omniscient/time-travel tooling, live-visualization and in-engine overlays, debugger-as-service protocols and scripting APIs, retroactive and partial evaluation, DWARF correctness and build-ID symbol distribution, automated fault-isolation (delta debugging, slicing, spectrum-based localization, statistical debugging, cause-effect chains, symbolic execution, fuzzer-assisted triage, IR-level UB interpreters, interrogative and declarative debugging), async-stack reconstruction, concurrency-aware race and deadlock detectors, post-mortem / out-of-process debugging (core dumps, kdump, kernel debuggers, embedded probe stacks), and specification-level debugging (model-checker counterexamples, interactive theorem prover proof states). Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`; the Miri/Stacked-Borrows angle is split between `DEBUGGERS.md §8.8` here and `MEMORY.md §§1.3, 8.11`. Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`.
+This document covers breakpoint mechanisms from the debugger's side, record/replay and checkpointing, omniscient/time-travel tooling, live-visualization and in-engine overlays, debugger-as-service protocols and scripting APIs, retroactive and partial evaluation, DWARF correctness and build-ID symbol distribution, automated fault-isolation (delta debugging, slicing, spectrum-based localization, statistical debugging, cause-effect chains, symbolic execution, fuzzer-assisted triage, IR-level UB interpreters, interrogative and declarative debugging), async-stack reconstruction, concurrency-aware race and deadlock detectors, post-mortem / out-of-process debugging (core dumps, kdump, kernel debuggers, embedded probe stacks), and specification-level debugging (model-checker counterexamples, interactive theorem prover proof states). Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`; the Miri/Stacked-Borrows angle is split between `DEBUGGERS.md §8.8` here and `MEMORY.md §§1.3, 8.11`. Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`. Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §11` for hot-reload from the module-system angle).
 
 ---
 
-## 1. Native Breakpoints
+## 1. Breakpoint Mechanisms
 
-A breakpoint mechanism stops execution precisely at a target instruction and reliably resumes afterward — often on code that other threads are executing concurrently. Entries in this chapter differ on *where the stop condition lives*: patched into the instruction stream (`INT 3`, compiled conditional), wired into the CPU's memory-access pipeline (hardware debug registers), or repurposed from a protection-boundary feature (RISC-V PMP).
+A breakpoint mechanism stops execution at a target condition and reliably resumes afterward — often on code that other threads are executing concurrently. Entries in this chapter differ on *where the stop condition lives*: patched into the instruction stream (`INT 3`, compiled conditional), wired into the CPU's memory-access pipeline (hardware debug registers), repurposed from a protection-boundary feature (RISC-V PMP, page-table permissions), built on the runtime's own event taxonomy (exceptions, syscalls, library loads, allocator events), or expressed as language-level invariants (assertions, contracts, semantic preconditions). The progression is from physical to logical: lower entries cost a CPU trap; higher entries cost a runtime-managed predicate evaluation.
 
 ### 1.1. GDB — INT 3 and Displaced Stepping
 
@@ -57,6 +57,36 @@ Source: https://thume.ca/2023/12/02/tracing-methods/ — "Hardware breakpoints" 
 Because bare-metal RISC-V often lacks standardized external debugging hardware, researchers from SUSTech designed "Raven". Instead of relying on JTAG or dedicated debug modules, Raven creatively repurposes the RISC-V Physical Memory Protection (PMP) security feature into a debugging primitive. By restricting access to specific memory regions, they trigger PMP faults that act as extremely lightweight, zero-modification watchpoints and breakpoints. This allows full kernel debugging capabilities (stepping, introspection) on completely bare-metal embedded targets with near-zero idle overhead.
 
 Source: https://fengweiz.github.io/paper/raven-dac22.pdf (DAC '22)
+
+### 1.5. Page-Protection Watchpoints and Guard Pages
+
+Hardware debug registers are precise but tiny: on x86, usually four watched addresses, each limited to a small width. A scalable alternative is to use page permissions. Mark a page `PROT_NONE` with `mprotect()` or `PAGE_GUARD` / `VirtualProtect()` on Windows; when the target reads or writes that page, the CPU raises a page fault and the debugger decides whether the access is interesting.
+
+The trade-off is precision versus scale. Page watchpoints can cover kilobytes or megabytes and can be created in large numbers, but they trigger on every access to the protected page, not only the watched object. Debuggers and runtimes can reduce false positives by isolating selected objects onto their own pages, using guard pages around stacks or heap allocations, or combining page faults with single-step/reprotect logic.
+
+The language-design lesson: **allocator cooperation turns crude page faults into useful object watchpoints**. A runtime that can place one object, arena, stack segment, or actor heap on a protected page can offer data breakpoints that are far larger than hardware DR registers allow.
+
+Source: https://man7.org/linux/man-pages/man2/mprotect.2.html and https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
+
+### 1.6. Event Breakpoints / Catchpoints
+
+Line breakpoints answer "stop here." Event breakpoints answer "stop when this kind of thing happens anywhere." Mature debuggers expose catchpoints for exceptions, signals, syscalls, process creation, thread creation, library loading, allocation, panic, and language-specific runtime events.
+
+GDB's `catch throw`, `catch syscall`, `catch fork`, `catch exec`, and shared-library catchpoints are the native model. Java debuggers expose caught/uncaught exception breakpoints through JPDA/JDWP. Chrome DevTools has "pause on caught exceptions" and "pause on uncaught exceptions." A language runtime can generalize this to actor message sends, task spawns, cancellation, effect invocation, allocation classes, or contract violations.
+
+The language-design lesson: **make runtime events first-class debugger stop reasons**. If the runtime already classifies events for exceptions, panics, tasks, actors, effects, or allocators, expose those same event IDs to the debugger instead of forcing users to guess implementation functions to break on.
+
+Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html and https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
+
+### 1.7. Assertions, Contracts, and Semantic Breakpoints
+
+Assertions and contracts are executable claims about program state: preconditions, postconditions, invariants, representation checks, and internal sanity checks. They are usually treated as testing or verification tools, but they are also debugger hooks. A contract violation is a semantically meaningful breakpoint: the program can stop exactly where an assumption first becomes false, with the violated predicate, source location, values, and call stack preserved.
+
+Eiffel made Design by Contract central to the language. Racket contracts enforce boundaries between components. Ada/SPARK contracts connect runtime checking and formal proof. Rust separates always-on `assert!` from debug-only `debug_assert!`. C++26 contract assertions add language-level `pre`, `post`, and `contract_assert` forms with different evaluation modes. Swift distinguishes `assert`, `precondition`, and unconditional traps.
+
+The language-design lesson: **contracts should have debugger semantics**. A new language can define whether contract failures terminate, throw, invoke restarts, enter the debugger, continue in observe mode, log telemetry, or become catchable semantic breakpoints. This gives users a precise spectrum from zero-overhead release builds to invariant-rich debug builds.
+
+Source: https://docs.racket-lang.org/guide/contracts.html, https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions, and https://cppreference.dev/w/cpp/language/contracts
 
 ---
 
@@ -219,7 +249,7 @@ Source: https://perfetto.dev/docs/analysis/perfetto-sql-getting-started and http
 
 ## 3. Omniscient / Time-Travel Debugging
 
-Omniscient debugging records every interesting event and makes the execution history queryable after the fact — inverting the breakpoint model. Entries differ on **what the recorded unit is and who pays the cost**: variable assignments (ODB), structurally-shared states (Toby Ho), immutable model updates (Elm, Redux DevTools), bytecode-woven event streams at production scale (Chronon, TOD, IntelliTrace, RevDebug), decorator-level single-function traces (PySnooper, snoop, viztracer), reflective runtime frames (Pharo, Common Lisp, Racket), and debugger-architecture outliers such as hypervisor-invisible hooks (HyperDbg). The common thread is Bil Lewis's original claim: **you don't need breakpoints if you record everything** — with HyperDbg included here as a time-travel-adjacent contrast rather than as a recording system.
+Omniscient debugging records every interesting event and makes the execution history queryable after the fact — inverting the breakpoint model. Entries differ on **what the recorded unit is and who pays the cost**: variable assignments (ODB), structurally-shared states (Toby Ho), immutable model updates (Elm, Redux DevTools), bytecode-woven event streams at production scale (Chronon, TOD, IntelliTrace, RevDebug), decorator-level single-function traces (PySnooper, snoop, viztracer), reflective runtime frames (Pharo, Common Lisp, Racket), debugger-architecture outliers such as hypervisor-invisible hooks (HyperDbg), and managed-runtime hot-replacement (Edit-and-Continue, JVM HotSwap, Flutter hot reload) that folds compilation back into the paused-debug session. The common thread is Bil Lewis's original claim: **you don't need breakpoints if you record everything** — with HyperDbg included here as a time-travel-adjacent contrast rather than as a recording system.
 
 ### 3.1. Bil Lewis — ODB (Omniscient Debugger for Java)
 
@@ -369,6 +399,16 @@ The design lesson for new languages: **every design decision that makes state tr
 
 Source: https://github.com/reduxjs/redux-devtools
 
+### 3.12. Edit-and-Continue / Hot Code Replacement
+
+Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version. The *module-system* preconditions that make this possible — flat-or-stable module identity, individually loadable artifacts, language-level cooperation primitives like `import.meta.hot.accept` — are covered in `MODULES.md §11`.
+
+Visual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk images, Flutter hot reload, Clojure REPL-driven development, and browser hot-module replacement all pick different points in the design space. The core problems are stable function identity, active-frame migration, closure layout changes, object shape changes, inlined-frame deoptimization, and coexistence of old and new code.
+
+This is the modern industry continuation of the Pharo (§3.4) and Common Lisp (§3.5) live-edit lineage: the difference is that managed runtimes (CLR, JVM, Dart VM) supply the deoptimization machinery the original reflective systems built into the language. The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Debuggers become dramatically more powerful if the runtime can deoptimize optimized frames back into an inspectable representation before applying a patch.
+
+Source: https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue, https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html, and https://docs.flutter.dev/tools/hot-reload
+
 ---
 
 ## 4. Live Visualization
@@ -451,7 +491,7 @@ Source: https://stately.ai/docs/inspector and https://github.com/statelyai/inspe
 
 ## 5. Debugger-as-Service — Transport Protocols
 
-Decoupling the debugger UI from the debugger runtime has become the dominant architecture — an N×M integration problem solved by standard protocols. Entries differ on **what the protocol commits to**: DAP is language-neutral and lowest-common-denominator; JDWP is transport-neutral but Java-typed; CDP is WebSocket-rich and Blink/V8-coupled; RemedyBG is shared-memory and proprietary; gdbserver vs. lldb-server differ on where authoritative environment knowledge lives; scripting APIs (GDB Python, LLDB formatters) turn the debugger itself into a programmable platform. The Mirror principle (§5.7) names the design shape the others approximate with varying fidelity.
+Decoupling the debugger UI from the debugger runtime has become the dominant architecture — an N×M integration problem solved by standard protocols. Entries differ on **what the protocol commits to**: DAP is language-neutral and lowest-common-denominator; JDWP is transport-neutral but Java-typed; CDP is WebSocket-rich and Blink/V8-coupled; RemedyBG is shared-memory and proprietary; gdbserver vs. lldb-server differ on where authoritative environment knowledge lives; scripting APIs (GDB Python, LLDB formatters) turn the debugger itself into a programmable platform; and expression evaluation/state surgery is the in-debugger evaluator that all of these protocols expose. The Mirror principle (§5.7) names the design shape the others approximate with varying fidelity.
 
 ### 5.1. RemedyBG — Debugger as Service with Protocol
 
@@ -556,6 +596,18 @@ Status: the **Comma IDE** is discontinued, but it drove substantial improvements
 The product itself shut down, but the durable artifact — a documented language-specific debug protocol contributed back to a small-team VM — is a useful pattern for new languages: even a single commercial tooling vendor can leave behind a debug protocol that outlives them, *if* the protocol is upstreamed into the runtime rather than kept inside the IDE binary. The lesson is symmetric to `TRACERS.md §3.11` (MoarVM Telemetry / heap snapshots): both originated as Comma-driven additions that became MoarVM mainline.
 
 Source: https://commaide.com/features and https://commaide.com/faq
+
+### 5.9. Debugger Expression Evaluation and State Surgery
+
+A debugger is not only an observer. Users expect to evaluate expressions in the current frame, call functions, assign variables, force returns, restart frames, and inspect values using language semantics. This requires a miniature evaluator whose environment is the paused program: current lexical scope, stack frame, registers, heap, generic instantiations, dynamic dispatch rules, and optimized-code location mappings.
+
+GDB has `print`, `call`, `set variable`, and `return`. LLDB embeds Clang to evaluate C/C++/Objective-C expressions. Chrome DevTools evaluates JavaScript in paused stack frames. JDWP exposes operations such as object invocation and `ForceEarlyReturn` (see §5.5). Smalltalk/Pharo and Common Lisp go further: the debugger is an interactive development environment where live frames can be inspected, edited, restarted, or resumed through restarts.
+
+The hard part is safety. Calling arbitrary code from a paused thread can deadlock, allocate, throw, mutate state, or observe inconsistent invariants. A language can define a **debug expression subset**: pure field access, formatting, total helper functions, controlled mutation, or explicitly unsafe target calls.
+
+The language-design lesson: **design the debugger evaluator as part of the language semantics, not as an afterthought**. If the compiler can emit enough metadata for lexical scopes, generic types, closures, effects, async frames, and optimized-out values, the debugger can evaluate expressions that feel like the source language instead of raw memory pokes.
+
+Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html and https://lldb.llvm.org/use/tutorial.html
 
 ---
 
@@ -662,7 +714,7 @@ Source: https://sourceware.org/elfutils/Debuginfod.html and https://sourceware.o
 
 ## 8. Automated Fault Isolation
 
-Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), or computation-tree nodes (Shapiro). The debugger becomes an automated search engine with a domain-specific query.
+Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), or aggregated value-histories (Daikon's dynamic invariants). The debugger becomes an automated search engine with a domain-specific query.
 
 ### 8.1. Delta Debugging — Minimizing Failure-Inducing Input
 
@@ -806,11 +858,21 @@ The design lesson for a new language: **the question the debugger asks the user 
 
 Source: https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model and http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html
 
+### 8.11. Dynamic Invariant Detection — Daikon
+
+Dynamic invariant detectors observe executions and infer properties that appear to hold: `x <= y`, `len(buffer) == count`, `field != null`, "this collection is sorted", or "this function returns a value larger than its argument." Daikon (Ernst et al.) is the canonical system: it instruments programs, records values at program points, and emits likely invariants that could be written as assertions, contracts, or documentation.
+
+This is useful for fault isolation because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations. False positives are expected — the technique depends on test quality — but even false invariants reveal missing tests or underspecified behavior.
+
+The language-design lesson: **make values observable at semantic program points**. If the compiler can expose function entries/exits, loop heads, object fields, algebraic data constructors, and effect boundaries in a typed trace format, invariant mining becomes much more accurate than raw memory observation. Daikon is the population-statistics sibling to CBI (§8.4): both extract bug signal from many runs, with Daikon mining invariants and CBI mining failure-correlated predicates.
+
+Source: https://plse.cs.washington.edu/daikon/ and https://plse.cs.washington.edu/daikon/pubs/
+
 ---
 
 ## 9. Async & Coroutine Debugging
 
-Async/await, coroutines, goroutines, and effect handlers all break the assumption that the call stack is the logical call chain — once a coroutine suspends and resumes, the physical stack no longer reflects who called whom. Reconstructing the logical async chain therefore depends on whatever metadata the runtime preserves across suspension points. Entries in this chapter differ on **how much runtime cooperation** the debugger can assume: Go's built-in scheduler events, Kotlin's coroutine objects carrying continuation state, V8's stitched async stacks recorded at each `await`, and Rust's `tokio-console` runtime introspection each represent a different point on the spectrum.
+Async/await, coroutines, goroutines, and effect handlers all break the assumption that the call stack is the logical call chain — once a coroutine suspends and resumes, the physical stack no longer reflects who called whom. Reconstructing the logical async chain therefore depends on whatever metadata the runtime preserves across suspension points. Entries in this chapter differ on **how much runtime cooperation** the debugger can assume: Go's built-in scheduler events (§9.2), Kotlin's coroutine objects carrying continuation state (§9.3), V8's stitched async stacks recorded at each `await` (§9.4), and Rust's `tokio-console` runtime introspection (§9.5) each represent a different point on the spectrum from designed-in metadata to retrofitted introspection.
 
 ### 9.1. The Async Stack Problem
 
@@ -818,21 +880,51 @@ Traditional debuggers show the call stack — the chain of function calls leadin
 
 The core challenge: when a coroutine suspends and later resumes, the physical stack frame that created the coroutine may no longer exist. The "parent" in the async sense is not the caller in the stack sense. Debugging an async Python program with GDB shows `_selector.poll()` at the top of every stack — the event loop — with no indication of which coroutine is stuck or why.
 
-Solutions across languages:
-- **Go's `runtime/trace`**: captures discrete scheduler events (goroutine creation, blocking, unblocking) and visualizes them as a timeline in `go tool trace`. Delve (Go debugger) understands goroutine semantics and can list/switch between goroutines, showing each goroutine's logical stack.
-- **Kotlin coroutines**: IntelliJ's debugger reconstructs coroutine call chains using metadata stored in coroutine objects. The Parallel Stacks plugin (Google, 2023) provides a visual graph of coroutine relationships — which coroutines spawned which, and their current states.
-- **JavaScript async stack traces**: V8 and Chrome DevTools maintain "async stack traces" by recording the call stack at each `await` point and stitching them together. This creates a synthetic stack that shows the full async call chain, even though the physical stacks are gone.
-- **Rust async**: debugging Rust futures is notoriously difficult because the compiler transforms async functions into state machines. The physical stack shows the executor; the logical async chain requires interpreting the future's internal state. `tokio-console` provides runtime introspection of Tokio tasks, showing task states, waker graphs, and poll durations.
+The design lesson framing the rest of this chapter: **async debugging requires runtime cooperation**. The runtime must record enough metadata (parent task, spawn site, await site) to reconstruct logical call chains. Languages that design async runtimes with debugging metadata from the start (Go, Kotlin) provide dramatically better debugging experiences than languages where async was added later (Python, Rust). The four following subsections trace this spectrum from heaviest first-class support to most retrofitted.
 
-The design lesson: async debugging requires runtime cooperation. The runtime must record enough metadata (parent task, spawn site, await site) to reconstruct logical call chains. Languages that design async runtimes with debugging metadata from the start (Go, Kotlin) provide dramatically better debugging experiences than languages where async was added later (Python, Rust).
+### 9.2. Go — `runtime/trace` + Delve Goroutine Awareness
 
-Source: https://github.com/go-delve/delve and https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/
+Go's runtime emits **scheduler events** — goroutine creation, blocking on channels/mutexes/syscalls, unblocking, GC pauses, system-monitor activity — into a per-thread ring buffer enabled by `runtime/trace.Start`. The result is a structured event stream that `go tool trace` visualizes as a per-goroutine timeline, with synchronization edges connecting senders to receivers across the goroutine graph. The mechanism is the same one TRACERS §3.5 covers from the always-on observability angle; for *debugging*, the same trace tells the operator which goroutine got stuck where.
+
+**Delve** is the Go debugger's runtime-aware front-end. `goroutines` lists every live goroutine with its current state (running, runnable, waiting on chan/syscall/mutex/io), the user-level function it last entered, and the blocked-on resource. `goroutine N` switches the debugger context to goroutine N so subsequent `bt`, `frame`, `print` commands operate on its stack rather than the current OS thread's executor stack. This is the cleanest production realization of "the debugger natively understands the runtime's concurrency primitive" — Delve is built knowing about `g`, `m`, `p` structures and walks them directly.
+
+The design takeaway is that Go's day-one investment in scheduler-event metadata pays compounding dividends for tooling. Async debugging in Go does not require stitching, post-hoc reconstruction, or third-party introspection libraries — the runtime just hands over the information.
+
+Source: https://github.com/go-delve/delve and https://pkg.go.dev/runtime/trace
+
+### 9.3. Kotlin — Coroutine Object Metadata + Parallel Stacks
+
+Kotlin coroutines are not OS threads; they are state machines compiled from `suspend fun` source, with each suspension point capturing the continuation (the "rest of the function") plus the local variables it needs. The compiler emits debug metadata describing this transformation, and IntelliJ's coroutine debugger reads that metadata to reconstruct logical call chains across `await`/`suspend` boundaries.
+
+The **Parallel Stacks plugin** (Google, GSoC 2023) builds a visual graph of coroutine relationships from this metadata: which coroutine spawned which, what each coroutine is currently waiting on, and how cancellation propagates through the tree. Where Delve presents Go's flat goroutine list (§9.2), the Kotlin tooling presents a *graph* — appropriate because Kotlin coroutines are structured (parent–child by `coroutineScope`) in a way Go's flat goroutines are not.
+
+The pattern: **structured concurrency in the language gives the debugger a richer object to render**. A flat list of goroutines can only be a list; a tree of structured-concurrency scopes can be a graph.
+
+Source: https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/
+
+### 9.4. JavaScript — V8 Stitched Async Stack Traces
+
+V8 and Chrome DevTools maintain "async stack traces" by **recording the call stack at each `await` / `.then` / `setTimeout` callback boundary** and stitching them together when an exception fires or the debugger pauses. The user sees a synthetic stack showing the full chain of asynchronous resumptions, even though the physical stacks at each link were already discarded by the event loop. The stitching is bounded — typically the last 10 async hops are kept — to keep memory cost predictable.
+
+The mechanism is **runtime cooperation paid at every suspension point**: each await pushes its current stack into a side data structure keyed by the resulting promise/microtask. Resumption reads the saved stack and stitches it as the "async caller." For users this is invisible; for V8 the steady-state cost is real but bounded, and the design has been the de-facto template for every modern JavaScript runtime debugger.
+
+Source: https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/ and https://developer.chrome.com/blog/devtools-modern-web-debugging/
+
+### 9.5. Rust — `tokio-console` + Future Introspection
+
+Rust's async story is the most retrofitted of the four. Async functions desugar to opaque state machines (anonymous types implementing `Future`); the physical stack at any moment shows only the executor's poll loop, never the logical chain of `await`s that led to the current suspension. Worse, the futures themselves are user-defined types with no shared metadata layout — the debugger cannot generically inspect "what is this future waiting on" without the runtime providing structure.
+
+**`tokio-console`** is the runtime-introspection answer for Tokio. Built on `tracing` instrumentation that Tokio emits for task spawn/poll/wake/drop events, the console presents a per-task view: which task is running, which is waiting on which resource, how many times each has been polled, how long each poll took, and the source location where each task was spawned. The "waker graph" answers the unique-to-Rust-async question of *who would unblock this task* — typically a different task, identified by its waker.
+
+The retrofit cost is visible in the architecture: tokio-console is a separate crate, requires opt-in instrumentation, and only works for Tokio (other Rust async runtimes — async-std, smol, glommio — need their own equivalents). Compare with Go (§9.2) where every binary's runtime is debuggable by Delve out of the box. The lesson generalizes: **a language that retrofits async pays the debugger tax for years afterward in the form of fragmented, runtime-specific tooling**.
+
+Source: https://github.com/tokio-rs/console and https://tokio.rs/blog/2021-12-announcing-tokio-console
 
 ---
 
 ## 10. Concurrency-Aware Debuggers
 
-Concurrency bugs evade step-through debugging. Data races disappear when the scheduler is slowed, deadlocks manifest only under load, and a stop-the-world breakpoint changes the very timing relationships being investigated. The tools in this chapter instrument synchronization semantics instead of stopping execution — they *observe* concurrency rather than pause it. They sit between the omniscient debuggers of §3 (which could in principle see races but rarely do at runtime resolution) and the always-on tracers of `TRACERS.md` (which record events but don't reason about happens-before).
+Concurrency bugs evade step-through debugging. Data races disappear when the scheduler is slowed, deadlocks manifest only under load, and a stop-the-world breakpoint changes the very timing relationships being investigated. The tools in this chapter instrument synchronization semantics instead of stopping execution — they *observe* concurrency rather than pause it. Entries split along three orthogonal questions: **did a race happen on this run?** (§10.1 ThreadSanitizer's hybrid happens-before + lockset), **what schedules could have happened that we haven't tried?** (§10.2 systematic schedule exploration via CHESS / loom / FoundationDB), and **why is nothing making progress?** (§10.3 deadlock/liveness wait-graph reasoning). They sit between the omniscient debuggers of §3 (which could in principle see races but rarely do at runtime resolution) and the always-on tracers of `TRACERS.md` (which record events but don't reason about happens-before).
 
 ### 10.1. ThreadSanitizer v2 — Hybrid Happens-Before + Lockset
 
@@ -848,11 +940,31 @@ The design lineage: TSan descends from Helgrind (Valgrind) and inspires RacerD (
 
 Source: https://research.google.com/pubs/archive/35604.pdf and https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs
 
+### 10.2. Systematic Concurrency Schedule Exploration
+
+Race detectors find races that happened in one execution. Systematic concurrency testing tries to *make* rare schedules happen. The runtime replaces the normal scheduler with a controlled scheduler, explores task interleavings, injects yields at synchronization points, records schedules, and replays failing schedules deterministically.
+
+Microsoft CHESS pioneered this for threaded programs using schedule bounding and partial-order reduction. Rust's `loom` explores possible interleavings of atomics, mutexes, and threads by replacing synchronization primitives with instrumented models. FoundationDB's deterministic simulation runs distributed-system components under a deterministic event loop with randomized faults, delays, and schedules, making entire cluster failures reproducible.
+
+The language-design lesson: **if the language owns tasks, channels, actors, or effects, it can own the scheduler in tests**. A debugger can then show "the schedule that caused the bug" as a first-class artifact, not just a stack trace. Pairs naturally with the happens-before tracking of §10.1 — schedule exploration finds the schedule, sanitizers diagnose what happens on it.
+
+Source: https://www.microsoft.com/en-us/research/project/chess/, https://github.com/tokio-rs/loom, and https://apple.github.io/foundationdb/testing.html
+
+### 10.3. Deadlock and Liveness Debugging
+
+Data races are not the only concurrency bugs. Programs also hang: locks form cycles, tasks wait on futures that will never complete, actors starve in mailboxes, channels have no receiver, and thread pools exhaust themselves. The debugger question is not "who wrote this memory?" but "why is nothing making progress?"
+
+Classic thread dumps expose blocked threads, owned locks, and wait stacks; JVM tools can detect monitor deadlocks from a wait-for graph. Go goroutine dumps show goroutines blocked on channels, mutexes, syscalls, and timers. Linux `lockdep` validates lock ordering in the kernel. Async runtimes such as Tokio can expose task graphs and resource wait states through tools like `tokio-console`.
+
+The language-design lesson: **debug wait relationships explicitly**. If the runtime has structured concurrency, channels, actors, promises, mutexes, and cancellation, it can maintain a wait-for graph: task A awaits future B, B waits for timer C, actor D waits for mailbox message E. A debugger can then answer "why is this task stuck?" directly.
+
+Source: https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html, https://go.dev/doc/diagnostics, https://docs.kernel.org/locking/lockdep-design.html, and https://github.com/tokio-rs/console
+
 ---
 
 ## 11. Post-Mortem and Out-of-Process Debugging
 
-Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (§2.7) is the non-crash sibling: checkpoint a *healthy* program for later inspection.
+Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint, a hardware-probe halt, or a curated crash artifact — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, the hardware substrate beneath embedded targets, the production pipelines that ship crash artifacts off failing machines, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (§2.7) is the non-crash sibling: checkpoint a *healthy* program for later inspection.
 
 ### 11.1. Core Dumps — ELF Cores, `coredump_filter`, On-Demand Snapshots
 
@@ -910,6 +1022,26 @@ The generalizable lesson is a pattern also seen in debuginfod (§7.4): **the hos
 
 Source: https://github.com/knurling-rs/defmt and https://probe.rs/docs
 
+### 11.5. JTAG / SWD / OpenOCD Hardware Debugging
+
+Bare-metal targets often lack `ptrace`, signals, virtual memory, files, or an operating system. Debugging happens through a hardware probe. JTAG and ARM SWD let the host halt the core, read/write registers and memory, set hardware breakpoints/watchpoints, flash firmware, and sometimes stream trace data through CoreSight, ETM, ITM, or SWO.
+
+OpenOCD is the classic open-source bridge from probes to GDB remote protocol. `probe-rs` (covered in §11.4) is the Rust-native replacement for many Cortex-M workflows. Flash breakpoints are a special constraint: code in flash cannot be patched with `INT3` cheaply, so debuggers rely on a limited number of hardware comparators or rewrite flash pages sparingly. Semihosting lets target code request host I/O through debugger traps, useful but slow.
+
+The language-design lesson: **embedded debugging is a target ABI, not just a tool**. Panic formatting, stack unwinding, symbol names, frame pointers, no-std allocators, and debug sections must work when the only communication channel is a probe reading memory.
+
+Source: https://openocd.org/doc/html/index.html and https://developer.arm.com/documentation/ihi0031/latest/
+
+### 11.6. Production Crash Pipelines: Minidumps, Symbolication, and Grouping
+
+Core dumps (§11.1) are complete but often too large, too sensitive, or too platform-specific for deployed software. Production crash systems instead collect compact crash artifacts: Windows minidumps, Breakpad/Crashpad dumps, Apple crash reports with `.dSYM` symbolication, JavaScript stack traces with source maps, or Sentry-style event envelopes. Server-side symbolication then reconstructs source locations from build IDs, debug files, unwind tables, source maps, and inlining metadata.
+
+This is a debugger technique because most deployed bugs are debugged after the fact, without the original process. The crash pipeline decides whether the developer gets a useful stack trace, async causality, registers, thread list, loaded module versions, panic payload, breadcrumbs, and privacy-filtered local variables — or only "segmentation fault."
+
+The language-design lesson: **standardize the crash artifact early**. A new language should define panic/crash metadata, build IDs, symbol lookup, async stack capture, source-map/debug-info integration, and privacy controls as part of its tooling story. The build-ID symbol distribution side is covered in §7.4 (debuginfod); minidumps are the artifact format that pairs with it.
+
+Source: https://chromium.googlesource.com/breakpad/breakpad, https://chromium.googlesource.com/crashpad/crashpad, and https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
+
 ---
 
 ## 12. Specification-Level Debugging
@@ -949,115 +1081,7 @@ Source: https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-
 
 ---
 
-## 13. Additional Semantic and Production Debugging Techniques
-
-This chapter collects additional debugger mechanisms that complement the earlier taxonomy and should be considered when designing a new language. The common theme is **semantic debugging**: break not only on program counters and memory addresses, but on language events, runtime states, scheduler choices, contract violations, and deployed crash artifacts.
-
-### 13.1. Event Breakpoints / Catchpoints
-
-Line breakpoints answer "stop here." Event breakpoints answer "stop when this kind of thing happens anywhere." Mature debuggers expose catchpoints for exceptions, signals, syscalls, process creation, thread creation, library loading, allocation, panic, and language-specific runtime events.
-
-GDB's `catch throw`, `catch syscall`, `catch fork`, `catch exec`, and shared-library catchpoints are the native model. Java debuggers expose caught/uncaught exception breakpoints through JPDA/JDWP. Chrome DevTools has "pause on caught exceptions" and "pause on uncaught exceptions." A language runtime can generalize this to actor message sends, task spawns, cancellation, effect invocation, allocation classes, or contract violations.
-
-The language-design lesson: **make runtime events first-class debugger stop reasons**. If the runtime already classifies events for exceptions, panics, tasks, actors, effects, or allocators, expose those same event IDs to the debugger instead of forcing users to guess implementation functions to break on.
-
-Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html and https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
-
-### 13.2. Page-Protection Watchpoints and Guard Pages
-
-Hardware debug registers are precise but tiny: on x86, usually four watched addresses, each limited to a small width. A scalable alternative is to use page permissions. Mark a page `PROT_NONE` with `mprotect()` or `PAGE_GUARD` / `VirtualProtect()` on Windows; when the target reads or writes that page, the CPU raises a page fault and the debugger decides whether the access is interesting.
-
-The trade-off is precision versus scale. Page watchpoints can cover kilobytes or megabytes and can be created in large numbers, but they trigger on every access to the protected page, not only the watched object. Debuggers and runtimes can reduce false positives by isolating selected objects onto their own pages, using guard pages around stacks or heap allocations, or combining page faults with single-step/reprotect logic.
-
-The language-design lesson: **allocator cooperation turns crude page faults into useful object watchpoints**. A runtime that can place one object, arena, stack segment, or actor heap on a protected page can offer data breakpoints that are far larger than hardware DR registers allow.
-
-Source: https://man7.org/linux/man-pages/man2/mprotect.2.html and https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
-
-### 13.3. Debugger Expression Evaluation and State Surgery
-
-A debugger is not only an observer. Users expect to evaluate expressions in the current frame, call functions, assign variables, force returns, restart frames, and inspect values using language semantics. This requires a miniature evaluator whose environment is the paused program: current lexical scope, stack frame, registers, heap, generic instantiations, dynamic dispatch rules, and optimized-code location mappings.
-
-GDB has `print`, `call`, `set variable`, and `return`. LLDB embeds Clang to evaluate C/C++/Objective-C expressions. Chrome DevTools evaluates JavaScript in paused stack frames. JDWP exposes operations such as object invocation and `ForceEarlyReturn`. Smalltalk/Pharo and Common Lisp go further: the debugger is an interactive development environment where live frames can be inspected, edited, restarted, or resumed through restarts.
-
-The hard part is safety. Calling arbitrary code from a paused thread can deadlock, allocate, throw, mutate state, or observe inconsistent invariants. A language can define a **debug expression subset**: pure field access, formatting, total helper functions, controlled mutation, or explicitly unsafe target calls.
-
-The language-design lesson: **design the debugger evaluator as part of the language semantics, not as an afterthought**. If the compiler can emit enough metadata for lexical scopes, generic types, closures, effects, async frames, and optimized-out values, the debugger can evaluate expressions that feel like the source language instead of raw memory pokes.
-
-Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html and https://lldb.llvm.org/use/tutorial.html. For JDWP object invocation and `ForceEarlyReturn`, see §5.5.
-
-### 13.4. Edit-and-Continue / Hot Code Replacement
-
-Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version.
-
-Visual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk images, Flutter hot reload, Clojure REPL-driven development, and browser hot-module replacement all pick different points in the design space. The core problems are stable function identity, active-frame migration, closure layout changes, object shape changes, inlined-frame deoptimization, and coexistence of old and new code.
-
-The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Debuggers become dramatically more powerful if the runtime can deoptimize optimized frames back into an inspectable representation before applying a patch.
-
-Source: https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue, https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html, and https://docs.flutter.dev/tools/hot-reload
-
-### 13.5. Production Crash Pipelines: Minidumps, Symbolication, and Grouping
-
-Core dumps are complete but often too large, too sensitive, or too platform-specific for deployed software. Production crash systems instead collect compact crash artifacts: Windows minidumps, Breakpad/Crashpad dumps, Apple crash reports with `.dSYM` symbolication, JavaScript stack traces with source maps, or Sentry-style event envelopes. Server-side symbolication then reconstructs source locations from build IDs, debug files, unwind tables, source maps, and inlining metadata.
-
-This is a debugger technique because most deployed bugs are debugged after the fact, without the original process. The crash pipeline decides whether the developer gets a useful stack trace, async causality, registers, thread list, loaded module versions, panic payload, breadcrumbs, and privacy-filtered local variables — or only "segmentation fault."
-
-The language-design lesson: **standardize the crash artifact early**. A new language should define panic/crash metadata, build IDs, symbol lookup, async stack capture, source-map/debug-info integration, and privacy controls as part of its tooling story.
-
-Source: https://chromium.googlesource.com/breakpad/breakpad, https://chromium.googlesource.com/crashpad/crashpad, and https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
-
-### 13.6. JTAG / SWD / OpenOCD Hardware Debugging
-
-Bare-metal targets often lack `ptrace`, signals, virtual memory, files, or an operating system. Debugging happens through a hardware probe. JTAG and ARM SWD let the host halt the core, read/write registers and memory, set hardware breakpoints/watchpoints, flash firmware, and sometimes stream trace data through CoreSight, ETM, ITM, or SWO.
-
-OpenOCD is the classic open-source bridge from probes to GDB remote protocol. `probe-rs` is the Rust-native replacement for many Cortex-M workflows (§11.4). Flash breakpoints are a special constraint: code in flash cannot be patched with `INT3` cheaply, so debuggers rely on a limited number of hardware comparators or rewrite flash pages sparingly. Semihosting lets target code request host I/O through debugger traps, useful but slow.
-
-The language-design lesson: **embedded debugging is a target ABI, not just a tool**. Panic formatting, stack unwinding, symbol names, frame pointers, no-std allocators, and debug sections must work when the only communication channel is a probe reading memory.
-
-Source: https://openocd.org/doc/html/index.html and https://developer.arm.com/documentation/ihi0031/latest/. For `probe-rs`, see §11.4.
-
-### 13.7. Systematic Concurrency Schedule Exploration
-
-Race detectors find races that happened in one execution. Systematic concurrency testing tries to make rare schedules happen. The runtime replaces the normal scheduler with a controlled scheduler, explores task interleavings, injects yields at synchronization points, records schedules, and replays failing schedules deterministically.
-
-Microsoft CHESS pioneered this for threaded programs using schedule bounding and partial-order reduction. Rust's `loom` explores possible interleavings of atomics, mutexes, and threads by replacing synchronization primitives with instrumented models. FoundationDB's deterministic simulation runs distributed-system components under a deterministic event loop with randomized faults, delays, and schedules, making entire cluster failures reproducible.
-
-The language-design lesson: **if the language owns tasks, channels, actors, or effects, it can own the scheduler in tests**. A debugger can then show "the schedule that caused the bug" as a first-class artifact, not just a stack trace.
-
-Source: https://www.microsoft.com/en-us/research/project/chess/, https://github.com/tokio-rs/loom, and https://apple.github.io/foundationdb/testing.html
-
-### 13.8. Deadlock and Liveness Debugging
-
-Data races are not the only concurrency bugs. Programs also hang: locks form cycles, tasks wait on futures that will never complete, actors starve in mailboxes, channels have no receiver, and thread pools exhaust themselves. The debugger question is not "who wrote this memory?" but "why is nothing making progress?"
-
-Classic thread dumps expose blocked threads, owned locks, and wait stacks; JVM tools can detect monitor deadlocks from a wait-for graph. Go goroutine dumps show goroutines blocked on channels, mutexes, syscalls, and timers. Linux `lockdep` validates lock ordering in the kernel. Async runtimes such as Tokio can expose task graphs and resource wait states through tools like `tokio-console`.
-
-The language-design lesson: **debug wait relationships explicitly**. If the runtime has structured concurrency, channels, actors, promises, mutexes, and cancellation, it can maintain a wait-for graph: task A awaits future B, B waits for timer C, actor D waits for mailbox message E. A debugger can then answer "why is this task stuck?" directly.
-
-Source: https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html, https://go.dev/doc/diagnostics, https://docs.kernel.org/locking/lockdep-design.html, and https://github.com/tokio-rs/console
-
-### 13.9. Dynamic Invariant Detection / Specification Mining
-
-Dynamic invariant detectors observe executions and infer properties that appear to hold: `x <= y`, `len(buffer) == count`, `field != null`, "this collection is sorted", or "this function returns a value larger than its argument." Daikon is the canonical system: it instruments programs, records values at program points, and emits likely invariants that could be written as assertions, contracts, or documentation.
-
-This is useful for debugging because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations. False positives are expected — the technique depends on test quality — but even false invariants reveal missing tests or underspecified behavior.
-
-The language-design lesson: **make values observable at semantic program points**. If the compiler can expose function entries/exits, loop heads, object fields, algebraic data constructors, and effect boundaries in a typed trace format, invariant mining becomes much more accurate than raw memory observation.
-
-Source: https://plse.cs.washington.edu/daikon/ and https://plse.cs.washington.edu/daikon/pubs/
-
-### 13.10. Assertions, Contracts, and Semantic Breakpoints
-
-Assertions and contracts are executable claims about program state: preconditions, postconditions, invariants, representation checks, and internal sanity checks. They are usually treated as testing or verification tools, but they are also debugger hooks. A contract violation is a semantically meaningful breakpoint: the program can stop exactly where an assumption first becomes false, with the violated predicate, source location, values, and call stack preserved.
-
-Eiffel made Design by Contract central to the language. Racket contracts enforce boundaries between components. Ada/SPARK contracts connect runtime checking and formal proof. Rust separates always-on `assert!` from debug-only `debug_assert!`. C++26 contract assertions add language-level `pre`, `post`, and `contract_assert` forms with different evaluation modes. Swift distinguishes `assert`, `precondition`, and unconditional traps.
-
-The language-design lesson: **contracts should have debugger semantics**. A new language can define whether contract failures terminate, throw, invoke restarts, enter the debugger, continue in observe mode, log telemetry, or become catchable semantic breakpoints. This gives users a precise spectrum from zero-overhead release builds to invariant-rich debug builds.
-
-Source: https://docs.racket-lang.org/guide/contracts.html, https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions, and https://cppreference.dev/w/cpp/language/contracts
-
----
-
-## 14. Summary of Debugger Techniques
+## 13. Summary of Debugger Techniques
 
 Rows grouped by chapter, in chapter order.
 
@@ -1067,6 +1091,9 @@ Rows grouped by chapter, in chapter order.
 | Compiled conditional breakpoint (INT3;NOP) | Zero until condition true | Single trap when fired | Requires source-level edit, not runtime toggle | Chris Wellons pattern (§1.2) |
 | Hardware debug registers (DR0–DR3) | Zero on unwatched access | Trap (~3μs on Linux) | Max 4 watchpoints × 8 bytes | GDB, Jane Street perftrace (§1.3) |
 | RISC-V PMP as debug primitive | Reuses security regs | PMP fault | Bare-metal embedded only | Raven DAC '22 (§1.4) |
+| Page-protection watchpoint | Page table permission bit | Page fault + filter + reprotect | Coarse page granularity; scales beyond DR registers | `mprotect`, `VirtualProtect(PAGE_GUARD)`, guard pages (§1.5) |
+| Event breakpoint / catchpoint | Runtime event taxonomy | Stop on matching event | Needs language/runtime event IDs, not just PCs | GDB catchpoints, JDWP exception breakpoints, DevTools pause-on-exception (§1.6) |
+| Contract violation as semantic breakpoint | Contract metadata/check mode | Predicate evaluation | Needs policy: ignore/observe/enforce/debug | Eiffel, Racket contracts, Rust `debug_assert!`, C++26 contracts (§1.7) |
 | Deterministic record + replay | N/A | ~20% recording overhead; replay re-executes from checkpoints | Single-threaded scheduling, CPU counter brittleness | rr, rr.soft (§2.1) |
 | Omniscient post-hoc query DB | N/A | Minutes to build, 10s of GB | Not live; post-hoc only | Pernosco (§2.2) |
 | Out-of-band production snapshot | N/A | Bounded snapshot collection overhead | Cannot step forward from snapshot; implementation/runtime-specific | VS Snapshot Debugger (§2.3) |
@@ -1090,6 +1117,7 @@ Rows grouped by chapter, in chapter order.
 | Bytecode-woven event DB + replay UI | Weaver at class-load | Instrumentation per event | Scale requires distributed DB or commercial scoping | Chronon, TOD, IntelliTrace, RevDebug (§3.9) |
 | Decorator-only omniscient trace | `sys.settrace` hook | 10–100× on traced code | One-function scope; no infrastructure | PySnooper, snoop, viztracer (§3.10) |
 | Action-log replay over pure state | Action history array | Action re-application on jump | Requires pure reducers + immutable state | Redux DevTools (cf. Elm §3.3) (§3.11) |
+| Hot code replacement | Versioned code metadata | Patch + deopt/frame policy | Active-frame migration is hard | Visual Studio Edit and Continue, JVM HotSwap, Erlang, Flutter (§3.12) |
 | Post-execution inline visualization | N/A | Full-run recording | No pause/step — post-run only | WhiteBox (§4.1) |
 | Timeline scrubber (aspirational) | Full state capture | Viable only at small scale | UX vision, not production | Bret Victor demo (§4.2) |
 | Live coding and reactive dataflow environments | Per-cell/static dependency metadata where available | Re-evaluation or watch updates on dependency/runtime change | Observable fits the DAG model; Light Table and Eve are related but different live-programming designs | Observable, Light Table, Eve (§4.3) |
@@ -1105,6 +1133,7 @@ Rows grouped by chapter, in chapter order.
 | Client-vs-platform-authoritative remote | Single TCP session | Per-packet memory/reg access | gdbserver thin vs lldb-server + SBPlatform thick | gdbserver, lldb-server, debugserver (§5.6) |
 | Mirror-based reflection | Capability required | Mirror dispatch per meta-op | Language must be designed for it | Newspeak, Self; JDWP/JDI shares the shape (§5.7) |
 | Language-specific TCP debug protocol | Zero until client connects | Per-command dispatch, spesh-aware frame reconstruction | Protocol outlives the IDE if upstreamed | MoarVM remote debug (§5.8) |
+| Debug expression evaluation | Debug metadata + evaluator | Target calls may mutate/deadlock | Requires safe subset or explicit unsafe evaluation | GDB `print/call`, LLDB expressions, DevTools console, JDWP invoke (§5.9) |
 | Retroactive console.log | Deterministic recording/checkpoint infrastructure already paid | Replay/evaluate expression at hit points across checkpoints/forks | Requires upfront deterministic recording | Replay.io (§6.1) |
 | Typed holes + live eval | Language-level holes | Per-hole type check | Requires language co-design | Hazel (§6.2) |
 | Compile-time macro print | Zero when removed | One formatter call per hit | Source-level only; not toggleable at runtime | Rust `dbg!`, Elixir `dbg/2`, icecream (§6.3) |
@@ -1123,38 +1152,44 @@ Rows grouped by chapter, in chapter order.
 | Interrogative debugging (why-did/why-didn't) | Provenance tracking | Slicing + call-graph per question | Needs recorded trace + analysis infrastructure | Whyline — Alice + Java (§8.9) |
 | 4-port tracing for nondeterministic control | Port-instrumentation hooks | Per-port trace callback | Requires Byrd-box-aware semantics | Prolog tracers (SWI, SICStus); generalizes to coroutines/effects (§8.10) |
 | Declarative / algorithmic debugging | Computation-tree reification | User answers O(log n) yes/no | Requires user to know intended semantics | Shapiro ADP; Mercury declarative debugger (§8.10) |
-| Async stack reconstruction | Per-task parent/spawn metadata | Runtime cooperation | Retrofitted async runtimes lose info | Go `runtime/trace`, Kotlin Parallel Stacks, V8 async traces, tokio-console (§9.1) |
+| Dynamic invariant detection | Instrumented passing runs | Trace values + infer predicates | False positives depend on test quality | Daikon (§8.11) |
+| Async stack problem framing | Conceptual: physical stack ≠ logical chain | None (taxonomy) | Reconstruction requires runtime cooperation | (§9.1) |
+| Scheduler-event runtime + debugger awareness | Per-goroutine event ring buffer | Native goroutine list/switch | Requires runtime designed for it | Go `runtime/trace`, Delve (§9.2) |
+| Coroutine-state metadata + structured-concurrency graph | Continuation captures per suspension | Compiler-emitted metadata read by IDE | Best when concurrency is structured | Kotlin coroutines + Parallel Stacks (§9.3) |
+| Stitched async stack traces | Per-await stack snapshot | Bounded record at each suspension | Memory tax at every async hop | V8 / Chrome DevTools (§9.4) |
+| Out-of-band task introspection | Per-task tracing instrumentation | Opt-in `console_subscriber` | Runtime-specific; per-runtime tooling | tokio-console (§9.5) |
 | Hybrid happens-before + lockset | Shadow memory ~1 byte per byte | ~5–15× slowdown | Only finds races that execute | ThreadSanitizer, Go race detector, Helgrind (§10.1) |
+| Systematic schedule exploration | Controlled test scheduler | Many explored interleavings | State-space explosion; needs runtime-owned sync | CHESS, Rust `loom`, FoundationDB simulation (§10.2) |
+| Deadlock/liveness wait graph | Runtime wait metadata | Graph update per wait/block | Requires all blocking primitives to be known | JVM thread dumps, Go goroutine dumps, lockdep, tokio-console (§10.3) |
 | ELF core + `coredump_filter` | Bitmask + file I/O on crash | One kernel-write | Managed runtimes need runtime-aware dumper | Core dumps, `gcore`, `qSaveCore`, SOS, SA (§11.1) |
 | kexec capture kernel + vmcore | Reserved memory at boot | Full RAM snapshot on panic | Kernel-only; dump ≈ RAM (mitigated by `makedumpfile`) | kdump + `crash` + `makedumpfile` + `pstore` (§11.2) |
 | Dual-frontend kernel debugger | `CONFIG_KGDB` compiled in | Either deadlock-safe shell or GDB-remote full source | kdb sacrifices DWARF for robustness | KGDB + KDB shared debug core (§11.3) |
 | Deferred-format embedded logging | Format strings in `.debug` only | Binary frame + host decode | Requires probe + host-side ELF | defmt + probe-rs + RTT + ITM (§11.4) |
+| Hardware probe debugging | Debug port wired in silicon | Halt/resume over JTAG/SWD | Limited breakpoints; no OS services | OpenOCD, CoreSight, probe-rs (§11.5) |
+| Production minidump pipeline | Build IDs + unwind metadata | Crash artifact upload + symbolication | Privacy and symbol availability dominate usefulness | Breakpad, Crashpad, Windows minidumps, Sentry (§11.6) |
 | Counterexample-trace navigable debugger | Model-checker output | Per-state expression evaluation | Requires finite-state verification tool | TLA+ Toolbox Trace Explorer + TLA+ Debugger (§12.1) |
 | Proof-state viewer with diffs | ITP kernel state | Per-tactic diff + widget render | Only meaningful for proof-construction languages | Lean 4 InfoView, Coq goal view, Agda typed holes (§12.2) |
-| Event breakpoint / catchpoint | Runtime event taxonomy | Stop on matching event | Needs language/runtime event IDs, not just PCs | GDB catchpoints, JDWP exception breakpoints, DevTools pause-on-exception (§13.1) |
-| Page-protection watchpoint | Page table permission bit | Page fault + filter + reprotect | Coarse page granularity; scales beyond DR registers | `mprotect`, `VirtualProtect(PAGE_GUARD)`, guard pages (§13.2) |
-| Debug expression evaluation | Debug metadata + evaluator | Target calls may mutate/deadlock | Requires safe subset or explicit unsafe evaluation | GDB `print/call`, LLDB expressions, DevTools console, JDWP invoke (§13.3) |
-| Hot code replacement | Versioned code metadata | Patch + deopt/frame policy | Active-frame migration is hard | Visual Studio Edit and Continue, JVM HotSwap, Erlang, Flutter (§13.4) |
-| Production minidump pipeline | Build IDs + unwind metadata | Crash artifact upload + symbolication | Privacy and symbol availability dominate usefulness | Breakpad, Crashpad, Windows minidumps, Sentry (§13.5) |
-| Hardware probe debugging | Debug port wired in silicon | Halt/resume over JTAG/SWD | Limited breakpoints; no OS services | OpenOCD, CoreSight, probe-rs (§13.6) |
-| Systematic schedule exploration | Controlled test scheduler | Many explored interleavings | State-space explosion; needs runtime-owned sync | CHESS, Rust `loom`, FoundationDB simulation (§13.7) |
-| Deadlock/liveness wait graph | Runtime wait metadata | Graph update per wait/block | Requires all blocking primitives to be known | JVM thread dumps, Go goroutine dumps, lockdep, tokio-console (§13.8) |
-| Dynamic invariant detection | Instrumented passing runs | Trace values + infer predicates | False positives depend on test quality | Daikon (§13.9) |
-| Contract violation as semantic breakpoint | Contract metadata/check mode | Predicate evaluation | Needs policy: ignore/observe/enforce/debug | Eiffel, Racket contracts, Rust `debug_assert!`, C++26 contracts (§13.10) |
 
 ---
 
-## 15. References
+## 14. References
 
 References are grouped by the chapter that first cites them. Within each chapter they roughly follow subsection order, with some broad background references grouped by topic rather than by exact first mention.
 
-### Chapter 1 — Native Breakpoints
+### Chapter 1 — Breakpoint Mechanisms
 
 1. Eli Bendersky: How Debuggers Work, Part 2: Breakpoints — https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints
 2. Debugger Breakpoints via Code Patching — https://devblogs.microsoft.com/oldnewthing/20241111-00/?p=110503
 3. Chris Wellons: Two Handy GDB Breakpoint Tricks — https://nullprogram.com/blog/2024/01/28/
 4. Tristan Hume: Tracing Methods (hardware breakpoints section) — https://thume.ca/2023/12/02/tracing-methods/
 5. Raven: RISC-V PMP as Debugging Primitive — https://fengweiz.github.io/paper/raven-dac22.pdf
+6. Linux `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html
+7. Windows Guard Pages — https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
+8. GDB Set Catchpoints — https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html
+9. Chrome DevTools Protocol Debugger Domain — https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
+10. Racket Contracts — https://docs.racket-lang.org/guide/contracts.html
+11. Eiffel Design by Contract — https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions
+12. C++ Contract Assertions — https://cppreference.dev/w/cpp/language/contracts
 
 ### Chapter 2 — Record and Replay
 
@@ -1204,6 +1239,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 20. PySnooper (Ram Rachum) — https://pypi.org/project/PySnooper/
 21. VizTracer Documentation — https://viztracer.readthedocs.io/en/latest/viztracer.html
 22. Redux DevTools — https://github.com/reduxjs/redux-devtools
+23. Visual Studio Edit and Continue — https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue
+24. JPDA Enhancements: HotSwap / Class Redefinition — https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html
+25. Flutter Hot Reload — https://docs.flutter.dev/tools/hot-reload
 
 ### Chapter 4 — Live Visualization
 
@@ -1237,6 +1275,8 @@ References are grouped by the chapter that first cites them. Within each chapter
 14. Bracha: The Newspeak Programming Platform — https://bracha.org/newspeak.pdf
 15. Comma IDE features — https://commaide.com/features
 16. Comma IDE FAQ — https://commaide.com/faq
+17. GDB Expressions — https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html
+18. LLDB Tutorial — https://lldb.llvm.org/use/tutorial.html
 
 ### Chapter 6 — Retroactive and Partial Evaluation
 
@@ -1279,16 +1319,28 @@ References are grouped by the chapter that first cites them. Within each chapter
 18. Ko & Myers: Debugging Reinvented — the Java Whyline (ICSE 2008) — https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf
 19. SWI-Prolog: The Byrd Box Model and Ports — https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model
 20. Shapiro: Algorithmic Program Debugging (archive of the debugger code) — http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html
+21. Daikon Dynamic Invariant Detector — https://plse.cs.washington.edu/daikon/
+22. Daikon Publications — https://plse.cs.washington.edu/daikon/pubs/
 
 ### Chapter 9 — Async & Coroutine Debugging
 
 1. Go Delve Debugger — https://github.com/go-delve/delve
-2. Kotlin Parallel Coroutine Stacks — https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/
+2. Go `runtime/trace` package documentation — https://pkg.go.dev/runtime/trace
+3. Kotlin Parallel Coroutine Stacks — https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/
+4. Chrome DevTools — modern web debugging (async stacks) — https://developer.chrome.com/blog/devtools-modern-web-debugging/
+5. tokio-console — https://github.com/tokio-rs/console
+6. Tokio blog — Announcing tokio-console — https://tokio.rs/blog/2021-12-announcing-tokio-console
 
 ### Chapter 10 — Concurrency-Aware Debuggers
 
 1. Serebryany & Iskhodzhanov: ThreadSanitizer (Google Research) — https://research.google.com/pubs/archive/35604.pdf
 2. ThreadSanitizer Detectable Bugs (google/sanitizers wiki) — https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs
+3. Microsoft CHESS — https://www.microsoft.com/en-us/research/project/chess/
+4. Rust `loom` — https://github.com/tokio-rs/loom
+5. FoundationDB Deterministic Simulation Testing — https://apple.github.io/foundationdb/testing.html
+6. Java Troubleshooting: Thread Dumps — https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html
+7. Go Diagnostics — https://go.dev/doc/diagnostics
+8. Linux Lockdep Design — https://docs.kernel.org/locking/lockdep-design.html
 
 ### Chapter 11 — Post-Mortem and Out-of-Process Debugging
 
@@ -1299,6 +1351,11 @@ References are grouped by the chapter that first cites them. Within each chapter
 5. Linux KGDB + KDB Documentation — https://www.kernel.org/doc/html/latest/process/debugging/kgdb.html
 6. knurling-rs/defmt — https://github.com/knurling-rs/defmt
 7. probe-rs Documentation — https://probe.rs/docs
+8. OpenOCD User Guide — https://openocd.org/doc/html/index.html
+9. ARM Debug Interface Architecture Specification — https://developer.arm.com/documentation/ihi0031/latest/
+10. Google Breakpad — https://chromium.googlesource.com/breakpad/breakpad
+11. Google Crashpad — https://chromium.googlesource.com/crashpad/crashpad
+12. Windows Minidump Files — https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
 
 ### Chapter 12 — Specification-Level Debugging
 
@@ -1307,31 +1364,3 @@ References are grouped by the chapter that first cites them. Within each chapter
 3. Nawrocki et al.: An Extensible User Interface for Lean 4 (ITP 2023) — https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf
 4. leanprover/vscode-lean4 InfoView Manual — https://github.com/leanprover/vscode-lean4
 
-### Chapter 13 — Additional Semantic and Production Debugging Techniques
-
-1. GDB Set Catchpoints — https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html
-2. Chrome DevTools Protocol Debugger Domain — https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
-3. Linux `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html
-4. Windows Guard Pages — https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
-5. GDB Expressions — https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html
-6. LLDB Tutorial — https://lldb.llvm.org/use/tutorial.html
-7. Visual Studio Edit and Continue — https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue
-8. JPDA Enhancements: HotSwap / Class Redefinition — https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html
-9. Flutter Hot Reload — https://docs.flutter.dev/tools/hot-reload
-10. Google Breakpad — https://chromium.googlesource.com/breakpad/breakpad
-11. Google Crashpad — https://chromium.googlesource.com/crashpad/crashpad
-12. Windows Minidump Files — https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
-13. OpenOCD User Guide — https://openocd.org/doc/html/index.html
-14. ARM Debug Interface Architecture Specification — https://developer.arm.com/documentation/ihi0031/latest/
-15. Microsoft CHESS — https://www.microsoft.com/en-us/research/project/chess/
-16. Rust `loom` — https://github.com/tokio-rs/loom
-17. FoundationDB Deterministic Simulation Testing — https://apple.github.io/foundationdb/testing.html
-18. Java Troubleshooting: Thread Dumps — https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html
-19. Go Diagnostics — https://go.dev/doc/diagnostics
-20. Linux Lockdep Design — https://docs.kernel.org/locking/lockdep-design.html
-21. tokio-console — https://github.com/tokio-rs/console
-22. Daikon Dynamic Invariant Detector — https://plse.cs.washington.edu/daikon/
-23. Daikon Publications — https://plse.cs.washington.edu/daikon/pubs/
-24. Racket Contracts — https://docs.racket-lang.org/guide/contracts.html
-25. Eiffel Design by Contract — https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions
-26. C++ Contract Assertions — https://cppreference.dev/w/cpp/language/contracts

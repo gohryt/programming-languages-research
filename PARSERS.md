@@ -2,7 +2,7 @@
 
 Research on parser architectures, source location strategies, AST representations, and error recovery across languages and toolchains.
 
-This document focuses on the **front end**: everything from characters to a usable syntax tree. Everything downstream — semantic analysis, IR, codegen, runtime — is in `COMPILERS.md`. Debug-info encoding formats (DWARF state machine, JS Source Maps, JVM `LineNumberTable`, CPython PEP 657) are compiler-output concerns and live in `COMPILERS.md` as well.
+This document focuses on the **front end**: everything from characters to a usable syntax tree. Everything downstream — semantic analysis, IR, codegen, runtime — is in `COMPILERS.md`. Debug-info encoding formats (DWARF state machine, JS Source Maps, JVM `LineNumberTable`, CPython PEP 657) are compiler-output concerns and live in `COMPILERS.md` as well. The structure *above* files — module systems, import semantics, package boundaries, build-graph formation — lives in `MODULES.md`.
 
 ---
 
@@ -16,9 +16,11 @@ Techniques for cheaply attaching file and line/column information to AST nodes w
 
 **swc** mirrors rustc: `Span { lo: BytePos(u32), hi: BytePos(u32), ctxt: SyntaxContext }` = 12 bytes per node. `BytePos(0)` is reserved for compiler-synthesized spans. The cost is real — on a large AST with millions of nodes, spans alone can consume tens of megabytes.
 
-**Go** uses compact `token.Pos` integers throughout the AST rather than storing full spans everywhere. All files in a compilation share a virtual address space via `FileSet.AddFile(name, base, size)`. Each file occupies `[base, base+size]`. Resolution is a binary search on the `FileSet`, then on the file's line-start table. Many AST nodes store a primary start position and compute `End()` structurally, while other structs store additional token positions for delimiters, operators, literals, braces, or parentheses. This is still space-efficient compared with full `(lo, hi)` spans, but it is not a strict “one position per node” scheme.
+**Go** uses compact `token.Pos` integers throughout the AST rather than storing full spans everywhere. All files in a compilation share a virtual address space via `FileSet.AddFile(name, base, size)`. Each file occupies `[base, base+size]`. Resolution is a binary search on the `FileSet`, then on the file's line-start table. Many AST nodes store a primary start position and compute `End()` structurally, while other structs store additional token positions for delimiters, operators, literals, braces, or parentheses. This is still space-efficient compared with full `(lo, hi)` spans, but it is not a strict "one position per node" scheme.
 
 **Cuik** packs source locations into `u32` with bit fields: 1 bit macro flag, 14 bits file ID, 17 bits file position. `SourceRange` is two of these = 8 bytes. Every `Stmt` and `Subexpr` carries a `SourceRange`. Line/column resolution uses a binary-searchable `line_map` per file. The bit-packing is impressively tight but limits file size to 128KB and file count to 16384 — workable for many hand-written C translation units, but risky for generated code, amalgamated libraries, or arbitrary-language source files.
+
+Source: https://rustc-dev-guide.rust-lang.org/diagnostics.html and https://rustdoc.swc.rs/swc_common/struct.Span.html and https://pkg.go.dev/go/token and https://pkg.go.dev/go/ast
 
 ### 1.2. No Stored Positions — Zig, Roslyn, rowan
 
@@ -29,6 +31,8 @@ Three production systems omit absolute positions from AST/tree nodes entirely, e
 **Roslyn** (C#) introduced the red-green tree pattern: green nodes store width (character count) rather than absolute offsets, and a red tree layer computes absolute positions by summing widths from the root on demand. Absolute-position storage per node is zero, but green nodes still pay for widths and child structure; position queries are O(depth). The primary motivation is incremental reparsing — green nodes carry no absolute positions and can be reused across edits without invalidation.
 
 **rowan** (rust-analyzer) follows Roslyn's design: position-free green nodes, red (syntax) nodes that compute `TextRange(u32, u32)` on demand. See §3.2 for the full red-green mechanism.
+
+Source: https://github.com/ziglang/zig/tree/master/lib/std/zig and https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax
 
 ### 1.3. Line Position Resolution — Cuik's `line_map` and Go's `FileSet`
 
@@ -101,7 +105,7 @@ The practical limitation: packrat parsing's memory consumption. For a 1MB source
 
 CPython has shipped `pegen`, its PEG parser generator, as the default parser since 3.9 (PEP 617); the old LL(1) parser was removed in 3.10. The PEG approach is now the established CPython parser architecture, not an experimental side path.
 
-Source: https://we-like-parsers.github.io/pegen/peg_parsers.html and https://peps.python.org/pep-0617/
+Source: https://we-like-parsers.github.io/pegen/peg_parsers.html and https://peps.python.org/pep-0617/ and https://web.cs.ucla.edu/~todd/research/pub.php?id=pepm08 and https://arxiv.org/abs/2104.11050
 ### 2.4. Pest — PEG Without Packrat Memoisation
 
 pest is a Rust PEG parser generator (see §2.3 for the PEG formalism) emphasising accessibility and speed over theoretical guarantees. It follows PEG ordered-choice semantics: alternatives are tried in order, and a later alternative is considered only if the earlier one fails. However, repetitions and predicates are greedy and do not perform regex-style backtracking to make later expressions succeed. Generated parsers read like direct recursive-descent code rather than table-driven state machines.
@@ -364,6 +368,8 @@ Source: https://link.springer.com/book/10.1007/978-3-642-14846-0 and https://dic
 ## 3. Flat and Compact AST Representations
 
 Memory-dense AST layouts that deliberately avoid pointer-rich trees, using positional encoding, indices into side arrays, or shared-width green nodes to get cache locality and cheap serialization. The subsections vary along what exactly replaces pointers — a postfix array (Cuik), a red/green split with structural sharing (Roslyn, rowan, SwiftSyntax), token indices plus relative offsets into IR (Zig), or arena offsets (HN arena-parsers) — and on whether full-fidelity round-tripping is preserved (Oil/OSH's lossless syntax tree).
+
+> Broader survey across the AST/CST/IR design space — including bytecode, e-graphs, content-addressed, and effect-annotated representations — lives in `REPRESENTATIONS.md`. This chapter retains the parser-output framing.
 
 ### 3.1. Cuik — Postfix Expression Encoding
 
@@ -859,7 +865,7 @@ References are grouped by the chapter that first cites them. Within each chapter
 11. LPeg site — http://www.inf.puc-rio.br/~roberto/lpeg/
 12. GLL Parsing (Scott & Johnstone) — https://pure.royalholloway.ac.uk/en/publications/purely-functional-gll-parsing
 13. Tomita — An Efficient Augmented Context-Free Parsing Algorithm (Computational Linguistics, 1987) — https://aclanthology.org/J87-1004.pdf
-14. Right Nulled GLR Parsers (Scott & Johnstone, TOPLAS 2006) — https://dl.acm.org/doi/pdf/10.1146809.1146810
+14. Right Nulled GLR Parsers (Scott & Johnstone, TOPLAS 2006) — https://dl.acm.org/doi/pdf/10.1145/1146809.1146810
 15. Earley parser — https://en.wikipedia.org/wiki/Earley_parser
 16. Lark parser toolkit — https://github.com/lark-parser/lark
 17. CYK algorithm — https://en.wikipedia.org/wiki/CYK_algorithm
@@ -906,10 +912,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 
 1. Cuik (RealNeGate) — https://github.com/RealNeGate/Cuik
 2. Roslyn Red-Green Trees — https://ericlippert.com/2012/06/08/red-green-trees/
-3. rowan (rust-analyzer) — https://github.com/rust-analyzer/rowan
-4. Zig ZIR documentation — https://github.com/ziglang/zig/blob/master/src/Zir.zig
-5. HN: Arena-based parsers — https://news.ycombinator.com/item?id=40276112
-6. From AST to Lossless Syntax Tree — https://www.oilshell.org/blog/2017/02/11.html
+3. Zig ZIR documentation — https://github.com/ziglang/zig/blob/master/src/Zir.zig
+4. HN: Arena-based parsers — https://news.ycombinator.com/item?id=40276112
+5. From AST to Lossless Syntax Tree — https://www.oilshell.org/blog/2017/02/11.html
 
 ### Chapter 4 — Error Recovery
 
@@ -949,19 +954,16 @@ References are grouped by the chapter that first cites them. Within each chapter
 
 ### Chapter 7 — Additional Parser Tools
 
-1. langcc — https://langcc.io/
-2. Practical LR Parser Generation — https://arxiv.org/abs/2209.08383
-3. Marpa parser site — https://jeffreykegler.github.io/Marpa-web-site/
-4. Menhir manual — https://gallium.inria.fr/~fpottier/menhir/manual.html
-5. Introducing Ungrammar — https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html
-6. syn (David Tolnay) — https://github.com/dtolnay/syn
-7. swift-syntax — https://github.com/swiftlang/swift-syntax
-8. Swift SE-0389 Attached Macros — https://github.com/swiftlang/swift-evolution/blob/main/proposals/0389-attached-macros.md
-9. @babel/parser docs — https://babeljs.io/docs/babel-parser
-10. @babel/parser source — https://github.com/babel/babel/tree/master/packages/babel-parser
-11. rust-analyzer parser crate — https://github.com/rust-lang/rust-analyzer/tree/master/crates/parser
-12. Resilient LL Parsing Tutorial (Matklad, 2023) — https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
-13. GNU Bison Manual — https://www.gnu.org/software/bison/manual/bison.html
+1. Practical LR Parser Generation — https://arxiv.org/abs/2209.08383
+2. Marpa parser site — https://jeffreykegler.github.io/Marpa-web-site/
+3. Introducing Ungrammar — https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html
+4. syn (David Tolnay) — https://github.com/dtolnay/syn
+5. swift-syntax — https://github.com/swiftlang/swift-syntax
+6. Swift SE-0389 Attached Macros — https://github.com/swiftlang/swift-evolution/blob/main/proposals/0389-attached-macros.md
+7. @babel/parser docs — https://babeljs.io/docs/babel-parser
+8. @babel/parser source — https://github.com/babel/babel/tree/master/packages/babel-parser
+9. rust-analyzer parser crate — https://github.com/rust-lang/rust-analyzer/tree/master/crates/parser
+10. Resilient LL Parsing Tutorial (Matklad, 2023) — https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
 
 ### Chapter 8 — Community Marginalia Worth Mining
 

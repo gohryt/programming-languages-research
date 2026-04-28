@@ -2,7 +2,7 @@
 
 Research on compilation techniques, intermediate representations, code generation, and runtime-compilation integration (JITs, regex, query engines, hot code swap).
 
-This document covers everything downstream of parsing: lowering, IR, optimization, codegen, runtime object models, and compiler-emitted debug metadata. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocator implementations, language-level allocator API models, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`.
+This document covers everything downstream of parsing: lowering, IR, optimization, codegen, runtime object models, and compiler-emitted debug metadata. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocator implementations, language-level allocator API models, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`. Module systems, import semantics, package identity, build-graph formation, and dynamic module loading at the source level live in `MODULES.md`; this document focuses on what compilers do *below* that boundary.
 
 ---
 
@@ -222,6 +222,8 @@ Parser-side strategies for *storing* positions on AST nodes are in `PARSERS.md �
 
 **Lua**: standard Lua uses 4 bytes per instruction for line info. Lua Compact Debug (NodeMCU) replaces this with run-length encoding of line deltas. LuaJIT uses adaptive encoding: `u8` for ≤255 lines, `u16` for ≤65535, `u32` otherwise. The adaptive approach is elegant — most functions are short, so most line numbers fit in a byte.
 
+Source: https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html and https://peps.python.org/pep-0657/ and https://www.lua.org/manual/5.4/manual.html#4.7
+
 ### 5.2. DWARF `.debug_line` State Machine
 
 DWARF's `.debug_line` section encodes source location information as a state machine program. The state machine has registers for address, line, column, file, etc. Opcodes advance these registers. A "special opcode" (single byte) encodes both a line delta and an address delta, covering the common case of sequential statements in compact form.
@@ -232,6 +234,8 @@ The design principle: exploit the regularity of compiler output. Consecutive mac
 
 > The *location expression* side of DWARF — describing where variables live under optimization — is a debugger correctness concern covered in `DEBUGGERS.md §7`.
 
+Source: https://dwarfstd.org/
+
 ### 5.3. JS Source Maps — VLQ Delta Encoding
 
 JavaScript source maps (ECMA-426) encode mappings as VLQ (Variable Length Quantity) delta-encoded Base64 strings. Each segment encodes: generated column delta (reset per line), source file index delta, original line delta, original column delta, optional name index delta. Semicolons separate generated lines.
@@ -239,6 +243,8 @@ JavaScript source maps (ECMA-426) encode mappings as VLQ (Variable Length Quanti
 The delta encoding is key: in minified JavaScript, consecutive generated positions map to consecutive original positions (since minification reorders very little). Each delta is typically 0–2 Base64 digits. For a 1MB minified file, the source map is typically 200–500KB — smaller than the original source. ECMA-426 reduced source map sizes by 50% versus v2.
 
 Bidirectional lookup (generated→original and original→generated) is implemented via binary search on sorted segments. This enables both "jump to source" (click on minified code, see original) and "jump to generated" (set breakpoint in source, find generated location).
+
+Source: https://tc39.es/ecma426/
 
 ### 5.4. Design Principle — Delta Encoding and Regularity
 
@@ -256,6 +262,8 @@ A new language's debug encoding should pick one of these families early. The dom
 ## 6. Intermediate Representations Beyond SSA
 
 SSA is the default IR shape for modern imperative compilers, but it is far from the only option — and even the SSA family itself has diverged into graph-based, block-linear, multi-level, and multi-target variants. The entries below differ on *what regularity the IR exploits and what it sacrifices to do so*: Sea of Nodes for global scheduling freedom, Turboshaft for cache locality over analytical elegance, MLIR for progressive lowering across abstraction levels, CPS/ANF for explicit control flow, and target-agnostic IRs like Ballerina BIR that serve as shared spines between very different backends. Each picks a different point on the expressiveness / compile-speed / optimizer-complexity triangle.
+
+> Broader survey across all language representations — concrete syntax trees, ASTs, bytecode, e-graphs, effect-annotated IRs, content-addressed code, Forth-style direct representations, and target-adjacent IRs — lives in `REPRESENTATIONS.md`. This chapter retains the IR-as-optimization-substrate framing.
 
 ### 6.1. CPS, ANF, and SSA — The Triad of Compiler IRs
 
@@ -683,7 +691,7 @@ Source: https://terralang.org/ and https://cs.stanford.edu/~zdevito/pldi071-devi
 
 ```ocaml
 let rec power n x =
-  if n = 0 then .<1>. 
+  if n = 0 then .<1>.
   else .< .~x * .~(power (n-1) x) >.
 ;;
 (* power 3 generates: .< x * x * x * 1 >. *)
@@ -845,7 +853,7 @@ TPDE (Schwarz, Kamm & Engelke, 2025) is a compiler back-end framework that adapt
 
 Target instructions are derived from code written in high-level language through LLVM's Machine IR, easing portability while enabling optimizations during code generation. The authors built a new back-end for LLVM IR from scratch targeting x86-64 and AArch64, showing compilation speeds an order of magnitude faster than LLVM -O0 while producing code with comparable quality.
 
-TPDE represents a new point in the design space: the framework approach means you can bolt fast native codegen onto any existing SSA-based IR without inventing a new backend from scratch. For a language with its own IR (like Mage's potential ZIR-equivalent), this could provide near-instant native compilation without LLVM dependency.
+TPDE represents a new point in the design space: the framework approach means you can bolt fast native codegen onto any existing SSA-based IR without inventing a new backend from scratch. For a language with its own IR, this could provide near-instant native compilation without LLVM dependency.
 
 Source: https://arxiv.org/abs/2505.22610
 
@@ -1168,6 +1176,8 @@ V8's TurboFan, SpiderMonkey's IonMonkey, and HotSpot's C2 all use these techniqu
 
 Interactive tooling — language servers, IDE diagnostics, watch-mode builds — requires compilers that do as little work as possible when anything changes. Entries in this chapter differ on *what the unit of caching is and how invalidation propagates*: query-based architectures like Salsa memoize demand-driven functions with automatic dependency tracking, parallel codegen splits a single compilation across workers, and Unison makes content-addressing the primary code identity so that rebuilds collapse to hash lookups. Each extracts incrementality from a different level of the compilation pipeline.
 
+> The *module-system* angle on dependency boundaries — package vs crate vs module identity, deterministic resolution, and how source-level module design constrains incremental invalidation — lives in `MODULES.md §6` and `MODULES.md §12.1` (lockfiles).
+
 ### 18.1. Query-Based Compilation — rustc, Salsa, rust-analyzer
 
 Traditional compilers execute a fixed sequence of passes (parse → type-check → lower → optimize → codegen). Query-based compilers invert this: computation is organized as a set of memoized functions ("queries") that compute results on demand. When a query is invoked, the system checks if a valid cached result exists; if not, it computes the result and caches it, tracking which inputs were read.
@@ -1442,6 +1452,8 @@ Source: https://docs.kernel.org/bpf/ and https://www.kernel.org/doc/html/latest/
 ## 23. Hot Code Swap and Dynamic Loading
 
 Runtime compilation integration includes not just "compile and run" but "replace running code without stopping the process." Entries differ on *where the code/state boundary is drawn*: Erlang BEAM cleaves at the module level with at-most-two-versions-in-flight semantics that work because Erlang processes share nothing; Julia's Revise.jl exploits the first-class method table to swap methods under a running JIT; Common Lisp's image-based redefinition treats the live environment itself as the program, with interactive `defun` propagating through CLOS dispatch; .NET Edit-and-Continue and the JVM HotSwap equivalent replace method bodies via debugger-facing APIs (`ICorProfilerInfo::SetILFunctionBody`, JVMTI) under tight constraints (Debug builds, no signature changes); and the C/C++ `dlopen` live-reload pattern (Casey Muratori's Handmade Hero being the canonical demonstration) draws the boundary by hand, keeping mutable state in the host and hot-swappable code in a shared library. The shared lesson is that any live-reload discipline requires a clean split between replaceable code and surviving state, whether the language enforces the split or the programmer does.
+
+> The *module-system* angle — what the language commits to (flat vs hierarchical module identity, individually loadable artifacts, fully-qualified-call vs local-call distinctions) so that runtime swap is even possible — is covered in `MODULES.md §11`. Erlang's hot-reload story in particular is enabled by language-design choices made decades ago at the module-system layer.
 
 ### 23.1. Erlang/BEAM — Hot Module Reload
 

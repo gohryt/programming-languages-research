@@ -2,7 +2,7 @@
 
 Research on observability, tracing, profiling, instrumentation, and runtime event pipelines — the "always-on" side of runtime introspection, as distinct from pause-and-inspect debugging.
 
-Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`. Memory disciplines and runtime memory architectures — GC, allocators, ownership, regions, hardware tagging, concurrent reclamation — are in `MEMORY.md`; memory-specific tracing mechanisms (heap snapshots, allocation sampling) currently live alongside their host event-pipeline entries in this document rather than being split out. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`.
+Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`. Memory disciplines and runtime memory architectures — GC, allocators, ownership, regions, hardware tagging, concurrent reclamation — are in `MEMORY.md`; memory-specific tracing mechanisms (heap snapshots, allocation sampling) currently live alongside their host event-pipeline entries in this document rather than being split out. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`. Module systems, package identity, and dynamic module loading are in `MODULES.md`.
 
 ---
 
