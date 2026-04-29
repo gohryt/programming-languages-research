@@ -1,6 +1,6 @@
 # Research Index and Ownership Guide
 
-This directory collects language-design research across parsing, compilation, debugging, tracing, program representations, memory management, and module/package boundaries.
+This directory collects language-design research across parsing, semantic analysis, compilation, concurrency, debugging, tracing, program representations, memory management, and module/package boundaries.
 
 The goal is to make the notes useful to any programming-language implementer. Keep the documents language-agnostic: prefer phrases like "a new language", "a compiler", "a runtime", or "a language server" rather than project-specific names.
 
@@ -11,8 +11,10 @@ The goal is to make the notes useful to any programming-language implementer. Ke
 | File | Owns | Use it for |
 |---|---|---|
 | `PARSERS.md` | Characters → tokens → parse trees | Parser architectures, source positions, lexing, error recovery, parser-output AST/CST concerns |
+| `TYPES.md` | Names → symbols → typed programs | Name resolution, semantic analysis, type representation, inference/checking, subtyping, generics, traits/type classes, effects, typed holes, exhaustiveness, type diagnostics |
 | `REPRESENTATIONS.md` | Program representation catalogue | CSTs, AST layouts, HIR/MIR/SSA, bytecode, e-graphs, content-addressed IRs, target-adjacent formats |
 | `COMPILERS.md` | Compiler pipeline and execution strategy | Lowering, optimization, code generation, backends, JIT tiers, compiler-emitted debug metadata |
+| `CONCURRENCY.md` | Runtime execution coordination | Threads, green threads, tasks, fibers, actors, channels, async/await, structured concurrency, schedulers, cancellation, synchronization, STM, runtime I/O integration |
 | `DEBUGGERS.md` | Debugger workflows and protocols | Breakpoints, record/replay, time travel, debugger protocols, DWARF correctness, fault isolation |
 | `TRACERS.md` | Runtime observability and profiling | Tracing, profiling, probes, event pipelines, trace storage, visualization, continuous profiling |
 | `MEMORY.md` | Memory models and memory safety | Ownership, borrowing, regions, RC, GC, allocators, hardware safety, verification, reclamation, capabilities |
@@ -29,12 +31,23 @@ When adding new research, put the full treatment in the canonical document and k
 | Parser algorithms | `PARSERS.md` | A short cross-reference only |
 | Lexing/tokenization | `PARSERS.md` | A note only when relevant to tooling/runtime |
 | Source locations during parsing | `PARSERS.md` | Cross-reference from compiler/debugger metadata sections |
+| Name resolution and symbol binding | `TYPES.md` | Parser/compiler/module docs should mention only integration points |
+| Type checking and inference algorithms | `TYPES.md` | Compiler docs should mention lowering or optimization consequences only |
+| Type classes, traits, protocols, and generics semantics | `TYPES.md` | Compiler docs may discuss monomorphization/dictionary passing; module docs may discuss visibility and coherence boundaries |
+| Effect systems and typed capabilities | `TYPES.md` | Runtime/compiler docs should discuss only execution or lowering consequences |
+| Exhaustiveness and usefulness checking | `TYPES.md` | Parser/compiler docs may discuss pattern syntax or pattern compilation only |
+| Typed holes and type-directed diagnostics | `TYPES.md` | Tooling/debugger docs may discuss UI/protocol integration only |
 | Concrete syntax trees | `REPRESENTATIONS.md` | Parser-specific implications in `PARSERS.md` |
 | AST layouts | `REPRESENTATIONS.md` | Parser-output capsules in `PARSERS.md` |
 | HIR/MIR/SSA/bytecode representations | `REPRESENTATIONS.md` | Compiler-pass implications in `COMPILERS.md` |
 | Compiler lowering and optimization | `COMPILERS.md` | Representation or runtime docs should only link back |
 | Backends and code generation | `COMPILERS.md` | Runtime/tracing docs should mention only integration points |
 | JIT tiers and deoptimization | `COMPILERS.md` | Debugger/tracer docs should discuss only observability implications |
+| Runtime scheduling and execution units | `CONCURRENCY.md` | Compiler/tracer/debugger docs should mention only metadata, lowering, or observability implications |
+| Async/await, futures, tasks, fibers, and virtual threads | `CONCURRENCY.md` | Compiler docs may discuss lowering; debugger/tracer docs may discuss stack reconstruction and events |
+| Actors, channels, structured concurrency, and cancellation | `CONCURRENCY.md` | Type/memory/docs should discuss safety or ownership implications only |
+| Synchronization primitives and STM | `CONCURRENCY.md` | Memory docs may discuss memory ordering; compiler docs may discuss lowering only |
+| Data-race freedom at runtime boundaries | `CONCURRENCY.md` | `TYPES.md` owns type rules; `MEMORY.md` owns memory-safety model |
 | Debugger UX and protocols | `DEBUGGERS.md` | Tracing docs should avoid repeating workflow details |
 | Breakpoint mechanisms | `DEBUGGERS.md` | `TRACERS.md` may discuss shared patching/probe mechanics |
 | Record/replay and time travel | `DEBUGGERS.md` | `TRACERS.md` may discuss trace storage or event substrates |

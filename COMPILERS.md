@@ -2,7 +2,7 @@
 
 Research on compilation techniques, intermediate representations, code generation, and runtime-compilation integration (JITs, regex, query engines, hot code swap).
 
-This document covers everything downstream of parsing: lowering, IR use, optimization, codegen, runtime object models, and compiler-emitted debug metadata. It treats representations from the compiler-pass perspective — what each form enables or constrains — while the broader CST/AST/HIR/MIR/SSA/bytecode catalogue lives in `REPRESENTATIONS.md`. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocator implementations, language-level allocator API models, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`. Module systems, import semantics, package identity, build-graph formation, and dynamic module loading at the source level live in `MODULES.md`; this document focuses on what compilers do *below* that boundary.
+This document covers everything downstream of parsing: lowering, IR use, optimization, codegen, runtime object models, and compiler-emitted debug metadata. It treats representations from the compiler-pass perspective — what each form enables or constrains — while the broader CST/AST/HIR/MIR/SSA/bytecode catalogue lives in `REPRESENTATIONS.md`. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocator implementations, language-level allocator API models, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Runtime scheduling, async/await execution, actors, channels, cancellation, STM, and blocking/I/O coordination live in `CONCURRENCY.md`; this file keeps only lowering, continuation, ABI, and optimization consequences. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`. Module systems, import semantics, package identity, build-graph formation, and dynamic module loading at the source level live in `MODULES.md`; this document focuses on what compilers do *below* that boundary.
 
 ---
 
@@ -945,11 +945,11 @@ The broader principle: many language features that appear to require dedicated V
 
 Sources: https://6guts.wordpress.com/2021/09/29/the-new-moarvm-dispatch-mechanism-is-here/ and https://6guts.wordpress.com/2021/04/15/raku-multiple-dispatch-with-the-new-moarvm-dispatcher/ and https://gist.github.com/jnthn/e81634dec57acdea87fcb2b92c722959
 
-### 14.6. MoarVM ThreadPoolAwaiter — Continuations for Non-Blocking await
+### 14.6. MoarVM ThreadPoolAwaiter — Compiler Consequences of Continuation-Captured Await
 
-Raku's `Promise`, `Supply`, `Channel`, and `await` desugar onto a single `ThreadPoolScheduler` plus a fixed set of MoarVM primitives (threads, mutexes, condvars, semaphores, async sockets via libuv). There are no green threads — every Raku thread is an OS thread. The non-trivial design point is **non-blocking `await`**: rather than parking a worker on a blocked future, the `ThreadPoolAwaiter` uses MoarVM **first-class continuations** (the `THREAD_POOL_PROMPT` sentinel) to capture the awaiting code as a continuation, which is re-queued on the pool when the awaitable resolves. A blocked `await` therefore does not pin a worker thread.
+Full runtime-concurrency treatment belongs in `CONCURRENCY.md`; this capsule keeps the compiler/VM consequence. Raku's `await` can capture the awaiting computation as a MoarVM continuation and re-queue it when the awaitable resolves, so non-blocking wait does not pin a worker thread. The compiler consequence is that `Supply` / `react` / `whenever` are CPS-transformed onto Promise chains, and continuation capture must preserve enough resumption metadata to land back in specialized frames correctly.
 
-Fall-back to true blocking is explicit: if the thread holds locks (`nqp::threadlockcount`) or `$*RAKUDO-AWAIT-BLOCKING` is set, the continuation capture is skipped. `Supply` / `react` / `whenever` are CPS-transformed at compile time onto Promise chains; `Channel` backpressure uses `ConcBlockingQueue` (a MoarVM REPR). This is the cleanest production example of using delimited continuations as the *implementation primitive* for async/await on an OS-thread runtime — distinct from goroutines (Go), virtual threads (Project Loom), or fibers (Ruby's Fiber). The new-disp dispatch programs (§14.5) interact directly with this: a continuation that captures across a dispatch site sees the dispatch program's resumption metadata, so resumed `await`s land in the right specialized frame.
+The interesting interaction with this chapter is new-disp (§14.5): dispatch programs contain resumption points, so a continuation captured across a dispatch site must restore the dispatch program's state as well as the language stack. This makes async/await a stress test for specialization metadata, deoptimization metadata, and continuation-safe inline caches rather than merely a scheduler feature.
 
 Sources: https://github.com/rakudo/rakudo/blob/nom/src/core/ThreadPoolScheduler.pm and https://github.com/MoarVM/MoarVM/blob/master/src/core/threads.c and https://docs.raku.org/language/concurrency.html
 
@@ -1166,78 +1166,37 @@ Sources: https://www.unison-lang.org/docs/the-big-idea/ and https://softwaremill
 
 ---
 
-## 19. Type System & Effect System Implementation
+## 19. Type-System Outputs and Compiler Consequences
 
-Modern type systems go well beyond Hindley-Milner: GADTs, higher-rank polymorphism, algebraic effects, type classes, and constraint-based inference each push against what syntax-directed algorithms can decide. Entries below differ on *how inference handles features that break HM's decidability or composability*: bidirectional typing splits synthesis and checking to support undecidable features via local annotations, evidence-passing compiles algebraic effects to plain function calls, dictionary passing translates type classes into runtime records, and OutsideIn(X) restricts GADT-introduced equalities to local scope to keep solving tractable. Each is a specific answer to a specific inference challenge.
+Full type-system and semantic-analysis details are in `TYPES.md`; this section focuses on what the compiler consumes after semantic analysis. The compiler cares less about the declarative typing rules themselves and more about the artifacts they leave behind: typed syntax, elaborated core terms, dictionaries or witnesses, effect evidence, specialization decisions, type-directed layout facts, and constraints that affect lowering.
 
-### 19.1. Bidirectional Type Checking
+### 19.1. Typed Elaboration as a Compiler Boundary
 
-Bidirectional typing (Pierce & Turner, 2000; surveyed by Dunfield & Krishnaswami, 2021) splits the typing judgment into two modes: **synthesis** (infer the type from the expression) and **checking** (verify the expression against a known type). The type information flows "down" in checking mode and "up" in synthesis mode.
+Many modern frontends elaborate rich surface syntax into a smaller typed core before optimization. This boundary can make later compiler passes simpler: overloads are resolved, implicit arguments are inserted, associated types are normalized where possible, coercions are explicit, pattern refinements are recorded, and typed holes or unresolved obligations have already become diagnostics rather than optimizer concerns.
 
-The practical benefits:
-- **Reduced annotations**: the programmer annotates function signatures, and the checker propagates type information inward. Lambda parameters, match arms, and return expressions can often omit types entirely.
-- **Supports undecidable features**: higher-rank polymorphism, dependent types, and GADTs have undecidable type inference, but decidable type checking. Bidirectional typing supports these features without requiring full inference — the user provides annotations where inference fails, and the checker handles the rest.
-- **Better error messages**: because the checker knows the "expected" type at every point, error messages can report mismatches precisely: "expected `Int`, got `String`" rather than "failed to unify `?a` with `?b`."
-- **Incremental-friendly**: Porter et al. (2025) showed how bidirectional typing can be made incremental via order maintenance data structures, enabling live type-checking that updates in real-time as the programmer edits.
+Compiler consequence: preserve enough type metadata to lower correctly, but avoid forcing every backend pass to understand the full source type system. A typed HIR/THIR-like layer can act as the bridge between `TYPES.md` concerns and MIR/SSA/codegen concerns.
 
-GHC (Haskell), Agda, Idris, and Lean all use bidirectional type checking. Bidirectional typing is the modern standard for balancing type inference convenience with expressive power.
+### 19.2. Evidence, Dictionary, and Witness Passing
 
-Source: https://dl.acm.org/doi/fullHtml/10.1145/3450952
+Type classes, traits, protocols, capabilities, and effect systems often elaborate implicit source facts into explicit compiler values: dictionaries, witnesses, vtables, capability tokens, or effect-handler evidence. Haskell-style dictionary passing turns class constraints into extra parameters; Rust-style monomorphization often resolves trait calls statically; Swift-style generics can pass value-witness and protocol-witness tables for separately compiled generic code.
 
-### 19.2. Algebraic Effects & Effect Handlers — Compilation Techniques
+Compiler consequence: evidence passing creates real calling-convention, inlining, specialization, and ABI choices. Once evidence is explicit in IR, ordinary optimization can inline through it, remove unused fields, specialize hot instantiations, or preserve it across dynamic boundaries.
 
-Algebraic effects (Plotkin & Power, 2001) provide a structured way to express side effects (I/O, state, exceptions, async, concurrency) as operations that are "performed" by the program and "handled" by an enclosing handler — analogous to `throw`/`catch` but vastly more general. Effect handlers can resume the computation after handling (unlike exceptions), enabling coroutines, generators, and cooperative concurrency as library-level abstractions.
+Sources: https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymorphism.pdf and https://download.swift.org/docs/assets/generics.pdf
 
-The compilation challenge: a naive implementation uses delimited continuations, which require capturing the call stack — expensive in time and space. Efficient compilation strategies include:
+### 19.3. Effect Handler Lowering
 
-- **Evidence passing** (Xie & Leijen, ICFP 2021): Koka compiles effect handlers to plain C by threading "evidence" (handler references) as extra function parameters. When an effect operation is performed, the runtime uses the evidence to find the handler and invoke it. This avoids continuation capture for the common case (tail-resumptive handlers).
-- **Multi-prompt delimited control** with **yield bubbling**: effect operations yield control up the stack frame by frame, avoiding full continuation capture. Only when a handler needs to suspend and later resume does a real continuation need to be allocated.
-- **Multicore OCaml**: implements effect handlers using stack switching with fiber-based continuations, leveraging the system's ability to cheaply allocate and switch between small stacks.
+Algebraic effects and typed capabilities are type-system topics, but their implementation is a compiler/runtime topic. Efficient effect-handler implementations avoid naive full continuation capture when possible. Koka-style generalized evidence passing threads handler evidence through calls; OCaml 5 exposes effect handlers through runtime-supported continuations and stack switching.
 
-The performance is real: Koka with evidence-passing compilation matches or beats OCaml on many benchmarks, while providing algebraic effects as a first-class feature. Combined with Perceus reference counting (§16.1), Koka achieves garbage-free, effect-typed, functional programming with C-level performance characteristics.
+Compiler consequence: the chosen effect representation affects call ABI, tail calls, stack maps, async lowering, optimization barriers, and interaction with memory management. If effects are statically typed, the compiler can often erase or specialize effect evidence; if effects are dynamically handled, the runtime must carry enough state to find handlers and resume continuations.
 
-Sources: https://xnning.github.io/papers/multip.pdf and https://koka-lang.github.io/koka/doc/book.html
+Sources: https://xnning.github.io/papers/multip.pdf and https://ocaml.org/manual/5.2/effects.html
 
-### 19.3. Hindley-Milner and Algorithm W
+### 19.4. Constraint Results as Optimization Inputs
 
-The **Hindley-Milner** (HM) type system, with **Algorithm W** as its classic inference procedure (Damas & Milner, POPL 1982), is the foundation of ML, Haskell, and OCaml. The system supports **let-polymorphism** — a function bound by `let` can be used at multiple monomorphic instantiations — while guaranteeing that every well-typed program has a unique principal (most general) type and that inference is decidable in near-linear time for typical programs.
+Constraint solvers such as OutsideIn(X), trait solvers, and bidirectional elaborators belong canonically in `TYPES.md`, but their results inform compilation. Solved constraints may produce concrete types, selected implementations, normalized associated types, coercions, local equality assumptions, effect rows, lifetime/region facts, or proof terms.
 
-Algorithm W proceeds by **unification**: the inferencer walks the expression tree, generating fresh type variables for each subexpression, and unifying them as constraints emerge (e.g., a function application unifies the function's parameter type with the argument's type). The result is a substitution that makes the whole expression well-typed. Let-bound variables get **generalized** — their free type variables are quantified, producing a polymorphic type scheme.
-
-Robinson's unification algorithm (1965) is the core engine; its efficient union-find-based implementation is what makes HM practical. The asymptotic worst case is exponential (Kanellakis & Mitchell 1989 showed programs whose most general type is exponentially large), but real programs are nowhere near this bound.
-
-HM is the standard against which other inference schemes are compared. Extensions — rank-2 polymorphism, GADTs, type families, linear types — each break some HM property and require more sophisticated inference (§19.5).
-
-Source: https://dl.acm.org/doi/10.1145/582153.582176
-
-### 19.4. Type Classes via Dictionary Passing
-
-Wadler and Blott's **type classes** (POPL 1989) extended HM with ad-hoc polymorphism: a type class `Eq a` specifies operations available on a type, and instances provide implementations. The compilation strategy — **dictionary passing** — translates polymorphic functions with class constraints into functions taking an extra "dictionary" parameter containing the class's method implementations.
-
-```haskell
-member :: Eq a => a -> [a] -> Bool
--- compiles to
-member :: EqDict a -> a -> [a] -> Bool
--- where EqDict = record of {eq :: a -> a -> Bool, neq :: a -> a -> Bool, ...}
-```
-
-At each call site, the compiler inserts the appropriate dictionary — looked up from the instance table based on the type of the argument. The translation is mechanical and preserves HM's inference properties.
-
-The performance cost of naive dictionary passing — an extra parameter and a dispatch through a record — is eliminated by **specialization**: GHC generates a specialized monomorphic copy of each polymorphic function at each concrete type it's used with, analogous to C++ template instantiation. Combined with inlining, specialized code approaches hand-written monomorphic performance.
-
-Rust's traits are operationally similar: `fn foo<T: Eq>(x: T, y: T)` compiles via monomorphization (§1.6 for the surgical variant) rather than dictionary passing, but the specification is close to type classes. Swift's protocols, Scala's implicit parameters, and Lean's type classes are variations on the same design.
-
-Source: https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymorphism.pdf
-
-### 19.5. OutsideIn(X) — GHC's Constraint Solver
-
-GHC's modern type inference (Vytiniotis, Peyton Jones, Schrijvers, Sulzmann 2011, "OutsideIn(X): Modular Type Inference with Local Assumptions") is the framework behind GADTs, type families, and other advanced Haskell features. The insight: features that break HM's decidability (GADT pattern matching introduces local type equalities, type families reduce to non-syntactic equivalences) can be incorporated cleanly *if* inference is restricted in specific ways.
-
-**OutsideIn** refers to the restriction that GADT-refined local type equalities are only used *inside* the GADT pattern match, never to solve constraints *outside* it. This keeps the constraint solver's search space bounded. The **(X)** is a parameter: the framework is generic over the specific constraint theory (simple equality, type families, linear arithmetic).
-
-The implementation is a **constraint-based** inferencer in the OutsideIn architecture: type check produces a bag of constraints, the solver resolves them (possibly with user-provided type signatures acting as "given" local assumptions). Unsolved constraints become type errors.
-
-The broader lesson: modern expressive type systems don't use pure syntax-directed inference like Algorithm W. They generate constraints and solve them, often with multiple constraint theories layered. OutsideIn(X) is the canonical modern reference; Scala 3's type inference, Lean's elaboration, and Rust's trait solver (**Chalk**) all follow this general shape.
+Compiler consequence: later passes should consume solved facts in a stable representation rather than re-running source-level inference. For example, monomorphization needs selected generic arguments; pattern lowering may need GADT-refined inhabitance facts; borrow/drop elaboration may need region or ownership constraints; and debug metadata may need source-to-typed-core mappings.
 
 Source: https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/
 
@@ -1982,7 +1941,7 @@ Source: https://github.com/liamHowatt/mcp_forth
 | Lazy stack-unwind deopt | Mark frames, deopt on return | Skips work for frames that unwind | Slight complication in unwinder | MoarVM spesh (§14.4) |
 | Uninlining on guard failure | Inliner records resume-init | Reconstructs pre-inlining stack | Per-inline metadata cost | MoarVM spesh (§14.4) |
 | Dispatcher programs (guards+delegate+resume) | Recorded dispatch bytecode | One mechanism for all dispatch kinds | Requires NQP-style dispatcher substrate | MoarVM new-disp (§14.5) |
-| Continuation-captured await | First-class continuations | Non-blocking on OS-thread runtime | Requires VM continuation primitive | MoarVM ThreadPoolAwaiter (§14.6) |
+| Continuation-safe await lowering | First-class continuations + resumption metadata | Non-blocking wait composes with specialization | Requires VM continuation primitive | MoarVM ThreadPoolAwaiter (§14.6; `CONCURRENCY.md`) |
 | Polyhedral compilation | Parametric polyhedra | Optimal loop tiling/fusion | Restricted to affine loops | Halide, Tiramisu, Triton (§15.1) |
 | Enzyme AD | LLVM IR differentiation | Language-agnostic, GPU support | Requires LLVM integration | Julia, C/C++, Rust (§15.2) |
 | NVRTC runtime PTX compile | CUDA source → PTX → SASS | Dynamic kernel specialization | Two-stage compile | PyTorch, JAX, XLA (§15.3) |
@@ -1998,11 +1957,10 @@ Source: https://github.com/liamHowatt/mcp_forth
 | Query-based compilation | Memoized demand-driven | Minimal recompilation | Architectural complexity | rustc, Salsa, rust-analyzer (§18.1) |
 | Parallel codegen units | Split per-function compile | Near-linear core scaling | Lost cross-module inlining | rustc CGUs, LLVM parallel (§18.2) |
 | Content-addressed code by hash | Hash-keyed codebase DB | Distributed compute, renames free | Ecosystem friction (no text files) | Unison (§18.3) |
-| Bidirectional typing | Synth + check modes | Reduced annotations, better errors | Undecidable full inference still | GHC, Agda, Lean (§19.1) |
-| Algebraic effects | Evidence-passing handlers | Composable effects, no monads | Requires language co-design | Koka, Multicore OCaml (§19.2) |
-| Hindley-Milner + Algorithm W | Unification + generalization | Near-linear principal types | Exponential worst case | ML, OCaml, Haskell (§19.3) |
-| Type classes via dictionaries | Extra dict parameters | Ad-hoc polymorphism | Dispatch cost (fixed by specialization) | Haskell, Scala implicits (§19.4) |
-| OutsideIn(X) constraint solver | Local-only GADT equalities | Decidable modern type systems | Solver complexity | GHC (§19.5) |
+| Typed elaboration boundary | Rich surface → typed core | Backend isolation from source type system | Requires stable typed metadata | Lean, Rust HIR/THIR, Swift SIL (§19.1) |
+| Evidence / dictionary / witness passing | Implicit facts become IR values | Ordinary optimizer can specialize them | ABI and calling-convention pressure | Haskell, Swift, Rust traits (§19.2) |
+| Effect handler lowering | Handler evidence or continuations | Typed effects become executable control flow | Runtime/ABI co-design | Koka, OCaml 5 (§19.3) |
+| Constraint results as optimization inputs | Solved obligations feed lowering | Avoids re-running inference in backend | Needs durable fact representation | GHC, Rust, Lean (§19.4) |
 | PCRE-JIT | Hand-written pattern templates | 4–15x over bytecode | Inherits backtracking blowup | PCRE2 (§20.1) |
 | irregexp tiered engine | Bytecode + native tier-up + restricted linear fallback | Fast common case, safe subset available | Full JS regex keeps backtracking semantics | V8 JavaScript (§20.2) |
 | NFA + lazy DFA regex | Thompson NFA + DFA cache | O(nm) guaranteed | No backrefs/lookaround | RE2, Rust regex (§20.3) |
@@ -2231,14 +2189,13 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 4. Unison: The Big Idea — https://www.unison-lang.org/docs/the-big-idea/
 5. Trying out Unison, part 1: code as hashes (SoftwareMill) — https://softwaremill.com/trying-out-unison-part-1-code-as-hashes/
 
-### Chapter 19 — Type System & Effect System Implementation
+### Chapter 19 — Type-System Outputs and Compiler Consequences
 
-1. Bidirectional Typing Survey (Dunfield & Krishnaswami, 2021) — https://dl.acm.org/doi/fullHtml/10.1145/3450952
-2. Generalized Evidence Passing for Effect Handlers (Xie & Leijen, ICFP 2021) — https://xnning.github.io/papers/multip.pdf
-3. Koka Programming Language — https://koka-lang.github.io/koka/doc/book.html
-4. Principal Type-Schemes for Functional Programs (Damas & Milner, POPL 1982) — https://dl.acm.org/doi/10.1145/582153.582176
-5. How to Make Ad-hoc Polymorphism Less Ad Hoc (Wadler & Blott, POPL 1989) — https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymorphism.pdf
-6. OutsideIn(X) (Vytiniotis, Peyton Jones, Schrijvers, Sulzmann, 2011) — https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/
+1. How to Make Ad-hoc Polymorphism Less Ad Hoc (Wadler & Blott, POPL 1989) — https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymorphism.pdf
+2. Swift Generics documentation — https://download.swift.org/docs/assets/generics.pdf
+3. Generalized Evidence Passing for Effect Handlers (Xie & Leijen, ICFP 2021) — https://xnning.github.io/papers/multip.pdf
+4. OCaml 5 effect handlers manual — https://ocaml.org/manual/5.2/effects.html
+5. OutsideIn(X) (Vytiniotis, Peyton Jones, Schrijvers, Sulzmann, 2011) — https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/
 
 ### Chapter 20 — Regex Compilation
 

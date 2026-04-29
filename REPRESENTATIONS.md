@@ -182,7 +182,7 @@ Source: https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.ht
 
 Rakudo's RakuAST replaces the QAST-based front-end with an AST whose nodes are Raku classes under the `RakuAST::` package: `RakuAST::StatementList`, `RakuAST::Call::Name`, etc. `.AST` parses to objects, `.DEPARSE` round-trips back to source, and `IMPL-TO-QAST` lowers to the runtime IR.
 
-The radical move: AST nodes are *first-class language objects*. User macros construct, traverse, and rewrite syntax with the same tools used to manipulate any other Raku object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) become available for runtime debuggers and packaging. Cross-references: `PARSERS.md §6.3` (Rakudo grammars), `COMPILERS.md §6.8` (RakuAST → QAST lowering), `COMPILERS.md §14.5` (MoarVM new-disp). The cost: every AST traversal goes through full language object dispatch, with measurable allocation pressure during compilation.
+The radical move: AST nodes are *first-class language objects*. User macros construct, traverse, and rewrite syntax with the same tools used to manipulate any other Raku object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) become available for runtime debuggers and packaging. Cross-references: `PARSERS.md §6.3` (Rakudo grammars), `COMPILERS.md §6.8` (RakuAST → QAST lowering), `COMPILERS.md §14.5` (MoarVM new-disp), and `TYPES.md §6.6` for the surrounding type-object / role / subset world that makes this representation unusually natural in Raku. The cost: every AST traversal goes through full language object dispatch, with measurable allocation pressure during compilation.
 
 Source: https://docs.raku.org/type/RakuAST
 
@@ -432,7 +432,7 @@ Source: https://users.soe.ucsc.edu/~cormac/papers/pldi93.pdf
 
 GHC's Core is a small typed lambda calculus with let-bindings, case analysis, and explicit type abstraction/application. Core is ANF-like (every let binds an intermediate), strongly typed (System F + extensions), and the substrate for all major GHC optimizations (inlining, specialization, fusion, strictness analysis, demand analysis).
 
-Core's distinctive property: it's *small enough to fit in a memorable specification*, which makes it tractable for formal reasoning. The GHC team treats Core as a stable interface — passes operate on Core, not on the much more complex Haskell source — so the compiler's invariants live at the Core level. This is also why Core is the level at which Haskell's "Beautiful Concurrency" (parallel evaluation, STM) is implemented.
+Core's distinctive property: it's *small enough to fit in a memorable specification*, which makes it tractable for formal reasoning. The GHC team treats Core as a stable interface — passes operate on Core, not on the much more complex Haskell source — so the compiler's invariants live at the Core level. This is also why Core is the level at which Haskell's "Beautiful Concurrency" (parallel evaluation, STM) is implemented. Cross-reference: `TYPES.md §6.7` covers GHC's surface type-system expansion; `CONCURRENCY.md §§2.6, 3.7, 9.6` cover the runtime side.
 
 Source: https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Core.hs
 
@@ -440,7 +440,7 @@ Source: https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Core.hs
 
 OCaml's Flambda is the optimizer between the OCaml front-end and the bytecode/native back-ends. Flambda's IR is ANF-like, with explicit closure representation and value-flow analysis. The original Flambda 1 was rewritten as Flambda 2 in 2020+, with a new IR that more aggressively unboxes values, specializes on known-shape arguments, and fuses pattern matches.
 
-Flambda is interesting for this survey because it's an ANF IR designed for *aggressive value-representation optimization* in a strict language. Where GHC Core lives in a lazy world (where value representation matters less), Flambda assumes strict evaluation and exploits it: known-int-typed bindings unbox to raw machine integers, known-tuple-typed bindings unbox to multiple registers, known-closure-typed bindings inline aggressively.
+Flambda is interesting for this survey because it's an ANF IR designed for *aggressive value-representation optimization* in a strict language. Where GHC Core lives in a lazy world (where value representation matters less), Flambda assumes strict evaluation and exploits it: known-int-typed bindings unbox to raw machine integers, known-tuple-typed bindings unbox to multiple registers, known-closure-typed bindings inline aggressively. Cross-reference: `TYPES.md §6.8` covers the surrounding OCaml type-discipline choices; `CONCURRENCY.md §§2.6, 5.5` cover OCaml 5's runtime split between domains and fibers.
 
 Source: https://v2.ocaml.org/manual/flambda.html
 
@@ -802,7 +802,7 @@ Source: https://capra.cs.cornell.edu/bril/
 
 ## 14. Forth-Style Direct Representations
 
-Forth's representation tradition is unlike anything in the compiler-IR mainstream. Programs are sequences of dictionary-entry references; "compilation" is concatenating addresses; "interpretation" is dispatching through them. The chapter's distinguishing axis is *how dispatch works*: indirect through an instruction-pointer table (DTC), through one extra indirection (ITC), or via subroutine calls (STC). The endpoint is colorForth and arrayForth, where the source representation IS the parsed program — no translation pass exists. Cross-reference: `COMPILERS.md §33` covers Forth implementations from the compiler angle; here the focus is the direct-representation tradition.
+Forth's representation tradition is unlike anything in the compiler-IR mainstream. Programs are sequences of dictionary-entry references; "compilation" is concatenating addresses; "interpretation" is dispatching through them. The chapter's distinguishing axis is *how dispatch works*: indirect through an instruction-pointer table (DTC), through one extra indirection (ITC), or via subroutine calls (STC). The endpoint is colorForth and arrayForth, where the source representation IS the parsed program — no translation pass exists. Cross-reference: `COMPILERS.md §33` covers Forth implementations from the compiler angle; `TYPES.md §9.4` covers stack-effect type systems in the Forth/Factor family; `CONCURRENCY.md §7.5` covers Forth-family multitasking and channels. Here the focus is the direct-representation tradition.
 
 ### 14.1. Direct Threaded Code (DTC)
 

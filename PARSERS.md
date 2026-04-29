@@ -437,7 +437,7 @@ Source: https://link.springer.com/article/10.1007/BF00263989
 
 ### 4.4. Hazel's Approach — Typed Holes as Error Recovery
 
-Hazel inserts "typed holes" wherever the parser encounters incomplete or missing expressions. Unlike traditional error recovery which produces error nodes, holes are semantically meaningful — they have types, so downstream phases can still operate on the incomplete program.
+Hazel inserts "typed holes" wherever the parser encounters incomplete or missing expressions. Unlike traditional error recovery which produces error nodes, holes are semantically meaningful — they have types, so downstream phases can still operate on the incomplete program. Full type-system treatment of holes belongs in `TYPES.md §10.2`; this parser section focuses on their use as recovery nodes.
 
 This turns error recovery from a hack (skip some tokens, hope for the best) into a language feature: every intermediate editor state is a valid program with holes. The trade-off: it requires the entire language and type system to be designed around the possibility of holes, which is a much larger commitment than bolting error recovery onto an existing parser.
 

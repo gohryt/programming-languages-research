@@ -565,7 +565,7 @@ The cost is also real:
 - more ceremony for simple projects,
 - and more distance from the file-as-module simplicity of Go or Zig.
 
-OCaml is the strongest argument that module design can be a **semantic abstraction feature**, not merely an organizational feature. The key question is whether a new language wants any part of that power, or whether it wants to remain intentionally simpler.
+OCaml is the strongest argument that module design can be a **semantic abstraction feature**, not merely an organizational feature. The key question is whether a new language wants any part of that power, or whether it wants to remain intentionally simpler. Full treatment of OCaml's value restriction and polymorphic-variant trade-offs lives in `TYPES.md §§6.8, 9`; OCaml 5's domains and effect-handler concurrency live in `CONCURRENCY.md §§5.5, 2.6`.
 
 Source: https://v2.ocaml.org/manual/moduleexamples.html and https://dev.realworldocaml.org/files-modules-and-programs.html and https://dev.realworldocaml.org/functors.html
 
@@ -603,7 +603,7 @@ At the ecosystem level, Haskell also separates:
 
 more than some simpler systems do. Cabal/Stack package boundaries and module visibility rules are related, but not identical. This makes Haskell a useful design reference for ecosystems that want package-level and source-level identities layered without becoming the same mechanism.
 
-Compared with OCaml, Haskell's module system is less ambitious as a semantic abstraction calculus. Compared with Rust or Go, it is more declaration-oriented and explicit about export surfaces. That middle position is a useful reference for any new language that wants stronger source-level API control without adopting full ML-style higher-order modules.
+Compared with OCaml, Haskell's module system is less ambitious as a semantic abstraction calculus. Compared with Rust or Go, it is more declaration-oriented and explicit about export surfaces. That middle position is a useful reference for any new language that wants stronger source-level API control without adopting full ML-style higher-order modules. Full treatment of GHC's richer type-system story lives in `TYPES.md §6.7`; GHC's lightweight-thread, capability, spark, and STM runtime design lives in `CONCURRENCY.md §§2.6, 3.7, 9.6`.
 
 Source: https://www.haskell.org/onlinereport/haskell2010/haskellch5.html and https://cabal.readthedocs.io/en/stable/cabal-package.html and https://downloads.haskell.org/~ghc/latest/docs/users_guide/packages.html
 
@@ -1159,7 +1159,7 @@ The resolution mechanism is the **`$*REPO` chain**: a linked list of `CompUnit::
 
 The **fez/zef ecosystem** (current Raku module ecosystem, replacing CPAN and the older p6c) validates `auth` against the uploader's identity, rejects distributions with version `*` (a poisoning attack — `*` would supersede every other version), enforces one-upload-per-(dist, version), and serves a JSON master index from `360.zef.pm/index.json`. `fez upload` publishes; `zef install` consumes. The `auth` validation closes a class of supply-chain attacks that was viable on CPAN, where uploaders could put arbitrary `auth` values in their META.
 
-The design lesson generalizes beyond Raku: **if the ecosystem allows multiple distributions of the same name to coexist, identity must be a tuple, not a string**. Raku's choice to make the tuple visible in the import syntax itself is unusual but principled — it means a security-conscious importer can pin `auth` directly without consulting external lockfiles.
+The design lesson generalizes beyond Raku: **if the ecosystem allows multiple distributions of the same name to coexist, identity must be a tuple, not a string**. Raku's choice to make the tuple visible in the import syntax itself is unusual but principled — it means a security-conscious importer can pin `auth` directly without consulting external lockfiles. Full treatment of Raku's multi-dispatch, subsets, roles, and type-object design lives in `TYPES.md §6.6`; full treatment of Raku schedulers, promises, supplies, channels, `react`, `whenever`, and continuation-based `await` lives in `CONCURRENCY.md §11.6`.
 
 Source: https://docs.raku.org/language/modules and https://docs.raku.org/language/distributions/configuration-structure and https://docs.raku.org/language/compilation and https://github.com/ugexe/zef and https://deathbyperl6.com/fez-zef-a-raku-ecosystem-and-auth/
 
@@ -1186,7 +1186,7 @@ Gforth and several modern Forths layer additional features. **Gforth** retains t
 
 The Gforth manual is unusually candid about the trade-offs: "trying to modularize programs in this way has disadvantages for debugging and reuse/factoring that overcome the advantages in my experience." The critique echoes a recurring concern with stack-of-namespaces designs — that "what does this name resolve to right now?" depends on the current search-order state, which is harder to reason about than a static import list. Forth's defenders note that the same property allows transient editor/assembler namespaces with no per-file ceremony.
 
-The lesson: **stack-of-tables is a viable module-system primitive for languages where source order and execution order are deliberately fused** (Forth's `:` definitions are immediately compiled and added to the top wordlist). It is poorly suited to languages with separate compilation, deferred linking, or static reasoning about visibility.
+The lesson: **stack-of-tables is a viable module-system primitive for languages where source order and execution order are deliberately fused** (Forth's `:` definitions are immediately compiled and added to the top wordlist). It is poorly suited to languages with separate compilation, deferred linking, or static reasoning about visibility. Full treatment of stack-effect type systems in the Forth/Factor family lives in `TYPES.md §9.4`; Forth-family multitasking, mailboxes, and CSP-style channels live in `CONCURRENCY.md §7.5`.
 
 Source: https://forth-standard.org/standard/search and https://gforth.org/manual/Word-Lists.html and https://gforth.org/manual/Wordlists-and-Search-Order-Tutorial.html and https://www.complang.tuwien.ac.at/forth/gforth/Docs-html-history/0.6.2/Why-use-word-lists-.html
 
