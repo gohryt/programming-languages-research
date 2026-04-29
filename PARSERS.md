@@ -48,13 +48,13 @@ Go's `FileSet` extends this to multiple files by giving each file a non-overlapp
 
 This chapter catalogs the top-level parsing algorithms a language implementation can pick between. Subsection numbering follows the document's research-history accumulation rather than family order; the family-grouped index below is the navigational map. Entries differ along the grammar-expressiveness / performance trade-off: O(n) deterministic parsers at one extreme through cubic-worst-case Earley/GLL/GLR at the other, with incremental reparsers and SIMD scanners on separate axes entirely.
 
-- **Expression / operator parsing**: §2.1 Pratt, §2.2 Precedence climbing, §2.26 shunting-yard and operator-precedence grammars
+- **Expression / operator parsing**: §2.1 Pratt, §2.2 Precedence climbing, §2.27 shunting-yard and operator-precedence grammars
 - **PEG family**: §2.3 PEG/packrat, §2.4 Pest, §2.5 LPeg
-- **Classical deterministic parsers**: §2.24 recursive descent, §2.25 LL/LR/LALR/IELR
-- **Generalized CFG parsers**: §2.6 GLL, §2.7 Tomita GLR, §2.8 Earley + Leo, §2.9 CYK/Valiant, §2.10 Parsing with derivatives, §2.27 ambiguity and SPPF
+- **Classical deterministic parsers**: §2.25 recursive descent, §2.26 LL/LR/LALR/IELR
+- **Generalized CFG parsers**: §2.6 GLL, §2.7 Tomita GLR, §2.8 Earley + Leo, §2.9 CYK/Valiant, §2.10 Parsing with derivatives, §2.28 ambiguity and SPPF
 - **Incremental / editor-oriented**: §2.11 Tree-sitter, §2.12 Lezer (and §7.8 rust-analyzer's parser)
 - **Fast lexing and structural scanning**: §2.13 Accelerated-Zig, §2.14 simdjson (and §5.3–§5.5 lexer generators)
-- **Special models and extensibility**: §2.15 Meriyah, §2.16 Scannerless, §2.17 TCC, §2.18 Parser combinators, §2.19 ANTLR4 ALL(\*), §2.20 Ohm, §2.21 Layout-sensitive, §2.22 Extensible syntax, §2.23 syntax-parse, §2.28 syntax-directed translation, §2.29 beyond-CFG formalisms
+- **Special models and extensibility**: §2.15 Meriyah, §2.16 Scannerless, §2.17 TCC, §2.18 Parser combinators, §2.19 ANTLR4 ALL(\*), §2.20 Ohm, §2.21 Layout-sensitive, §2.22 Extensible syntax, §2.23 syntax-parse, §2.29 syntax-directed translation, §2.30 beyond-CFG formalisms
 
 ### 2.1. Pratt Parsing — Top-Down Operator Precedence
 
@@ -298,7 +298,21 @@ syntax-parse delivers specification-driven macro error messages comparable to a 
 
 Sources: https://www2.ccs.neu.edu/racket/pubs/c-jfp12.pdf and https://docs.racket-lang.org/syntax/Parsing_Syntax.html
 
-### 2.24. Recursive Descent — The Hand-Written Baseline
+### 2.24. Structured Editing, Projectional Editing, and Hybrid Editing
+
+Most parser research assumes that programs are edited as plain text and that a parser's job is to recover structure from a character stream. Modern language tooling complicates that assumption. **Structured editing** treats the program's syntax tree as the primary editing object, while **projectional editing** goes further and edits the tree directly instead of parsing text at all. Hybrid systems try to preserve ordinary text editing while retaining stronger structural guarantees than a traditional parse-on-save workflow can provide.
+
+The trade-off is not theoretical elegance but *editing freedom*. Structured and projectional systems can guarantee syntactic correctness, make AST-level refactorings trivial, and support notations that ordinary parsers handle poorly — tables, diagrams, context-sensitive forms, mixed textual/graphical surfaces, and aggressively extensible syntax. JetBrains MPS is the clearest production reference point: the editor manipulates AST nodes directly, persistence and diff/merge operate on syntax structure with stable node identities, and language composition avoids grammar ambiguity by construction.
+
+The cost is that many programmers regularly make intermediate edits that are intentionally syntactically invalid: block edits, multi-line partial rewrites, or temporary violations of delimiter balance. Pure projectional editors often make such workflows awkward. This is why the most relevant design question for a new language is not simply "projectional or text?" but **where to place the boundary between free-form editing and structural awareness**.
+
+Laurence Tratt's 2024 essay argues that **incremental parsing** is the practical bridge. The editor can let users type ordinary text while maintaining a continuously updated parse tree in the background, including partially broken trees when the source is invalid. This recovers many of the benefits of structured editing without forbidding transient syntax errors. Beckmann et al.'s **Partial Parsing for Structured Editors** strengthens the same point from a language-workbench angle: partial parsing can support keyboard-centric structured editing generated from general-purpose grammars, reducing reliance on menus and mouse-driven syntax construction.
+
+The language-design lesson is that parser strategy and editor strategy are no longer separable. If a language expects rich IDE support, syntax-aware completions, or multiple notations over one syntax tree, then structured, projectional, or hybrid editing models should be considered alongside ordinary incremental parsing rather than deferred until much later.
+
+Sources: https://tratt.net/laurie/blog/2024/structured_editing_and_incremental_parsing.html and https://dl.acm.org/doi/10.1145/3567512.3567522 and https://www.jetbrains.com/help/mps/mps-faq.html
+
+### 2.25. Recursive Descent — The Hand-Written Baseline
 
 Recursive descent deserves an explicit entry because it is not merely an implementation detail behind Pratt parsing (§2.1) or PEG (§2.3). In its simplest form, each grammar production becomes a host-language function, and the parser advances through the token stream by calling these functions directly. Predictive recursive descent chooses alternatives from lookahead tokens; backtracking recursive descent tries alternatives speculatively; resilient recursive descent (§7.8) deliberately consumes a well-formed prefix and emits error nodes instead of failing globally.
 
@@ -308,7 +322,7 @@ The cost is that ambiguity detection moves from generator to author. An LR gener
 
 Sources: https://tratt.net/laurie/blog/2020/which_parsing_approach.html and https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
 
-### 2.25. Deterministic LL and LR — The Classical Compiler Workhorses
+### 2.26. Deterministic LL and LR — The Classical Compiler Workhorses
 
 The classic parsing families are still the vocabulary of compiler front-ends even when a production parser is hand-written. **LL** parsers read left-to-right and construct a leftmost derivation; they are naturally top-down and align with recursive descent. `LL(1)` uses one token of lookahead, `LL(k)` uses fixed k-token lookahead, and `LL(*)`/`ALL(*)` generalise the lookahead story (§2.19). Grammar engineering for LL usually means eliminating left recursion and left-factoring common prefixes so that a lookahead token selects one production.
 
@@ -318,7 +332,7 @@ For language design, the key question is not "which acronym is best?" but "where
 
 Sources: https://dickgrune.com/Books/PTAPG_2nd_Edition/index.html and https://www.gnu.org/software/bison/manual/bison.html
 
-### 2.26. Shunting-Yard and Operator-Precedence Grammars
+### 2.27. Shunting-Yard and Operator-Precedence Grammars
 
 Dijkstra's **shunting-yard** algorithm is the classic stack-based expression parser: operands go to an output queue, operators sit on a stack, and precedence/associativity decide when stacked operators are popped. It is easy to implement and ideal for calculators, bytecode emitters, and expression-only DSLs. Compared with Pratt (§2.1) and precedence climbing (§2.2), shunting-yard is less natural when expressions contain rich prefix/postfix forms, contextual keywords, lambdas, or error recovery, but it remains the simplest way to translate infix expressions to postfix or bytecode.
 
@@ -326,7 +340,7 @@ The older **operator-precedence grammar** family, associated with Floyd, general
 
 Sources: https://en.wikipedia.org/wiki/Shunting_yard_algorithm and https://en.wikipedia.org/wiki/Operator-precedence_parser
 
-### 2.27. Ambiguity, Parse Forests, and Disambiguation
+### 2.28. Ambiguity, Parse Forests, and Disambiguation
 
 Generalized parsers do not make ambiguity disappear; they make it explicit. When GLR, GLL, Earley, or CYK finds multiple parses, the practical output is usually a **Shared Packed Parse Forest** (SPPF): common subtrees are shared, and ambiguous alternatives are stored as packed nodes. This keeps the representation polynomial rather than exploding into every full parse tree.
 
@@ -343,7 +357,7 @@ The engineering lesson is that "accepts all CFGs" is not the same as "gives the 
 
 Sources: https://lark-parser.readthedocs.io/en/stable/parsers.html and https://tree-sitter.github.io/tree-sitter/creating-parsers/3-writing-the-grammar.html
 
-### 2.28. Syntax-Directed Translation and Attribute Grammars
+### 2.29. Syntax-Directed Translation and Attribute Grammars
 
 Parsing rarely stops at "recognise the sentence." Most compiler front-ends attach work to productions: build AST nodes, record declarations, desugar constructs, emit bytecode, or compute attributes. This family is usually called **syntax-directed translation**. In a yacc-style parser, semantic actions are host-language fragments attached to grammar reductions; in recursive descent, they are ordinary code inside parse functions; in Raku/NQP (§6.3), grammar matches are paired with action methods that build QAST.
 
@@ -353,7 +367,7 @@ The modern tooling lesson from Ohm (§2.20) and syntax-parse (§2.23) is that in
 
 Sources: https://web.cs.wpi.edu/~cs544/PLT6.5.2.html and https://cecs.wright.edu/~tkprasad/papers/Attribute-Grammars.pdf
 
-### 2.29. Beyond-CFG Formalisms — TAG, MCFG, Boolean Grammars, and Friends
+### 2.30. Beyond-CFG Formalisms — TAG, MCFG, Boolean Grammars, and Friends
 
 Most programming-language parsers live in the regular + CFG + context-sensitive-escape-hatch world: regular lexers, CFG-ish syntax, and semantic checks after parsing. Research parsing goes further. **Tree-Adjoining Grammars** (TAG), **Multiple Context-Free Grammars** (MCFG), **Linear Context-Free Rewriting Systems** (LCFRS), and **Range Concatenation Grammars** (RCG) capture mildly context-sensitive patterns important in natural language. **Conjunctive** and **Boolean grammars** extend CFGs with intersection and negation. **Visibly pushdown languages** sit between regular and deterministic context-free languages and model nested calls/returns while retaining strong automata properties.
 
@@ -458,6 +472,26 @@ The modern representative is **CPCT+** ("Don't Panic! Better, Fewer, Syntax Erro
 For a language implementation, minimum-distance repair is especially attractive when using LR-family infrastructure: it gives high-quality diagnostics without requiring every grammar production to hand-code recovery. The cost is algorithmic complexity and a need to rank repairs so that the parser's "fix" matches programmer intent.
 
 Sources: https://www.cs.princeton.edu/courses/archive/spr04/cos320/notes/error-recovery.pdf and https://arxiv.org/abs/1804.07133
+
+### 4.8. Resilient Parsing for Interactive Tooling
+
+This section synthesizes the editor-oriented implications of the recovery techniques above rather than introducing a separate parser family. Interactive tooling changes the parser's success condition. A batch compiler may reasonably stop once it has emitted one high-quality syntax error. An IDE, formatter, refactoring engine, or semantic-completion service usually cannot. It needs a tree — often a best-effort one — for *every* intermediate editor state, including incomplete declarations, half-written expressions, and mismatched delimiters.
+
+This shifts the parser's job from "accept or reject" toward **producing the most useful structurally sound tree possible under invalid input**. The specific mechanisms vary:
+- local recovery with explicit `ERROR` or placeholder nodes;
+- resilient recursive-descent strategies that parse a correct prefix and quarantine the broken region;
+- phrase-level repair and token synchronization;
+- AST placeholders that let later phases continue operating.
+
+Matklad's **resilient LL parsing** work is the clearest hand-written parser formulation of this philosophy: instead of propagating failure upward, each production consumes what it can, inserts localized error nodes, and preserves unaffected siblings so later tooling remains meaningful. The Hylo 2025 work on **error-tolerant parsing and compilation** makes the same point from a language-implementation perspective: interactive development requires more than nicer parse errors; it requires a tree that later stages — semantic analysis, diagnostics, navigation, and completion — can still consume.
+
+The practical design question for a new language is therefore not only which parsing algorithm to use, but whether the language wants:
+- one parser optimized for compiler throughput and a separate resilient parser for tooling;
+- or one parser deliberately engineered to satisfy both batch compilation and interactive editing.
+
+This concern connects parser design directly to AST design (§3), semantic analysis (`TYPES.md §13`), and debugger/tooling workflows (`DEBUGGERS.md §6.2`).
+
+Sources: https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html and https://repository.tudelft.nl/record/uuid:5f796ca0-1b65-4d28-9255-6cb4b6810817
 
 ---
 
@@ -667,7 +701,7 @@ Sources: https://github.com/rust-lang/rust-analyzer/tree/master/crates/parser an
 
 Yacc established the classic Unix parser-generator shape: a grammar file with tokens, precedence declarations, productions, and semantic actions; generated C code implementing an LALR(1) shift/reduce parser; and conflict reports for grammar ambiguities. GNU Bison is the modern continuation, supporting traditional LALR(1), canonical LR(1), IELR(1), and GLR.
 
-This section exists as the tool-specific complement to the algorithm overview in §2.25. Bison matters because many parser concepts are easiest to understand in its vocabulary: shift/reduce conflicts, reduce/reduce conflicts, `%left`/`%right` precedence declarations, `%prec` overrides, semantic value stacks, location stacks, and generated error paths. Even when an implementer chooses recursive descent or tree-sitter, knowing the Yacc/Bison model clarifies what is gained and lost by leaving table-driven LR.
+This section exists as the tool-specific complement to the algorithm overview in §2.26. Bison matters because many parser concepts are easiest to understand in its vocabulary: shift/reduce conflicts, reduce/reduce conflicts, `%left`/`%right` precedence declarations, `%prec` overrides, semantic value stacks, location stacks, and generated error paths. Even when an implementer chooses recursive descent or tree-sitter, knowing the Yacc/Bison model clarifies what is gained and lost by leaving table-driven LR.
 
 Source: https://www.gnu.org/software/bison/manual/bison.html
 
@@ -687,6 +721,22 @@ Production: rustc historically used LALRPOP for some embedded-DSL parsing; Ruff 
 Status (as of 2026-04): production-stable, still maintained, the de facto LR(1) parser generator for Rust when one is needed.
 
 Sources: https://lalrpop.github.io/lalrpop/ and https://github.com/lalrpop/lalrpop
+
+### 7.11. Language Workbenches and Grammar-Centered Tooling
+
+A newer line of parser-adjacent work treats the grammar not merely as input to a parser generator, but as the starting point for a **tooling stack**: parser, formatter, language-server integration, and sometimes reference resolution or editor services. The question is no longer only "what algorithm recognizes this language?" but "how much of the surrounding tooling can be derived from one authoritative syntax specification?"
+
+**AnyText** (SLE 2025) is a strong current example. It combines a scannerless, incremental packrat parser with left-recursion support, an EBNF-like grammar notation, formatting instructions that drive pretty-printing, and first-class LSP support from the same language definition. This is a materially different design point from classic parser generators: the grammar becomes part of a broader language-workbench substrate.
+
+The attraction is obvious. A language author wants one source of truth for syntax and enough generated infrastructure that adding a feature to the language does not require hand-maintaining the parser, pretty-printer, and editor support in lockstep. But the cost is also real. The 2025 MontiCore experience report on **Challenges of Modular Language Design** is a valuable counterweight: compositional language engineering introduces substantial infrastructure complexity, parser-composition edge cases, and pressure from the limitations of target languages and host compilers.
+
+The parser-design lesson is therefore double-sided:
+- a single-source grammar can become the center of a powerful tooling ecosystem;
+- modular syntax composition and language-workbench generation should be treated as major architectural commitments, not as a small extension of parser generation.
+
+For a new language, this section is the bridge between ordinary parsing and the broader language-engineering question: whether the syntax definition should remain a compiler-internal artifact or become the source of truth for editor and tooling infrastructure as well.
+
+Sources: https://dl.acm.org/doi/10.1145/3732771.3742716 and https://dl.acm.org/doi/10.1145/3732771.3742717 and https://www.spoofax.dev/background/bibliography/sdf3/
 
 ---
 
@@ -778,6 +828,8 @@ Rows are grouped by family. Within a group, order roughly follows the body text.
 | Incremental LR with selective GLR conflicts (tree-sitter) | Full syntax tree | Usually proportional to changed region; worst case can reparse more | Editor-usable tree over invalid input, with explicit `ERROR` or missing nodes | Neovim, Helix, Zed (§2.11) |
 | Lezer parser | Compact JS tree | Incremental reparse; linear full parse | No Wasm overhead | CodeMirror 6 (§2.12) |
 | Resilient LL + rowan | Event stream + ERROR nodes | Linear, constant recovery cost | Always produces a tree; per-production recovery | rust-analyzer, Typst, Lelwel (§7.8) |
+| Hybrid structured editing + partial parsing | Parser + editor-maintained structure | Incremental on edited regions, with extra editor-side bookkeeping | Keeps keyboard-centric text workflows while preserving more structure than plain text parsing | Partial Parsing for Structured Editors, Tratt's incremental-structured-editing framing (§2.24) |
+| Workbench-generated incremental parsing + pretty-printing | Grammar plus generated infrastructure | Depends on workbench/runtime complexity | Single-source syntax for parser, formatter, and LSP comes with larger tooling commitment | AnyText (§7.11) |
 
 ### 9.6. Lexing and tokenization
 
@@ -822,6 +874,7 @@ Rows are grouped by family. Within a group, order roughly follows the body text.
 | Recovery-as-specification | Insertion-mode state machine | Linear | Spec-equivalent DOM structure on any input; huge spec | HTML5, CSS forgiving selectors (§4.6) |
 | LR(1) error-state messages | `.messages` file + enumeration | Compile-time verified coverage | Author-written diagnostics tied to states | Menhir + Pottier CC 2016 (§7.3) |
 | Minimum-distance repair | Search over insert/delete/substitute repairs | Per-error search with timeout | Better diagnostics, fewer cascades | Burke–Fisher, CPCT+ (§4.7) |
+| Resilient parsing for interactive tooling | Extra error/placeholder nodes and recovery logic | Usually linear full parse; locality depends on design | Keeps semantic tooling alive on incomplete code, but often complicates parser architecture | rust-analyzer, Hylo work, resilient LL (§4.8, §7.8) |
 
 ### 9.9. Flat and compact AST representations
 
@@ -922,6 +975,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 4. HTML Standard — Parsing HTML documents — https://html.spec.whatwg.org/multipage/parsing.html
 5. Princeton COS 320 Error Recovery notes — https://www.cs.princeton.edu/courses/archive/spr04/cos320/notes/error-recovery.pdf
 6. Don't Panic! Better, Fewer, Syntax Errors for LR Parsers — https://arxiv.org/abs/1804.07133
+7. Resilient LL Parsing Tutorial — https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
+8. Error-Tolerant Parsing and Compilation for Hylo — https://repository.tudelft.nl/record/uuid:5f796ca0-1b65-4d28-9255-6cb4b6810817
 
 ### Chapter 5 — Parser Techniques
 
@@ -963,6 +1018,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 9. Resilient LL Parsing Tutorial (Matklad, 2023) — https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
 10. LALRPOP book — https://lalrpop.github.io/lalrpop/
 11. LALRPOP repository — https://github.com/lalrpop/lalrpop
+12. AnyText (SLE 2025) — https://dl.acm.org/doi/10.1145/3732771.3742716
+13. Lessons Learned from Developing the MontiCore Language Workbench: Challenges of Modular Language Design — https://dl.acm.org/doi/10.1145/3732771.3742717
+14. SDF3 bibliography (Spoofax) — https://www.spoofax.dev/background/bibliography/sdf3/
+15. JetBrains MPS FAQ — https://www.jetbrains.com/help/mps/mps-faq.html
 
 ### Chapter 8 — Community Marginalia Worth Mining
 
@@ -973,3 +1032,4 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 5. HN: langcc — https://news.ycombinator.com/item?id=32949019
 6. Tratt — Which Parsing Approach? — https://tratt.net/laurie/blog/2020/which_parsing_approach.html
 7. Tree-sitter External Scanners — https://tree-sitter.github.io/tree-sitter/creating-parsers/4-external-scanners.html
+8. Tratt — Structured Editing and Incremental Parsing — https://tratt.net/laurie/blog/2024/structured_editing_and_incremental_parsing.html

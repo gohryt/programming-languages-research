@@ -301,7 +301,24 @@ For a package manager designer, the question Nix and Guix raise is whether repro
 
 Sources: https://nixos.wiki/wiki/Flakes and https://nix.dev/concepts/flakes.html and https://guix.gnu.org/manual/en/html_node/Defining-Packages.html and https://spack.readthedocs.io/en/latest/concretize.html
 
-### 4.7. Design Lessons from Build Systems and Registries
+### 4.7. OSS Rebuild — Ecosystem-Scale Rebuild Verification
+
+Google's **OSS Rebuild** (announced 2025) is a newer point in the packaging design space: instead of asking every package author to adopt hermetic build tooling from day one, it attempts to **rebuild published packages at ecosystem scale** and compare the result with the upstream artifact. The goal is not merely reproducibility for one project, but **continuous, third-party validation of public package ecosystems**.
+
+This matters because most mainstream package managers still rely on a trust model of:
+- the registry served the bytes the author intended;
+- the author's CI/build pipeline was not compromised;
+- the published artifact actually corresponds to the public source.
+
+Lockfiles and content hashes (§4.1) help only after a consumer has decided which artifact to trust. OSS Rebuild addresses an earlier question: *should this artifact have been trusted in the first place?*
+
+The design point is distinct from Nix/Guix (§4.6). Nix and Guix make reproducibility a property of a hermetic package-definition language and a content-addressed store. OSS Rebuild instead works against existing ecosystems such as PyPI, npm, and crates.io with much lower ecosystem-wide migration cost: infer how a package was likely built, rebuild it, and compare outputs. This is weaker than fully hermetic package management, but far easier to deploy across large pre-existing ecosystems.
+
+The broader design lesson is that **reproducibility can become a registry- or ecosystem-level validation service**, not just a local developer or CI concern. A new language ecosystem could choose to make this kind of rebuild verification a first-class registry feature from the start, rather than retrofitting it after supply-chain incidents.
+
+Sources: https://github.com/google/oss-rebuild and https://oss-rebuild.dev/ and https://security.googleblog.com/2025/07/introducing-oss-rebuild-open-source.html
+
+### 4.8. Design Lessons from Build Systems and Registries
 
 The build-system-and-registry layer adds several specific lessons not visible at the language level:
 
@@ -312,8 +329,7 @@ The build-system-and-registry layer adds several specific lessons not visible at
 - **Vendoring should be a first-class workflow** for hermetic builds and disaster-recovery scenarios.
 - **Build-system visibility is a layer above language visibility** and dominates at large scale. Compatibility with Bazel-style visibility is increasingly important for languages targeting enterprise monorepo use.
 - **Reproducibility can be a build-system property, not just a lockfile property** (Nix, Guix). Hermetic, content-addressed builds eliminate "works on my machine" by construction. The cost is a substantial language learning curve for the package manifest; the benefit is reproducibility that no retrofitted lockfile can guarantee.
-
-A language designer can pick from this menu deliberately rather than discover the choices through painful retrofits.
+- **Ecosystem-scale rebuild verification is a distinct layer above lockfiles**. Lockfiles pin what *you* resolved; rebuild services like OSS Rebuild can validate whether the published artifact itself matches public source.
 
 ---
 
@@ -372,6 +388,7 @@ Rows are grouped by topic; within a topic, ordering follows the body text.
 | Approach | Mechanism | Examples |
 |---|---|---|
 | Lockfile-pinned | Version + content hash | Cargo, Go, npm, Pip |
+| Ecosystem-scale rebuild verification | Rebuild published package and compare with upstream artifact | OSS Rebuild |
 | Content-addressed build derivation | Hermetic sandbox + narHash | Nix flakes, Guix |
 | Combinatorial variant selection | Concretisation per dependency tuple | Spack |
 | Vendoring | Source committed to repo | Go, idiomatic for hermetic builds |
@@ -451,3 +468,6 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 18. nix.dev — Concepts: Flakes — https://nix.dev/concepts/flakes.html
 19. GNU Guix — Defining Packages — https://guix.gnu.org/manual/en/html_node/Defining-Packages.html
 20. Spack — Concretization (combinatorial version selection) — https://spack.readthedocs.io/en/latest/concretize.html
+21. OSS Rebuild repository — https://github.com/google/oss-rebuild
+22. OSS Rebuild site — https://oss-rebuild.dev/
+23. Google Security Blog — Introducing OSS Rebuild — https://security.googleblog.com/2025/07/introducing-oss-rebuild-open-source.html

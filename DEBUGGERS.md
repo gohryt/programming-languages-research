@@ -399,7 +399,17 @@ The distinct contribution beyond §3.3 is the **Replay.io integration**: because
 
 Source: https://github.com/reduxjs/redux-devtools
 
-### 3.12. Edit-and-Continue / Hot Code Replacement
+### 3.12. CodeTracer — A New User-Friendly Time-Travel Debugger
+
+**CodeTracer** is a newer open-source time-travel debugging effort that is interesting less for a novel tracing substrate than for its attempt to make time-travel debugging feel like an ordinary developer workflow rather than a specialist or enterprise-only tool. Public material describes it as a GUI-first debugger intended to support multiple languages, initially around Ruby with broader language ambitions.
+
+The architectural interest is its product direction: reduce the intimidation factor of reverse debugging by presenting recording, replay, and navigation in a more everyday developer experience. That is a different emphasis from rr (§2.1), Pernosco (§2.2), WinDbg TTD (§2.5), or UndoDB (§2.8), which are either lower-level, strongly platform-specific, or aimed at expert workflows.
+
+Status (as of 2026-04): early-stage and less established than the major time-travel systems above. It is worth recording as evidence of a continuing trend toward **developer-friendly time-travel debugging** as a mainstream aspiration rather than a niche research capability.
+
+Sources: https://github.com/metacraft-labs/codetracer and https://www.rubyevents.org/talks/codetracer-a-new-way-to-debug
+
+### 3.13. Edit-and-Continue / Hot Code Replacement
 
 Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version. The *module-system* preconditions that make this possible — flat-or-stable module identity, individually loadable artifacts, language-level cooperation primitives like `import.meta.hot.accept` — are covered in `MODULES.md §10`.
 
@@ -1132,7 +1142,8 @@ Rows grouped by chapter, in chapter order.
 | Bytecode-woven event DB + replay UI | Weaver at class-load | Instrumentation per event | Scale requires distributed DB or commercial scoping | Chronon, TOD, IntelliTrace, RevDebug (§3.9) |
 | Decorator-only omniscient trace | `sys.settrace` hook | 10–100× on traced code | One-function scope; no infrastructure | PySnooper, snoop, viztracer (§3.10) |
 | Action-log replay over pure state | Action history array | Action re-application on jump | Requires pure reducers + immutable state | Redux DevTools (cf. Elm §3.3) (§3.11) |
-| Hot code replacement | Versioned code metadata | Patch + deopt/frame policy | Active-frame migration is hard | Visual Studio Edit and Continue, JVM HotSwap, Erlang, Flutter (§3.12) |
+| GUI-first modern time-travel debugger | Recording + replay + interactive navigation | Early-stage ecosystem / tooling maturity | Aims to mainstream time-travel workflows | CodeTracer (§3.12) |
+| Hot code replacement | Versioned code metadata | Patch + deopt/frame policy | Active-frame migration is hard | Visual Studio Edit and Continue, JVM HotSwap, Erlang, Flutter (§3.13) |
 | **Chapter 4 — Live Visualization** | | | | |
 | Post-execution inline visualization | N/A | Full-run recording | No pause/step — post-run only | WhiteBox (§4.1) |
 | Timeline scrubber (aspirational) | Full state capture | Viable only at small scale | → subsumed by Observable / Light Table / Eve, see §4.3 | Bret Victor demo (§4.2) |
@@ -1264,9 +1275,11 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 20. PySnooper (Ram Rachum) — https://pypi.org/project/PySnooper/
 21. VizTracer Documentation — https://viztracer.readthedocs.io/en/latest/viztracer.html
 22. Redux DevTools — https://github.com/reduxjs/redux-devtools
-23. Visual Studio Edit and Continue — https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue
-24. JPDA Enhancements: HotSwap / Class Redefinition — https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html
-25. Flutter Hot Reload — https://docs.flutter.dev/tools/hot-reload
+23. CodeTracer repository — https://github.com/metacraft-labs/codetracer
+24. RubyEvents — CodeTracer talk — https://www.rubyevents.org/talks/codetracer-a-new-way-to-debug
+25. Visual Studio Edit and Continue — https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue
+26. JPDA Enhancements: HotSwap / Class Redefinition — https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html
+27. Flutter Hot Reload — https://docs.flutter.dev/tools/hot-reload
 
 ### Chapter 4 — Live Visualization
 

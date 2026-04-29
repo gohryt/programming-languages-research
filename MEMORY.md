@@ -389,7 +389,28 @@ Intel Skylake-SP (2017)+ server, Tiger Lake+ client; AMD Zen 3+; ARMv8.9 FEAT_S1
 
 Sources: https://kernel.org/doc/html/latest/core-api/protection-keys.html and https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
 
-### 5.10. SPARC ADI and Intel MPX — Lessons from Predecessors
+### 5.10. CHERI-Lite — Lower-Cost Capability-Style Mitigation
+
+**CHERI-Lite** (Microsoft Research, 2025) explores a middle ground between full CHERI capabilities (§5.6) and lighter-weight pointer-tagging designs such as MTE (§5.1). The core idea is to retain the security value of *tagged, non-forgeable pointers* while reducing the hardware and software adoption burden of full architectural capabilities. Instead of carrying the full CHERI semantic model — bounds, permissions, sealed object capabilities, and a pure-capability ABI — CHERI-Lite focuses on preventing attackers from freely fabricating pointers and reusing stale ones in the most common exploit patterns.
+
+The design point matters because full CHERI is powerful but expensive:
+- pointers become larger;
+- ABIs and compilers change substantially;
+- legacy code and interoperability become harder;
+- hardware support must be pervasive to get the full benefit.
+
+CHERI-Lite is therefore best read as a **transition strategy** rather than as a replacement for full CHERI. It suggests a practical deployment path for ecosystems that want stronger memory-safety exploit mitigation than MTE/PAC/CET alone provide, but cannot yet absorb the full compatibility cost of CHERI.
+
+For language and runtime designers, the lesson is that hardware memory-safety mechanisms need not be all-or-nothing. There is a meaningful design space between:
+- full spatial+authority capability systems (CHERI, CHERIoT);
+- tagging-only systems (MTE, HWASan);
+- and control-flow-only integrity systems (PAC, CET).
+
+Status (as of 2026-04): research-stage proposal, not a mainstream deployed hardware target.
+
+Sources: https://www.microsoft.com/en-us/research/publication/cheri-lite-for-memory-safety-exploit-mitigation/ and https://www.microsoft.com/en-us/research/wp-content/uploads/2025/11/CHERI-Lite-for-Memory-Safety.pdf
+
+### 5.11. SPARC ADI and Intel MPX — Lessons from Predecessors
 
 Two cautionary tales whose lessons informed every later design.
 
@@ -1018,7 +1039,8 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | CHERIoT MCU CHERI | 64-bit cap over 32-bit addr | Designed for MCU budgets | Emerging embedded CHERI ecosystem; silicon availability is vendor- and date-specific | (§5.7) |
 | SoftBound/CETS/LowFat | Per-pointer software | 80–200% / single-digit% | Research only | (§5.8) |
 | MPK/POE | Per-page-group | ~20–26 cycles per switch | Skylake-SP+, Zen 3+, ARMv8.9 | (§5.9) |
-| SPARC ADI / Intel MPX | Tag / bounds | Various | ADI legacy; MPX dead | (§5.10) |
+| CHERI-Lite | Tagged-pointer / capability-style mitigation | Research-stage; intended lower adoption cost than full CHERI | Transitional design point between full CHERI and lighter tagging schemes | (§5.10) |
+| SPARC ADI / Intel MPX | Tag / bounds | Various | ADI legacy; MPX dead | (§5.11) |
 
 ### 11.6. Tracing GC architectures
 
@@ -1252,18 +1274,20 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 11. CHERIoT 1.0 ISA — https://cheriot.org/sail/specification/release/2025/11/03/cheriot-1.0.html
 12. cheriot-ibex — https://github.com/Microsoft/cheriot-ibex
 13. Linux Memory Protection Keys — https://kernel.org/doc/html/latest/core-api/protection-keys.html
-14. SPARC ADI Solaris docs — https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-application-data-integrity-adi.html
-15. Intel MPX retrospective — https://arxiv.org/pdf/2009.06490
-16. Arm learning path — MTE on Pixel 8 — https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/
-17. Apple developer — Meet with Apple session 206 (MIE/EMTE) — https://developer.apple.com/videos/play/meet-with-apple/206/
-18. Cai et al. — PAC analysis (USENIX Security 2023) — https://www.usenix.org/system/files/usenixsecurity23-cai-zechao.pdf
-19. Phoronix — Intel CET-IBT for Linux 5.18 — https://www.phoronix.com/news/Intel-CET-IBT-For-Linux-5.18
-20. Wind River joins the CHERI Alliance — https://www.businesswire.com/news/home/20260421249526/en/Wind-River-Joins-the-CHERI-Alliance
-21. CHERIoT-RTOS publication — https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/
-22. SoftBound project page — http://acg.cis.upenn.edu/softbound/
-23. CETS ISMM 2010 paper — https://acg.cis.upenn.edu/papers/ismm10_cets.pdf
-24. LowFat allocator — https://github.com/GJDuck/LowFat
-25. Connor et al. — MPK security (USENIX Security 2020) — https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
+14. CHERI-Lite for Memory Safety Exploit Mitigation — https://www.microsoft.com/en-us/research/publication/cheri-lite-for-memory-safety-exploit-mitigation/
+15. CHERI-Lite paper PDF — https://www.microsoft.com/en-us/research/wp-content/uploads/2025/11/CHERI-Lite-for-Memory-Safety.pdf
+16. SPARC ADI Solaris docs — https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-application-data-integrity-adi.html
+17. Intel MPX retrospective — https://arxiv.org/pdf/2009.06490
+18. Arm learning path — MTE on Pixel 8 — https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/
+19. Apple developer — Meet with Apple session 206 (MIE/EMTE) — https://developer.apple.com/videos/play/meet-with-apple/206/
+20. Cai et al. — PAC analysis (USENIX Security 2023) — https://www.usenix.org/system/files/usenixsecurity23-cai-zechao.pdf
+21. Phoronix — Intel CET-IBT for Linux 5.18 — https://www.phoronix.com/news/Intel-CET-IBT-For-Linux-5.18
+22. Wind River joins the CHERI Alliance — https://www.businesswire.com/news/home/20260421249526/en/Wind-River-Joins-the-CHERI-Alliance
+23. CHERIoT-RTOS publication — https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/
+24. SoftBound project page — http://acg.cis.upenn.edu/softbound/
+25. CETS ISMM 2010 paper — https://acg.cis.upenn.edu/papers/ismm10_cets.pdf
+28. LowFat allocator — https://github.com/GJDuck/LowFat
+29. Connor et al. — MPK security (USENIX Security 2020) — https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
 
 ### Chapter 6 — Tracing GC Architectures
 
