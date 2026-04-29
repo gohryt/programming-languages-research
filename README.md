@@ -2,7 +2,7 @@
 
 This directory collects language-design research across parsing, semantic analysis, compilation, concurrency, debugging, tracing, program representations, memory management, and module/package boundaries.
 
-The goal is to make the notes useful to any programming-language implementer. Keep the documents language-agnostic: prefer phrases like "a new language", "a compiler", "a runtime", or "a language server" rather than project-specific names.
+The goal is to make the notes useful to any programming-language implementer. Keep the documents language-agnostic: prefer phrases like "a new language", "a compiler", "a runtime", or "a language server" rather than project-specific names. Marginal or unique mechanisms that grant language developers distinctive abilities must retain full treatment in their canonical document.
 
 ---
 
