@@ -10,6 +10,8 @@ Ownership boundary: parser algorithms belong in `PARSERS.md`; concrete and inter
 
 ## 1. Scope and Design Axes
 
+This chapter names the recurring axes along which type-system designs differ. The axes overlap and combine in practice — most production type checkers make a different trade-off on each — but separating them clarifies what each later chapter is optimising for. The axes below are ordered roughly by how visible the choice is to the language user, from "what counts as well-typed" through "where types live" to "how much the user must annotate."
+
 ### 1.1. Static, dynamic, gradual, and hybrid checking
 
 A static type checker rejects some programs before execution; a dynamic language defers most checks to runtime; a gradual type system deliberately allows typed and untyped regions to coexist, usually with runtime casts or contracts at boundaries. The engineering choice is not simply safety versus flexibility: it also changes compilation strategy, runtime metadata, optimizer assumptions, diagnostic quality, and language-server latency.
@@ -58,6 +60,8 @@ A practical compiler often separates:
 ---
 
 ## 2. Historical Through-Line, 1960–2026
+
+The modern type-system design space accumulated by recombination rather than by replacement: System F, Hindley-Milner inference, type classes, GADTs, occurrence typing, dependent types, refinement types, linear types, and effect rows each emerged in a different decade and now coexist in production type checkers. This chapter traces the through-line from 1960s ALGOL/Simula type-as-storage-discipline to the 2020s' effect handlers and modal memory management, identifying where each idea entered the lineage and which subsequent designs absorbed or reacted against it.
 
 ### 2.1. 1960s — ALGOL, Simula, and early typed structure
 
@@ -275,7 +279,7 @@ Key design axes:
 
 Chalk lowers Rust trait information into logical predicates and uses a solver similar to a Prolog engine, while remaining embeddable in hosts such as rustc and rust-analyzer. Source: https://rust-lang.github.io/chalk/book/
 
-Rust's next-generation trait solver frames trait checking as proving goals under a parameter environment, returning success, ambiguity, or error plus constraints. Source: https://rustc-dev-guide.rust-lang.org/solve/trait-solving.html
+Rust's next-generation trait solver frames trait checking as proving goals under a parameter environment, returning success, ambiguity, or error plus constraints. Status (as of 2026-04): a flagship 2025–2026 Rust project goal targets stabilization of `-Znext-solver=globally`, replacing the existing trait solver implementation entirely; LWN's March 2026 coverage describes the rewrite as simplifying future trait-system changes, fixing several long-standing soundness bugs, and improving compile times on trait-heavy code. Sources: https://rustc-dev-guide.rust-lang.org/solve/trait-solving.html and https://lwn.net/Articles/1063124/ and https://rust-lang.github.io/rust-project-goals/
 
 ### 6.3. Associated types and projection equality
 
@@ -287,7 +291,7 @@ Chalk models associated type normalization with predicates such as normalization
 
 Coherence means the same overloaded expression has a unique meaning independent of compilation order or search strategy. Haskell, Rust, Swift, and Scala-like systems make different trade-offs around global uniqueness, associated types, implicits, and path-dependent typing.
 
-`Status (as of 2025-02):` a paper comparing type-class coherence in Swift, Rust, Scala, and Haskell notes that mainstream non-dependent systems often rely on coherence, while Scala-like dependent typing supports more flexible implicit resolution at the cost of intricate disambiguation policies. Source: https://arxiv.org/pdf/2502.20546
+A 2025 comparative paper on type-class coherence in Swift, Rust, Scala, and Haskell notes that mainstream non-dependent systems often rely on coherence, while Scala-like dependent typing supports more flexible implicit resolution at the cost of intricate disambiguation policies. Source: https://arxiv.org/pdf/2502.20546
 
 ### 6.5. Variadic generics, const generics, and type-level computation
 
@@ -600,7 +604,9 @@ The compiler targets the JVM, JavaScript, and the LLVM-backed Chez Scheme runtim
 
 Status (as of 2026-04): research-grade. Effekt is one of the cleanest examples of "effect handlers as a primary language design choice" rather than as an effect-row addition to an existing functional core. Combined with Koka (§11.2), Flix (§11.2), and Unison (§11.2), the four span the dominant design space for effect-handler languages.
 
-Sources: https://effekt-lang.org/ and https://se.cs.uni-tuebingen.de/publications/brachthaeuser20effect.pdf and https://dl.acm.org/doi/10.1145/3428194
+Recent compilation work has formalised the lexical-effect-handler discipline as an *evidence-lifting* transformation that infers and inserts the minimal handler-frame metadata at compile time, enabling efficient native compilation of second-class handlers without the per-operation evidence dispatch Koka pays (Schuster et al., OOPSLA 2023). The 2025 follow-up "Affect: An Affine Type and Effect System" (van Rooij, POPL 2025) investigates affine — rather than purely linear — handler resources, allowing handlers to be installed at most once but discarded without explicit close, simplifying common resource-management patterns at the cost of slightly weaker static guarantees.
+
+Sources: https://effekt-lang.org/ and https://se.cs.uni-tuebingen.de/publications/brachthaeuser20effect.pdf and https://dl.acm.org/doi/10.1145/3428194 and https://dl.acm.org/doi/10.1145/3622831 and https://iris-project.org/pdfs/2025-popl-affect.pdf
 
 ### 11.5. Session Types — Typed Communication Protocols
 
@@ -622,6 +628,20 @@ Production and research deployments:
 Status (as of 2026-04): full multiparty session types remain research-grade in production languages; binary session types are simpler to integrate but limited to two-party protocols. The architectural lesson is that **session types are the type-level dual of CSP and the actor model**: for a language with channels, session types are the strongest static guarantee available; for a language with actors, MPST adapts naturally as a global-protocol description that projects to per-actor local types. Languages designing channels or actors from scratch should decide early whether session-type integration is in scope, since retrofitting linear-session discipline onto an existing channel API is hard.
 
 Sources: https://www.doc.ic.ac.uk/~yoshida/papers/multiparty-tutorial.pdf and https://www.scribble.org/ and https://groups.inf.ed.ac.uk/abcd/papers/ESOP98.pdf and https://github.com/sessionrs/sessionrs
+
+### 11.6. Verse — Functional-Logic Programming with Failure-as-Effect
+
+Tim Sweeney and Simon Peyton Jones's **Verse** (Epic Games, deployed in **Unreal Editor for Fortnite (UEFN)** since 2023) is the largest production deployment of **functional-logic programming** in any language — and the design point worth recording is that **failure is a first-class effect**. Every Verse expression has a *success/failure* outcome alongside its value: `if (x > 0) { y } else { fail }` reads naturally because the failure context is part of the language's evaluation semantics, not an exception bolted on top. Failure backtracks across logical-and and propagates through logical-or, recovering the Mercury / Curry functional-logic tradition with deterministic execution semantics suitable for an authoritative game runtime.
+
+The type-system contribution of interest in this chapter is treating **failure as an effect row** comparable to the algebraic-effects rows of Koka (§11.2) and the second-class capabilities of Effekt (§11.4). A Verse function's signature includes which effect specifiers it may exhibit — `decides`, `varies`, `transacts`, `reads`, `writes`, `allocates`, `suspends` — and the type system rejects programs that invoke a stronger-effect callee from a weaker-effect context. The `transacts` effect is particularly distinctive: a function in `transacts` context may roll back its mutations on failure, recovering software transactional memory (`CONCURRENCY.md §9.4`) at the language level rather than as a library.
+
+The **deterministic execution semantics** is the architectural complement: Verse evaluation in UEFN must produce identical outcomes on every client running the same simulation, so the language commits to a deterministic interleaving of failures, transactions, and effect handlers. This is rare for a production game-runtime language; most game scripting (Lua in Roblox via Luau, C# in Unity, GameplayTags in Unreal Blueprint) accepts non-determinism as the cost of dynamic dispatch and lets gameplay code paper over it.
+
+Status (as of 2026-04): Verse is shipping inside UEFN with millions of player-creators authoring Fortnite Islands; the language has not been published as a standalone toolchain outside Epic's ecosystem, and the formal semantics paper drafts (Sweeney + SPJ) circulate but have not appeared in a peer-reviewed venue. The cleanest production data point for "functional-logic + deterministic execution + failure-as-effect" as a language design choice, with the major caveat that documentation is partial and the language is not portable beyond UEFN today.
+
+The lesson generalises: **for languages whose primary use case demands deterministic re-execution** (game simulation, on-chain smart contracts, distributed-system state machines, time-travel debugging substrates — `DEBUGGERS.md §3.13`), making failure a typed effect is structurally cleaner than retrofitting deterministic exception handling onto an effect-untyped core. Verse is the existence proof at production scale.
+
+Sources: https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference and https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf
 
 ---
 
@@ -663,6 +683,20 @@ The ergonomic cost is real: ATS's dependent types interact with linearity in way
 The lesson is that **combining linearity with dependent types is feasible at production scale** but ergonomically demanding; modern designs (QTT, Granule — `MEMORY.md §1.12`) attempt cleaner integrations of the same expressive power.
 
 Sources: http://www.ats-lang.org/ and https://www.cs.bu.edu/~hwxi/ATS/ATS.html and https://www.cs.bu.edu/~hwxi/atslangweb/ATS2/COURSES/PRACTAlT/HTML/x46.html
+
+### 12.5. Move — Resource Types and Abilities for Smart Contracts
+
+Sam Blackshear et al.'s **Move** (Diem/Libra, 2019; now production at **Aptos** and **Sui**, 2022+) is the largest production deployment of linear types in any language, period. The core type-system primitive is the **resource** — a struct whose values must be linearly used: cannot be copied, cannot be silently dropped (must be explicitly destroyed via a constructor of the defining module), and cannot leak from the module that defined it. This is exactly the discipline ATS (§12.4) and Linear Haskell (`MEMORY.md §1.11`) describe, but applied to digital assets where copying or losing a value is a real economic loss.
+
+Move replaces ad-hoc linearity with an **ability system**: every type carries up to four abilities — `copy` (can be duplicated by `=`), `drop` (can be silently discarded at scope end), `key` (can be a top-level resource stored in global state), `store` (can be nested inside another resource). A type without `copy + drop` is fully linear; a type with only `key` is a top-level singleton; a type with `key + store` can be moved into nested storage. Function generics carry ability constraints (`fun foo<T: copy + drop>(x: T)`), making "this function only works on duplicable types" a first-class type-system concept.
+
+The **bytecode verifier** (mandatory before execution) statically enforces the ability discipline at the bytecode level — distinct from compile-time-only linearity in Haskell or Rust, because Move bytecode crosses trust boundaries (modules from different authors run on the same chain). The verifier is similar in spirit to the BPF verifier (`COMPILERS.md §22`): a small static analysis that gates execution. The **Move Prover** (covered as a Boogie frontend in `REPRESENTATIONS.md §11.8`) layers SMT-discharged functional correctness on top.
+
+The Sui and Aptos Move dialects diverged in 2022. Sui Move adds *object-centric* semantics where every resource has a globally unique ID and storage is owner-keyed; Aptos Move retains the original Diem account-centric model. Both share the ability system and bytecode verifier; the differences are in how resources are stored and how ownership is expressed at the language level.
+
+The lesson generalises beyond blockchain: **a small, mandatory verifier checking linear/ability discipline at the trust boundary** is dramatically more deployable than full dependent-type or refinement-type machinery, and covers the asset-protection use cases that motivated linear types in the first place. For a language designer considering linear types, Move is the existence proof that an ability lattice with 2–4 dimensions can express most real linearity needs without the proof-engineering cost of QTT (§6.9) or ATS (§12.4).
+
+Sources: https://aptos.dev/network/blockchain/move and https://move-language.github.io/move/ and https://github.com/diem/move and https://github.com/MystenLabs/sui/blob/main/external-crates/move/documentation/book/src/abilities.md
 
 ---
 
@@ -734,6 +768,8 @@ A language can support layered diagnostics: concise messages by default, expande
 
 ## 15. Summary of Type-System Techniques
 
+The technique families below collapse the chapter-level material into a comparison axis. Each row picks the one or two design dimensions that most distinguish the family from its peers, and the Examples column anchors back to the body chapter where the technique is treated in detail. Rows are ordered by topical proximity rather than chapter order, so closely related families (e.g., HM, bidirectional, and constraint solving) sit together.
+
 | Technique family | Best for | Main implementation burden | Main trade-off | Examples |
 |---|---|---|---|---|
 | Explicit simple static types | Small compilers, predictable diagnostics | Annotation parsing and checking | Higher annotation burden | (§1.3) |
@@ -752,7 +788,8 @@ A language can support layered diagnostics: concise messages by default, expande
 | Dependent types | Proofs and precise invariants | Elaborator, holes, unification, kernel | High implementation complexity | (§10.1, §10.3, §6.9); Cubical Agda / HoTT (§10.5) |
 | Effect systems | Purity, capabilities, checked effects | Effect rows/sets and handler typing | Annotation and inference complexity | (§11.1, §11.2, §11.3); Effekt second-class capabilities (§11.4) |
 | Session types | Statically-typed communication protocols | Linearity discipline + duality + (for MPST) projection | Production tooling research-grade; integrates with channels and actors | Sing#, Scribble, Rust mpstthree (§11.5) |
-| Linear/affine types | Resources and protocols | Use-counting and move analysis | Ergonomic friction | (§12.1, §12.3); ATS linear-plus-dependent (§12.4) |
+| Failure-as-effect functional-logic typing | Domain language with non-determinism + decidability | Effect specifiers (`transacts`/`decides`/`varies`) drive typed search | Confines logic-programming-style search to where effect annotation permits it | Verse (§11.6) |
+| Linear/affine types | Resources and protocols | Use-counting and move analysis | Ergonomic friction | (§12.1, §12.3); ATS linear-plus-dependent (§12.4); Move ability system (§12.5) |
 | Exhaustiveness checking | Pattern-match safety | Pattern matrix or space algorithms | Hard with open/extensible types | (§8.3) |
 | Incremental semantic analysis | IDEs and fast rebuilds | Query dependency graph and stable IDs | Architecture complexity | (§13.2, §13.3) |
 
@@ -825,6 +862,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 1. Chalk book — https://rust-lang.github.io/chalk/book/
 2. Chalk type equality and unification — https://rust-lang.github.io/chalk/book/clauses/type_equality.html
 3. Rustc dev guide — next-generation trait solving — https://rustc-dev-guide.rust-lang.org/solve/trait-solving.html
+3b. LWN — Rust's next-generation trait solver (March 2026) — https://lwn.net/Articles/1063124/
+3c. Rust Project Goals — https://rust-lang.github.io/rust-project-goals/
 4. Swift generics documentation — https://download.swift.org/docs/assets/generics.pdf
 5. TypeScript conditional types — https://www.typescriptlang.org/docs/handbook/2/conditional-types.html
 6. Type-class coherence comparison — https://arxiv.org/pdf/2502.20546
@@ -897,10 +936,14 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 8. Effekt language home — https://effekt-lang.org/
 9. Brachthäuser, Schuster, Ostermann — "Effects as Capabilities" (OOPSLA 2020) — https://se.cs.uni-tuebingen.de/publications/brachthaeuser20effect.pdf
 10. Effekt OOPSLA 2020 (ACM DL) — https://dl.acm.org/doi/10.1145/3428194
+10b. Schuster et al. — Enabling Efficient Compilation of Lexical Effect Handlers (OOPSLA 2023) — https://dl.acm.org/doi/10.1145/3622831
+10c. Affect: An Affine Type and Effect System (POPL 2025) — https://iris-project.org/pdfs/2025-popl-affect.pdf
 11. Yoshida — Multiparty Session Types tutorial — https://www.doc.ic.ac.uk/~yoshida/papers/multiparty-tutorial.pdf
 12. Scribble multiparty protocol description language — https://www.scribble.org/
 13. Honda, Vasconcelos, Kubo — "Language Primitives and Type Discipline for Structured Communication-Based Programming" (ESOP 1998) — https://groups.inf.ed.ac.uk/abcd/papers/ESOP98.pdf
 14. Session types in Rust (sessionrs) — https://github.com/sessionrs/sessionrs
+15. Verse Language Reference (Epic Games / UEFN) — https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference
+16. Verse: A Functional-Logic Language with Failure-Effect (Peyton Jones et al.) — https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf
 
 ### Chapter 12 — Linear, Affine, Ownership, and Resource Types
 
@@ -909,6 +952,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 3. ATS language home — http://www.ats-lang.org/
 4. ATS overview (Boston University) — https://www.cs.bu.edu/~hwxi/ATS/ATS.html
 5. ATS practical aspects — https://www.cs.bu.edu/~hwxi/atslangweb/ATS2/COURSES/PRACTAlT/HTML/x46.html
+6. Aptos — Move Web3 Language and Runtime — https://aptos.dev/network/blockchain/move
+7. Move Language Reference — https://move-language.github.io/move/
+8. Diem Move repository — https://github.com/diem/move
+9. Sui Move abilities — https://github.com/MystenLabs/sui/blob/main/external-crates/move/documentation/book/src/abilities.md
 
 ### Chapter 13 — Semantic Analysis for Tooling and Incrementality
 

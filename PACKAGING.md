@@ -178,9 +178,6 @@ Sources: https://docs.deno.com/runtime/fundamentals/modules/ and https://deno.co
 
 ---
 
-
----
-
 ## 4. Build Systems, Workspaces, Lockfiles, and Registries
 
 A module system is incomplete without the surrounding ecosystem of build tools, dependency resolvers, lockfiles, registries, and workspace structures. This chapter covers the layer above the language-level module system, where the practical experience of "how do I add a dependency?", "how do I build my project?", and "how do I publish?" actually plays out. The choices here often determine whether a language's module system feels lightweight or oppressive in everyday use.
@@ -318,7 +315,21 @@ The broader design lesson is that **reproducibility can become a registry- or ec
 
 Sources: https://github.com/google/oss-rebuild and https://oss-rebuild.dev/ and https://security.googleblog.com/2025/07/introducing-oss-rebuild-open-source.html
 
-### 4.8. Design Lessons from Build Systems and Registries
+### 4.8. Sigstore + SLSA + cosign — Cryptographic Build Provenance
+
+The complement to OSS Rebuild (§4.7): instead of rebuilding artifacts post-publication to verify them, **Sigstore + SLSA + cosign** make the build process itself verifiable through cryptographic signatures and structured attestations. Where Rebuild answers "does this artifact match the public source?" by re-running the build, Sigstore/SLSA answers "did this artifact come from a specified, attested build process?" via signatures plus a public transparency log. The two compose well: a lockfile entry pins resolved bytes (§4.1), Sigstore proves who built them, SLSA describes how, and Rebuild can independently confirm the build is reproducible.
+
+**Sigstore** (OpenSSF, 2021+) is the cryptographic substrate. Its design point is **keyless signing via short-lived OIDC-bound certificates** issued by the **Fulcio** certificate authority and recorded in the **Rekor** transparency log. A CI job (GitHub Actions, GitLab CI, Buildkite) presents an OIDC identity token to Fulcio, receives a code-signing certificate valid for ~10 minutes, signs the artifact, and submits the signature plus certificate to Rekor. The certificate then expires; later verifiers consult Rekor (an append-only Merkle log) to confirm the signature was logged before its expiry. This eliminates long-lived signing keys and the associated key-rotation/key-loss problems that plagued earlier signing systems (PGP, traditional code signing).
+
+**SLSA (Supply-chain Levels for Software Artifacts)** is the framework specifying *what* build provenance must include — build-system identity, source revision, dependencies, isolation properties, parameters — and assigning **Levels 1–4** corresponding to increasingly strong tamper-resistance guarantees (L1 = documented build process; L2 = version-controlled source + hosted build; L3 = isolated, hermetic, signed provenance from a hardened build platform; L4 = two-party review + reproducibility). The provenance format itself is **in-toto v1.0** attestations carrying SLSA-shaped predicates.
+
+**cosign** is the canonical CLI tying the two together: `cosign sign-blob` produces a Sigstore-backed signature with an in-toto SLSA provenance attestation; `cosign verify` checks the signature against Rekor and validates the attestation against a policy. Status (as of 2026-04): GitHub Actions emits SLSA Level 3 build provenance via `actions/attest-build-provenance` (using GitHub-hosted Fulcio); npm enforces Sigstore-signed publishing for trusted packages since 2024; PyPI Trusted Publishing uses the same OIDC-to-Sigstore flow; container registries (GCR, ECR, ACR, GitHub Container Registry, Quay) accept and verify cosign-signed images; Kubernetes admission controllers (Kyverno, sigstore-policy-controller) gate deployments on signature/attestation policies.
+
+The design lesson generalises: **content-addressed lockfiles (§4.1) prove what bytes were resolved, but Sigstore-style provenance proves the bytes came from an authorised build, and SLSA describes how authorised that build was**. The three layers attack the supply-chain problem at different points and compose end-to-end: a consumer can pin a content-hashed dependency, verify the publisher's identity from its Sigstore signature, inspect the SLSA attestation to confirm hermetic build conditions, and (with OSS Rebuild) independently re-derive the artifact. For a new package ecosystem, designing a registry so that all three are emitted by default — rather than retrofitted later under incident pressure — is dramatically cheaper than the npm/PyPI experience of bolting them on after years of typo-squatting and account-compromise incidents.
+
+Sources: https://www.sigstore.dev/ and https://slsa.dev/ and https://github.com/sigstore/cosign and https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds and https://openssf.org/blog/2024/05/17/where-does-your-software-really-come-from/
+
+### 4.9. Design Lessons from Build Systems and Registries
 
 The build-system-and-registry layer adds several specific lessons not visible at the language level:
 
@@ -330,9 +341,7 @@ The build-system-and-registry layer adds several specific lessons not visible at
 - **Build-system visibility is a layer above language visibility** and dominates at large scale. Compatibility with Bazel-style visibility is increasingly important for languages targeting enterprise monorepo use.
 - **Reproducibility can be a build-system property, not just a lockfile property** (Nix, Guix). Hermetic, content-addressed builds eliminate "works on my machine" by construction. The cost is a substantial language learning curve for the package manifest; the benefit is reproducibility that no retrofitted lockfile can guarantee.
 - **Ecosystem-scale rebuild verification is a distinct layer above lockfiles**. Lockfiles pin what *you* resolved; rebuild services like OSS Rebuild can validate whether the published artifact itself matches public source.
-
----
-
+- **Cryptographic build provenance (Sigstore + SLSA) is a complementary trust layer.** Lockfiles pin bytes; Sigstore proves who signed them and SLSA describes the build conditions under which they were produced. New ecosystems should emit signed in-toto attestations from day one rather than retrofit them after the first major supply-chain incident.
 
 ---
 
@@ -383,15 +392,16 @@ Rows are grouped by topic; within a topic, ordering follows the body text.
 | URL-shaped (no central registry) | Go (URLs), Deno (URLs) | Eliminates governance bottleneck; loses discovery affordance |
 | Strict pre-publication review | CRAN | Quality control at registry-policy level |
 
-### 5.5. Reproducibility models
+### 5.5. Reproducibility and provenance models
 
 | Approach | Mechanism | Examples |
 |---|---|---|
-| Lockfile-pinned | Version + content hash | Cargo, Go, npm, Pip |
-| Ecosystem-scale rebuild verification | Rebuild published package and compare with upstream artifact | OSS Rebuild |
-| Content-addressed build derivation | Hermetic sandbox + narHash | Nix flakes, Guix |
-| Combinatorial variant selection | Concretisation per dependency tuple | Spack |
-| Vendoring | Source committed to repo | Go, idiomatic for hermetic builds |
+| Lockfile-pinned | Version + content hash | Cargo, Go, npm, Pip (§4.1) |
+| Ecosystem-scale rebuild verification | Rebuild published package and compare with upstream artifact | OSS Rebuild (§4.7) |
+| Cryptographic build provenance | Keyless OIDC signing + transparency log + in-toto/SLSA attestation | Sigstore + SLSA + cosign (§4.8) |
+| Content-addressed build derivation | Hermetic sandbox + narHash | Nix flakes, Guix (§4.6) |
+| Combinatorial variant selection | Concretisation per dependency tuple | Spack (§4.6) |
+| Vendoring | Source committed to repo | Go, idiomatic for hermetic builds (§4.4) |
 
 ---
 
@@ -445,7 +455,6 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 13. Deno security and permissions — https://docs.deno.com/runtime/fundamentals/security/
 14. Deno blog — JSR Q4 update — https://deno.com/blog/jsr_q4
 
-
 ### Chapter 4 — Build Systems, Workspaces, Lockfiles, and Registries
 
 1. Cargo — `Cargo.toml` vs `Cargo.lock` — https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
@@ -471,3 +480,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 21. OSS Rebuild repository — https://github.com/google/oss-rebuild
 22. OSS Rebuild site — https://oss-rebuild.dev/
 23. Google Security Blog — Introducing OSS Rebuild — https://security.googleblog.com/2025/07/introducing-oss-rebuild-open-source.html
+24. Sigstore project — https://www.sigstore.dev/
+25. SLSA — Supply-chain Levels for Software Artifacts — https://slsa.dev/
+26. cosign repository — https://github.com/sigstore/cosign
+27. GitHub Artifact Attestations — https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds
+28. OpenSSF — Where Does Your Software (Really) Come From? — https://openssf.org/blog/2024/05/17/where-does-your-software-really-come-from/

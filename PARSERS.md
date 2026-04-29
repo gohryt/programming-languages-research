@@ -1022,6 +1022,7 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 13. Lessons Learned from Developing the MontiCore Language Workbench: Challenges of Modular Language Design — https://dl.acm.org/doi/10.1145/3732771.3742717
 14. SDF3 bibliography (Spoofax) — https://www.spoofax.dev/background/bibliography/sdf3/
 15. JetBrains MPS FAQ — https://www.jetbrains.com/help/mps/mps-faq.html
+16. Beckmann et al. — Partial Parsing for Structured Editors — https://dl.acm.org/doi/10.1145/3567512.3567522
 
 ### Chapter 8 — Community Marginalia Worth Mining
 

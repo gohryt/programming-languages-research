@@ -18,6 +18,9 @@ Ownership systems make memory safety a static type-system property by enforcing 
 - **Pony** — six-capability lattice;
 - **Linear Haskell** — multiplicity-polymorphic arrows;
 - **Idris 2 / Granule / Clean** — multiplicity, graded modal, and uniqueness systems.
+- **OxCaml** — modal types (locality / uniqueness / affinity) layered on OCaml's GC;
+- **Inko** — single ownership + Erlang-style processes;
+- **Move (Aptos/Sui)** — resource-types-with-abilities (the type-system perspective is canonical at `TYPES.md §12.5`); from a memory-discipline angle, Move's resources are the largest production deployment of linearity-as-asset-protection in any language, with a mandatory bytecode verifier enforcing the discipline at the trust boundary.
 
 Each picks a different point on the annotation-burden / inference-power / expressiveness triangle.
 
@@ -116,6 +119,32 @@ Three adjacent mechanisms worth naming as a group, none requiring full per-entry
 **Idris 2** (Edwin Brady) uses **Quantitative Type Theory**: every binder has a multiplicity 0 / 1 / ω, where 0 = erased at runtime, 1 = used exactly once, ω = unrestricted. Unifies linearity *and* erasure: types are 0-quantity; runtime values are 1 or ω. **Granule** combines linear types with **graded modal types** — `a [n]` says "use `a` exactly `n` times" where `n` ranges over a user-chosen semiring (naturals, intervals, security levels), generalizing linear `!` to track fine-grained co-effects. **Clean uniqueness types** (since the 1990s) use `*T` for "no other reference exists, destructive update is safe"; semantically distinct from linearity (Clean is about graphs, linearity about lambda terms; uniqueness is about the past, linearity about the future).
 
 Sources: https://arxiv.org/abs/2104.00480 and https://granule-project.github.io/ and https://wiki.clean.cs.ru.nl/download/html_report/CleanRep.2.2_11.htm
+
+### 1.13. OxCaml — Modal Memory Management for OCaml
+
+Jane Street's **OxCaml** branch (Lorenzen, Dolan, White et al.; "Oxidizing OCaml with Modal Memory Management", ICFP 2024) retrofits Rust-style ownership onto OCaml without abandoning the language's tracing GC. The mechanism is **three orthogonal mode axes** attached to every binding:
+
+- **Locality** (`local` vs `global`): a `local` value is allowed to allocate on the call's stack frame and may not escape it; `global` values may escape and are heap-allocated under GC. The compiler statically rejects programs that try to return a `local` from a function or store one in a heap data structure.
+- **Uniqueness** (`unique` vs `shared`): a `unique` value has no aliases; the compiler can rewrite operations on it in place (the equivalent of Lean 4's `isExclusive`-guarded mutation §3.6, but proven statically rather than checked at runtime).
+- **Affinity** (`affine` vs `many`): an `affine` value can be used at most once; `many` values are unrestricted. Affinity composes with uniqueness to recover Rust-style move semantics for resource handles (file descriptors, mutex tokens) within an otherwise GC'd language.
+
+The combinations form a small mode lattice; arrow types carry mode annotations on parameters and results (`f : 'a @ local -> 'b @ unique`). The compiler infers most mode usage; explicit annotations are needed at the API boundary. OxCaml ships an `exclave_` keyword that lets `local` values escape *into* a parent stack frame when the call structure permits, recovering the equivalent of Hylo's subscript-yields (`§1.6`) for OCaml.
+
+The architectural contribution is showing that **ownership and a tracing GC compose in one language** without choosing between them. Rust gives up GC entirely; Hylo (`§1.6`) gives up first-class references; Mojo (`§1.7`) gives up Python compatibility. OxCaml gives up nothing — existing OCaml code typechecks unchanged at the default modes (`global`, `shared`, `many`), and performance-critical code opts into the more restrictive modes for stack allocation, in-place mutation, and resource management. Status (as of 2026-04): production at Jane Street since early 2024; the OxCaml branch was open-sourced July 2025; merging the modes into mainline OCaml is being negotiated, with parts (locality/stack allocation) likelier to land first.
+
+The lesson generalises: **modes are a lower-cost retrofit path for ownership disciplines than language redesign**. A language with a sound type system can introduce locality, uniqueness, and affinity as opt-in modes without breaking existing code, with the compiler enforcing them only where annotated. For language designers considering Rust-style discipline as a feature rather than a foundation, OxCaml is the reference data point.
+
+Sources: https://blog.janestreet.com/oxidizing-ocaml-locality/ and https://blog.janestreet.com/oxidizing-ocaml-ownership/ and https://antonlorenzen.de/oxidizing-ocaml-modal-memory-management.pdf and https://oxcaml.org/documentation/stack-allocation/reference/ and https://tarides.com/blog/2025-07-09-introducing-jane-street-s-oxcaml-branch/
+
+### 1.14. Inko — Single Ownership with Erlang-Style Processes
+
+Yorick Peterse's **Inko** is the closest production language to "Rust's ownership + Erlang's processes" — single-ownership with deterministic destruction, no shared mutable state across processes, message passing with ownership transfer, and a Rust-implemented runtime targeting native code via LLVM. Where Pony (`§1.10`) layers a six-capability lattice on top of an actor runtime, Inko picks the simpler discipline: every value has exactly one owner, sending a value over a channel transfers ownership to the receiver, and receivers cannot share their state back without explicitly cloning.
+
+The runtime uses **lightweight processes** (similar to Erlang's, BEAM `§6.9`) scheduled cooperatively across an OS thread pool; messages cross processes by ownership move, eliminating the shared-heap data races that motivate Pony's reference capabilities. Garbage collection is *not* required for the ownership discipline (Inko's runtime uses RC for cyclic references inside one process), so allocation and reclamation are deterministic and the compiler can reason about resource lifetimes statically.
+
+Distinct from Pony: no capability lattice — every value is "owned by one process" and that's the entire discipline. Distinct from Rust: no borrow checker; references are not first-class, and "borrows" within a function are inferred from lexical scope rather than explicit lifetime annotations. Distinct from Erlang: static typing throughout, with HM-derived inference and explicit type annotations at module boundaries.
+
+Status (as of 2026-04): pre-1.0, actively developed since ~2015, version 0.18 released 2025. Production users few; the language's value as a design data point is the proof that **the Rust-ownership/Erlang-process combination is a coherent design choice** without committing to either the borrow checker's complexity or the BEAM's runtime. Sources: https://inko-lang.org/ and https://docs.inko-lang.org/manual/master/getting-started/concurrency/ and https://github.com/inko-lang/inko
 
 ---
 
@@ -594,6 +623,47 @@ Cross-reference: the architectural lesson pairs with `REPRESENTATIONS.md §9.1` 
 
 Sources: https://openjdk.org/jeps/519 and https://wiki.openjdk.org/display/lilliput and https://shipilev.net/jvm/objects-inside-out/ and https://openjdk.org/jeps/450
 
+### 6.19. Iso — Request-Private Garbage Collection (PLDI 2025)
+
+Tianle Qiu and Stephen M. Blackburn's **Iso** (PLDI 2025; ANU/Google) is the first request-private garbage collector for Java with a competitive performance profile. The mechanism: each request running on the JVM gets its own *request-private heap region*; when the request completes, its private region is reclaimed wholesale without any thread-local-to-shared-heap promotion. This is the GC analogue to Erlang's per-process heaps (§6.9) — each request lives in its own GC universe — but adapted to Java's shared-mutable-heap reality through **opportunistic copying**: allocations stay request-private when no shared references reach them, and only escape to the shared heap when sharing is observed.
+
+The architectural trick is using **Immix's mark-region heap structure** (§6.1) as the substrate. Immix already partitions the heap into 32 KB blocks; Iso assigns whole blocks to requests at allocation time and reclaims them on request completion. Cross-request references force promotion of the source object to the shared heap, but in measurement on real Java workloads (microservices, REST handlers, Spring Boot apps) the vast majority of allocations remain request-local and are reclaimed with zero tracing.
+
+The reported result: for request-shaped workloads, Iso outperforms OpenJDK G1 (§6.6) by significant margins on both throughput and tail latency, because most allocation/reclamation cycles bypass the global GC entirely. The lesson generalises: **for languages and runtimes serving request/response workloads, partitioning the heap by request is a more direct lever than tuning a global concurrent collector**. Web frameworks have approximated this with object pools and arena allocators per request; Iso brings it into the GC itself, transparently to the application.
+
+Status (as of 2026-04): research-grade, with an artifact at the PLDI 2025 proceedings. Production deployment in OpenJDK or Azul Prime is the natural next step but not yet announced. The architectural pattern — request-scoped heap regions with opportunistic escape to a shared heap — is reusable beyond Java for any GC'd request-shaped runtime.
+
+Sources: https://www.steveblackburn.org/pubs/papers/iso-pldi-2025.pdf and https://dl.acm.org/doi/10.1145/3729285 and https://pldi25.sigplan.org/details/pldi-2025-papers/36/Iso-Request-Private-Garbage-Collection
+
+### 6.20. Arborescent Garbage Collection — Synchronous Immediate Cycle Collection (ISMM 2025)
+
+Lahaie-Bertrand, Oest O'Leary, Melançon, Feeley, and Monnier's **Arborescent GC** (ISMM 2025 Best Paper) addresses the long-standing weakness of reference counting (§3): cycles either leak (ARC, Lobster) or require a separate cycle-collection phase (ORC, Bacon trial-deletion) introducing latency spikes. Arborescent GC instead reclaims unreachable cyclic structures **immediately and synchronously** at the moment the last external reference is dropped, using a dynamic-graph reachability algorithm inspired by Even and Shiloach's classical decremental-connectivity work.
+
+The mechanism: every object maintains an **arborescence** — a spanning tree of incoming references rooted at a globally-reachable anchor. When an edge is removed, the algorithm checks whether the affected subtree can still reach the root via any remaining edge; if not, the entire subtree is unreachable and is reclaimed immediately. The cost per edge update is bounded (related to the subtree's structure, not the heap size); cycles are *not* a special case — they are reclaimed by the same algorithm as acyclic structures.
+
+Compared to existing RC + cycle collectors:
+- **Bacon trial-deletion** (used in ORC, CPython): reclaims cycles asynchronously in batched scans; introduces unpredictable latency spikes.
+- **Backwards reference counting** (Vale-style generational refs): defers reclamation entirely; requires explicit programmer cooperation.
+- **Mark-and-sweep over RC** (some Lisp implementations): a separate full traversal; defeats RC's incremental property.
+
+Arborescent GC reclaims with **bounded latency** in the strict real-time sense — every edge update is processed in time proportional to the size of the affected subtree, not the heap. The trade-off is bookkeeping: every object carries arborescence pointers, and edge updates are more expensive than plain RC's `inc`/`dec`. The empirical evaluation in the paper shows the technique competitive with mature tracing collectors on JavaScript-style workloads while delivering Erlang-class predictability.
+
+The lesson: **for languages where deterministic memory behaviour matters more than peak throughput** (real-time, embedded, financial trading), incremental cycle reclamation via dynamic-graph reachability is now a practical alternative to either pure RC + leak-on-cycles or RC + asynchronous trial-deletion. Status (as of 2026-04): research-grade, ISMM 2025 Best Paper artifact.
+
+Sources: https://oestoleary.com/papers/ISMM25.pdf and https://dl.acm.org/doi/10.1145/3735950.3735953 and https://www.iro.umontreal.ca/~feeley/papers/LahaieBertrandOestOLearyMelanconFeeleyMonnierISMM25.pdf
+
+### 6.21. Eclipse OMR — Pluggable Multi-Language Runtime Toolkit
+
+IBM's **Eclipse OMR** is the open-source extraction of the J9 JVM's runtime components (GC framework, JIT compiler, port library, threading, diagnostic) into a language-agnostic toolkit. Originally built for J9 Java, OMR now serves as the runtime substrate for **OpenJ9** (IBM's drop-in JVM alternative to HotSpot), **Eclipse Omega VM**, and several research/production projects retrofitting GC and JIT capabilities onto languages without their own runtime: **OMR Ruby+** (a Ruby integration with GC and JIT acceleration), **SOM++** (a Smalltalk dialect), and various OMR-based DSL runtimes. JitBuilder is the OMR component that lets a language frontend describe its semantics declaratively and get a JIT-compiled implementation without writing a backend.
+
+**OpenJ9** is the production-grade IBM JVM that consumes OMR as its runtime substrate. Distinct from HotSpot (the OpenJDK default), OpenJ9 ships in IBM Semeru Runtimes and several enterprise Java distributions, with its primary differentiation in **AOT compilation via Shared Class Cache** (a per-machine cache of compiled classes shared across JVM instances), aggressive memory-footprint optimisation (typically 30–60% lower heap-after-startup than HotSpot on equivalent workloads), and an architecture that lets Garbage Collection policy be selected per workload (`-Xgc:concurrentScavenge`, `-Xgc:gencon`, `-Xgc:metronome`, `-Xgc:balanced`). The Shared Class Cache is conceptually similar to .NET R2R (`COMPILERS.md §30.1`) and Project Leyden (`COMPILERS.md §30.2b`) — pre-compiled native code amortised across runs — but OpenJ9's predates Leyden by over a decade and operates at a different granularity (per-class, machine-wide cache).
+
+The architectural contribution is the **decoupling of runtime services from language semantics**: GC, threading, JIT, and diagnostics are reusable libraries with well-defined interfaces, and a new language implementation can pick which to consume rather than building each from scratch. This is similar in spirit to MMTk (§6.3) for GC alone, but OMR is broader (also covers JIT, port library, threading) and originated from production J9 code rather than research prototypes.
+
+Status (as of 2026-04): actively maintained at github.com/eclipse-omr/omr; production via OpenJ9. The lesson: **a language designer building a new managed runtime should evaluate OMR + JitBuilder before writing GC and JIT from scratch**, much as a frontend designer evaluates LLVM before writing a backend. The cost is OMR's specific APIs and assumptions; the benefit is decades of production-tested GC and JIT engineering.
+
+Sources: https://github.com/eclipse-omr/omr and https://eclipse.dev/omr/starter/whatisomr.html and https://projects.eclipse.org/projects/technology.omr
+
 ---
 
 ## 7. General-Purpose Allocators
@@ -686,6 +756,18 @@ Most subsequent allocators (jemalloc, tcmalloc) cite Hoard as ancestor. Worth na
 
 Sources: https://people.cs.umass.edu/~emery/pubs/berger-asplos2000.pdf and https://emeryberger.github.io/Hoard/
 
+### 7.11b. Linux folio + mTHP — OS-Level Memory Management Refactoring (2022–2026)
+
+Every userspace allocator in this chapter sits on top of OS page allocation. Two parallel Linux kernel efforts have reshaped that substrate in 2022–2026 and matter for any language runtime targeting Linux.
+
+The **folio refactoring** (Matthew Wilcox et al., merged starting Linux 5.16, 2022) replaces uses of `struct page` (the kernel's per-page metadata) with `struct folio` — a typed handle representing a contiguous physically-aligned run of pages. Where `struct page` conflated single-page and multi-page (compound) cases ambiguously, requiring runtime checks throughout the kernel, `struct folio` makes the typing explicit. The 2025 milestone is moving `struct folio` to be allocated independently of `struct page`, eliminating a long-standing memory-management ambiguity. The lesson for language runtime designers: **the OS-level page metadata you allocate on top of is moving from "single page or maybe compound" to "explicit-size folio"**, which makes huge-page-aware allocators (TCMalloc + Temeraire §7.3, jemalloc with hugepage hints §7.4) cleaner to implement.
+
+**Multi-size Transparent Huge Pages (mTHP)** (merged Linux 6.6+, 2023+) extends Transparent Huge Pages (THP) — which previously gave only PMD-sized 2 MB pages — to allocate folios of *intermediate* sizes (16 KB, 32 KB, 64 KB, 128 KB, 256 KB, 512 KB, 1 MB) called "anonymous mTHP." This is critical because the binary choice between 4 KB pages (no TLB benefit) and 2 MB pages (memory waste, allocation pressure) was poor for many workloads. mTHP fills the middle. UEK8 documentation reports 5–20% performance improvements on mixed workloads from mTHP enablement; ARM64 work in Linux 6.17 (2025) optimised khugepaged for batched PTE operations on large folios.
+
+The runtime-design implication: **allocator designs that explicitly cooperate with the OS page-size hierarchy (4 KB → multi-size mTHP → 2 MB THP → 1 GB hugepages) outperform allocators that assume one page size everywhere**. TCMalloc's Temeraire backend (§7.3) is the production existence proof. For new language runtimes, exposing explicit large-allocation paths (`std.mem.Allocator` policy hints in Zig, allocator zones in C3) lets runtime code request mTHP-friendly sizes when allocation patterns warrant.
+
+Sources: https://blogs.oracle.com/linux/intro-to-folios and https://lwn.net/Articles/1015320/ and https://blogs.oracle.com/linux/uek8-a-few-notable-changes-in-the-core-kernel and https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
+
 ### 7.12. Language-Level Allocator APIs — Zig, Odin, C3, Jai, Beef, Hare, D
 
 A separate design axis from allocator internals is **how a language routes allocation authority through ordinary code**. Zig, Odin, C3, Jai, Beef, Hare, and D are useful because they make allocation policy visible at the language/library boundary rather than treating `malloc` as ambient global state.
@@ -715,6 +797,25 @@ The reusable design space:
 - **D model** — allocator building blocks and wrappers as a library.
 
 Sources: https://zig.guide/standard-library/allocators/ and https://github.com/ziglang/zig/blob/master/lib/std/heap.zig and https://odin-lang.org/docs/overview/ and https://pkg.odin-lang.org/base/runtime/ and https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin and https://c3-lang.org/language-common/memory/ and https://c3-lang.org/misc-advanced/debugging/ and https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md and https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced and https://www.beeflang.org/docs/language-guide/memory/ and https://docs.harelang.org/rt and https://harelang.org/documentation/usage/freestanding.html and https://dlang.org/phobos/std_experimental_allocator.html and https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
+
+### 7.13. V (Vlang) — Memory Mode as Compiler Flag
+
+V (Alex Medvednikov, since 2019) takes a position the §7.12 entries don't: it exposes **four orthogonal memory modes** as command-line flags, letting the user pick the discipline at compile time without committing the language source to one model. Where Zig is "always explicit allocator parameter" and Odin is "implicit context allocator," V is "your choice — compile flag picks the model."
+
+The four modes:
+
+- **Default — minimal tracing GC**: a small, well-performing tracing collector. The default ergonomic choice for general-purpose application code.
+- **`-autofree`**: the compiler statically inserts `free()` calls during compilation for ~90–100% of objects (Lobster-influenced — see `§3.3`). The remaining small fraction (objects whose lifetime escapes static analysis) is handled by the GC, or by reference counting in some V documentation versions. Programmers can mark functions `[manualfree]` to opt out per function. Status (as of 2026-04): autofree is experimental, with V 1.0 stabilisation as the planned milestone.
+- **`-prealloc`**: arena allocation tuned for short-lived single-threaded batch workloads (compilers, build tools, batch data processing). Allocation is bump-pointer; deallocation is end-of-program reset.
+- **`-gc none`**: full manual via `C.malloc`/`C.free` exposed as builtins; the developer takes complete responsibility.
+
+Three less-flagship modes round it out: `[heap]` struct attribute forces heap allocation per type, `&MyStruct{...}` per-call-site heap allocation, and `[manualfree]` opts a single function out of autofree. The `-b wasm -autofree -gc none` combination produces WASM output with neither GC nor explicit allocator — useful for embedded WASM targets where GC would cost too much.
+
+The architectural lesson generalises: **a language can expose memory-mode choice as a build flag rather than as a language commitment**. Lobster (`§3.3`) hard-codes "lifetime analysis + bump arena" as its model; Rust hard-codes ownership; Go hard-codes GC. V hard-codes nothing — the same source compiles into a GC binary, an autofree binary, an arena binary, or a manual-malloc binary. The cost is that the source code style must remain conservative (no relying on a specific lifetime model), and autofree as the most ambitious mode is still experimental. The benefit is unusual deployment flexibility: the same V codebase serves a server (default GC), a batch tool (prealloc), an embedded WASM module (manual), and a long-lived service (autofree once stable) without source-level rewrites.
+
+V's multiple backends (C as default, Go, JS in browser/Node/freestanding variants, native x64/arm64, WebAssembly) compose with the memory-mode choice — the same source can target a native binary with GC and a WASM module without GC from one codebase. Status (as of 2026-04): V is pre-1.0 (~v0.4.x at the time of writing), with autofree stabilisation gating the 1.0 milestone. The mode-as-flag design is established and the language has built itself with this discipline since inception.
+
+Sources: https://docs.vlang.io/memory-management.html and https://vlang.io/ and https://github.com/vlang/v/discussions/18374
 
 ---
 
@@ -884,6 +985,16 @@ Facebook's production C++ hazard pointers — thread-cached `hazptr_rec`s, RAII 
 
 Source: https://github.com/facebook/folly/blob/main/folly/synchronization/Hazptr.h
 
+### 9.13. RRR-SMR — Reduce, Reuse, Recycle for Lock-Free Data Structures (PLDI 2025)
+
+Nikolaev, Boyle, et al.'s **RRR-SMR** ("Reduce, Reuse, Recycle: Better Methods for Practical Lock-Free Data Structures", PLDI 2025) addresses a fundamental limitation of every SMR scheme in §§9.1–9.12: existing safe-memory-reclamation methods only allow *reclamation* of retired memory (return to the allocator), not *reuse* (in-place rebirth as a different node of the same type within the data structure). Reuse is dramatically more efficient than reclaim-and-reallocate because it avoids allocator round-trips, but unsafe under naive SMR — a stale reader holding a pointer to the old value would see the new value and break invariants.
+
+The RRR contribution is a general method of **constructing data structures whose nodes can be safely recycled** under SMR by reasoning about which fields must be left untouched while a stale reader could observe them. The mechanism uses *generation tags* in node headers that retired nodes carry into reuse, plus a discipline ensuring reuses are visible to stale readers as inert "tombstone" states rather than as inconsistent live nodes. Combined with HE/IBR/Hyaline-class SMR schemes (§§9.5, 9.6, 9.8), RRR-recycled data structures outperform classical SMR-based ones on contention-heavy workloads where allocation pressure dominates.
+
+The lesson generalises: **SMR research has converged on bounded retention; the next frontier is bounded reuse-vs-reclaim cycles**. For language designers building lock-free data structures into a language runtime (channels, lock-free queues, work-stealing deques), RRR-SMR is the current best technique for combining safe reader-side discipline with allocation-pressure-friendly reuse.
+
+Sources: https://dl.acm.org/doi/10.1145/3729337 and https://pldi25.sigplan.org/details/pldi-2025-papers/88/RRR-SMR-Reduce-Reuse-Recycle-Better-Methods-for-Practical-Lock-Free-Data-Structur and https://zenodo.org/records/15110373
+
 ---
 
 ## 10. Capability-Based Memory and Authority
@@ -988,6 +1099,9 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Six reference capabilities | rcap per reference | Sendable subset by construction | Data-race freedom static | Pony (§1.10) |
 | Multiplicity-polymorphic arrows | `%m ->` arrows | Polymorphism over linearity | Code reuse vs. opt-in | Linear Haskell (§1.11) |
 | Quantitative type theory / graded modal | 0/1/ω or semiring | Unifies linearity + erasure | Academic; small ecosystem | Idris 2, Granule, Clean (§1.12) |
+| Modal memory management | Locality + uniqueness + affinity modes | Stack alloc + reuse + borrow on a GC base | Production retrofit at Jane Street | OxCaml (§1.13) |
+| Single ownership + actor processes | Move-on-send across processes | Erlang-style isolation with static types | Pre-1.0 ecosystem | Inko (§1.14) |
+| Resource-with-abilities | Linear/copy/drop/key/store ability lattice | Mandatory bytecode verifier at trust boundary | Largest production deployment of linearity | Move (Aptos/Sui) (`TYPES.md §12.5`) |
 
 ### 11.2. Region-based memory management
 
@@ -1064,6 +1178,9 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Concurrent mark-sweep without compaction | Low-ms STW initial/final mark | Concurrent marking + sweeping | Fragmentation accumulates → eventual STW Full GC | HotSpot CMS / ParNew (deprecated) (§6.16) |
 | Value-class flattening retrofitted onto JVM | Inline classes + null-restricted types + primitive generics | 2–5× memory reduction on small-struct workloads | 12+ year retrofit; loses object identity | Project Valhalla (preview JDK 25+) (§6.17) |
 | 8-byte JVM object header | Class pointer compressed to 22 bits + 42-bit mark word | 5–15% heap reduction; better cache locality | Required biased-locking removal first; tooling updates | Project Lilliput / JEP 519 (JDK 25) (§6.18) |
+| Request-private GC | Per-request mark-region heap on Immix substrate | Bypasses global GC for request-local allocations | Research-grade; PLDI 2025 | Iso (§6.19) |
+| Synchronous immediate cycle collection | Arborescence (dynamic-graph reachability) | RC + cycle reclamation in bounded time | Per-edge bookkeeping cost | Arborescent GC (ISMM 2025) (§6.20) |
+| Pluggable language-agnostic runtime toolkit | GC + JIT + threading as reusable libraries | Decades of J9-tested engineering in OSS | OMR-specific APIs and assumptions | Eclipse OMR (§6.21) |
 
 ### 11.7. General-purpose allocators
 
@@ -1092,6 +1209,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Allocation-expression allocator control | High for object-style code | Medium | Global, scoped, or custom allocation | Beef (§7.12) |
 | Runtime heap replacement | Moderate | Low-medium | Good freestanding story, weak per-library policy | Hare (§7.12) |
 | Composable allocator building blocks | Low for casual users | High for experts | Toolkit over one blessed policy | D `std.experimental.allocator` (§7.12) |
+| Mode-as-compiler-flag (`-autofree`/`-prealloc`/`-gc none`) | High default; specialised modes via flags | Low to high | Single source compiles under different policies; mode-specific bug surface | V (Vlang) (§7.13) |
 
 ### 11.9. Verified memory safety
 
@@ -1125,6 +1243,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | VBR | Optimistic versioning | Immediate reuse | Lock-free typed allocator | (§9.10) |
 | NBR | EBR fast + signal handshake | Bounded (HP-grade) | Lock and lock-free DS | (§9.11) |
 | Folly hazptr | Production HP | Bounded | C++26 reference impl | (§9.12) |
+| RRR-SMR (PLDI 2025) | Bounded; recycling rather than reallocation | Generation-tagged tombstones for safe reuse | Lock-free DS contention-heavy workloads | (§9.13) |
 
 ### 11.11. Capability-based memory
 
@@ -1185,6 +1304,14 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 33. Borretti — "How capabilities work in Austral" — https://borretti.me/article/how-capabilities-work-austral
 34. Pony capability matrix — https://tutorial.ponylang.io/reference-capabilities/capability-matrix.html
 35. Clean language report 2.2 — https://wiki.clean.cs.ru.nl/download/html_report/CleanRep.2.2_11.htm
+36. Lorenzen et al. — Oxidizing OCaml with Modal Memory Management (ICFP 2024) — https://antonlorenzen.de/oxidizing-ocaml-modal-memory-management.pdf
+37. Jane Street — Oxidizing OCaml: Locality — https://blog.janestreet.com/oxidizing-ocaml-locality/
+38. Jane Street — Oxidizing OCaml: Ownership — https://blog.janestreet.com/oxidizing-ocaml-ownership/
+39. OxCaml stack-allocation reference — https://oxcaml.org/documentation/stack-allocation/reference/
+40. Tarides — Introducing Jane Street's OxCaml Branch — https://tarides.com/blog/2025-07-09-introducing-jane-street-s-oxcaml-branch/
+41. Inko language home — https://inko-lang.org/
+42. Inko concurrency manual — https://docs.inko-lang.org/manual/master/getting-started/concurrency/
+43. Inko repository — https://github.com/inko-lang/inko
 
 ### Chapter 2 — Region-Based Memory Management
 
@@ -1328,10 +1455,23 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 35. Project Valhalla — https://openjdk.org/projects/valhalla/
 36. JEP 401: Value Classes and Objects (Preview) — https://openjdk.org/jeps/401
 37. Goetz — State of Valhalla, Part 1 (Background) — https://cr.openjdk.org/~briangoetz/valhalla/sov/01-background.html
+37a. State of Valhalla — Goetz talk (YouTube) — https://www.youtube.com/watch?v=XBu54ZIXIgM
 38. JEP 519: Compact Object Headers — https://openjdk.org/jeps/519
 39. OpenJDK Project Lilliput wiki — https://wiki.openjdk.org/display/lilliput
 40. Aleksey Shipilëv — "Java Objects Inside Out" — https://shipilev.net/jvm/objects-inside-out/
 41. JEP 450: Compact Object Headers (Experimental) — https://openjdk.org/jeps/450
+42. Qiu & Blackburn — Iso: Request-Private Garbage Collection (PLDI 2025) — https://www.steveblackburn.org/pubs/papers/iso-pldi-2025.pdf
+43. Iso ACM DL — https://dl.acm.org/doi/10.1145/3729285
+43a. Iso PLDI 2025 details — https://pldi25.sigplan.org/details/pldi-2025-papers/36/Iso-Request-Private-Garbage-Collection
+44. Lahaie-Bertrand et al. — Arborescent Garbage Collection (ISMM 2025) — https://oestoleary.com/papers/ISMM25.pdf
+45. Arborescent GC ACM DL — https://dl.acm.org/doi/10.1145/3735950.3735953
+45a. Arborescent GC author copy (Université de Montréal) — https://www.iro.umontreal.ca/~feeley/papers/LahaieBertrandOestOLearyMelanconFeeleyMonnierISMM25.pdf
+46. Eclipse OMR repository — https://github.com/eclipse-omr/omr
+47. What is OMR? — https://eclipse.dev/omr/starter/whatisomr.html
+48. Eclipse OMR project page — https://projects.eclipse.org/projects/technology.omr
+49. Eclipse OpenJ9 home — https://www.eclipse.org/openj9/
+50. OpenJ9 documentation — https://www.eclipse.org/openj9/docs/
+51. IBM Semeru Runtimes — https://developer.ibm.com/languages/java/semeru-runtimes/
 
 ### Chapter 7 — General-Purpose Allocators
 
@@ -1372,6 +1512,13 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 35. Hare freestanding runtime allocation hooks — https://harelang.org/documentation/usage/freestanding.html
 36. D `std.experimental.allocator` — https://dlang.org/phobos/std_experimental_allocator.html
 37. D allocator regions — https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
+38. Oracle Linux blog — Introduction to Folios — https://blogs.oracle.com/linux/intro-to-folios
+39. LWN — The state of the page in 2025 — https://lwn.net/Articles/1015320/
+40. Oracle UEK8 kernel notes (mTHP) — https://blogs.oracle.com/linux/uek8-a-few-notable-changes-in-the-core-kernel
+41. Linux Transparent Huge Pages admin guide — https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
+42. V (Vlang) Memory management — https://docs.vlang.io/memory-management.html
+43. V language home page — https://vlang.io/
+44. V `-autofree` discussion (#18374) — https://github.com/vlang/v/discussions/18374
 
 ### Chapter 8 — Verified Memory Safety
 
@@ -1417,6 +1564,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 14. Folly Hazptr — https://github.com/facebook/folly/blob/main/folly/synchronization/Hazptr.h
 15. Interval-Based Reclamation library (Rochester) — https://github.com/urcs-sync/Interval-Based-Reclamation
 16. Hyaline reference implementation (lfsmr) — https://github.com/rusnikola/lfsmr
+17. Nikolaev et al. — RRR-SMR: Reduce, Reuse, Recycle (PLDI 2025) — https://dl.acm.org/doi/10.1145/3729337
+18. RRR-SMR PLDI 2025 abstract — https://pldi25.sigplan.org/details/pldi-2025-papers/88/RRR-SMR-Reduce-Reuse-Recycle-Better-Methods-for-Practical-Lock-Free-Data-Structur
+19. RRR-SMR Zenodo artifact — https://zenodo.org/records/15110373
 
 ### Chapter 10 — Capability-Based Memory and Authority
 

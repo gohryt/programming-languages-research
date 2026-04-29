@@ -8,6 +8,8 @@ Ownership boundary: memory-safety and ownership models belong in `MEMORY.md`; ty
 
 ## 1. Scope and Design Axes
 
+This chapter names the recurring axes along which concurrency designs differ. None of these axes is binary in practice — almost every real runtime makes a different trade-off on each — but separating them clarifies what each later chapter is optimising for. The axes are not ordered by importance; they are ordered by how visible the choice becomes at the source-language level.
+
 ### 1.1. Parallelism vs concurrency
 
 Concurrency is about managing multiple in-flight computations; parallelism is about executing computations at the same time. A single-threaded event loop can be highly concurrent without parallelism. A fork-join computation can be highly parallel without exposing long-lived concurrent identities to the programmer.
@@ -67,6 +69,8 @@ Nathaniel Smith's Trio nursery model emphasizes that a nursery block does not ex
 ---
 
 ## 2. Historical Through-Line, 1960–2026
+
+The concurrency design space accumulated by recombination rather than by replacement: the actor model, CSP channels, monitors, work-stealing, STM, async/await, and effect handlers each emerged in a different decade and now coexist in modern runtimes. This chapter traces the through-line from 1960s OS-process abstractions to the 2020s' virtual threads and effect-handler runtimes, identifying where each idea entered the lineage and which subsequent designs absorbed or reacted against it. The chapter is shorter than the chapters that follow because each entry is a pointer to where the topic is treated in depth elsewhere in the document.
 
 ### 2.1. 1960s–1970s — Processes, monitors, CSP, actors, and coroutines
 
@@ -157,6 +161,8 @@ Cilk established the theoretical foundations and inspired many modern runtime sc
 An event-loop runtime maintains a set of ready tasks and I/O interests. When the OS reports readiness or completion, the runtime wakes the corresponding tasks. This model powers JavaScript runtimes, libuv systems, Python async frameworks, and many Rust executors.
 
 Event-loop schedulers are efficient for I/O-bound workloads but must prevent CPU-bound tasks from starving the loop. They need explicit blocking pools, cooperative yielding, or preemption support.
+
+A distinctive Rust subfamily is the **thread-per-core io_uring runtimes** — **Glommio** (Datadog, originally for ScyllaDB-adjacent workloads) and **Monoio** (Bytedance, similar design). Each worker thread runs its own independent single-threaded event loop bound to a specific CPU core via affinity, with its own io_uring instance for asynchronous I/O. Inter-core coordination is by explicit message passing through bounded channels rather than by work-stealing across a shared scheduler. Distinct from Tokio's M:N work-stealing model (`§3.2`-style) where futures freely migrate between worker threads: Glommio/Monoio futures are pinned to one core for their lifetime, eliminating cross-core synchronisation on the hot path. The trade-off is sharp — perfect cache locality and zero shared-state contention, at the cost of needing to manually balance work across cores when the workload isn't naturally per-connection or per-shard. Production use: ScyllaDB-class databases where every connection is a long-lived shard owner, Cloudflare's pingora proxy variants, and Bytedance internal services. Distinct from ActiveJ Eventloop + Workers (`§3.12`): ActiveJ's primary/worker topology balances *connections* across worker eventloops at accept time and lets each worker run arbitrary code; Glommio/Monoio expect the application to organise itself around per-core ownership of long-lived state. Sources: https://github.com/DataDog/glommio and https://github.com/bytedance/monoio
 
 ### 3.5. Actor schedulers
 
@@ -254,6 +260,41 @@ Status (as of 2026-04): oneTBB is part of the **oneAPI specification** (UXL Foun
 The lesson generalises: **a task-parallelism library can substitute for a parallel-programming language extension** (OpenMP) when the host language has sufficient template / generics machinery to express scheduling abstractions ergonomically. C++ has it; C does not, which is why C codebases tend to use OpenMP and C++ codebases can choose between TBB, OpenMP, and `std::execution`.
 
 Sources: https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html and https://github.com/uxlfoundation/oneTBB and https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/
+
+### 3.11. Bend / HVM2 — Interaction Combinator Runtime as Implicit Parallelism
+
+Victor Taelin's **Bend** (Higher Order Company, 2024) and its underlying runtime **HVM2 (Higher-Order Virtual Machine 2)** sit in a different corner of the parallelism design space from every other entry in this chapter. Where Go (§3.2), Cilk (§3.3), GHC sparks (§3.7), OpenMP (§3.9), and TBB (§3.10) all multiplex *explicit* tasks/threads/work-items onto cores, HVM2 treats every program as a graph of **interaction combinators** (Lafont 1997) — small first-order rewrite rules with the property that **non-overlapping rewrites are always commutative** — and parallelises by detecting those non-overlapping reductions and executing them simultaneously across CPU cores or GPU lanes.
+
+The mechanical core: a Bend program compiles to an HVM2 net (a graph of typed nodes with directed ports). The runtime repeatedly scans for **active pairs** (two nodes whose principal ports are connected) and rewrites each pair according to its interaction rule. Because interaction-combinator semantics guarantee that disjoint active pairs never interfere, the runtime can fire thousands of rewrites in parallel without locking, scheduling, or memory-ordering subtleties. HVM2's CUDA backend executes one rewrite per warp lane on Nvidia GPUs; the C backend uses atomics on x86-64 multicore. The published 2024 paper reports near-linear speedup with core count on benchmarks ranging from list operations to symbolic differentiation — workloads with no parallel annotations of any kind.
+
+The trade-off is real and worth naming: interaction-net evaluation pays a constant-factor overhead vs ordinary execution (every operation is a graph rewrite, not an inline machine instruction), so a sequential Bend program is slower than a sequential C program even on one thread. The bet is that on workloads with abundant intrinsic parallelism, the GPU's thousands of lanes more than compensate. Distinct from Cilk-style work stealing (§3.3), which still requires programmers to identify spawnable tasks; distinct from OpenMP pragmas (§3.9), which require declaring loop-parallel regions; distinct from data-parallel languages (Halide, Triton — `COMPILERS.md §15`), which require expressing computation as parallel array kernels. HVM2's contribution is making **arbitrary higher-order functional programs** parallel without the programmer naming the parallelism.
+
+Status (as of 2026-04): Bend is research-grade; the standard library is small, ecosystem is nascent, and the constant-factor cost makes it unsuitable for the kind of fine-grained sequential code Rust or C target. As an existence proof that a non-explicit-parallelism programming model can scale to GPUs without programmer annotation, however, it is the most original parallel-runtime data point of the 2020s. The compile-target IR (interaction combinator graphs) is treated separately in `REPRESENTATIONS.md §13.11`; the GPU compilation pipeline angle is in `COMPILERS.md §15.6`.
+
+Sources: https://github.com/HigherOrderCO/Bend and https://github.com/HigherOrderCO/HVM2 and https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf and https://higherorderco.com/
+
+### 3.12. ActiveJ Eventloop + Workers — Primary/Worker Reactor Topology on the JVM
+
+ActiveJ (SoftIndex Lab; current v6.0-rc2) takes a Node.js-shaped single-threaded event-loop reactor and combines it with a **multi-reactor balancing topology** that sits between pure event-loop schedulers (§3.4) and full M:N goroutine runtimes (§3.2). The `Eventloop` class is a single-threaded NIO reactor with a tick loop, a task queue, scheduled-task heap, and `Selector.select()` as the only blocking call — structurally identical to Node.js's libuv loop or a single-threaded Tokio runtime. What's distinctive is the topology layered above.
+
+The **Workers + WorkerPoolModule** mechanism splits an application into a **Primary Reactor** thread and N **Worker Reactor** threads. The Primary accepts incoming connections on listen sockets via `PrimaryServer`, then redistributes each accepted socket to a worker via thread-safe handoff; each Worker runs its own independent `Eventloop` in its own OS thread, processes the I/O for the connections it owns, and never shares mutable state with other workers. Cross-worker communication is by message passing (`Reactor.submit()` posts a task to another reactor's queue) plus thread-safe singleton services injected via the DI graph. Because workers don't share heap state, there is no per-request synchronisation; because each worker runs a single thread, there is no within-worker concurrency to coordinate.
+
+The architectural contribution is a *clean middle point* between four neighboring designs:
+
+- **Single eventloop (§3.4)**: one thread, one loop, one core. Node.js, single-threaded Tokio. ActiveJ is one-step richer: many independent eventloops, one per worker, balanced by a primary.
+- **M:N goroutines (§3.2)**: many goroutines multiplexed across worker threads, but with a *shared heap* and runtime-stolen work. ActiveJ rejects the shared heap and the work-stealing scheduler.
+- **Akka actors (§6.7)**: many actors, each single-threaded internally, message-passing. ActiveJ's workers behave identically *at the worker boundary*, but each worker is an Eventloop with arbitrary code rather than an actor with a mailbox.
+- **Erlang/BEAM (§6.2)**: many isolated lightweight processes per scheduler. ActiveJ has fewer, heavier units (one per OS thread) but the same isolation guarantee.
+
+The trade-off position: ActiveJ commits to **per-worker single-threaded code with no within-worker concurrency**, in exchange for **cross-worker isolation without runtime overhead**. The Primary Reactor handles connection-level load balancing; each Worker handles its connections with the latency and predictability of a single-threaded Node.js process; multi-core scaling comes from running N workers, not from concurrent execution within one worker. The DI integration (`@Provides @Worker Foo perWorker(...)` versus `@Provides Foo singleton(...)`) makes the worker-vs-shared distinction part of the application's typed dependency graph rather than a runtime convention.
+
+Status (as of 2026-04): production-stable; v6.0-rc2 ships under Apache 2.0 from io.activej Maven coordinates. Used inside SoftIndex Lab products and a small population of external Java teams that have adopted the framework over Spring/Vert.x. The benchmark claim "millions of HTTP requests per second per server" matches this topology — N workers each running a single-threaded eventloop scale linearly with cores up to roughly the number of cores on the box.
+
+The compiler-side techniques that make ActiveJ's hot paths competitive — runtime bytecode generation via ActiveJ Codegen and instance-to-static-class rewriting via ActiveJ Specializer — live in `COMPILERS.md §13.10` and `COMPILERS.md §17.4`. The runtime topology described here is independent of those techniques; a language designer could adopt the primary/worker topology without the codegen + specializer stack, or vice versa.
+
+The lesson generalises: **for I/O-bound services where per-request isolation is the dominant correctness concern**, the primary/worker topology over isolated single-threaded reactors is a viable alternative to both shared-heap M:N runtimes (Go, Tokio multi-thread) and full actor systems (Akka, BEAM). The framework gets multi-core scaling from horizontal worker replication rather than from intra-worker concurrency, eliminating an entire class of races and synchronisation bugs in exchange for slightly higher coordination cost when work *must* cross worker boundaries.
+
+Sources: https://activej.io/async-io/eventloop and https://activej.io/boot/workers and https://activej.io/ and https://github.com/activej/activej
 
 ---
 
@@ -721,6 +762,8 @@ The following are recurring trade-offs visible across the surveyed systems, fram
 
 ## 14. Summary of Concurrency Techniques
 
+The following tables collapse the body chapters into three orthogonal axes — execution-unit choice, coordination mechanism, and safe-sharing strategy — that a language designer must decide independently. Rows are grouped by topical similarity within each axis rather than by body-chapter order, so directly comparable techniques (e.g., goroutines, virtual threads, fibers) sit adjacent. The Examples column anchors back to the body chapter where each technique is treated in detail.
+
 ### 14.1. Execution units and scheduling
 
 | Technique | Mechanism | Strength | Cost / risk | Examples |
@@ -741,6 +784,9 @@ The following are recurring trade-offs visible across the surveyed systems, fram
 | Eager-task async/await with context capture | `Task<T>` + `SynchronizationContext` | Auto-thread-affinity for UI/web frameworks | Eager tasks run before await; ConfigureAwait friction | C# `async`/`await` (§4.9) |
 | Pragma-driven shared-memory parallelism | Compiler pragmas + runtime thread pool | Most-deployed parallel model in HPC; one-line parallelism | Opacity; runtime-and-compiler co-dependence | OpenMP (§3.9) |
 | Library-level C++ task parallelism | Templates + work-stealing pool + concurrent containers | C++ portability; no compiler dependency | Limited to C++ host language | Intel TBB / oneTBB (§3.10) |
+| Interaction-combinator parallel runtime | Graph rewrites of disjoint active pairs | No programmer annotations; scales to GPU lanes | Constant-factor overhead; research-grade | Bend / HVM2 (§3.11) |
+| Primary/worker reactor topology | N isolated single-threaded eventloops + primary balancer | Per-worker isolation without shared-heap coordination | No within-worker concurrency; horizontal scaling only | ActiveJ Eventloop + Workers (§3.12) |
+| Thread-per-core io_uring runtime | Pinned single-thread executor per core + io_uring submission | Cache-locality, predictable latency, no cross-core contention | No work stealing; load imbalance must be handled by sharding | Glommio, Monoio (§3.4) |
 
 ### 14.2. Coordination mechanisms
 
@@ -821,6 +867,16 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 19. Intel oneTBB product page — https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html
 20. oneTBB repository (UXL Foundation) — https://github.com/uxlfoundation/oneTBB
 21. oneAPI specification — oneTBB elements — https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/
+22. Bend repository — https://github.com/HigherOrderCO/Bend
+23. HVM2 repository — https://github.com/HigherOrderCO/HVM2
+24. Taelin — HVM2: A Parallel Evaluator for Interaction Combinators — https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf
+25. Higher Order Company — https://higherorderco.com/
+26. ActiveJ Eventloop — https://activej.io/async-io/eventloop
+27. ActiveJ Workers (boot) — https://activej.io/boot/workers
+28. ActiveJ home — https://activej.io/
+29. ActiveJ repository — https://github.com/activej/activej
+30. Glommio repository — https://github.com/DataDog/glommio
+31. Monoio repository — https://github.com/bytedance/monoio
 
 ### Chapter 4 — Async/Await and Futures
 

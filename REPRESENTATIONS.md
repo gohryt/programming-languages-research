@@ -250,6 +250,8 @@ In the GraalVM Truffle framework, the language implementer writes an *AST interp
 
 This is the Futamura projection (`COMPILERS.md §1.3`) made concrete: the partial evaluator (Graal) plus the interpreter (the AST + node specializations) is the compiler. Truffle's contribution is showing that the same data structure can be both the source-faithful AST and the optimization substrate, eliminating a translation layer.
 
+Production languages on Truffle as of 2026-04: **GraalJS** (V8-replacement for Java embedding), **GraalPy** (CPython-compatible Python with claimed competitive performance to PyPy on numeric workloads, Java-embedding-friendly), **TruffleRuby** (Ruby with C-extension support), **FastR** (R), **Espresso** (Java-on-Java for sandboxing), **Sulong** (LLVM bitcode interpreter for C/C++/Fortran). The Truffle pattern proves that a **single partial-evaluator infrastructure** (Graal) hosting many language frontends produces competitive performance per language with much less per-language engineering than handwriting a JIT compiler — the "language implementation framework" thesis. The cost is the GraalVM runtime dependency and Java-VM-shaped behaviour at the host boundary; the benefit is that a small team can ship a competitive language implementation by writing only the AST interpreter and node specialisations.
+
 Source: https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/
 
 ### 4.7. Babel AST + Plugin Pipeline
@@ -487,7 +489,7 @@ Yihong Zhang et al.'s egglog combines e-graphs with Datalog. Rules are written d
 
 egglog targets workloads where the rewrite system is itself complex: program analysis, type inference, theorem proving, equational program optimization. The representation: an e-graph plus a relational database, queryable with Datalog. This is unusual enough to deserve a separate entry from egg — egg is a library; egglog is a *language* for writing rewrite systems.
 
-Source: https://github.com/egraphs-good/egglog
+Status (as of 2026-04): egglog has spawned both a **research community** (the EGRAPHS workshop, co-located with PLDI; "Destructive E-Graph Rewrites" at EGRAPHS 2025 mitigates e-graph explosion by allowing matched terms to be removed rather than retained as alternatives) and a **performance-oriented descendant**: **Oatlog** (Lukas Gustafsson, Chalmers, 2025) is an ahead-of-time-compiling e-graph engine that compiles user rewrite rules into specialised Rust code rather than interpreting them, reportedly outperforming egglog by significant margins on production rewrite systems. The lesson is the same one MLIR (§10.1) shows for IR dialects: **a domain-specific rewrite engine becomes a substrate worth specialising the compiler for**, not just a library. Sources: https://github.com/egraphs-good/egglog and https://pldi25.sigplan.org/details/egraphs-2025-papers/7/Destructive-E-Graph-Rewrites and https://odr.chalmers.se/items/a5d65db4-2cb8-4b18-a780-89feadcefa60
 
 ### 8.3. Cranelift e-Graph Mid-End
 
@@ -573,7 +575,9 @@ WebAssembly is a stack-based bytecode designed for portability and verification.
 
 Wasm's structured control flow is the design choice that distinguishes it from JVM bytecode. JVM allows arbitrary jump targets within a method, requiring stackmap frames for verification; Wasm's structured form makes verification single-pass and decoder-friendly. Cross-reference: `COMPILERS.md §24.2` covers Wasm's in-place interpreter (Virgil); here the focus is the format itself.
 
-Source: https://webassembly.github.io/spec/core/
+Status (as of 2026-04): the **Wasm GC reference types proposal** has shipped cross-browser. WasmGC adds typed `struct` and `array` heap types managed by the host's GC, plus `funcref`/`externref` reference types and downcast/upcast operations — sufficient for Java, Kotlin, Dart, Scheme, OCaml, and other GC-required languages to compile to Wasm without bundling their own GC into linear memory. Production rollout: Chrome 119 (October 2023), Firefox 120 (late 2023), Safari 18.2 (early 2025); cross-browser baseline as of 2025. The `wasm-gc` proposal is the substrate for Kotlin/Wasm, Dart Web (replacing dart2js for a class of workloads), and Scala.js' experimental Wasm backend. **WebAssembly 3.0** (drafted 2025) consolidates GC, multiple-memories, tail calls, exception handling, and 64-bit memory addressing into a single specification milestone. Cross-reference for the WASI Component Model and Preview 3 native async on top of this substrate: `MODULES.md §11.3`.
+
+Sources: https://webassembly.github.io/spec/core/ and https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md and https://devnewsletter.com/p/state-of-webassembly-2026/
 
 ### 9.9. BPF / eBPF Bytecode
 
@@ -611,7 +615,9 @@ MLIR (Lattner et al., 2020) generalizes the multi-level IR pattern: instead of a
 
 The contribution: making "the IR you want" cheap to define. Adding a new dialect for a domain (CUDA `gpu`, Linalg structured-loop, SPV for SPIR-V, Tensor) is a few hundred lines; integrating it with the rest of MLIR is automatic. This is how Mojo (§5.4), IREE, Triton, Torch-MLIR, Polygeist, and many other projects build their compilers — they don't write a compiler from scratch; they write a few dialects on top of MLIR.
 
-Source: https://mlir.llvm.org/
+Status (as of 2026-04): **ClangIR (CIR)** — an MLIR-based high-level IR for C and C++ — is the most consequential MLIR dialect added to the LLVM mainline since 2020. The ClangIR incubator was frozen for new development on February 20 2026 with the development moved fully into the LLVM monorepo; CIR is invoked via `clang -fclangir`. CIR sits between Clang's internal AST and LLVM IR, exposing C/C++ language constructs (constructors, exceptions, virtual dispatch, RAII, atomics) as MLIR operations rather than the immediate translation to LLVM IR that Clang historically performed. The motivation: Clang's traditional "AST → LLVM IR" lowering loses language-level structure that high-level analyses (ownership inference, lifetime analysis, exception-flow tracking) want, forcing those analyses to work on the AST (which is not an analysis-friendly form) or to reinvent C/C++ semantic models in their own infrastructure. CIR is the canonical fix: a structured, MLIR-based IR that retains C/C++ semantics through a chunk of the optimization pipeline before lowering to LLVM IR. This is the multi-level cascade idea (§10.3 Rust HIR/THIR/MIR) applied retroactively to C/C++. Cross-reference: `COMPILERS.md §6` will track ClangIR's optimizer-pipeline angle as it stabilises.
+
+Sources: https://mlir.llvm.org/ and https://llvm.github.io/clangir/ and https://discourse.llvm.org/t/clangir-transition-plans-for-the-clangir-incubator/89583
 
 ### 10.2. LLVM IR + Machine IR
 
@@ -821,9 +827,9 @@ Source: https://github.com/rems-project/isla
 
 See §6.8 for the full treatment. Bril is listed in this chapter because the *wire format itself is the IR* (JSON, parseable from any language) — a non-traditional encoding choice that fits this chapter's "domain-specific / non-traditional" framing.
 
-### 13.10. AI Compiler IR Family — TVM Relay/TIR, PyTorch FX, StableHLO
+### 13.10. AI Compiler IR Family — TVM Relay/TIR, PyTorch FX, StableHLO, IREE
 
-The AI compiler ecosystem has evolved a representation family largely separate from the LLVM/MLIR mainstream, optimised for tensor-shape inference, operator fusion, autotuning, and cross-hardware deployment. Three IRs anchor the space.
+The AI compiler ecosystem has evolved a representation family largely separate from the LLVM/MLIR mainstream, optimised for tensor-shape inference, operator fusion, autotuning, and cross-hardware deployment. Four IRs anchor the space.
 
 **Apache TVM Relay/TIR** (Chen, Moreau, Jiang et al. — OSDI 2018) is the most-deployed open-source DL compiler IR. The two-level design splits responsibilities. **Relay** is a high-level functional IR with first-class tensors, ADTs, gradient operators, and shape polymorphism: a Relay program looks like a typed lambda calculus where every value is a tensor or a tensor-producing function. **TIR (Tensor IR)** is the low-level loop-and-buffer IR with explicit memory hierarchies, suitable for hardware-target codegen via `Schedule` transformations. The architectural lesson is **schedule-as-IR-transformation** (echoing Halide §13.7): a TIR program plus a schedule produces target-specific code, and the schedule space can be searched (AutoTVM, MetaSchedule, Ansor) for performance. TVM's Relay→TIR lowering is the canonical example of "two-level IR with separation of algorithm and schedule" applied to whole neural networks rather than single kernels.
 
@@ -831,11 +837,58 @@ The AI compiler ecosystem has evolved a representation family largely separate f
 
 **StableHLO** (Google, OpenXLA, 2023+) is the portable successor to XLA's HLO (`COMPILERS.md §15.5`). The design goal is a **versioned, MLIR-defined operator set** that frontend frameworks (JAX, PyTorch via `torch.export`, TensorFlow, ONNX) can target as a stable interchange format, decoupling them from XLA backend evolution. StableHLO is to AI compilers what SPIR-V (`COMPILERS.md §15.4`) is to GPU compilers: a portable IR that lets frontend and backend evolve independently. The op set is small (~150 ops), each with a precise spec covering shape inference, broadcasting semantics, and numerical behaviour. Status (as of 2026-04): StableHLO is the OpenXLA-blessed exchange format, with `torch.export` to StableHLO emerging as the canonical PyTorch-to-XLA path; JAX produces StableHLO directly via `jax.export`.
 
+**IREE (Intermediate Representation Execution Environment)** (Google, 2019+; pronounced "eerie") is the fourth canonical entry, distinguished by **holistic IR**: a single representation containing *both* scheduling logic (data dependencies for parallel pipelined hardware) *and* execution logic (hardware-specific dense computation). Where TVM separates Relay (algorithm) from TIR (schedule) and lowers them as a two-step pipeline, IREE merges scheduling and execution in one IR and lets the same compiler driver target the full set of deployment platforms from one source. Importers cover JAX, ONNX, PyTorch, TensorFlow, and TFLite; targets cover Vulkan, ROCm/HIP, CUDA, Metal (Apple), AMD AIE, and CPU (LLVM static or dynamic linkage).
+
+The two distinctive IREE design points worth recording:
+
+- **VM bytecode dialect** (`vm`) — IREE programs ultimately compile to a small VM bytecode representing reference-counted resources, typed values, and control flow. This bytecode is **either interpreted at runtime** (the VMVX Vector VM Extensions backend uses it for portable CPU execution via a microkernel library) **or lowered further** to LLVM IR / C / SPIR-V kernels for native deployment. This dual interpret-or-lower posture is unusual: most ML compilers commit to one or the other.
+- **Holistic compilation, embeddable runtime** — AOT compilation runs on the host machine targeting any combination of platforms; the runtime is small enough to embed in mobile / edge / browser deployments, or even bypass entirely for embedded systems calling out to custom accelerators. The contract is that the *same IR* produces the GPU kernels, the CPU code, and the scheduling logic, eliminating the impedance mismatch between separate compilation pipelines per target.
+
+Status (as of 2026-04): IREE is the canonical end-to-end MLIR-based ML compiler/runtime in the OpenXLA ecosystem; production users include several hardware vendors targeting custom accelerators where TVM's autotuner-heavy design is too compile-expensive. The architectural lesson generalises: **for ML workloads where one model is deployed across heterogeneous hardware (cloud GPU, mobile NPU, embedded accelerator), holistic IR + embeddable runtime is a more direct fit than the schedule-search-per-target model TVM popularised**. The cost is that hand-tuned per-target performance can lag TVM's MetaSchedule autotuning on workloads where exhaustive schedule search pays off.
+
 The design lesson generalises beyond AI: **a domain with rapid hardware evolution and many frontend frameworks needs a stable mid-level IR with versioned operator semantics**, separating frontend concerns (autodiff, dynamic shapes, model authorship) from backend concerns (codegen, scheduling, kernel fusion, hardware targeting). The split mirrors LLVM IR's role for general-purpose compilation but is specialised for tensor-graph workloads and shaped by the AI hardware diversity (NVIDIA / AMD / Apple / Google TPU / AWS Trainium / Cerebras / Groq) that no single backend can serve well.
 
 Cross-references: Triton (`COMPILERS.md §15.1`) is the kernel-level companion to TVM Relay/TIR — Triton is to GPU kernels what TIR is to whole-network compilation. Mojo's KGEN/POP (§5.4) is the parametric-IR alternative for the same workload class. MLIR (§10.1) underlies StableHLO and parts of TVM. Halide (§13.7) is the algorithm/schedule separation idea TVM TIR inherits.
 
-Sources: https://tvm.apache.org/docs/arch/relay_intro.html and https://pytorch.org/docs/stable/fx.html and https://openxla.org/stablehlo and https://arxiv.org/abs/1802.04799
+Sources: https://tvm.apache.org/docs/arch/relay_intro.html and https://pytorch.org/docs/stable/fx.html and https://openxla.org/stablehlo and https://arxiv.org/abs/1802.04799 and https://iree.dev/ and https://github.com/iree-org/iree
+
+### 13.11. Bend / HVM2 — Interaction Combinator Graphs as Program Representation
+
+Bend / HVM2 (concurrency angle in `CONCURRENCY.md §3.11`) presents a representation that has no analogue elsewhere in this chapter: a program is a graph of **interaction combinators** (Lafont 1997) — small first-order rewrite rules over typed nodes connected by directed ports. There is no SSA, no CPS, no ANF, no CFG; the data structure is a *net*, and "execution" is repeated rewriting of *active pairs* (two nodes whose principal ports are connected) via interaction rules until no active pairs remain.
+
+The four canonical node families of HVM2 are **CON** (constructors / lambdas), **DUP** (duplication / sharing), **ERA** (erasure / discard), and **REF** (top-level definition reference). Every higher-order construct — λ-calculus, recursion, algebraic data types, pattern matching — encodes into combinations of these. Crucially, the encoding preserves the property that **disjoint active pairs commute**: if two active pairs do not share nodes, they can be rewritten in parallel without interference, in any order, with the same final result. This is a structural property of the representation, not a concurrency feature added on top.
+
+The representation pays a constant-factor overhead vs ordinary IRs — every operation is a graph-node allocation and a graph-edge update — but in exchange unlocks two things SSA/CPS cannot offer: (1) **sound parallel evaluation without analysis**, because the representation itself encodes which reductions can fire concurrently; and (2) **optimal sharing** in the Lévy sense, because DUP nodes lazily duplicate sub-graphs only when forced rather than eagerly substituting bodies into call sites. The cost is that locality is hostile to modern CPUs (every reduction touches global heap memory, not registers), which is why HVM2's killer hardware target is the GPU — thousands of warp lanes can each work on disjoint active pairs without coherency traffic.
+
+Distinct from sea-of-nodes (§6.3): SoN is a *graph representation of one program's data and control flow* still requiring an external scheduler; interaction nets *are* the schedule, in that the representation tells you which reductions can fire next without external analysis. Distinct from e-graphs (§8): e-graphs represent equivalence classes of programs for optimization-rule application; interaction nets represent *one* program whose evaluation is a rewrite sequence. Distinct from Forth dictionary representations (§14): Forth executes by walking a linear sequence of code-field references; interaction nets execute by rewriting a graph in place.
+
+The lesson generalises: **a representation whose evaluation rule is locally confluent encodes parallelism for free**. Most programming-language IRs were designed when single-core was the norm; reconsidering the IR itself for the parallel-evaluation property is the road HVM2 walks.
+
+Sources: https://github.com/HigherOrderCO/HVM2 and https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf and https://github.com/HigherOrderCO/Bend
+
+### 13.12. ZK-Language IRs — Cairo CASM, Noir ACIR, Aiken UPLC
+
+Zero-knowledge programming languages compile to representations designed for **proof generation**, not for CPU execution. The constraint surface is unusual: the target is not an instruction set with registers and memory but an *arithmetic circuit* — a graph of additions, multiplications, and lookup operations over a finite field — that a SNARK or STARK prover can encode as a polynomial identity. The compiler IR has to bridge ordinary high-level source (control flow, arrays, recursion) to this constraint-graph target.
+
+**Cairo** (StarkWare, 2018+) is the largest deployment, powering Starknet's L2 ZK rollup. The Cairo language compiles via **Sierra** (Safe Intermediate Representation) to **CASM** (Cairo Assembly), a custom **ZK-friendly ISA** designed from scratch for STARK proof generation rather than CPU execution. Cairo's distinctive choice is to define its own ISA rather than compile to a general arithmetic circuit: the ISA's instruction set is small (~10 ops including `assert_eq`, `call`, `ret`, `jmp`, memory operations), and every program execution becomes a sequence of trace cells the prover can polynomial-encode efficiently. The Cairo VM executes CASM both for testing and as the substrate the prover proves about. Sierra acts as a typed safe IR between high-level Cairo and CASM, ensuring the compiled program cannot panic or branch on uncommitted memory.
+
+**Noir** (Aztec Labs, 2022+) is a Rust-flavoured ZK DSL whose IR is **ACIR** (Abstract Circuit Intermediate Representation) — explicitly *not* an instruction set but a representation of arithmetic and bitwise constraints plus calls to predefined "black-box" gadgets (Pedersen hash, range checks, hash functions). ACIR is proving-system-agnostic: a Noir program compiles once to ACIR, and any ACIR-compatible proving backend (PLONK, Honk, UltraGroth, etc.) can consume it. This is closer in spirit to LLVM IR (one frontend, many backends) than to Cairo's bespoke ISA.
+
+**Aiken** (Cardano, 2023+) compiles to **UPLC** (Untyped Plutus Core), the Cardano blockchain's existing on-chain script representation. Aiken provides a typed, Rust-flavoured surface compiling to UPLC, which is itself a small lambda-calculus-based IR Cardano nodes execute and verify. The choice of UPLC as target rather than a custom ISA reflects ecosystem constraints (the chain's verifier must validate every script, so the language must compile to whatever the chain accepts).
+
+The design lesson cuts across blockchain/ZK design: **the IR target shapes the language frontend** more directly than in conventional compilers. Cairo defined a custom ISA to optimise proof costs; Noir defined a constraint-graph IR to be backend-agnostic; Aiken accepted an existing chain's IR and built a typed frontend on top. For a language designer in any constraint-target domain (ZK, FHE, MPC, hardware synthesis), these three points span the design space: define your own target ISA, define a target-agnostic constraint IR, or compile to an existing target's representation and add typing/ergonomics on top.
+
+Sources: https://www.starknet.io/cairo-book/ch201-architecture.html and https://www.cairo-lang.org/about-cairo/ and https://noir-lang.org/ and https://github.com/noir-lang/noir and https://aiken-lang.org/ and https://arxiv.org/pdf/2601.09372
+
+### 13.13. Yul — Solidity's Compiler-Internal Mid-Level IR
+
+**Yul** is the mid-level IR used by the **Solidity** compiler since the IR-based pipeline became the default in Solidity 0.8.13 (2022). Solidity source compiles to Yul (a small typed assembly-like language with named variables, `for`/`if`/`switch`, and direct EVM opcode access), Yul is optimised by the YulOptimizer (constant folding, common-subexpression elimination, dead-code elimination, structural simplification), and the optimised Yul is then translated to EVM bytecode. The Solidity compiler also exposes Yul as a *first-class language*: developers can write inline-assembly Yul blocks within Solidity, or write whole contracts in pure Yul for fine-grained gas optimisation.
+
+Yul's distinctive role compared to other DSL IRs (`§13` entries) is that it bridges *two language ecosystems*: Solidity (high-level OO smart contracts) on one side and Vyper (Python-shaped, alternative Ethereum smart-contract language with a similar SSA-IR pipeline) historically targeted Yul-like IRs as well. As of 2026, Vyper's compiler has its own Venom IR but Yul remains the de facto interchange-IR-in-spirit for EVM toolchains: gas profilers, decompilers, and security analysers consume Yul as a more tractable target than EVM bytecode itself.
+
+The design lesson is narrow: **a typed mid-level IR exposed both as a compiler internal and as a user-writable language** is unusual and produces second-order benefits — toolchain authors target it, optimisations developed for one frontend benefit other frontends targeting the same IR, and the language designer can prototype new high-level features by lowering them to existing Yul ops without backend work. The cost is that the IR's semantics become a public contract that future evolution must respect.
+
+Sources: https://docs.soliditylang.org/en/latest/yul.html and https://docs.soliditylang.org/en/latest/ir-breaking-changes.html and https://blog.ethereum.org/2020/01/08/update-on-the-vyper-compiler
 
 ---
 
@@ -1091,7 +1144,10 @@ Rows grouped by chapter, in chapter order. Each row's Examples column ends with 
 | Algorithm/schedule split | Image processing | Auto-tunable schedule space | Halide (§13.7) |
 | Sail ISA spec as IR | Hardware verification | Symbolic execution of ISA semantics | ISLA / CHERI (§13.8) |
 | JSON-encoded IR | Pedagogy | Minimal tooling barrier | Bril (§13.9) |
-| AI compiler IR family | Tensor-graph compilation | Two-level relay/TIR or trace-based or MLIR-versioned | TVM Relay/TIR, PyTorch FX, StableHLO (§13.10) |
+| AI compiler IR family | Tensor-graph compilation | Two-level relay/TIR or trace-based or MLIR-versioned, or fused scheduling+execution | TVM Relay/TIR, PyTorch FX, StableHLO, IREE (§13.10) |
+| Interaction-combinator graph | Higher-order functional + parallel evaluation | Disjoint reductions parallel by construction | Bend / HVM2 (§13.11) |
+| ZK-language IRs | Arithmetic-circuit / proof-friendly ISA | Constraint graphs vs custom ZK ISA | Cairo CASM, Noir ACIR, Aiken UPLC (§13.12) |
+| Compiler-internal mid-level IR exposed as language | Solidity → Yul → EVM | Bridges high-level OO and low-level bytecode | Yul (§13.13) |
 
 ### 16.13. Forth-style direct representations
 
@@ -1153,6 +1209,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 4. Microsoft Learn — Roslyn semantic analysis — https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/semantic-analysis
 5. Hermes Optimizer — https://github.com/facebook/hermes/tree/main/lib/Optimizer
 6. GraalVM Truffle Language Implementation Framework — https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/
+6a. GraalPy — https://www.graalvm.org/python/
+6b. TruffleRuby — https://www.graalvm.org/ruby/
 7. @babel/parser — https://babeljs.io/docs/babel-parser
 
 ### Chapter 5 — Mid-Level IRs
@@ -1195,6 +1253,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 
 1. egg (Equality Saturation Library) — https://egraphs-good.github.io/
 2. egglog — https://github.com/egraphs-good/egglog
+2b. Destructive E-Graph Rewrites (EGRAPHS 2025) — https://pldi25.sigplan.org/details/egraphs-2025-papers/7/Destructive-E-Graph-Rewrites
+2c. Oatlog: A high-performance e-graph engine — https://odr.chalmers.se/items/a5d65db4-2cb8-4b18-a780-89feadcefa60
 3. Cranelift e-graph RFC — https://github.com/bytecodealliance/rfcs/blob/main/accepted/cranelift-egraph.md
 4. RVSDG: An Intermediate Representation for Optimizing Compilers (Reissmann et al., 2020) — https://dl.acm.org/doi/10.1145/3391902
 
@@ -1208,6 +1268,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 6. PEP 659: Specializing Adaptive Interpreter — https://peps.python.org/pep-0659/
 7. MoarVM bytecode documentation — https://github.com/MoarVM/MoarVM/blob/master/docs/bytecode.markdown
 8. WebAssembly Specification — Core — https://webassembly.github.io/spec/core/
+8b. WebAssembly GC proposal — https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md
+8c. State of WebAssembly 2026 — https://devnewsletter.com/p/state-of-webassembly-2026/
 9. Linux BPF documentation — https://docs.kernel.org/bpf/
 10. HHBC specification — https://github.com/facebook/hhvm/blob/master/hphp/doc/bytecode.specification
 11. Hermes design document — https://github.com/facebook/hermes/blob/main/doc/Design.md
@@ -1218,6 +1280,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 2. LLVM Machine IR Language Reference — https://llvm.org/docs/MIRLangRef.html
 3. GHC generated code wiki — https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/generated-code
 4. OCaml C interface manual — https://v2.ocaml.org/manual/intfc.html
+5. ClangIR (CIR) project page — https://llvm.github.io/clangir/
+6. ClangIR transition plans — https://discourse.llvm.org/t/clangir-transition-plans-for-the-clangir-incubator/89583
 
 ### Chapter 11 — Effect-, Region-, and Capability-Annotated IRs
 
@@ -1252,6 +1316,20 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 9. PyTorch FX documentation — https://pytorch.org/docs/stable/fx.html
 10. StableHLO project (OpenXLA) — https://openxla.org/stablehlo
 11. Chen et al. — "TVM: An Automated End-to-End Optimizing Compiler for Deep Learning" (OSDI 2018) — https://arxiv.org/abs/1802.04799
+11a. IREE project page — https://iree.dev/
+11b. IREE repository — https://github.com/iree-org/iree
+12. HVM2 repository — https://github.com/HigherOrderCO/HVM2
+13. Bend repository — https://github.com/HigherOrderCO/Bend
+14. Taelin — HVM2: A Parallel Evaluator for Interaction Combinators — https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf
+15. Cairo language architecture — https://www.starknet.io/cairo-book/ch201-architecture.html
+16. About Cairo — https://www.cairo-lang.org/about-cairo/
+17. Noir language — https://noir-lang.org/
+18. Noir repository — https://github.com/noir-lang/noir
+19. Aiken language — https://aiken-lang.org/
+20. Antonino — Formally Verifying Noir Programs with NAVe — https://arxiv.org/pdf/2601.09372
+21. Solidity Yul documentation — https://docs.soliditylang.org/en/latest/yul.html
+22. Solidity IR-based pipeline notes — https://docs.soliditylang.org/en/latest/ir-breaking-changes.html
+23. Vyper compiler update (Ethereum blog) — https://blog.ethereum.org/2020/01/08/update-on-the-vyper-compiler
 
 ### Chapter 14 — Forth-Style Direct Representations
 

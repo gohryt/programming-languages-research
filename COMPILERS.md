@@ -18,9 +18,9 @@ The results are striking: compilation is 4–6x faster than the fastest existing
 
 The technique has historical roots: QEMU's original "dyngen" backend by Fabrice Bellard used a similar approach in 2003, compiling C stencils and extracting relocations. Copy-and-patch modernizes this by using LLVM as the stencil compiler, enabling better stencil quality and automatic relocation extraction.
 
-Status (as of 2026-04): CPython 3.13 adopted copy-and-patch for its experimental JIT. The LuaJIT Remake project by Haoran Xu applies the technique to Lua. The technique is particularly well-suited for tier-1 (baseline) compilers in tiered JIT systems, where compilation speed matters more than peak code quality.
+Status (as of 2026-04): CPython 3.13 (October 2024) shipped copy-and-patch as an experimental JIT enabled via `--enable-experimental-jit`; CPython 3.14 (October 2025) added free-threading mode (PEP 703) on top, with Mark Shannon and the Faster CPython team independently optimising both the adaptive interpreter and the JIT for the no-GIL build. Status reports through 2025 are mixed — the 3.13 JIT is sometimes slower than the interpreter on individual benchmarks, with 3.16 targeting 5–10% speedup on the free-threaded JIT. The LuaJIT Remake project by Haoran Xu applies the technique to Lua. The technique is particularly well-suited for tier-1 (baseline) compilers in tiered JIT systems, where compilation speed matters more than peak code quality.
 
-Source: https://arxiv.org/abs/2011.13127
+Sources: https://arxiv.org/abs/2011.13127 and https://docs.python.org/3/whatsnew/3.14.html and https://fidget-spinner.github.io/posts/faster-jit-plan.html
 
 ### 1.2. Tiered Compilation — Interpreter → Baseline → Optimizing
 
@@ -111,6 +111,40 @@ Stefan Brunthaler's **bytecode quickening** technique (ECOOP 2010) replaces gene
 The insight: you don't need to generate machine code to get inline-caching benefits. Interpreter-level specialization captures the same monomorphic-fast-path wins with a fraction of the engineering complexity. The trade-off is favorable on both axes — large baseline speedup, low architectural cost — which makes it a strong candidate to evaluate before committing to a JIT.
 
 Sources: https://peps.python.org/pep-0659/ and https://publications.cispa.saarland/1069/1/ecoop10.pdf
+
+### 1.10. Production Python JITs — Cinder, Pyston, Pyjion
+
+The mainline CPython JIT (§1.1) is one of several Python-acceleration efforts. Three production-influential alternatives are worth recording.
+
+**Cinder / CinderX** (Meta, since 2020) is the most-deployed alternative Python runtime: a fork of CPython 3.10/3.12 with a method-level JIT, a function inliner ("Instagram inliner"), strict-typing module mode (`Static Python`), shadow bytecode for type-specialization, and immortal-object support (objects whose refcount the runtime never decrements, useful for deeply-shared globals). Cinder's JIT generates type-specialized native code per function; the function inliner aggressively inlines small callees including builtins, recovering performance lost to Python's dynamic dispatch. Production at Instagram (the largest production Python deployment) since 2020. The 2025 strategic shift was to repackage Cinder as **CinderX**, a CPython extension consumable from a vanilla CPython 3.12+ rather than a forked binary, lowering the operational cost of deploying it alongside other Python ecosystem components.
+
+**Pyston / Pyston-lite** (originally Dropbox 2014–2017, revived 2020+) is a JIT-compiling CPython fork with attribute-cache acceleration, JIT-compiled bytecode interpretation, and a runtime model closer to PyPy than to mainline Python. Pyston-lite (2022) repackaged the JIT as a CPython extension (`pip install pyston-lite-autoload`) — same idea CinderX adopted three years later. Status (as of 2026-04): mostly dormant since the parent company refocused; mainline CPython JIT and Cinder eclipsed it.
+
+**Pyjion** (Microsoft, 2016–2021) is the third historical production JIT effort, using the .NET CLR's RyuJIT as the codegen backend for CPython bytecode. It demonstrated that a host JIT can be reused for a guest language but shipped as research and was archived in 2022.
+
+The lesson for Python performance: **mainline CPython has converged on a copy-and-patch JIT (§1.1) plus the adaptive interpreter (§1.9), but the production-deployment-history of Cinder shows that aggressive method-JITs with type-specialization plus inlining give larger wins (~30–50% on Instagram workloads) than either approach alone**. The trade-off is engineering complexity: Cinder-class JITs are large codebases (~100K lines of C/C++) maintained by full-time teams.
+
+Sources: https://github.com/facebookincubator/cinderx and https://github.com/facebookincubator/cinder and https://engineering.fb.com/2022/05/02/open-source/cinder-jits-instagram/ and https://github.com/pyston/pyston and https://blog.pyston.org/
+
+### 1.11. PHP 8 JIT — DynASM Origin and the IR Framework
+
+PHP 8.0 (2020) added a tracing JIT designed by Dmitry Stogov, originally built on **DynASM** (covered as a macroassembler JIT in §13.4). The first version targeted x86-64 only and emitted machine code per traced bytecode sequence. Status (as of 2026-04): PHP 8.4 (2024) incorporates a second-generation JIT based on a **standalone IR framework** (Stogov's IR, an SSA-based mid-level IR with a small set of optimization passes) that replaces direct DynASM emission with a compiler-style IR + multi-target backend. This is the same architectural shift V8 made from TurboFan to Turboshaft (`REPRESENTATIONS.md §6.5`) and from Cranelift's pre-2022 backend to its e-graph mid-end (§13.2): a typed mid-level IR makes optimizations composable and additional targets (ARM64, RISC-V) tractable.
+
+The PHP IR framework is independent of PHP and is being explored as a substrate by other dynamic-language runtimes. Its design point is between QBE (§13.1, ~14K lines, no IR-level optimizations) and LLVM (millions of lines, every optimization): a mid-sized IR with a curated optimization set, designed for short compilation budgets typical of JITs. The architectural lesson: **for languages whose JIT compile times must stay sub-millisecond, a small SSA-IR framework with a hand-curated pass list is the natural middle point** between DynASM-style direct emission (no analysis budget) and LLVM-style full pipeline (impossible budget).
+
+Sources: https://wiki.php.net/rfc/jit and https://wiki.php.net/rfc/jit-ir and https://php.watch/articles/jit-in-depth and https://www.zend.com/blog/php-8-4
+
+### 1.12. Roblox Luau — `--!native` Type-Annotation-Driven JIT
+
+Roblox's **Luau** (covered for `LOP_BREAK` bytecode patching in `TRACERS.md §1.1`) added **native code generation** in late 2023, available per-script via the `--!native` directive and per-function via `@native`. The codegen is x86-64 and ARM64 (Android included by 2025), produced from Luau bytecode at module load time, with runtime fallback to the interpreter for unsupported constructs.
+
+The distinctive design choice is that **type annotations actively drive specialization**. Luau is gradually typed (annotations are optional); when present, the JIT uses them to elide type checks and emit specialized arithmetic. `local x: number` lets `x + 1` compile to a direct `addsd` rather than going through Luau's tagged-value arithmetic dispatch. Production deployment (Roblox engine, billions of script instances per day) makes Luau one of the largest production gradual-typing-driven JITs.
+
+Distinct from V8's TurboFan (`REPRESENTATIONS.md §6.4`) and SpiderMonkey IonMonkey (`REPRESENTATIONS.md §5.6`): those are speculation-driven (compile assuming observed types, deopt on guard failure); Luau native uses the *programmer-supplied types* directly without speculation, treating `--!native` as a contract that types at module boundaries are correct. The trade-off is that wrong type annotations produce undefined behaviour rather than deopt — but in Roblox's user-script ecosystem, where the typed/native combination is opt-in by the script author, the discipline scales.
+
+The lesson generalises: **for gradually-typed languages with optional annotations, treating annotations as optimization hints rather than only as documentation can substitute for speculative JITs**. The annotation surface becomes part of the optimizer's contract; the cost is annotation-correctness pressure on programmers rather than a deoptimization machinery in the runtime.
+
+Sources: https://create.roblox.com/docs/luau/native-code-gen and https://luau.org/news/2025-12-19-luau-recap-runtime-2025/ and https://devforum.roblox.com/t/optimizing-native-code-performance-with-type-hints-and-magic/4247690
 
 ---
 
@@ -889,6 +923,31 @@ The lesson generalises: **monomorphisation + defunctionalization + whole-program
 
 Sources: http://mlton.org/ and https://www.cs.purdue.edu/homes/suresh/papers/popl00-camera-ready.pdf and https://github.com/MLton/mlton and https://www.cs.purdue.edu/homes/suresh/papers/contification.pdf
 
+### 13.10. ActiveJ Codegen — Productive ASM Wrapper for Runtime JVM Bytecode Generation
+
+ActiveJ Codegen (SoftIndex Lab) is a productivity layer over **ObjectWeb ASM** for runtime bytecode generation on the JVM. ASM is the canonical low-level bytecode-manipulation library, but its visitor-based API (`MethodVisitor.visitInsn`, `MethodVisitor.visitVarInsn`, manual stack-frame accounting) is verbose and error-prone for anything beyond simple class transformation. Codegen replaces this with an **expression-based fluent DSL** modelled on a Lisp-like AST: `call(staticField(System.class, "out"), "println", value("Hello world"))` produces the bytecode for `System.out.println("Hello world")`, with stack-frame accounting, type inference, and verifier-correctness handled automatically.
+
+The expression vocabulary covers:
+
+- Arithmetic (`add`, `sub`, `mul`, `div`, `mod`, `neg`), bitwise, and comparison ops with automatic type promotion.
+- Field/method access (`property`, `call`, `staticCall`, `constructor`).
+- Control flow (`ifThenElse`, `loop`, `forEach`, `switch`, `tryCatch`).
+- Local variables (`let`, `set`).
+- Relational-algebra-shaped operations on iterables (filter, map, reduce, group-by, sort) — useful for query-engine codegen.
+- Records (heterogeneous data containers) — the Java-21 `record` keyword as a Codegen primitive.
+
+Generated classes are cached in-memory by their generation key (in-process re-use) and optionally persisted via `BytecodeStorage` to disk for cross-process reuse — relevant when the same generated class would be regenerated repeatedly across application restarts (database query plans, schema-bound serializer codecs, AST-bound calculators).
+
+The most-deployed Codegen application is **ActiveJ Serializer** — the framework's schema-free serializer that generates per-type binary codec classes at first use, recovering hand-written-codec performance from runtime-introspected Java classes. ActiveJ claims it as the fastest JVM serializer; whether it is *the* fastest is contested, but the design pattern (one generated codec class per serialized type, cached forever, JIT-warm before use) is the same one Kryo, FlatBuffers, and Cap'n Proto Java each implement at varying levels of automation. Codegen is what makes "generate one codec class per type" cheap to implement.
+
+Distinct from the §13 lightweight backends (QBE, Cranelift, TPDE, DynASM, MoarVM lego, Virgil): those generate native machine code; Codegen generates JVM bytecode. Distinct from MetaOCaml/Terra staged programming (§12.3, §12.4): those provide compile-time staging with type-safe quotations; Codegen is runtime, with type inference but without staged-code typing — the bytecode is verifier-checked at class-define time. Distinct from Template Haskell (§12.5): TH is compile-time AST-rewriting, Codegen is runtime bytecode emission. The right comparison point is **JitBuilder** (Eclipse OMR's `MEMORY.md §6.21` codegen library) — both target managed-runtime bytecode generation with productivity-oriented APIs; Codegen is JVM-only, JitBuilder is multi-language.
+
+Sister technique inside ActiveJ: **Specializer (§17.4)** uses ASM directly (not Codegen) to rewrite existing class instances rather than generate new classes from scratch. The two libraries target adjacent but distinct use cases — Codegen for "I have an AST/schema and want a class implementing it"; Specializer for "I have a class instance and want a specialised static class encoding its values."
+
+The lesson generalises: **a productive expression-based DSL over the host runtime's bytecode-emission library** (ASM for JVM, IL emit API for CLR, V8's `Wasm.builder()` style APIs for Wasm-emitting Java code) substantially lowers the cost of runtime code generation for query engines, serializer codecs, expression evaluators, and DI frameworks. The cost is one library between user and bytecode; the benefit is dropping the floor of "should I codegen this?" from "only if it's worth a 1000-line ASM exercise" to "if I have an AST or schema to specialise against, yes."
+
+Sources: https://activej.io/codegen and https://activej.io/codegen/examples and https://central.sonatype.com/artifact/io.activej/activej-codegen
+
 ---
 
 ## 14. Trace-Based JIT & Speculative Optimization
@@ -1034,6 +1093,28 @@ Separately, **XLA** (Accelerated Linear Algebra, Google) and **Triton** (OpenAI)
 
 The takeaway for language design: GPU compilation is fundamentally a multi-stage pipeline with portable IRs (SPIR-V, LLVM IR, NIR, HLO) at each level. The trade-off for a new GPU-targeting language is between plugging into one of these IRs (inheriting driver/vendor support and tooling) and inventing a parallel IR (gaining language-specific optimizations at the cost of duplicating the pipeline below).
 
+### 15.6. Bend / HVM2 — Interaction-Combinator Runtime to GPU
+
+The HVM2 runtime (concurrency angle in `CONCURRENCY.md §3.11`, representation angle in `REPRESENTATIONS.md §13.11`) compiles **Bend** source code to an interaction-combinator graph, then to either a C runtime or a CUDA runtime. The CUDA backend's compilation pipeline is unusual: rather than emitting per-program PTX (the NVRTC §15.3 pattern) or per-kernel SPIR-V (§15.4), HVM2 ships a **fixed CUDA evaluator** that interprets the graph at runtime, distributing active-pair rewrites across warp lanes. The "compiler" therefore becomes a *graph-builder for the GPU evaluator*, not a code generator in the traditional sense.
+
+The architectural lesson is distinct from every other entry in this chapter: where Triton (§15.1, §15.5), NVRTC (§15.3), Mojo (§6.6), and TornadoVM (next subsection) all generate target-specific kernel code, HVM2 generates target-neutral graph data and lets a fixed runtime evaluate it. This pays a constant-factor performance cost vs hand-tuned kernels, but eliminates the per-program codegen step entirely — a Bend program runs on any HVM2-supported device without backend-specific compilation. Status (as of 2026-04): the CUDA backend is research-grade; production deployment requires either accepting the constant-factor cost or generating specialised kernels for hot subgraphs (a hybrid approach not yet in the public roadmap).
+
+Sources: https://github.com/HigherOrderCO/HVM2 and https://github.com/HigherOrderCO/Bend and https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf
+
+### 15.7. Project Babylon and TornadoVM — Java to GPU
+
+The JVM has two complementary 2024–2026 efforts to compile Java to GPUs without writing CUDA C or OpenCL.
+
+**Project Babylon** (OpenJDK, Paul Sandoz et al., 2024+) is the upstream OpenJDK answer. The mechanism is **code reflection**: the compiler emits a *code model* — a typed, structured representation of a method's body — alongside the bytecode for selected methods (typically annotated `@CodeReflection` or in known classes). The HAT runtime ("Heterogeneous Accelerator Toolkit") consumes code models and translates them to GPU-native targets at runtime: OpenCL C for AMD/Intel/Apple GPUs, CUDA PTX for NVIDIA. Distinct from JNI/CUDA wrappers: the Java method body itself is the source for the GPU kernel, with no separate kernel language. Status (as of 2026-04): Babylon is in active development under OpenJDK; HAT prototypes ship with experimental Java 25+ builds. The 2025 demos focused on writing GPU-ready ML model bodies in plain Java.
+
+**TornadoVM** (University of Manchester, Juan Fumero et al., since ~2014; v2.0 December 2025) predates Babylon and takes a different architectural choice: a **Graal-based JIT plugin** that intercepts annotated Java methods (`@Parallel`, `@Reduce`) and lowers them to one of three GPU backends (OpenCL C, NVIDIA CUDA PTX, SPIR-V). Production deployment for LLM inference, scientific computing, and data analytics on Java-shop infrastructure. v2.0 added native INT8 support for NVIDIA, FP32-to-INT8 quantisation kernels, and a more polished Java-native programming surface.
+
+The two efforts are complementary rather than competing: Babylon provides the upstream JDK *infrastructure* (code models as a stable API surface for any GPU-targeting framework); TornadoVM provides a production-deployable *implementation* on top of Graal. The expected long-term architecture has TornadoVM (or its successors) consuming Babylon code models from JDK 26+ rather than parsing bytecode, simplifying both projects.
+
+The lesson for language designers: **a managed-runtime language can add GPU compilation without designing a new GPU DSL** if the compiler emits structured code models (Babylon) that a separate framework can consume and lower. This is more flexible than the "language X needs its own GPU compiler" pattern (Triton, Mojo, Bend) but pays a coordination cost — the JDK and TornadoVM teams must agree on code-model semantics for the integration to work.
+
+Sources: https://openjdk.org/projects/babylon/ and https://www.tornadovm.org/ and https://tornadovm.readthedocs.io/en/latest/introduction.html and https://www.infoq.com/news/2025/12/tornadovm-20-gpu-llm/ and https://jjfumero.github.io/posts/2025/02/07/babylon-and-tornadovm
+
 Sources: https://docs.mesa3d.org/nir/ and https://www.tensorflow.org/xla
 
 ---
@@ -1099,6 +1180,33 @@ Source: https://bibliography.selflanguage.org/_static/pics.pdf
 ### 17.3. Speculative Type Specialization in the Object Model
 
 JIT compilers extend inline caching (§§17.1–17.2) with deeper speculation guarded by runtime checks; the general OSR/deoptimization mechanism is covered in §14.2 and the MoarVM lazy-unwind variant in §14.4. The object-model-specific patterns layered on top are: **type specialization** (compile arithmetic assuming integer operands), **shape guards** (compile property access assuming a specific hidden class), **bounds-check elimination** (prove array indices in bounds and drop the check), and **allocation sinking / scalar replacement** (replace a non-escaping object with stack-allocated fields). V8 TurboFan, SpiderMonkey IonMonkey, and HotSpot C2 all combine these patterns; the operational cost is managing deoptimization frequency, typically via adaptive recompilation that drops assumptions after repeated deopts.
+
+### 17.4. ActiveJ Specializer — Instance-to-Static Class Rewriting at Runtime
+
+ActiveJ Specializer (SoftIndex Lab, since v3, current v6.0-rc2) is an unusual point in the runtime-object-model design space: rather than caching dispatch decisions (§17.1, §17.2) or speculating on observed types (§17.3), it transforms class instances into **specialised static classes** whose methods are static and whose instance fields become baked-in `static final` constants. The original instance disappears; what remains is a class whose state is encoded entirely in its bytecode, and which the JVM's JIT can aggressively inline, dead-code-eliminate, and constant-fold as if the values had been hand-written.
+
+The mechanism uses ASM at runtime. Given an instance whose class has predictable shape (no lambdas, simple instance construction), the Specializer:
+
+1. Walks the instance's field values and serializes each as a target class's `static final` field.
+2. Rewrites every instance method `m(args)` as a static method `m(this_was_instance, args)` whose body has had all `this.field` reads inlined to constant references.
+3. Defines the new class via `DefiningClassLoader`, instantiates a "compiled" handle that delegates to the static methods, and returns it as the same interface type.
+
+The result: dispatch goes through static method calls (cheap on HotSpot — directly inlinable), field reads become constant loads (the JIT specialises through them), and the entire instance's data flow becomes a candidate for HotSpot's escape analysis, scalar replacement, and aggressive inlining. ActiveJ's published benchmark on a parsed-AST calculator expression: tree-walking evaluation 828 ns/op, manual hand-written code 116 ns/op, Specializer-rewritten AST instance 117 ns/op — a ~7× speedup that recovers manual-code performance from a generic interpreter.
+
+The Specializer's main production user is **ActiveJ Inject** (the framework's DI library): bindings — the closure-like values produced by the injector graph — are Specializer-compiled into static classes, eliminating the per-injection dispatch overhead. ActiveJ measured ~2× server-throughput gains from `Injector.useSpecializer()` on RPC workloads. The technique is also applied to expression trees (calculator/query AST nodes), serializer codecs, and any other tree-shaped data structure where each instance carries small immutable state and is hot enough to amortise the rewrite cost.
+
+Distinct from the rest of §17:
+- **Hidden classes (§17.1)** track shared layout across instances; Specializer makes each instance its own class.
+- **PICs (§17.2)** cache dispatch by receiver type; Specializer eliminates dispatch by making the call static.
+- **Speculative type specialization (§17.3)** speculates on *observed* types and deoptimises on guard failure; Specializer doesn't speculate — it rewrites against *known field values* and never needs to deoptimise.
+
+Distinct from Futamura-style partial evaluation (§1.3): Futamura specialises a *program* against partially-known *inputs* at compile time; Specializer specialises *one runtime instance* against *its own field values* at the moment it is constructed. The classes-of-things being specialised (programs vs instances) are fundamentally different.
+
+Status (as of 2026-04): production-stable, used inside ActiveJ Inject and several internal SoftIndex Lab products. Caveats: ActiveJ marks Specializer "experimental" and notes it does not support lambdas and may struggle with non-trivial instance graphs. Caching of generated classes (in-memory and persistent via `BytecodeStorage`, see §13.10) avoids paying the rewrite cost more than once per (class, field-value-tuple) pair.
+
+The lesson generalises: **for any managed runtime where class instances carry small immutable state and are repeatedly invoked, runtime instance-to-static-class rewriting is a complementary lever to PIC-style dispatch caching** — different mechanism, different cost model, additive performance gain. New language runtimes targeting the JVM (Kotlin, Scala, Clojure, Groovy implementations) inherit Specializer's applicability for free; new managed runtimes designing their own bytecode can adopt the same rewrite pattern.
+
+Sources: https://activej.io/specializer and https://activej.io/specializer/examples and https://activej.io/inject/speeding-up-injection
 
 ---
 
@@ -1307,6 +1415,20 @@ The Gandiva design pattern — "LLVM-backed expression compilation as a library"
 
 Sources: https://arrow.apache.org/docs/cpp/gandiva.html and https://www.dremio.com/blog/introducing-gandiva-initiative-for-apache-arrow/
 
+### 21.6. Differential Dataflow + Materialize — IVM as a Distinct Compilation Paradigm
+
+Frank McSherry's **differential dataflow** (Naiad project, MSR Cambridge 2013–2015; productionised at **Materialize**, 2019+) compiles SQL into a fundamentally different runtime artifact from HyPer / Photon / DuckDB / Spark: the query plan becomes a **graph of differential operators**, each operator transforming *changes* (deltas) rather than full result sets, and the overall pipeline maintains its output as an **incrementally-updated materialised view** that is always current with the input data. This is **incremental view maintenance (IVM)** as a first-class compilation target rather than as a feature retrofitted onto a batch engine.
+
+The mechanical core: every relation has a *timestamp* (a partial order, supporting both wall-clock time and logical iteration counts for fixed-point queries), every record carries a *multiplicity* (positive for insertions, negative for deletions), and operators (`map`, `filter`, `join`, `reduce`, `iterate`) are defined to consume and produce difference streams while preserving the invariant that integrating the difference stream over time yields the correct snapshot. The compiler turns an SQL query into a fixed dataflow graph; the runtime feeds input changes through the graph, and the materialised output is always consistent with the inputs.
+
+Distinct from streaming SQL engines that re-evaluate over windows (Flink, Kafka Streams, ksqlDB): Materialize produces *strict serialisability* — every input change is reflected in every materialised view atomically — at sub-millisecond latency, with no window-boundary effects. Distinct from batch SQL engines (HyPer §21.1, Photon §21.2, DuckDB §21.4): Materialize cannot accept arbitrary one-shot queries efficiently; its compilation target is *long-lived materialised views*, not single queries. The trade-off is sharp: low-latency continuous queries vs high-throughput one-shot analytics.
+
+The compilation lesson generalises beyond SQL: **IVM is a distinct compilation paradigm**, not a feature. A query compiler targeting IVM produces a runtime data structure that maintains state incrementally; the operator algebra (delta-based, with timestamps and retractions) is designed for incremental composition rather than batch evaluation. For any language whose users want "this expression is always up to date as inputs change" (Excel-like reactive computation, real-time dashboards, live indices), IVM-as-compilation-target is more direct than batch + cache-invalidation.
+
+Status (as of 2026-04): Materialize is in production for real-time dashboards, live anomaly detection, and operational analytics; competitors include **RisingWave** (similar IVM model), **Epsio** (IVM as a layer over PostgreSQL), and IVM features in PostgreSQL, ClickHouse, and Snowflake (more limited, view-maintenance-only). The **timely dataflow** runtime underneath Materialize is a separate research artifact also worth noting for its handling of fixed-point queries (recursive views) — a use case where batch SQL engines struggle.
+
+Sources: https://materialize.com/ and https://materialize.com/blog/olvm/ and https://materializedview.io/p/everything-to-know-incremental-view-maintenance and https://github.com/TimelyDataflow/differential-dataflow
+
 ---
 
 ## 22. BPF and eBPF JIT
@@ -1326,6 +1448,22 @@ BPF's reach is extraordinary. Every packet filter (tcpdump, Cilium, Cloudflare),
 BPF is the canonical model for kernel-resident or sandboxed execution: verifier-first restricted bytecode plus per-architecture in-kernel JIT. Even outside that target, the design illustrates how much can be achieved with a verifier-first approach to safety.
 
 Sources: https://docs.kernel.org/bpf/ and https://www.kernel.org/doc/html/latest/bpf/verifier.html
+
+### 22.2. Move Bytecode Verifier — Linear-Resource-Discipline at the Trust Boundary
+
+The same verifier-first design that BPF (§22.1) deploys at the OS kernel boundary appears at the smart-contract trust boundary in **Move** (Aptos/Sui). Every Move bytecode module submitted to a Move VM (Aptos blockchain, Sui blockchain, or off-chain executor) passes through a **mandatory bytecode verifier** before any execution. The verifier statically enforces:
+
+- **Linear resource discipline**: types declared with the `key`/`store` abilities (resources, see `TYPES.md §12.5`) cannot be silently dropped or duplicated; every code path must explicitly destroy, store, or transfer them.
+- **Type safety**: every operand must have the type the opcode expects, including across module boundaries; no implicit coercions.
+- **Reference safety**: borrowed references cannot escape their scope; mutable and immutable borrows of the same object cannot overlap (Rust-borrow-checker-class invariants enforced at the bytecode layer).
+- **Bounded execution**: structural limits on stack depth, function nesting, and instruction count.
+- **Module visibility and access**: cross-module calls respect declared `public`/`friend` visibility; cross-module storage accesses respect ability constraints.
+
+Like BPF, Move's verifier accepts *only* programs it can prove safe; rejected modules cannot run at all. Unlike BPF, the safety property being enforced is not "doesn't crash the kernel" but "doesn't violate the linear-resource invariants the asset model depends on." The two are structurally similar: a small, mandatory static analysis at the trust boundary substitutes for runtime checks throughout the program.
+
+The lesson generalises: **a verifier-restricted bytecode is the natural compilation target for any language whose programs run in untrusted contexts**. BPF deploys this for kernel modules; Move deploys it for blockchain smart contracts; WASI/Component Model (`MODULES.md §11`) deploys it for sandboxed Wasm. For language designers building compilers that target sandbox-class execution environments (WebAssembly with capability discipline, embedded scripting languages with restricted authority, plug-in systems for other applications), the verifier-restricted bytecode pattern is the structurally cleanest answer.
+
+Sources: https://aptos.dev/network/blockchain/move and https://move-language.github.io/move/ and https://hackenproof.com/blog/for-hackers/move-smart-contract-security-guide-part-1
 
 ---
 
@@ -1632,6 +1770,29 @@ The compiler must choose a model per TLS access based on visibility and module k
 
 Source: https://www.akkadia.org/drepper/tls.pdf
 
+### 29.5. Project Panama / Foreign Function & Memory API — Managed-Runtime FFI Without C Glue
+
+The Java equivalent of native interop has historically been **JNI**: write a `native` method declaration in Java, write a hand-rolled C/C++ glue function with the `JNIEXPORT JNICALL` calling convention, compile it into a shared library, and load the library at runtime. JNI is verbose, requires a separate build pipeline for the C side, mishandles memory by default (every off-heap pointer is a `jlong` that the caller must validate), and forces the JVM into an opaque-call mode that disables many optimizations. **Project Panama** (OpenJDK, since ~2014) and its first finalized deliverable, the **Foreign Function & Memory (FFM) API** (JEP 454, finalized in **JDK 22, March 2024**), replace this entire stack.
+
+The mechanical pieces:
+
+- **`MemorySegment`** — a typed view over a contiguous off-heap memory region. Distinct from `ByteBuffer` (now considered legacy): `MemorySegment` carries a *spatial bound* (the segment's length) and a *temporal bound* (its `Arena` lifetime), so out-of-bounds and use-after-free are detected at runtime rather than producing UB.
+- **`Arena`** — the lifetime owner. `Arena.ofConfined()` is single-thread, deterministic-cleanup; `Arena.ofShared()` is multi-thread; `Arena.ofAuto()` defers cleanup to the GC; `Arena.global()` is the never-freed root. Closing an arena invalidates every segment derived from it, and subsequent access throws — Rust-borrow-checker-class spatial+temporal safety expressed as a runtime contract.
+- **`Linker`** — `Linker.nativeLinker()` returns the platform-specific linker; `linker.downcallHandle(symbolAddress, FunctionDescriptor)` produces a `MethodHandle` that invokes the native function directly with no intermediate C glue. The downcall handle is JIT-compileable and inlinable in HotSpot.
+- **`FunctionDescriptor`** — the Java-side declaration of a native function's calling convention via `ValueLayout` constants (`JAVA_LONG`, `JAVA_INT`, `ADDRESS`, etc.).
+- **`SymbolLookup`** — locates symbols in shared libraries; `linker.defaultLookup()` exposes the standard C library.
+- **`jextract`** — command-line tool that reads C header files and emits Java source binding the declared functions, types, and constants. Eliminates the manual `FunctionDescriptor` writing for libraries with stable headers.
+
+Distinct from `MEMORY.md §10.2` CHERI C/C++ programming model (also discusses pointer provenance) — Panama operates *inside* a managed-runtime where the JVM remains the source of truth for object lifetimes, while CHERI hardware-enforces capabilities for the unmanaged C/C++ language. Distinct from the calling conventions in §29.1 — Panama uses those conventions on the platform side but exposes them through Java method handles rather than C function pointers. Distinct from .NET P/Invoke (the analogous CLR mechanism) — Panama is more memory-discipline-explicit (Arena + MemorySegment) where P/Invoke leans on `IntPtr` + manual `Marshal` calls.
+
+Status (as of 2026-04): production in JDK 22+. **JEP 472** ("Prepare to Restrict the Use of JNI") signals JNI is being deprecated in favour of FFM — applications calling `native` methods will increasingly require `--enable-native-access=ALL-UNNAMED` or per-module declarations, surfacing as a warning today and an error later. Major libraries (Lucene, Netty, Apache Arrow Java, several JDBC drivers) have begun migrating to FFM for new-codepath native calls.
+
+The **Vector API** (JEP 426, separate Panama deliverable) is the sibling — managed-runtime SIMD intrinsics with cross-platform abstraction. Together with FFM, the two close the gap between Java and C-level performance for native interop and SIMD-heavy code without the JNI / hand-written-intrinsic cost.
+
+The lesson generalises: **a managed-runtime language can adopt a borrow-checker-class temporal+spatial discipline for native memory** (via Arena-bounded MemorySegments) without forcing that discipline on its own GC'd heap. The FFM API is the cleanest production example of a hybrid model — GC for managed objects, explicit-arena ownership for foreign memory — and the design pattern transfers directly to other managed runtimes (CLR, BEAM, V8) considering FFI redesigns.
+
+Sources: https://openjdk.org/jeps/454 and https://openjdk.org/projects/panama/ and https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html
+
 ---
 
 ## 30. .NET ReadyToRun and AOT+JIT Hybrids
@@ -1655,6 +1816,42 @@ Source: https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/rea
 Status (JDK 9 through JDK 16/17-era cleanup): experimental in JDK 9; removed from the main JDK in the JDK 16/17-era cleanup. HotSpot's `jaotc`, based on Graal, could precompile Java classes into a shared library that the JVM loaded at startup, reducing some first-use JIT latency while retaining the ordinary JVM runtime. The idea matched the same hybrid pattern as ReadyToRun: use AOT code as a startup accelerator, then let the managed runtime remain in charge.
 
 The experiment did not become the mainstream Java deployment path, while GraalVM continued outside the main JDK. The lesson is that an AOT+JIT hybrid must justify its maintenance cost against simpler levers: class-data sharing, faster tiered JITs, profile-guided warmup, and full native-image deployment.
+
+### 30.2b. Project Leyden — AOT Caching with Full JIT Fallback
+
+**Project Leyden** (OpenJDK, since 2020 with deliveries beginning JDK 25, 2025) is the second OpenJDK attempt at AOT-and-JIT coexistence after `jaotc`. The architectural difference: Leyden's primary deliverable is **AOT caching** (per-method ahead-of-time compiled code stored in a per-application cache that the JVM consults on startup) rather than full ahead-of-time native images. The cache is generated from a "training run" — an instrumented run of the application that records which methods are hot, profile data, and observed types — and the JVM's HotSpot JIT remains the runtime authority for re-compilation, deoptimisation, and tier-up. AOT cache hits replace first-call JIT compilation; misses fall through to ordinary tiered compilation.
+
+The mechanical pieces are:
+- **AppCDS extension**: the existing Class Data Sharing format gains AOT-compiled-method slots, so the same archive that loads classes also primes the JIT cache.
+- **Profile-data reuse**: training-run profiles persist into the cache so AOT-compiled methods can be re-JITed with profile feedback even on first run.
+- **`jcmd`-driven training** plus build-time training tools (Maven/Gradle plugins, Spring Boot integration via `spring-boot-maven-plugin process-aot`) produce the cache as a build artifact rather than a per-deployment training step.
+
+Status (as of 2026-04): JDK 25 (LTS, October 2025) shipped Leyden's first wave (`-XX:CacheDataStore=` plus AOT-class-loading). JDK 26 adds AOT-cache support for ZGC (`MEMORY.md §6.4`). Spring Boot 4 integrated Leyden alongside its existing GraalVM Native Image support, giving deployers a choice between fast-startup-with-full-dynamism (Leyden) and faster-startup-with-closed-world (Native Image §30.3). Reported speedups on Spring Boot startup: 2–3× cold-start improvement without the closed-world reflection-modelling cost of GraalVM.
+
+The lesson generalises: **AOT caching with full JIT fallback is a less radical bet than closed-world native images, and may suit more workloads**. Where R2R (§30.1) is .NET's similar hybrid and GraalVM Native Image (§30.3) gives up dynamism entirely, Leyden picks a middle point — AOT only what training data justifies, fall back to JIT for everything else, preserve all runtime dynamism (reflection, dynamic class loading, agents, redefinition).
+
+Sources: https://openjdk.org/projects/leyden/ and https://developer.ibm.com/articles/java-project-leyden/ and https://softwaremill.com/project-leyden-and-jdk-26-bringing-aot-caching-to-zgc/ and https://quarkus.io/blog/leyden-2/
+
+### 30.2c. Project CRaC — Coordinated Restore at Checkpoint
+
+**Project CRaC** (OpenJDK, Anton Kozlov / Azul, since 2021) is the third OpenJDK answer to JVM startup latency, complementing Leyden (§30.2b, AOT cache) and GraalVM Native Image (§30.3, closed-world AOT). Its mechanism is fundamentally different from both: rather than compiling code ahead of time, CRaC **snapshots a fully warmed-up JVM** — post-JIT, post-class-load, post-cache-warm — and restores from the snapshot on subsequent starts.
+
+The mechanical core uses **CRIU** underneath on Linux (covered from the debugger angle in `DEBUGGERS.md §2.7`) but adds a coordination layer the generic CRIU lacks. Java applications hold open file descriptors, network connections, JDBC pools, and other live resources that cannot survive arbitrary process snapshotting. CRaC introduces the **`org.crac` API** with two callbacks per registered resource:
+
+- **`beforeCheckpoint(Context)`** — close files, flush buffers, drop sockets, release pool connections, persist in-memory state. Called in registration order.
+- **`afterRestore(Context)`** — reopen files, reconnect sockets, rebuild pools, rehydrate state. Called in *reverse* registration order — so an init sequence and its teardown are mirror-symmetric.
+
+A `jcmd JDK.checkpoint` command (or the in-process `Core.checkpointRestore()`) initiates a snapshot. The JVM walks all registered resources, invokes their `beforeCheckpoint`, then hands control to CRIU which writes the process image to disk. Restoration is the reverse: CRIU restores the process image, the JVM invokes `afterRestore` in reverse order, and the application resumes with all JIT-compiled code, class metadata, and warm caches intact — typical Spring Boot / Quarkus / Micronaut applications report 1–3 second cold starts dropping to **tens of milliseconds**.
+
+Distinct from Leyden (§30.2b): Leyden caches AOT-compiled code, CRaC caches the *entire JVM state* (heap, threads, JIT'd code, pools). Distinct from Native Image (§30.3): CRaC preserves all dynamism (reflection, dynamic class loading, agents, JFR) because the running JVM is unchanged — Native Image gives those up. Distinct from generic CRIU (`DEBUGGERS.md §2.7`): CRaC supports **multiple restores from a single checkpoint** (the design point that distinguishes it as a *deployment* tool rather than a debug tool), because the application coordinates resource state through the API.
+
+The key constraint: **at checkpoint time, no open file handles or network connections are allowed** — every external resource must be releasable. This is restrictive but tractable for most service applications: Spring Boot 3+, Micronaut 4+, and Quarkus 2.10+ ship CRaC integration in their HikariCP / Redis / JDBC / Tomcat / Jetty / Netty integrations, so application authors mostly inherit checkpoint-correctness from framework integrations.
+
+Status (as of 2026-04): Linux-only (x64 + ARM64) for actual checkpoint creation; Windows / macOS support a "simulation engine" for development. Available in **Azul Zulu Builds of OpenJDK** (JDK 17, 21, 25). Production deployments include AWS Lambda Java cold-start optimisation, Cloudflare Workers Java integration, and several FaaS platforms. The `--XX:CRaCCheckpointTo=` and `--XX:CRaCRestoreFrom=` JVM flags drive the lifecycle; runtime constraints (CPU count, memory) at restore should match checkpoint conditions for stability.
+
+The lesson generalises beyond the JVM: **for any managed runtime serving short-lived workloads (FaaS, CLI tools, batch workers, ephemeral containers), a coordinated checkpoint/restore mechanism is a third lever alongside AOT compilation and lazy initialisation**. The coordination cost — explicit `beforeCheckpoint`/`afterRestore` discipline for resource-holding code — is the price for retaining all dynamism that AOT and closed-world approaches give up. CRIU's process-snapshot infrastructure is the OS-level enabler; CRaC is the language-runtime layer that makes it usable for production Java services.
+
+Sources: https://openjdk.org/projects/crac/ and https://docs.azul.com/core/crac/crac-introduction and https://crac.org/ and https://azul.com/products/components/crac and https://github.com/openjdk/crac
 
 ### 30.3. GraalVM Native Image — Closed-World AOT
 
@@ -1828,6 +2025,8 @@ Source: https://github.com/liamHowatt/mcp_forth
 
 ## 34. Summary of Compiler Techniques
 
+Rows are grouped by chapter and within a group roughly follow body order. The Examples column ends with `(§N.M)` anchors back into the chapter where the technique is described in detail. The space and time columns characterize the compiler-side cost of each technique, not the cost it imposes on emitted code.
+
 | Technique | Space Cost | Time Cost | Key Trade-off | Examples |
 |---|---|---|---|---|
 | Copy-and-patch stencils | Stencil library (~MB) | memcpy + patch per instruction | Compilation speed vs code quality | CPython 3.13 JIT (§1.1) |
@@ -1839,6 +2038,9 @@ Source: https://github.com/liamHowatt/mcp_forth
 | Dynamic superinstructions | On-the-fly code stitching | Eliminates dispatch overhead | Basic template copying | GForth (§1.7) |
 | Register vs stack bytecode | Wider instructions | ~47% fewer ops executed | Dispatch overhead vs code size | Lua 5, Dalvik, V8 Ignition (§1.8) |
 | Specializing adaptive interpreter | Per-site type counters | 10–60% speedup without JIT | Interpreter complexity | CPython 3.11+, Brunthaler quickening (§1.9) |
+| Production Python JITs | Method JIT + inliner + type specialization | ~30–50% wins on Instagram-scale workloads | Large codebase + full-time team | Cinder/CinderX, Pyston, Pyjion (§1.10) |
+| PHP 8 IR-based JIT | DynASM origin + standalone SSA IR framework | Mid-sized IR for sub-ms JIT budgets | Curated optimization set | PHP 8 IR (§1.11) |
+| Type-annotation-driven gradual JIT | `--!native` + type-hint specialization | Bypasses speculation; production at billions/day | Wrong annotations = UB | Roblox Luau native (§1.12) |
 | Arena allocation | One large region | ~2ns per allocation | No individual free | bumpalo, every compiler (§2.1) |
 | String interning | Hash table + buffer | One hash per new string | O(1) equality after intern | rustc Symbol, V8 (§2.2) |
 | Hash consing | Hash table + structure | One hash per construction | O(1) structural equality | BDDs, type representations (§2.2) |
@@ -1901,6 +2103,7 @@ Source: https://github.com/liamHowatt/mcp_forth
 | REPL-driven type-directed open coding | Block-compiler + type-environment accumulation | AOT-quality code, REPL-style interactivity | Per-language; Common-Lisp-flavoured | SBCL (§13.7) |
 | Whole-program type-inference compilation | Closed-world flow + escape + alias analysis | 0.6–4× of `gcc -O2` from Scheme source | Super-linear compile time; no sep-compile or eval | Stalin (§13.8) |
 | Whole-program monomorphisation + defunctionalization + contification | SSA pipeline of ~20 small passes | C-competitive on numeric SML; HOL4 production scale | No separate compilation; minutes-scale compile times | MLton (§13.9) |
+| Productive expression DSL over JVM bytecode | Lisp-like AST → ASM → cached generated class | Drops floor of "should I codegen?" for managed-runtime apps | JVM-only; runtime not compile-time | ActiveJ Codegen (§13.10) |
 | Trace-based JIT | Trace recording | Auto-inlining, cross-function opt | Trace explosion on branchy code | LuaJIT, PyPy (§14.1) |
 | OSR / Deoptimization | Stack frame mapping | Tier switch mid-execution | Complex frame reconstruction | V8, HotSpot, SpiderMonkey (§14.2) |
 | Basic Block Versioning | Per-block specialized variants | Type specialization without tracing | Code duplication | Ruby YJIT (§14.3) |
@@ -1914,6 +2117,8 @@ Source: https://github.com/liamHowatt/mcp_forth
 | NVRTC runtime PTX compile | CUDA source → PTX → SASS | Dynamic kernel specialization | Two-stage compile | PyTorch, JAX, XLA (§15.3) |
 | SPIR-V portable GPU IR | Binary SSA IR | Vendor-independent GPU codegen | Driver-level lowering | Vulkan, OpenCL, Mesa (§15.4) |
 | Mesa NIR / XLA / Triton | Multi-stage GPU pipelines | Specialized backends per stage | Ecosystem fragmentation | Mesa, TensorFlow, OpenAI (§15.5) |
+| Interaction-net runtime to GPU | Fixed CUDA evaluator interpreting graphs | No per-program codegen step | Constant-factor cost vs hand-tuned kernels | Bend / HVM2 (§15.6) |
+| Java to GPU via code reflection | Code models lowered to OpenCL/PTX at runtime | No separate kernel language | OpenJDK feature still maturing | Project Babylon + TornadoVM (§15.7) |
 | Perceus ref counting | Linear resource calculus | Garbage-free, in-place reuse | No cycles without extension | Koka (§16.1) |
 | Region-based memory | Region inference | Bulk deallocation, no GC pauses | Less control than ownership | MLKit, Cyclone (§16.2) |
 | Generational references | 48-bit gen per alloc + per-ref | 2–10% cost, no GC/RC/borrow checker | Runtime check on every deref | Vale (§16.3) |
@@ -1921,6 +2126,7 @@ Source: https://github.com/liamHowatt/mcp_forth
 | Historical hybrid-generational memory prototype | Static analysis + scope tethering | Intended to elide many runtime checks | Abandoned/subsumed by regions + generational references | Vale HGM (§16.3) |
 | Hidden classes / IC | Shape transition chains | 60–100x faster monomorphic access | Megamorphic cliff | V8, SpiderMonkey, JSC (§17.1) |
 | Polymorphic Inline Caches | Type-chain dispatch stubs | O(1) for <10 types | Megamorphic cliff | SELF, V8 ICs, Julia (§17.2) |
+| Instance-to-static-class rewriting | ASM-driven runtime instance specialisation | 7× speedup recovering manual-code performance | JVM-only; instance state must be predictable | ActiveJ Specializer (§17.4) |
 | Query-based compilation | Memoized demand-driven | Minimal recompilation | Architectural complexity | rustc, Salsa, rust-analyzer (§18.1) |
 | Parallel codegen units | Split per-function compile | Near-linear core scaling | Lost cross-module inlining | rustc CGUs, LLVM parallel (§18.2) |
 | Content-addressed code by hash | Hash-keyed codebase DB | Distributed compute, renames free | Ecosystem friction (no text files) | Unison (§18.3) |
@@ -1936,7 +2142,9 @@ Source: https://github.com/liamHowatt/mcp_forth
 | Vectorized interpretation | SIMD kernels + batching | ~80% of JIT perf | Batch setup overhead | Photon, DuckDB (§21.2) |
 | JVM bytecode SQL codegen | Janino runtime classes | Reuses HotSpot JIT | Class-loading overhead | Spark Tungsten (§21.3) |
 | LLVM expression JIT library | Per-expression native code | Caches by signature | Narrow scope (no joins) | Apache Arrow Gandiva (§21.5) |
+| Differential dataflow + IVM | Delta-based operator graph + materialised views | Always-current materialised state, sub-ms latency | Long-lived views only, not one-shot queries | Materialize, RisingWave, Epsio (§21.6) |
 | BPF verifier + in-kernel JIT | Static analysis + native emit | Safe user code in kernel | Restricted source language | Linux BPF/eBPF (§22.1) |
+| Move bytecode verifier | Linear-resource discipline + reference safety + ability lattice | Largest-deployment linear-types verifier | Smart-contract-shaped programs only | Move VM (Aptos/Sui) (§22.2) |
 | Hot module reload | Two versions simultaneously | Uptime under upgrade | Requires process-isolated model | Erlang BEAM (§23.1) |
 | Runtime method table patch | Re-JIT on change | Interactive development | Process-local, not distributed | Julia Revise.jl (§23.2), Common Lisp (§23.3) |
 | Edit-and-Continue / HotSwap | IL-level method replace | Iterative debug workflow | Restricted to debug builds | .NET EnC, JVM JVMTI (§23.4) |
@@ -1957,8 +2165,11 @@ Source: https://github.com/liamHowatt/mcp_forth
 | Stage0 / minimal bootstrap | 357-byte hex0 seed | Fully auditable chain | Slow, multi-stage build | GNU Mes, Bootstrappable Builds (§28.3) |
 | Itanium C++ mangling | Structured name encoding | Unambiguous linker symbols | Verbose, demangling needed | GCC, Clang, Rust v0 (§29.2) |
 | TLS model selection | Exec / init / general-dynamic | Speed-vs-flexibility per access | Per-symbol model choice | ELF, Mach-O, COFF (§29.4) |
+| Java FFM API | `MemorySegment` + `Linker` + `MethodHandle` | Pure-Java FFI without JNI per-call overhead | Off-heap memory and lifetime management on the user | Project Panama / FFM (§29.5) |
 | R2R AOT+JIT hybrid | Pre-native with IL fallback | Fast startup + re-spec | AOT less optimized than JIT | .NET CrossGen2 (§30.1) |
 | Deprecated JVM AOT hybrid | Shared-library native image loaded by HotSpot | Startup experiment with JVM fallback | Removed from mainline JDK | HotSpot `jaotc` (§30.2) |
+| AOT caching with JIT fallback | Training-run profiles → AOT cache + JIT for misses | Preserves all dynamism; 2–3× cold-start | Cache must be primed by training | Project Leyden (JDK 25+) (§30.2b) |
+| Process checkpoint/restore as JVM warmup | CRIU snapshot of warmed JVM + `org.crac` lifecycle | Sub-second restore of multi-second-warmup JVM | Snapshot is environment-coupled; resources need pre-checkpoint release | Project CRaC, Azul Zulu (§30.2c) |
 | Closed-world native image | Whole-program AOT executable | Fast startup, low memory | Reduced reflection/loading dynamism | GraalVM Native Image (§30.3) |
 | Salsa incremental type checking | Memoized query graph | 80x faster incremental vs Pyright | Requires query-based architecture | ty, rust-analyzer (§31.1) |
 | Forth metacompilation | 2-phase host-seed + self-host | Retarget to N archs from ~1 file/arch | Forth-only idiom | lbForth, Gforth cross (§33.10) |
@@ -1988,6 +2199,20 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 11. Efficient Interpretation by Inline Caching and Quickening (Brunthaler, ECOOP 2010) — https://publications.cispa.saarland/1069/1/ecoop10.pdf
 12. EuroForth 2024 proceedings (Ertl IP-update papers) — http://www.euroforth.org/ef24/papers/
 13. Anton Ertl EuroForth collection — https://www.complang.tuwien.ac.at/anton/euroforth/
+14. Python 3.14 release notes (free-threading) — https://docs.python.org/3/whatsnew/3.14.html
+15. Faster CPython JIT plan for 3.16 (Ken Jin) — https://fidget-spinner.github.io/posts/faster-jit-plan.html
+16. CinderX repository — https://github.com/facebookincubator/cinderx
+17. Cinder repository (Meta CPython fork) — https://github.com/facebookincubator/cinder
+18. Meta — Cinder JIT function inliner (2022) — https://engineering.fb.com/2022/05/02/open-source/cinder-jits-instagram/
+19. Pyston repository — https://github.com/pyston/pyston
+20. Pyston blog — https://blog.pyston.org/
+21. PHP RFC: JIT — https://wiki.php.net/rfc/jit
+22. PHP RFC: JIT IR Framework — https://wiki.php.net/rfc/jit-ir
+23. PHP JIT in depth (php.watch) — https://php.watch/articles/jit-in-depth
+24. Zend — What's new in PHP 8.4 (JIT changes) — https://www.zend.com/blog/php-8-4
+25. Roblox — Luau Native Code Generation — https://create.roblox.com/docs/luau/native-code-gen
+26. Luau Recap for 2025: Runtime — https://luau.org/news/2025-12-19-luau-recap-runtime-2025/
+27. Luau native code with type hints — https://devforum.roblox.com/t/optimizing-native-code-performance-with-type-hints-and-magic/4247690
 
 ### Chapter 2 — Memory Management in Compilers
 
@@ -2118,6 +2343,10 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 15. Cejtin, Jagannathan, Weeks — "Flow-Directed Closure Conversion for Typed Languages" (POPL 2000) — https://www.cs.purdue.edu/homes/suresh/papers/popl00-camera-ready.pdf
 16. MLton repository — https://github.com/MLton/mlton
 17. Fluet, Weeks — "Contification Using Dominators" — https://www.cs.purdue.edu/homes/suresh/papers/contification.pdf
+18. ActiveJ Codegen — https://activej.io/codegen
+19. ActiveJ Codegen examples — https://activej.io/codegen/examples
+20. activej-codegen on Maven Central — https://central.sonatype.com/artifact/io.activej/activej-codegen
+21. LuaJIT DynASM — https://luajit.org/dynasm.html
 
 ### Chapter 14 — Trace-Based JIT & Speculative Optimization
 
@@ -2147,6 +2376,14 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 7. SPIR-V Specification — https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html
 8. Mesa NIR — https://docs.mesa3d.org/nir/
 9. TensorFlow XLA — https://www.tensorflow.org/xla
+10. HVM2 repository — https://github.com/HigherOrderCO/HVM2
+11. Bend repository — https://github.com/HigherOrderCO/Bend
+12. Taelin — HVM2 paper — https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf
+13. OpenJDK Project Babylon — https://openjdk.org/projects/babylon/
+14. TornadoVM home — https://www.tornadovm.org/
+15. TornadoVM introduction — https://tornadovm.readthedocs.io/en/latest/introduction.html
+16. InfoQ — TornadoVM 2.0 GPU LLM — https://www.infoq.com/news/2025/12/tornadovm-20-gpu-llm/
+17. Babylon vs TornadoVM (Fumero) — https://jjfumero.github.io/posts/2025/02/07/babylon-and-tornadovm
 
 ### Chapter 16 — Advanced Memory Management
 
@@ -2160,6 +2397,9 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 1. Hidden Classes in V8 — https://v8.dev/docs/hidden-classes
 2. Mrale.ph — What's up with Monomorphism? — https://mrale.ph/blog/2015/01/11/whats-up-with-monomorphism.html
 3. Polymorphic Inline Caches (Hölzle, Chambers, Ungar, ECOOP 1991) — https://bibliography.selflanguage.org/_static/pics.pdf
+4. ActiveJ Specializer overview — https://activej.io/specializer
+5. ActiveJ Specializer examples — https://activej.io/specializer/examples
+6. ActiveJ Inject — speeding up injection (Specializer integration) — https://activej.io/inject/speeding-up-injection
 
 ### Chapter 18 — Incremental & Query-Based Compilation
 
@@ -2196,11 +2436,18 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 6. DuckDB: an Embeddable Analytical Database (CIDR 2020) — https://www.cidrdb.org/cidr2020/papers/p22-raasveldt-cidr20.pdf
 7. Apache Arrow Gandiva — https://arrow.apache.org/docs/cpp/gandiva.html
 8. Dremio Gandiva intro — https://www.dremio.com/blog/introducing-gandiva-initiative-for-apache-arrow/
+9. Materialize home — https://materialize.com/
+10. Materialize — Online View Maintenance (OLVM) — https://materialize.com/blog/olvm/
+11. Everything to Know About Incremental View Maintenance — https://materializedview.io/p/everything-to-know-incremental-view-maintenance
+12. Differential dataflow repository — https://github.com/TimelyDataflow/differential-dataflow
 
 ### Chapter 22 — BPF and eBPF JIT
 
 1. Linux BPF Documentation — https://docs.kernel.org/bpf/
 2. BPF Verifier — https://www.kernel.org/doc/html/latest/bpf/verifier.html
+3. Aptos Move language and runtime — https://aptos.dev/network/blockchain/move
+4. Move language reference — https://move-language.github.io/move/
+5. Move smart-contract security guide — https://hackenproof.com/blog/for-hackers/move-smart-contract-security-guide-part-1
 
 ### Chapter 23 — Hot Code Swap and Dynamic Loading
 
@@ -2252,10 +2499,22 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 3. Itanium C++ ABI (Name Mangling) — https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling
 4. Rust v0 Symbol Mangling RFC — https://rust-lang.github.io/rfcs/2603-symbol-name-mangling-v0.html
 5. ELF TLS Models (Drepper) — https://www.akkadia.org/drepper/tls.pdf
+6. JEP 454: Foreign Function & Memory API — https://openjdk.org/jeps/454
+7. OpenJDK Project Panama — https://openjdk.org/projects/panama/
+8. Java SE 25 Foreign Function and Memory API documentation — https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html
 
 ### Chapter 30 — .NET ReadyToRun and AOT+JIT Hybrids
 
 1. .NET ReadyToRun Format — https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/readytorun-format.md
+2. OpenJDK Project Leyden — https://openjdk.org/projects/leyden/
+3. IBM Developer — Improve Java startup with Project Leyden — https://developer.ibm.com/articles/java-project-leyden/
+4. SoftwareMill — Project Leyden & JDK 26: AOT Caching to ZGC — https://softwaremill.com/project-leyden-and-jdk-26-bringing-aot-caching-to-zgc/
+5. Quarkus — How we integrated Project Leyden — https://quarkus.io/blog/leyden-2/
+6. OpenJDK Project CRaC — https://openjdk.org/projects/crac/
+7. CRaC home page — https://crac.org/
+8. Azul — Coordinated Restore at Checkpoint — https://azul.com/products/components/crac
+8a. Azul Docs — CRaC introduction — https://docs.azul.com/core/crac/crac-introduction
+9. OpenJDK CRaC repository — https://github.com/openjdk/crac
 
 ### Chapter 31 — Case Study — ty (Astral)
 

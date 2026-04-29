@@ -930,7 +930,9 @@ The runtime story is unusual: Erlang supports **hot module reload**, where a run
 
 **Elixir** sits on top of the Erlang VM and reuses the same module mechanics with a more hierarchical naming convention (`MyApp.Accounts.User`) and the `defmodule ... do ... end` syntax. The dot-separated module name is a convention layered on top of the flat BEAM module namespace — `MyApp.Accounts.User` compiles to a BEAM module named `Elixir.MyApp.Accounts.User`. Elixir's `import`, `alias`, `require`, and `use` keywords cover different access patterns: `alias` for shorter names, `import` for unqualified function access, `require` for compile-time macro availability, `use` for invoking a module's `__using__/1` macro at compile time. **Mix** is Elixir's build tool, which adds package and dependency management (with **Hex** as the registry) above the application layer.
 
-Sources: https://www.erlang.org/doc/system/code_loading.html and https://www.erlang.org/doc/design_principles/applications.html and https://hexdocs.pm/elixir/Kernel.html#defmodule/2 and https://hexdocs.pm/mix/Mix.html
+**Gleam** (Louis Pilfold, 2016+; v1.0 March 2024) is the third major BEAM language and the first with **Hindley-Milner type inference** as the primary discipline. Modules use the same `.gleam` file = one module convention with hierarchical names mirroring directory paths (`gleam/io.gleam` → `gleam/io`); imports are declarative `import gleam/list` with optional `as` renames and selective `.{map, filter}` unqualified-import; privacy is per-declaration (`pub fn` exports, no marker = module-local). The compiler targets *both* Erlang BEAM and JavaScript, sharing the same module declaration syntax across both backends — distinct from Elixir, which is BEAM-only. The package manager (`gleam` CLI plus Hex registry) integrates with the Mix/Hex ecosystem so Gleam modules can be published alongside Erlang/Elixir packages and consumed from any BEAM language. The lesson: a typed, ML-flavoured layer on a flat-named-runtime substrate (BEAM) is feasible without redesigning the runtime; the module system is unchanged from Erlang's, but the type system makes the ML-style `import .{..}` discipline feel natural rather than retrofitted. Source: https://gleam.run/
+
+Sources: https://www.erlang.org/doc/system/code_loading.html and https://www.erlang.org/doc/design_principles/applications.html and https://hexdocs.pm/elixir/Kernel.html#defmodule/2 and https://hexdocs.pm/mix/Mix.html and https://gleam.run/
 
 ### 8.3. Julia — Module Objects, `using`/`import`, and Precompilation
 
@@ -1146,6 +1148,30 @@ The lesson for language designers: **if the language has compile-time parametric
 
 Sources: https://docs.modular.com/mojo/manual/packages/ and https://docs.modular.com/mojo/manual/structs/ and https://docs.modular.com/mojo/manual/parameters/
 
+### 8.17. CUE — Lattice-Based Configuration Language
+
+Marcel van Lohuizen's **CUE** (Configure, Unify, Execute; descended from Google's GCL) is a configuration language whose module system is unusual because **types and values inhabit the same lattice**, and unification — not assignment — is the primary composition operator. A CUE module is a directory of `.cue` files plus a `cue.mod/module.cue` manifest; imports use Go-style paths (`import "list"`, `import "encoding/json"`); files in the same package implicitly compose by unification, so two files declaring `service: { name: "foo" }` and `service: { port: 8080 }` produce one combined `service: { name: "foo", port: 8080 }` without any explicit merge directive.
+
+The module-system-relevant property is that **constraints and concrete values are the same kind of thing**. A "type" like `int & >0` (positive integer) is a value in the lattice; unifying it with `42` yields `42`; unifying it with `-1` yields `_|_` (bottom — unification failure). Module composition therefore enforces type-and-constraint compatibility automatically: importing a constrained schema and unifying it with concrete data either produces a more-specific value or a build-time error. The package manager (`cue`) supports module versions and dependency resolution against a CUE-specific module proxy.
+
+Production: Kubernetes ecosystem (Istio configuration, kube-policy systems), Dagger CI/CD, several internal Google configuration tools, Tailscale ACLs. Distinct from JSON/YAML schemas: CUE schemas are CUE values, so schemas can be unified with each other to produce more-specific schemas, and a value validates against a schema by being unifiable with it. Distinct from Pkl (Apple's typed configuration language): Pkl is more imperative with classes and inheritance; CUE is fully declarative with lattice unification as the only composition primitive.
+
+The lesson generalises beyond configuration: **a module system can be a unification system if the language's types and values share a lattice**. Most general-purpose languages cannot adopt this model because their type systems are stratified — types and values are different kinds of thing — but for declarative-data languages (configuration, schemas, policy) the unification model handles composition, validation, and constraint propagation in one mechanism.
+
+Sources: https://cuelang.org/docs/introduction/ and https://cuelang.org/ and https://github.com/cue-lang/cue
+
+### 8.18. Haxe — Cross-Compilation as a Module-System Concern
+
+Nicolas Cannasse's **Haxe** is a strict, statically-typed language whose distinguishing trait is that the *target backend* is a configuration choice at compile time: the same source can compile to JavaScript, PHP, C++, C#, Java, Python, Lua, HashLink (Haxe's own VM), NekoVM, or Haxe-specific JVM bytecode. The module system uses Java-like file-as-module-with-`package`-declaration semantics (a file `com/foo/Bar.hx` declares `package com.foo;` and exports class `Bar`), but with one critical addition: **conditional compilation via `#if <flag>`** is used to gate target-specific code, allowing one module file to provide platform-specific implementations behind a single API.
+
+The module-system-interesting property is the **target-conditional dependency**. A library may depend on `js.html.Document` only when compiling to JavaScript, on `cpp.NativeMath` only when compiling to C++, and on neither when compiling to Python. The Haxe build system (`haxelib` + `hxml` build scripts) resolves the dependency graph per-target, so the same library can declare different sets of cross-module imports depending on target — a design point that languages with single-target compilation never need to address. The std library itself is partitioned into target-specific subpackages (`js.*`, `php.*`, `python.*`, etc.) plus a target-agnostic core, and the `target.*` namespace conventions encode the boundary explicitly.
+
+Production: **Heaps** game engine, **Shiro Games** (Northgard, Dune: Spice Wars), **Motion-Twin** (Dead Cells before C++ rewrite), enterprise PHP apps via the `php7` target, and several embedded UI systems on HashLink. Distinct from Kotlin Multiplatform (`§6.4`) which compiles to JVM/JS/Native via separate per-target source-set hierarchies: Haxe uses one source set with `#if` directives, simpler at small scale and noisier at large scale. Distinct from F# (`§8.7`) which has a Fable transpiler to JavaScript: Fable is one bolt-on backend whereas Haxe was multi-target from the start, and the Haxe macro system (compile-time AST manipulation in Haxe itself) lets a library generate target-specific bindings programmatically rather than maintaining hand-written stubs per target.
+
+The lesson for a language designer: **if cross-compilation to multiple radically different runtimes is a first-class goal, the module system needs to be target-aware from the start**. Retrofitting target-conditional imports onto a single-target module system (as Kotlin and F# did) tends to produce per-target source-set hierarchies whose composition rules are awkward; designing the module system around a target enum from day one (as Haxe and Zig with `comptime` target detection do) keeps the surface uniform.
+
+Sources: https://haxe.org/manual/introduction.html and https://haxe.org/ and https://github.com/HaxeFoundation/haxe and https://lib.haxe.org/
+
 ---
 
 ## 9. Research and Advanced Module Calculi
@@ -1315,7 +1341,7 @@ Carbon's module design (still evolving; Carbon is pre-1.0, status as of 2026-04)
 
 The distinguishing claim is that **Carbon learns from the C++20 retrofit**: by making modules the *only* unit from day 1, Carbon avoids the migration overhead that left half of C++'s ecosystem still on `#include` in 2026. The cost is that Carbon has no existing ecosystem to consume — every dependency must be Carbon-native, with C++ interop via a dedicated FFI layer rather than `import` of C++ headers. The interop story is structurally distinct: Carbon defines a controlled interop surface for calling into and out of C++ libraries, but Carbon imports do not see C++ headers as modules.
 
-Status (as of 2026-04): Carbon is pre-1.0, not production-ready. The language is being developed in the open at `github.com/carbon-language/carbon-lang`; the explicit non-goal is "stable enough for production today." For module-system designers, Carbon is the cleanest current example of "modules from day 1, no migration debt" in a C-family successor language — even if Carbon itself never reaches production, its module-system design choices are an instructive data point on what can be done when the migration constraint is removed.
+Status (as of 2026-04): Carbon is pre-1.0, not production-ready. The published 2025 roadmap targeted two areas of focus: a "major chunk of C++ interop working" demo and the design of memory safety; both are still in progress as of early 2026. The language is being developed in the open at `github.com/carbon-language/carbon-lang`; the explicit non-goal is "stable enough for production today." For module-system designers, Carbon is the cleanest current example of "modules from day 1, no migration debt" in a C-family successor language — even if Carbon itself never reaches production, its module-system design choices are an instructive data point on what can be done when the migration constraint is removed.
 
 Sources: https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/modules.md and https://github.com/carbon-language/carbon-lang and https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/code_and_name_organization/README.md
 
@@ -1418,11 +1444,13 @@ The **resource type** is the most distinctive contribution. A resource is an opa
 
 ### 11.3. WASI Worlds and Capability-Scoped Modules
 
-**WASI** (Preview 2 launched January 2024; Preview 3 in progress) is built on the Component Model. WASI defines worlds for common use cases (`wasi:cli/command`, `wasi:http/proxy`, `wasi:keyvalue/store`), each declaring the narrow capability handles a component in that world receives — filesystem dirs, sockets, HTTP clients, clocks, RNGs, etc. The module-boundary point is that a world is a typed-binary IDL: capabilities cross the component boundary as resource handles, and a component's authority equals the handles it was granted at instantiation. Capability mechanics, attenuation/virtualization patterns, and the broader ocap argument live in `MEMORY.md §10`; here the relevant fact is that the Component Model preserves those properties at the binary module boundary because all external interaction goes through declared imports.
+**WASI** (Preview 2 launched January 2024; Preview 3 RC `0.3.0-rc-2025-09-16` released September 2025) is built on the Component Model. WASI defines worlds for common use cases (`wasi:cli/command`, `wasi:http/proxy`, `wasi:keyvalue/store`), each declaring the narrow capability handles a component in that world receives — filesystem dirs, sockets, HTTP clients, clocks, RNGs, etc. The module-boundary point is that a world is a typed-binary IDL: capabilities cross the component boundary as resource handles, and a component's authority equals the handles it was granted at instantiation. Capability mechanics, attenuation/virtualization patterns, and the broader ocap argument live in `MEMORY.md §10`; here the relevant fact is that the Component Model preserves those properties at the binary module boundary because all external interaction goes through declared imports.
 
-The module-system-relevant lessons: **a binary-level module system can be designed from scratch with strong typed interfaces** if the ecosystem commits to a typed IDL (WIT plays for components what signatures play for ML modules), and **the canonical ABI matters** — marshalling typed data across the component boundary has real per-call overhead that the design must balance against richness.
+The Preview 3 release adds **native async via Component Model `future` and `stream` types** — first-class typed async primitives in WIT signatures, replacing the Preview 2 pattern of pollable resource handles. A function returning `future<u32>` exposes a typed promise the consumer awaits; a function returning `stream<u8>` exposes a typed byte stream with built-in backpressure. Status (as of 2026-04): Wasmtime 37+ supports Preview 3 previews; runtime adoption is in early stages, with most production deployments still on Preview 2. The async primitives are co-designed with the Component Model rather than layered on top, so a component-to-component async call goes through the typed interface without needing a separate async runtime per language.
 
-Sources: https://github.com/WebAssembly/component-model and https://component-model.bytecodealliance.org/ and https://github.com/WebAssembly/WASI and https://github.com/WebAssembly/WASI/blob/main/Proposals.md
+The module-system-relevant lessons: **a binary-level module system can be designed from scratch with strong typed interfaces** if the ecosystem commits to a typed IDL (WIT plays for components what signatures play for ML modules); **the canonical ABI matters** — marshalling typed data across the component boundary has real per-call overhead that the design must balance against richness; and **adding async to the IDL after the fact requires careful co-design** rather than bolting per-runtime async semantics on each side of a synchronous interface.
+
+Sources: https://github.com/WebAssembly/component-model and https://component-model.bytecodealliance.org/ and https://github.com/WebAssembly/WASI and https://github.com/WebAssembly/WASI/blob/main/Proposals.md and https://wasi.dev/roadmap
 
 ### 11.4. Design Lessons from Wasm Components
 
@@ -1461,6 +1489,7 @@ The previous chapters now cover enough of the design space to support direct com
 | Swift (§8.1) | Module (framework / SPM target) | Build-tool target name | Low-medium | Framework / SPM package |
 | Erlang (§8.2) | Module (`-module(foo).`) | Flat module name | Medium (one module per file) | OTP application + Hex package |
 | Elixir (§8.2) | Module (`defmodule MyApp.Foo`) | Hierarchical-by-convention atom name | Medium | Mix project + Hex package |
+| Gleam (§8.2) | File-as-module on BEAM and JS | Hierarchical name mirroring directory path | High | gleam CLI + Hex package |
 | Julia (§8.3) | Module + package | `module Foo`, possibly nested | Low (file-as-include) | Pkg environment + General registry |
 | Dart (§8.4) | Library | URI specifier (`package:foo/foo.dart`) | Medium-high | pub package |
 | Nim (§8.5) | File-as-module | Filename | High | Nimble package |
@@ -1484,6 +1513,7 @@ The previous chapters now cover enough of the design space to support direct com
 | Wasm Component (§11.2) | Component artifact | WIT world declaration | None (binary artifact) | Distribution-format-independent |
 | Deno (`PACKAGING.md §3.7`) | Module URL + content hash | HTTPS URL with version path; lockfile pins SHA-256 | None (URL-shaped) | No central registry; URL identity = distribution identity |
 | Mojo (§8.16) | File-as-module | Filename + dotted package path | Medium-high | Compile-time-elaborated parametric IR shipped pre-instantiation |
+| CUE (§8.17) | Directory-as-package on lattice | `cue.mod/module.cue` manifest + Go-style import path | Medium | CUE module proxy |
 | Carbon (§9.12) | Library inside package | `package`/`library` declaration | Toolchain-managed | BUILD-file mapping; modules from day 1 |
 
 ### 12.2. Import semantics
@@ -1530,6 +1560,7 @@ The previous chapters now cover enough of the design space to support direct com
 | Deno (`PACKAGING.md §3.7`) | Yes (ESM) | Yes (ESM evaluation) | Module records per host | Allowed (ESM live-binding) | URL-shaped imports, content-hashed lockfile |
 | Mojo (§8.16) | Yes (`from foo import bar`) | No (no module-body exec at import time) | Compile-time namespace | Disallowed in practice | Compile-time elaboration over imports |
 | Carbon (§9.12) | Yes (`import Foo library "Bar"`) | No (compile-time only) | Not primary | Forbidden across libraries / packages | API/impl file split with explicit `api` markers |
+| Haxe (§8.18) | Yes (`package`) | No body exec at import | Not primary | Allowed | `#if` target-conditional imports across multi-target std library |
 
 ### 12.3. Visibility and export models
 
@@ -1796,6 +1827,7 @@ References are grouped by the chapter that first cites them. Within each chapter
 6. Erlang — Applications design principles — https://www.erlang.org/doc/design_principles/applications.html
 7. Elixir — `Kernel.defmodule/2` — https://hexdocs.pm/elixir/Kernel.html#defmodule/2
 8. Mix build tool — https://hexdocs.pm/mix/Mix.html
+8b. Gleam programming language — https://gleam.run/
 9. Julia Manual — Modules — https://docs.julialang.org/en/v1/manual/modules/
 10. Julia Manual — Code loading — https://docs.julialang.org/en/v1/manual/code-loading/
 11. Julia 1.9 highlights (precompilation) — https://julialang.org/blog/2023/04/julia-1.9-highlights/
@@ -1840,6 +1872,13 @@ References are grouped by the chapter that first cites them. Within each chapter
 50. Mojo packages manual — https://docs.modular.com/mojo/manual/packages/
 51. Mojo structs manual — https://docs.modular.com/mojo/manual/structs/
 52. Mojo parameters / parametric types — https://docs.modular.com/mojo/manual/parameters/
+53. CUE language documentation — https://cuelang.org/docs/introduction/
+54. CUE language home — https://cuelang.org/
+55. CUE repository — https://github.com/cue-lang/cue
+56. Haxe Manual — Introduction — https://haxe.org/manual/introduction.html
+57. Haxe language home — https://haxe.org/
+58. Haxe repository — https://github.com/HaxeFoundation/haxe
+59. Haxelib package directory — https://lib.haxe.org/
 
 ### Chapter 9 — Research and Advanced Module Calculi
 
@@ -1898,3 +1937,4 @@ References are grouped by the chapter that first cites them. Within each chapter
 4. Bytecode Alliance — Component Model book — https://component-model.bytecodealliance.org/
 5. WASI repository — https://github.com/WebAssembly/WASI
 6. WASI proposals — https://github.com/WebAssembly/WASI/blob/main/Proposals.md
+7. WASI roadmap (0.3 native async) — https://wasi.dev/roadmap

@@ -1406,4 +1406,3 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 2. TLA+ Debugger: Interactive State-Space Exploration — https://discuss.tlapl.us/msg06620.html
 3. Nawrocki et al.: An Extensible User Interface for Lean 4 (ITP 2023) — https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf
 4. leanprover/vscode-lean4 InfoView Manual — https://github.com/leanprover/vscode-lean4
-
