@@ -23,7 +23,7 @@ Ownership boundaries with other documents:
 - Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Sanitizer mechanism details (including ThreadSanitizer) are owned by `TRACERS.md §8`; this document covers only debugger-use.
 - Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`. The Miri/Stacked-Borrows aliasing model is canonical in `MEMORY.md §§1.3, 8.11`; `DEBUGGERS.md §8.8` covers Miri only as a debugger-side UB interpreter.
 - Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`. Compiler-emitted debug metadata encoding is in `COMPILERS.md §5`; OSR/deoptimization is in `COMPILERS.md §14.2`.
-- Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §11` for hot-reload from the module-system angle).
+- Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §10` for hot-reload from the module-system angle).
 
 ---
 
@@ -401,7 +401,7 @@ Source: https://github.com/reduxjs/redux-devtools
 
 ### 3.12. Edit-and-Continue / Hot Code Replacement
 
-Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version. The *module-system* preconditions that make this possible — flat-or-stable module identity, individually loadable artifacts, language-level cooperation primitives like `import.meta.hot.accept` — are covered in `MODULES.md §11`.
+Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version. The *module-system* preconditions that make this possible — flat-or-stable module identity, individually loadable artifacts, language-level cooperation primitives like `import.meta.hot.accept` — are covered in `MODULES.md §10`.
 
 Visual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk images, Flutter hot reload, Clojure REPL-driven development, and browser hot-module replacement all pick different points in the design space. The core problems are stable function identity, active-frame migration, closure layout changes, object shape changes, inlined-frame deoptimization, and coexistence of old and new code.
 

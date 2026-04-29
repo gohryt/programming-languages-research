@@ -660,7 +660,7 @@ The internal architecture has two strata:
 
 The ergonomic cost is real: ATS's dependent types interact with linearity in ways that produce verbose annotations and intricate proof obligations. The language has not seen wide adoption despite shipping useful production code (the Postiats compiler is itself written in ATS, plus several embedded-systems and cryptography projects). Compare Idris 2's QTT (§6.9): QTT aims for similar expressivity with cleaner ergonomics, leveraging multiplicities in binders rather than separate linear-and-dependent type strata.
 
-The lesson is that **combining linearity with dependent types is feasible at production scale** but ergonomically demanding; modern designs (QTT, Granule §1.12 in `MEMORY.md`) attempt cleaner integrations of the same expressive power.
+The lesson is that **combining linearity with dependent types is feasible at production scale** but ergonomically demanding; modern designs (QTT, Granule — `MEMORY.md §1.12`) attempt cleaner integrations of the same expressive power.
 
 Sources: http://www.ats-lang.org/ and https://www.cs.bu.edu/~hwxi/ATS/ATS.html and https://www.cs.bu.edu/~hwxi/atslangweb/ATS2/COURSES/PRACTAlT/HTML/x46.html
 

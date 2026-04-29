@@ -539,7 +539,7 @@ Source: https://source.android.com/docs/core/runtime/dex-format
 
 BEAM is the bytecode for the Erlang VM, also used by Elixir, LFE, and other BEAM languages. Register-based, with operations modeling Erlang's per-process heap, message passing, and pattern matching natively. Tail calls are first-class (every BEAM call site is potentially a tail call). The bytecode is loaded into the VM as `.beam` files, one per Erlang module.
 
-BEAM's distinctive feature: hot code reload is a first-class VM concept. Modules can be reloaded while processes continue executing the old version (`COMPILERS.md §23.1`, `MODULES.md §11.3`). This shapes the bytecode design — BEAM avoids cross-module inlining at the bytecode level, keeping module boundaries swappable.
+BEAM's distinctive feature: hot code reload is a first-class VM concept. Modules can be reloaded while processes continue executing the old version (`COMPILERS.md §23.1`, `MODULES.md §10.3`). This shapes the bytecode design — BEAM avoids cross-module inlining at the bytecode level, keeping module boundaries swappable.
 
 Source: https://www.erlang.org/doc/system/code_loading.html
 
@@ -875,7 +875,7 @@ Source: https://www.bradrodriguez.com/papers/moving1.htm
 
 Forth's fundamental representation is the *dictionary*: a linked list of named entries, each containing a name, a flag word (immediate, hidden, etc.), a code field, and a parameter field. The program is a sequence of dictionary references; compilation extends the dictionary; interpretation walks it.
 
-This is not an IR layered atop a parser tree — it IS the program representation. There is no AST in classical Forth; the source is interpreted directly into dictionary entries via the text-interpreter (`PARSERS.md §6.2`). The dictionary is simultaneously the symbol table, the code store, and the executable form. Cross-reference: `MODULES.md §9.10` covers Forth wordlists as the module system.
+This is not an IR layered atop a parser tree — it IS the program representation. There is no AST in classical Forth; the source is interpreted directly into dictionary entries via the text-interpreter (`PARSERS.md §6.2`). The dictionary is simultaneously the symbol table, the code store, and the executable form. Cross-reference: `MODULES.md §8.10` covers Forth wordlists as the module system.
 
 Source: https://forth-standard.org/standard/dictionaries
 

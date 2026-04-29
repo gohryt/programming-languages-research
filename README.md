@@ -18,7 +18,8 @@ The goal is to make the notes useful to any programming-language implementer. Ke
 | `DEBUGGERS.md` | Debugger workflows and protocols | Breakpoints, record/replay, time travel, debugger protocols, DWARF correctness, fault isolation |
 | `TRACERS.md` | Runtime observability and profiling | Tracing, profiling, probes, event pipelines, trace storage, visualization, continuous profiling |
 | `MEMORY.md` | Memory models and memory safety | Ownership, borrowing, regions, RC, GC, allocators, hardware safety, verification, reclamation, capabilities |
-| `MODULES.md` | Module/package boundaries | Imports, package identity, linking boundaries, dynamic loading, hot reload at the module-system level |
+| `MODULES.md` | Module boundaries (language-level) | Imports, visibility, linking boundaries, dynamic loading, hot reload at the module-system level |
+| `PACKAGING.md` | Package boundaries (ecosystem-level) | Package identity, resolution, lockfiles, registries, build systems, workspaces, vendoring, reproducibility |
 
 ---
 
@@ -61,6 +62,8 @@ When adding new research, put the full treatment in the canonical document and k
 | Sanitizers | `TRACERS.md` | `MEMORY.md` discusses the safety model; `DEBUGGERS.md` discusses debugging use |
 | Module identity and import semantics | `MODULES.md` | Compiler/runtime docs should mention implementation consequences only |
 | Hot reload at module boundaries | `MODULES.md` | Compiler/debugger docs may discuss code replacement mechanics |
+| Package identity, resolution, registries | `PACKAGING.md` | Module docs may reference packaging-shaped resolution but should not duplicate it |
+| Lockfiles, workspaces, build-system layering | `PACKAGING.md` | Compiler docs may mention build-graph integration points only |
 
 ---
 

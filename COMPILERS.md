@@ -1106,7 +1106,7 @@ JIT compilers extend inline caching (§§17.1–17.2) with deeper speculation gu
 
 Interactive tooling — language servers, IDE diagnostics, watch-mode builds — requires compilers that do as little work as possible when anything changes. Entries in this chapter differ on *what the unit of caching is and how invalidation propagates*: query-based architectures like Salsa memoize demand-driven functions with automatic dependency tracking, parallel codegen splits a single compilation across workers, and Unison makes content-addressing the primary code identity so that rebuilds collapse to hash lookups. Each extracts incrementality from a different level of the compilation pipeline.
 
-> The *module-system* angle on dependency boundaries — package vs crate vs module identity, deterministic resolution, and how source-level module design constrains incremental invalidation — lives in `MODULES.md §6` and `MODULES.md §12.1` (lockfiles).
+> The *module-system* angle on dependency boundaries — package vs crate vs module identity, deterministic resolution, and how source-level module design constrains incremental invalidation — lives in `PACKAGING.md §3` and `PACKAGING.md §4.1` (lockfiles).
 
 ### 18.1. Query-Based Compilation — rustc, Salsa, rust-analyzer
 
@@ -1148,7 +1148,7 @@ The compiler-pass consequences:
 - **Result caching by expression hash.** Pure expressions are cached keyed by expression-tree hash; a watched expression recomputes only when its hash changes. The effect system prevents I/O in watch positions, so caching is safe.
 - **Distributed computation for free.** Shipping a computation means shipping the bytecode tree; the receiver requests missing dependencies by hash and runs locally. The Unison **Remote** ability exposes this directly.
 
-This makes Unison the **inverse** of the rest of this chapter: query-based compilation (§18.1) caches compiled outputs by input hash but keeps source name-addressed; Unison makes content-addressing the *primary* code identity, and builds/caches/distribution fall out as corollaries. The module-system and ecosystem implications — non-breaking renames, dependency-conflict elimination by construction, code-hosting that understands content-addressed code, and the broader axis of identity-by-name vs identity-by-hash — live in `MODULES.md §6`.
+This makes Unison the **inverse** of the rest of this chapter: query-based compilation (§18.1) caches compiled outputs by input hash but keeps source name-addressed; Unison makes content-addressing the *primary* code identity, and builds/caches/distribution fall out as corollaries. The module-system and ecosystem implications — non-breaking renames, dependency-conflict elimination by construction, code-hosting that understands content-addressed code, and the broader axis of identity-by-name vs identity-by-hash — live in `PACKAGING.md §3`.
 
 For a new language, partial content-addressing (hashing compiled artifacts by IR content, caching expression results by hash) captures much of the value with lower ecosystem cost than full Unison-style replacement of text source.
 
@@ -1333,7 +1333,7 @@ Sources: https://docs.kernel.org/bpf/ and https://www.kernel.org/doc/html/latest
 
 Runtime compilation integration includes not just "compile and run" but "replace running code without stopping the process." Entries differ on *where the code/state boundary is drawn*: Erlang BEAM cleaves at the module level with at-most-two-versions-in-flight semantics that work because Erlang processes share nothing; Julia's Revise.jl exploits the first-class method table to swap methods under a running JIT; Common Lisp's image-based redefinition treats the live environment itself as the program, with interactive `defun` propagating through CLOS dispatch; .NET Edit-and-Continue and the JVM HotSwap equivalent replace method bodies via debugger-facing APIs (`ICorProfilerInfo::SetILFunctionBody`, JVMTI) under tight constraints (Debug builds, no signature changes); and the C/C++ `dlopen` live-reload pattern (Casey Muratori's Handmade Hero being the canonical demonstration) draws the boundary by hand, keeping mutable state in the host and hot-swappable code in a shared library. The shared lesson is that any live-reload discipline requires a clean split between replaceable code and surviving state, whether the language enforces the split or the programmer does.
 
-> The *module-system* angle — what the language commits to (flat vs hierarchical module identity, individually loadable artifacts, fully-qualified-call vs local-call distinctions) so that runtime swap is even possible — is covered in `MODULES.md §11`. Erlang's hot-reload story in particular is enabled by language-design choices made decades ago at the module-system layer.
+> The *module-system* angle — what the language commits to (flat vs hierarchical module identity, individually loadable artifacts, fully-qualified-call vs local-call distinctions) so that runtime swap is even possible — is covered in `MODULES.md §10`. Erlang's hot-reload story in particular is enabled by language-design choices made decades ago at the module-system layer.
 
 ### 23.1. Erlang/BEAM — Hot Module Reload
 
