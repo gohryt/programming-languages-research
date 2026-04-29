@@ -18,7 +18,7 @@ To resume past a breakpoint without removing it (which would be racy in multithr
 
 The simplest breakpoint mechanism is also the most universal. Every CPU architecture has a trap instruction. The out-of-line execution trick avoids races that simpler schemes cannot handle.
 
-Source: https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints and https://devblogs.microsoft.com/oldnewthing/20241111-00/?p=110503
+Sources: https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints and https://devblogs.microsoft.com/oldnewthing/20241111-00/?p=110503
 
 ### 1.2. Chris Wellons — INT3;NOP as Fast Conditional Breakpoint
 
@@ -66,7 +66,7 @@ The trade-off is precision versus scale. Page watchpoints can cover kilobytes or
 
 The language-design lesson: **allocator cooperation turns crude page faults into useful object watchpoints**. A runtime that can place one object, arena, stack segment, or actor heap on a protected page can offer data breakpoints that are far larger than hardware DR registers allow.
 
-Source: https://man7.org/linux/man-pages/man2/mprotect.2.html and https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
+Sources: https://man7.org/linux/man-pages/man2/mprotect.2.html and https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
 
 ### 1.6. Event Breakpoints / Catchpoints
 
@@ -76,7 +76,7 @@ GDB's `catch throw`, `catch syscall`, `catch fork`, `catch exec`, and shared-lib
 
 The language-design lesson: **make runtime events first-class debugger stop reasons**. If the runtime already classifies events for exceptions, panics, tasks, actors, effects, or allocators, expose those same event IDs to the debugger instead of forcing users to guess implementation functions to break on.
 
-Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html and https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
+Sources: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html and https://chromedevtools.github.io/devtools-protocol/tot/Debugger/
 
 ### 1.7. Assertions, Contracts, and Semantic Breakpoints
 
@@ -86,13 +86,13 @@ Eiffel made Design by Contract central to the language. Racket contracts enforce
 
 The language-design lesson: **contracts should have debugger semantics**. A new language can define whether contract failures terminate, throw, invoke restarts, enter the debugger, continue in observe mode, log telemetry, or become catchable semantic breakpoints. This gives users a precise spectrum from zero-overhead release builds to invariant-rich debug builds.
 
-Source: https://docs.racket-lang.org/guide/contracts.html, https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions, and https://cppreference.dev/w/cpp/language/contracts
+Sources: https://docs.racket-lang.org/guide/contracts.html, https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions, and https://cppreference.dev/w/cpp/language/contracts
 
 ---
 
 ## 2. Record and Replay
 
-Record/replay debuggers turn execution into an artifact you can rewind. Entries differ on **what fraction of execution is re-derived on replay vs. captured at record time**: rr records only nondeterministic inputs and re-derives the rest; Pernosco post-processes rr traces into a searchable database; VS Snapshot and CRIU capture whole program state at chosen points; Magic Trace captures a ring buffer of hardware-traced control flow; Perfetto ingests trace files into a queryable relational store. Each choice trades recording overhead against replay power.
+Record/replay debuggers turn execution into an artifact you can rewind or query. Entries differ on **what fraction of execution is re-derived on replay vs. captured at record time**: rr records nondeterministic inputs and re-derives the rest; Pernosco post-processes rr traces into a searchable database; VS Snapshot and CRIU capture whole program state at chosen points; Magic Trace and Perfetto appear here only for their debugger workflows. Their tracing substrates are covered in `TRACERS.md`.
 
 ### 2.1. rr — Deterministic Record and Replay
 
@@ -109,7 +109,7 @@ The critical insight: you don't need to record every instruction — only the no
 
 The hardware performance counter approach is brittle — it depends on CPU-specific counter behavior and has been broken by various CPU microcode updates and errata. The rr team maintains a list of known-good CPU models. An alternative project, `rr.soft`, replaces hardware counters with lightweight dynamic instrumentation for environments where counters are unavailable (VMs, cloud, Apple Silicon via emulation).
 
-Source: https://rr-project.org/ and https://queue.acm.org/detail.cfm?id=3688088
+Sources: https://rr-project.org/ and https://queue.acm.org/detail.cfm?id=3688088
 
 ### 2.2. Pernosco — Omniscient Debugging via Post-Hoc Analysis
 
@@ -125,7 +125,7 @@ Pernosco also demonstrates "omniscient JS debugging" by observing V8's internal 
 
 The trade-off: Pernosco's analysis takes minutes to hours and writes tens of gigabytes. It is a post-hoc tool, not a live tool. But users report it is overwhelmingly faster than traditional debugging for complex bugs.
 
-Source: https://pernos.co/ and https://robert.ocallahan.org/2024/10/debt-workshop.html
+Sources: https://pernos.co/ and https://robert.ocallahan.org/2024/10/debt-workshop.html
 
 ### 2.3. Visual Studio Snapshot Debugger — Non-Breaking Production Snapshots
 
@@ -155,7 +155,7 @@ This also distinguishes TTD from rr in a useful way. rr's killer move is determi
 
 The trade-off is that TTD is still a recording-based system: it adds overhead while capturing, and it is Windows-centric. But as a debugger UX idea — execution history as a queryable object model — it deserves to be in any survey of original debugger designs.
 
-Source: https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-overview and https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-object-model and https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-memory-objects
+Sources: https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-overview and https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-object-model and https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-memory-objects
 
 ### 2.6. devops-rewind — Branching Terminal Session Debugger
 
@@ -173,7 +173,7 @@ This puts CRIU in a different category from rr and VS Snapshot. It does not reco
 
 The limitations are concrete: not every resource can be C/R'd (GPUs, some kernel interfaces, raw sockets), and the restored process must land on a kernel and filesystem close enough to the dump to look the same from userspace. MPI and GPU-accelerated workloads often fail outright.
 
-Source: https://criu.org/Main_Page and https://criu.org/Assisted_debugging
+Sources: https://criu.org/Main_Page and https://criu.org/Assisted_debugging
 
 ### 2.8. UndoDB / LiveRecorder — JIT-Instrumented Record/Replay
 
@@ -189,7 +189,7 @@ Undo's UDB is a commercial time-travel debugger for Linux C/C++/Rust that differ
 
 rr and UDB together map the design space for record/replay: rr's hardware-counter route is fastest on supported CPUs; UDB's JIT route is more portable across CPUs and virtualized environments; both share the deterministic-replay-plus-reverse-execution core and produce traces that a GDB front-end can drive.
 
-Source: https://undo.io/products/udb/ and https://docs.undo.io/GettingStartedWithUDB.html
+Sources: https://undo.io/products/udb/ and https://docs.undo.io/GettingStartedWithUDB.html
 
 ### 2.9. TotalView ReplayEngine — MPI / HPC Reverse Debugging
 
@@ -201,23 +201,15 @@ This is the omniscient pattern applied to scientific parallel computing where bu
 
 The design lesson: **deterministic replay must be negotiated with every nondeterminism source in the platform**. On a desktop, that means the scheduler and the kernel. On HPC, add MPI, RDMA, NUMA memory affinity, and GPU offload. A language runtime aiming at HPC has to expose hooks for each.
 
-Source: https://help.totalview.io/classicTV/current/HTML/Splash/tvgettingstartedug-gettingStarted.3.30.html and https://help.totalview.io/previous_releases/2024.2/HTML/TotalView/totalviewlhug-parallel-debugging-setup.19.46.html
+Sources: https://help.totalview.io/classicTV/current/HTML/Splash/tvgettingstartedug-gettingStarted.3.30.html and https://help.totalview.io/previous_releases/2024.2/HTML/TotalView/totalviewlhug-parallel-debugging-setup.19.46.html
 
-### 2.10. Magic Trace — Intel PT Circular Buffer for Retrospective Control-Flow Debugging
+### 2.10. Magic Trace — Triggered Hardware-Trace Debugging
 
-Jane Street's `magic-trace` (Tristan Hume, 2022) is a debugger built on **Intel Processor Trace with a circular buffer**. Unlike `perf`, which samples periodically, magic-trace records *all control flow* continuously into a ring buffer; a **trigger event** — `SIGUSR2`, a specific function call, or Ctrl+C — takes a snapshot of the last ~10 ms of execution. The snapshot is reconstructed into a call-stack timeline viewable in Perfetto UI (§2.12).
+Jane Street's `magic-trace` is covered as a hardware-tracing mechanism in `TRACERS.md §5.1`; the debugger-specific contribution is the workflow. Intel Processor Trace records recent control flow into a circular buffer, and a trigger event snapshots the last ~10 ms into a call-stack timeline viewable in Perfetto.
 
-The original contribution is the *debugging framing* of Intel PT. The hardware has existed since Broadwell/Skylake and `perf` has supported it since 2015. What magic-trace adds:
-- **Snapshot-on-trigger workflow**: the user chooses when to freeze the ring buffer, so recording can run indefinitely in production with bounded storage.
-- **Call-stack reconstruction that handles OCaml tail-calls and exceptions** — Intel PT emits 1 bit per conditional branch and nothing else; turning that back into meaningful call stacks in a language with aggressive tail-call optimization and OCaml-style exception unwinding is nontrivial.
-- **~2–10% overhead**, low enough to enable in production for services that cannot tolerate record/replay's 20%+ cost.
-- ~40 ns resolution per event, vastly finer than sampling profilers.
+This answers a narrower but highly practical question than full record/replay: **what executed immediately before the crash, latency spike, or suspicious state?** It does not provide arbitrary historical values, but it gives low-overhead retrospective control-flow debugging for production-like runs. The language-design lesson is that hardware traces become useful only after the runtime/compiler can reconstruct meaningful language frames from raw branch packets.
 
-This is the debugger face of the Intel PT story — the tracer angle lives in `TRACERS.md §5`. The philosophical move is important for this chapter: **hardware tracing + circular buffer + trigger-driven snapshot = low-overhead retrospective control-flow debugging for the last 10 ms**. It answers "what executed right before the crash/slowdown/weird state?" rather than arbitrary value-history questions, so it complements rather than replaces full record/replay or omniscient data debugging.
-
-Limitations: Intel only (Skylake or later), Linux only, VMs mostly unsupported. Works on any language the compiler emits stable call frames for, but stack-reconstruction quality depends on handling language-specific idioms — OCaml is handled; other languages vary.
-
-Source: https://github.com/janestreet/magic-trace and https://blog.janestreet.com/magic-trace/
+Sources: https://github.com/janestreet/magic-trace and https://blog.janestreet.com/magic-trace/
 
 ### 2.11. `ocamldebug` — Fork-Checkpoint Reverse Execution (1991)
 
@@ -231,19 +223,15 @@ OCaml's `ocamlearlybird` exposes this over the Debug Adapter Protocol (§5.2); t
 
 Source: https://ocaml.org/manual/5.3/debugger.html
 
-### 2.12. Perfetto TraceProcessor + PerfettoSQL — Trace as SQL Database
+### 2.12. Perfetto TraceProcessor + PerfettoSQL — Trace as Queryable Evidence
 
-Perfetto is Google's tracing infrastructure for Android and Linux (the recorder side is in `TRACERS.md §11`). Its debugger-adjacent contribution is **TraceProcessor**: a C++ library that ingests a trace file and exposes its contents as **SQLite-queryable relational tables**.
+Perfetto's recorder, wire format, and visualization role are covered in `TRACERS.md §11.2`. The debugger-adjacent contribution is **TraceProcessor**: it ingests a trace and exposes execution events as SQLite-queryable relational tables.
 
-Standard tables include `slice` (named events with start/end), `thread_slice` (slices partitioned by thread), `counter` (scalar time series like CPU frequency, memory pressure), `process`, `thread`, `cpu`, `symbol` — dozens of them, documented in Perfetto's SQL table reference. The trace is effectively a relational database of execution events.
+That makes a trace more than a timeline. A debugger or investigation tool can ask structured questions over `slice`, `thread_slice`, `counter`, `process`, `thread`, `cpu`, and symbol tables instead of manually scrolling through rectangles. PerfettoSQL adds domain-specific table/function/view/macro support and reusable metrics, turning common performance-debugging questions into named queries.
 
-**PerfettoSQL** extends SQLite with new syntax, all marked with the `PERFETTO` keyword to signal extensions: `CREATE PERFETTO TABLE` (read-only optimized tables defined by a `SELECT` statement), `CREATE PERFETTO FUNCTION` (scalar or table-valued, inspired by PostgreSQL), `CREATE PERFETTO VIEW`, `CREATE PERFETTO INDEX` (fast lookups on sorted columns), `CREATE PERFETTO MACRO` (Rust-macro-inspired syntactic extension). "Metrics" are pre-baked named SQL queries maintained by domain experts that output structured JSON/Protobuf — a library of common diagnostics (janky frames, GC pauses) that runs without the user writing any SQL.
+The design lesson is narrow and important: if runtime events are emitted with stable typed schemas, a debugger can treat execution history as queryable evidence. Timeline UI is one view; SQL-like analysis is the more general interface.
 
-An emerging ecosystem direction is **LLM-driven query loops**: an AI agent iteratively issues SQL queries against a trace, refines hypotheses, and localizes bottlenecks in minutes instead of hours of manual timeline scrolling. This mirrors WinDbg TTD's `dx`/`TTD.Memory(...)` query model (§2.5) — open-source Linux/Android performance traces with SQL as the query language instead of a bespoke object model.
-
-The design lesson: **trace-as-database is a richer debugger interface than trace-as-timeline**. The timeline is one visualization; the database supports arbitrary queries — "find all slices longer than 10 ms on thread X preceded within 1 ms by a GC pause on any thread" — that no timeline UI can express.
-
-Source: https://perfetto.dev/docs/analysis/perfetto-sql-getting-started and https://perfetto.dev/docs/analysis/perfetto-sql-syntax
+Sources: https://perfetto.dev/docs/analysis/perfetto-sql-getting-started and https://perfetto.dev/docs/analysis/perfetto-sql-syntax
 
 ---
 
@@ -299,7 +287,7 @@ The philosophical point: the debugger is the IDE. Rather than a cycle of edit �
 
 No other mainstream language has achieved this level of integration, except Common Lisp (see below).
 
-Source: https://pharo.org/ and https://stackoverflow.com/questions/54496857/how-does-pharo-starts-debugger-when-message-is-not-understanded
+Sources: https://pharo.org/ and https://stackoverflow.com/questions/54496857/how-does-pharo-starts-debugger-when-message-is-not-understanded
 
 ### 3.5. Common Lisp — Condition/Restart System
 
@@ -329,7 +317,7 @@ The insight: if the language provides a first-class mechanism for annotating the
 
 The overhead is one mark allocation per annotated frame. When no marks are read, the only cost is the allocation (which is amortized by the GC). When marks are read, it is a stack walk — but only the marks with the requested key are returned, not the entire stack.
 
-Source: https://www2.ccs.neu.edu/racket/pubs/dissertation-clements.pdf and https://srfi.schemers.org/srfi-157/srfi-157.html
+Sources: https://www2.ccs.neu.edu/racket/pubs/dissertation-clements.pdf and https://srfi.schemers.org/srfi-157/srfi-157.html
 
 ### 3.7. HyperDbg — Ring -1 Debugging with EPT Hidden Hooks
 
@@ -341,7 +329,7 @@ This is philosophically different from traditional debugger design. The debugger
 
 The price is complexity and specificity. This is specialized machinery: Windows, VT-x, EPT, kernel-mode/hypervisor expertise, and significant engineering surface area. But it is genuinely original and belongs in the survey.
 
-Source: https://misc0110.net/files/hyperdbg_ccs22.pdf and https://docs.hyperdbg.org/commands/extension-commands/epthook and https://github.com/HyperDbg/docs
+Sources: https://misc0110.net/files/hyperdbg_ccs22.pdf and https://docs.hyperdbg.org/commands/extension-commands/epthook and https://github.com/HyperDbg/docs
 
 ### 3.8. REPL-Integrated Debuggers — pdb, PuDB, GHCi `:history`
 
@@ -353,7 +341,7 @@ Python's `pdb` contribution is idiomatic ubiquity: `pdb.set_trace()` can be drop
 
 The broader pattern: in a language with an interactive REPL, the debugger is not a separate tool but a set of REPL commands that share the interpreter's state. This is the less reflective cousin of Pharo's `doesNotUnderstand:` integration (§3.4) and Common Lisp's condition/restart system (§3.5) — the same philosophy at a lower ceiling.
 
-Source: https://docs.python.org/3/library/pdb.html and https://documen.tician.de/pudb/index.html and https://simonmar.github.io/bib/papers/ghci-debug.pdf
+Sources: https://docs.python.org/3/library/pdb.html and https://documen.tician.de/pudb/index.html and https://simonmar.github.io/bib/papers/ghci-debug.pdf
 
 ### 3.9. Managed-Runtime Omniscient Debuggers — Chronon, TOD, IntelliTrace, RevDebug
 
@@ -369,7 +357,7 @@ Bil Lewis's ODB (§3.1) defined the shape of omniscient debugging for Java but d
 
 All four make the same design bets ODB made: record through bytecode instrumentation, store as events, replay through a trace-as-database UI. They differ on **where the overhead lands** — Chronon on the target JVM, TOD on a database cluster, IntelliTrace on snapshot size, RevDebug on commercial-grade scoping heuristics — and on **where the product boundary sits**: IDE plugin (Chronon/IntelliTrace), research prototype (TOD), commercial observability platform (RevDebug). The pattern is mature enough that choosing among them is an engineering trade-off, not a research question.
 
-Source: https://wiki.jvmlangsummit.com/Chronon_-_Time_Travelling_Debugger and https://pleiad.cl/tod/ and https://learn.microsoft.com/en-us/visualstudio/debugger/intellitrace and https://revdebug.com/
+Sources: https://wiki.jvmlangsummit.com/Chronon_-_Time_Travelling_Debugger and https://pleiad.cl/tod/ and https://learn.microsoft.com/en-us/visualstudio/debugger/intellitrace and https://revdebug.com/
 
 ### 3.10. Decorator-Based Omniscient Tracing — PySnooper, snoop, viztracer
 
@@ -383,7 +371,7 @@ For languages with runtime tracing hooks (`sys.settrace` in Python, `TracePoint`
 
 The design lesson: **if the language runtime exposes per-line or per-function callback hooks, decorator-based omniscient tracing is a ~100-line library**. No modified VM, no recording infrastructure, no server. The cost is runtime overhead (10–100× depending on configuration), but the workflow is "add a decorator, run once, inspect output." For exploratory debugging of a specific function, this is the cheapest omniscient pattern available in any mainstream language.
 
-Source: https://github.com/alexmojaki/snoop and https://pypi.org/project/PySnooper/ and https://viztracer.readthedocs.io/en/latest/viztracer.html
+Sources: https://github.com/alexmojaki/snoop and https://pypi.org/project/PySnooper/ and https://viztracer.readthedocs.io/en/latest/viztracer.html
 
 ### 3.11. Redux DevTools — Omniscient Over Application State
 
@@ -407,7 +395,7 @@ Visual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk
 
 This is the modern industry continuation of the Pharo (§3.4) and Common Lisp (§3.5) live-edit lineage: the difference is that managed runtimes (CLR, JVM, Dart VM) supply the deoptimization machinery the original reflective systems built into the language. The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Debuggers become dramatically more powerful if the runtime can deoptimize optimized frames back into an inspectable representation before applying a patch.
 
-Source: https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue, https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html, and https://docs.flutter.dev/tools/hot-reload
+Sources: https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue, https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html, and https://docs.flutter.dev/tools/hot-reload
 
 ---
 
@@ -447,7 +435,7 @@ The lesson is the same as Elm's: **if the language (or notebook model) makes dep
 
 The prior art is older than any of these. Excel has shipped **Trace Precedents / Trace Dependents** for decades: click a cell, press `Ctrl+[` or the Formula Auditing ribbon button, and blue arrows trace every cell feeding the formula; `Ctrl+]` traces downstream dependents; red arrows mark error propagation; black arrows with worksheet icons mark cross-sheet references. The **Watch Window** is a live cross-workbook variable watch — add any cell and observe its value update as upstream inputs change. Third-party tools (TraceModel) externalize the full dependency graph as an interactive node view. Excel's dataflow debugger predates Observable's Minimap by decades, and the design lesson is the same: a reactive-language debugger needs to expose the dependency DAG as first-class UI.
 
-Source: http://lighttable.com/ and https://witheve.com/deepdives/lighttable.html and https://observablehq.com/documentation/debugging/minimap and https://support.microsoft.com/en-us/office/display-the-relationships-between-formulas-and-cells-a59bef2b-3701-46bf-8ff1-d3518771d507
+Sources: http://lighttable.com/ and https://witheve.com/deepdives/lighttable.html and https://observablehq.com/documentation/debugging/minimap and https://support.microsoft.com/en-us/office/display-the-relationships-between-formulas-and-cells-a59bef2b-3701-46bf-8ff1-d3518771d507
 
 ### 4.4. Unreal Gameplay Debugger — In-Engine Replicated Overlays
 
@@ -473,7 +461,7 @@ Shader debug information is handled by stripping the debug blob at compile time 
 
 The design lesson is **temporal separation**: record cheaply, inspect expensively, offline. Pernosco (§2.2) applies the same principle to CPU execution. For any execution model whose *live* observation is prohibitive — GPU shaders, massively parallel kernels, production regressions — capture-and-inspect beats attach-and-step.
 
-Source: https://renderdoc.org/docs/how/how_debug_shader.html and https://docs.nvidia.com/nsight-graphics/UserGuide/shader-debugger-setup.html
+Sources: https://renderdoc.org/docs/how/how_debug_shader.html and https://docs.nvidia.com/nsight-graphics/UserGuide/shader-debugger-setup.html
 
 ### 4.6. XState Inspector — Live State-Machine Debugger
 
@@ -485,7 +473,7 @@ The inspection API is **language-neutral at the protocol level**. Any runtime th
 
 The design lesson is **the notation is the debugger UI**. When the language's primary artifact is already a diagram (state chart, dataflow graph, proof tree), the debugger should render the diagram, not a textual stack. This extends the Whyline's philosophy (§8.9) — debug in the user's mental model, not the machine's — from interrogation to visualization.
 
-Source: https://stately.ai/docs/inspector and https://github.com/statelyai/inspect
+Sources: https://stately.ai/docs/inspector and https://github.com/statelyai/inspect
 
 ---
 
@@ -516,7 +504,7 @@ DAP is now supported by VS Code, Neovim, Emacs (dap-mode), Helix, Zed, and many 
 
 The limitation: DAP's abstraction is lowest-common-denominator. Advanced debugger features (rr's reverse execution, Pernosco's omniscient queries, RemedyBG's shared-memory speed) are hard to express in DAP's generic request/response model. Enet et al. (2023) studied DAP's suitability for domain-specific languages and found similar friction — DSL-specific debugging concepts (model-level stepping, constraint visualization) require protocol extensions.
 
-Source: https://microsoft.github.io/debug-adapter-protocol/ and https://hal.science/hal-04245594v1/document
+Sources: https://microsoft.github.io/debug-adapter-protocol/ and https://hal.science/hal-04245594v1/document
 
 ### 5.3. Debugger Scripting APIs — GDB Python, LLDB Formatters, pwndbg, gdb-dashboard
 
@@ -530,7 +518,7 @@ The scripting surface is large enough to host **alternative front-ends** inside 
 
 The lesson for a language designer: a debugger scripting API turns "the UI we shipped" into "the UI you want." The cost is a Python embedding and a stable object model for values, types, frames, and events.
 
-Source: https://lldb.llvm.org/varformats.html and https://github.com/cyrus-and/gdb-dashboard and https://github.com/pwndbg/pwndbg
+Sources: https://lldb.llvm.org/varformats.html and https://github.com/cyrus-and/gdb-dashboard and https://github.com/pwndbg/pwndbg
 
 ### 5.4. Chrome DevTools Protocol — Domain-Structured Wire Protocol
 
@@ -542,7 +530,7 @@ The architectural difference from DAP: CDP is a *persistent session* over a sing
 
 The trade-off is sharp: CDP is powerful but tightly coupled to Blink/V8 semantics; DAP is weaker but portable. VS Code's own `vscode-js-debug` is a DAP adapter that **translates CDP to DAP** to bridge the two worlds — losing some CDP features along the way (e.g., fine-grained heap snapshots) because DAP cannot express them.
 
-Source: https://chromedevtools.github.io/devtools-protocol/ and https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/devtools-protocol.md
+Sources: https://chromedevtools.github.io/devtools-protocol/ and https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/devtools-protocol.md
 
 ### 5.5. JDWP + JPDA — Transport-Agnostic Language-Typed Protocol
 
@@ -554,7 +542,7 @@ Unlike DAP, JDWP is **stateful and type-aware**: command sets mirror JDI interfa
 
 The lesson for protocol design: **a debugger protocol tied to one language can expose operations a language-neutral protocol cannot**. DAP trades this away for multi-language reach; JDWP gets live class redefinition and typed frame manipulation as first-class protocol operations in exchange for being Java-only. A new language runtime can borrow JPDA's three-layer split (in-VM tool interface, wire protocol, client-side language API) without inheriting its Java-specific commands.
 
-Source: https://docs.oracle.com/en/java/javase/24/docs/specs/jdwp/jdwp-spec.html and https://docs.oracle.com/en/java/javase/21/docs/specs/jpda/architecture.html
+Sources: https://docs.oracle.com/en/java/javase/24/docs/specs/jdwp/jdwp-spec.html and https://docs.oracle.com/en/java/javase/21/docs/specs/jpda/architecture.html
 
 ### 5.6. Remote Debugging — gdbserver vs lldb-server + SBPlatform
 
@@ -568,7 +556,7 @@ Both use the GDB Remote Serial Protocol at the wire level — `g`/`G` (registers
 
 The design question a language runtime inherits: **do we ship a thin stub and keep knowledge at the client, or a thick agent and let the target describe itself?** Thin is easier to port; thick is easier to operate cross-target. There is no universal right answer, but the LLDB model wears better when targets diverge from the host.
 
-Source: https://lldb.llvm.org/use/remote.html and https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html
+Sources: https://lldb.llvm.org/use/remote.html and https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html
 
 ### 5.7. Mirrors — Reflection as Debugger Primitive
 
@@ -587,15 +575,15 @@ The consequence for debuggers is direct. A debugger is structurally a program ho
 
 The language-design lesson: **design reflection as the debugger's primitive**, not as a convenience bolt-on. If mirrors are the only way to reach the meta-level, remote debugging, secure sandboxes, and cross-implementation debug protocols fall out of the same mechanism.
 
-Source: https://bracha.org/mirrors.pdf and https://bracha.org/newspeak.pdf
+Sources: https://bracha.org/mirrors.pdf and https://bracha.org/newspeak.pdf
 
 ### 5.8. MoarVM Remote Debug Protocol — Comma's Durable Artifact
 
-Status: the **Comma IDE** is discontinued, but it drove substantial improvements to MoarVM's debug surface that survive Comma itself: a **TCP-based remote debug protocol** for Raku/MoarVM, plus an open-source Raku client library and CLI driver. The protocol shape mirrors the JDWP / DAP / CDP family (§§5.2, 5.4, 5.5) — connect to a port the running MoarVM listens on, exchange typed commands, receive event notifications. Distinctive features: stack-frame introspection that understands Raku's role in a multi-stage compilation pipeline (RakuAST nodes → QAST → MoarVM bytecode all addressable), and integration with MoarVM's spesh and inliner metadata so that debugging *specialized* code reconstructs the original frame layout (see `COMPILERS.md §14.4` on uninlining).
+Status (as of 2026-04): the **Comma IDE** is discontinued, but it drove substantial improvements to MoarVM's debug surface that survive Comma itself: a **TCP-based remote debug protocol** for Raku/MoarVM, plus an open-source Raku client library and CLI driver. The protocol shape mirrors the JDWP / DAP / CDP family (§§5.2, 5.4, 5.5) — connect to a port the running MoarVM listens on, exchange typed commands, receive event notifications. Distinctive features: stack-frame introspection that understands Raku's role in a multi-stage compilation pipeline (RakuAST nodes → QAST → MoarVM bytecode all addressable), and integration with MoarVM's spesh and inliner metadata so that debugging *specialized* code reconstructs the original frame layout (see `COMPILERS.md §14.4` on uninlining).
 
 The product itself shut down, but the durable artifact — a documented language-specific debug protocol contributed back to a small-team VM — is a useful pattern for new languages: even a single commercial tooling vendor can leave behind a debug protocol that outlives them, *if* the protocol is upstreamed into the runtime rather than kept inside the IDE binary. The lesson is symmetric to `TRACERS.md §3.11` (MoarVM Telemetry / heap snapshots): both originated as Comma-driven additions that became MoarVM mainline.
 
-Source: https://commaide.com/features and https://commaide.com/faq
+Sources: https://commaide.com/features and https://commaide.com/faq
 
 ### 5.9. Debugger Expression Evaluation and State Surgery
 
@@ -607,7 +595,7 @@ The hard part is safety. Calling arbitrary code from a paused thread can deadloc
 
 The language-design lesson: **design the debugger evaluator as part of the language semantics, not as an afterthought**. If the compiler can emit enough metadata for lexical scopes, generic types, closures, effects, async frames, and optimized-out values, the debugger can evaluate expressions that feel like the source language instead of raw memory pokes.
 
-Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html and https://lldb.llvm.org/use/tutorial.html
+Sources: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html and https://lldb.llvm.org/use/tutorial.html
 
 ---
 
@@ -623,7 +611,7 @@ The implementation: Replay maintains a pool of forked browser processes at vario
 
 This is philosophically significant: it eliminates the "I should have added a log here" regret that plagues traditional debugging. The recording captures everything; print statements become a *query language* for the recording rather than instrumentation that must exist before the bug occurs.
 
-Source: https://docs.replay.io/time-travel-intro/add-console-logs-on-the-fly and https://docs.replay.io/basics/time-travel/how-does-time-travel-work
+Sources: https://docs.replay.io/time-travel-intro/add-console-logs-on-the-fly and https://docs.replay.io/basics/time-travel/how-does-time-travel-work
 
 ### 6.2. Hazel — Live Evaluation of Incomplete Programs
 
@@ -637,7 +625,7 @@ The connection to debugging: Hazel dissolves the distinction between "writing" a
 
 > The *parser-side* perspective on Hazel — typed holes as an error-recovery strategy — is covered in `PARSERS.md §4.4`.
 
-Source: https://hazel.org/ and https://arxiv.org/abs/1805.00155
+Sources: https://hazel.org/ and https://arxiv.org/abs/1805.00155
 
 ### 6.3. Structured Print Debugging — Rust `dbg!`, Elixir `dbg/2`, icecream
 
@@ -654,7 +642,7 @@ The original contribution is *meta*: the debugger is the compiler macro itself. 
 
 For a new language, the implementation cost is small: a macro that captures `stringify!(expr)` and `file!()/line!()` alongside the evaluated value. The ergonomic payoff is large enough that the 15-port community ecosystem formed around Python's `ic()` within a few years.
 
-Source: https://doc.rust-lang.org/std/macro.dbg.html and https://www.germanvelasco.com/blog/using-dbg-to-replace-io-inspect-and-pry-into-code and https://github.com/gruns/icecream
+Sources: https://doc.rust-lang.org/std/macro.dbg.html and https://www.germanvelasco.com/blog/using-dbg-to-replace-io-inspect-and-pry-into-code and https://github.com/gruns/icecream
 
 ---
 
@@ -672,7 +660,7 @@ The correctness problem is severe. Li et al. (PLDI 2020) presented the first sys
 
 The practical consequence: debugging optimized code is unreliable. Variables show as "optimized out" even when their value is recoverable, and worse, sometimes show incorrect values. This is why developers often resort to `-O0` for debugging, sacrificing the 2–5x performance of optimized code. A language that generates correct, complete debug information — or provides its own debugging mechanism that bypasses DWARF — sidesteps this entire class of problems.
 
-Source: https://dwarfstd.org/doc/Debugging-using-DWARF-2012.pdf and https://faculty.cc.gatech.edu/~qzhang414/papers/pldi20_yuanbo1.pdf and https://export.arxiv.org/pdf/2211.09568v1.pdf
+Sources: https://dwarfstd.org/doc/Debugging-using-DWARF-2012.pdf and https://faculty.cc.gatech.edu/~qzhang414/papers/pldi20_yuanbo1.pdf and https://export.arxiv.org/pdf/2211.09568v1.pdf
 
 ### 7.2. Debug Information Across Tiers — The Mapping Problem
 
@@ -708,7 +696,7 @@ The implication for language design: **debug info becomes a separate concern fro
 
 The broader pattern is content-addressed symbol distribution: Microsoft's symsrv + SymbolSource has offered a similar service for PDB files for decades, keyed on the PDB signature/GUID plus age. debuginfod's contribution is making this ecosystem *default-on* for open-source stripped Linux binaries.
 
-Source: https://sourceware.org/elfutils/Debuginfod.html and https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html
+Sources: https://sourceware.org/elfutils/Debuginfod.html and https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html
 
 ---
 
@@ -726,7 +714,7 @@ The technique is fully automated — it requires only a test oracle (pass/fail) 
 
 The practical limitation: each test requires a full program execution. For programs that take seconds or minutes to run, minimizing a large input can take hours. But for programs that run in milliseconds (unit tests, parsers, compilers), delta debugging is transformative.
 
-Source: https://www.debuggingbook.org/html/DeltaDebugger.html and https://www.cs.purdue.edu/homes/xyzhang/fall07/Papers/delta-debugging.pdf
+Sources: https://www.debuggingbook.org/html/DeltaDebugger.html and https://www.cs.purdue.edu/homes/xyzhang/fall07/Papers/delta-debugging.pdf
 
 ### 8.2. Program Slicing — "What Affects This Variable?"
 
@@ -740,7 +728,7 @@ The practical application: when a variable has a wrong value, the dynamic backwa
 
 Dynamic slicing is closely related to Pernosco's reverse dataflow tracking. The difference is granularity: program slicing operates on source statements, while Pernosco operates on individual memory writes and register transfers.
 
-Source: https://en.wikipedia.org/wiki/Program_slicing and http://www0.cs.ucl.ac.uk/staff/mharman/sf.html
+Sources: https://en.wikipedia.org/wiki/Program_slicing and http://www0.cs.ucl.ac.uk/staff/mharman/sf.html
 
 ### 8.3. Tarantula — Fault Localization via Test Coverage Coloring
 
@@ -758,7 +746,7 @@ The remarkable property: Tarantula requires no program analysis, no symbolic exe
 
 Later techniques (Ochiai, DStar, etc.) improved the suspiciousness formula, but Tarantula's contribution was showing that coverage × pass/fail is sufficient to localize faults with surprising accuracy. Empirically, Tarantula examines less than 20% of the code to find the fault in most cases.
 
-Source: https://dl.acm.org/doi/10.1145/1101908.1101949 and https://faculty.cc.gatech.edu/~harrold/6340/cs6340_fall2009/Slides/class20.pdf
+Sources: https://dl.acm.org/doi/10.1145/1101908.1101949 and https://faculty.cc.gatech.edu/~harrold/6340/cs6340_fall2009/Slides/class20.pdf
 
 ### 8.4. Cooperative Bug Isolation — Statistical Debugging at Population Scale
 
@@ -770,7 +758,7 @@ The analysis is statistical. A predicate *P* is suspicious if *Pr(fail | P obser
 
 The design lesson: **when per-run observation is expensive or noisy, cross-run statistics recover what single-run tracing cannot**. CBI sits next to Tarantula as the distributed-population generalization — less per-run information, traded against vastly more runs. For a language runtime that can ship observations home (opt-in crash reporters, telemetry), the CBI machinery is directly applicable and fits neatly alongside the continuous-profiling infrastructure in `TRACERS.md §14`.
 
-Source: https://pages.cs.wisc.edu/~liblit/dissertation/ and https://pages.cs.wisc.edu/~liblit/pldi-2005/
+Sources: https://pages.cs.wisc.edu/~liblit/dissertation/ and https://pages.cs.wisc.edu/~liblit/pldi-2005/
 
 ### 8.5. Isolating Cause-Effect Chains — Delta Debugging Over Program States
 
@@ -784,7 +772,7 @@ The only tool dependency is a debugger that can **read and write variables in ar
 
 The connection to Pernosco (§2.2) is direct: Pernosco's reverse dataflow is a memory-level refinement of the same idea, operating on register transfers rather than source variables, and on a recorded trace rather than two live runs. Cause-effect chains are the *interventional* version; reverse dataflow is the *observational* version.
 
-Source: https://www.st.cs.uni-saarland.de/papers/fse2002/ and https://www.cs.umd.edu/~atif/zeller.pdf
+Sources: https://www.st.cs.uni-saarland.de/papers/fse2002/ and https://www.cs.umd.edu/~atif/zeller.pdf
 
 ### 8.6. KLEE — Symbolic Execution as Bug Finder and Test Generator
 
@@ -798,7 +786,7 @@ KLEE's empirical record: 56 bugs in 452 real applications, 10 fatal in GNU COREU
 
 The trade-offs are the usual ones for symbolic execution: exponential path counts, solver cost on large constraints, weakness on code with opaque library calls, and the need to model the environment (KLEE ships a POSIX environment model). But as a **debugging** tool — "I have a hypothesis that input *X* could cause *Y*; is there an *X* that does?" — symbolic execution asks questions no other technique asks, and when the solver answers, the answer is concrete.
 
-Source: https://klee.github.io/docs/ and https://llvm.org/pubs/2008-12-OSDI-KLEE.pdf
+Sources: https://klee.github.io/docs/ and https://llvm.org/pubs/2008-12-OSDI-KLEE.pdf
 
 ### 8.7. Fuzzer-Assisted Crash Triage — `afl-tmin`, AFL `-C`, libFuzzer `-minimize_crash`
 
@@ -814,7 +802,7 @@ Modern coverage-guided fuzzers are indirectly powerful debuggers. AFL, libFuzzer
 
 The debugging role is narrow but sharp: **given a crash, produce a minimal reproducer and a population of related crashes.** Humans doing this by hand spend hours to days; machines finish in seconds to minutes.
 
-Source: https://afl-1.readthedocs.io/en/latest/fuzzing.html and https://chromium.googlesource.com/chromium/src/+/main/testing/libfuzzer/reproducing.md
+Sources: https://afl-1.readthedocs.io/en/latest/fuzzing.html and https://chromium.googlesource.com/chromium/src/+/main/testing/libfuzzer/reproducing.md
 
 ### 8.8. Miri — MIR Interpreter as UB Detector
 
@@ -828,7 +816,7 @@ Miri also leaks-detects at process exit: any allocation not reachable from a `st
 
 The trade-off is crushing slowdown — MIR is interpreted, not JIT'd, and every access goes through check logic — and incomplete coverage (no formal specification of Rust semantics exists, so Miri uses an approximation, and programs calling opaque C code cannot be fully verified). But for the question it answers — *is there UB on this execution?* — it answers authoritatively and with an exact MIR-level diagnostic. The design lesson for a new language: if the IR is accessible and typed, an interpreter-based UB detector is cheap to add and catches bugs no DWARF-based debugger will.
 
-Source: https://github.com/rust-lang/miri and https://deepwiki.com/rust-lang/rust/6.2-miri:-mir-interpreter-and-ub-detector
+Sources: https://github.com/rust-lang/miri and https://deepwiki.com/rust-lang/rust/6.2-miri:-mir-interpreter-and-ub-detector
 
 ### 8.9. Whyline — Interrogative Debugging
 
@@ -840,7 +828,7 @@ Evaluation: comparing identical debugging scenarios, programmers using Whyline d
 
 Philosophically this sits alongside Pernosco (§2.2): both use a recorded execution as a queryable database, but Whyline's contribution is the *interrogative UI* — users don't compose queries, they pick from an auto-generated list derived from what's currently on the output. The language-design lesson: if the compiler tracks enough provenance to connect output values back to the code that produced them, an interrogative debugger is a reasonable feature to ship — not a research aspiration.
 
-Source: https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf and https://faculty.washington.edu/ajko/papers/Ko2004Whyline.pdf
+Sources: https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf and https://faculty.washington.edu/ajko/papers/Ko2004Whyline.pdf
 
 ### 8.10. Algorithmic Debugging and the Byrd Box 4-Port Model
 
@@ -856,7 +844,7 @@ This is **declarative debugging**: the user reasons about *intended semantics*, 
 
 The design lesson for a new language: **the question the debugger asks the user is a choice**. "Where should I step?" (traditional), "Why did X happen?" (Whyline §8.9), "Is this result correct?" (Shapiro). The last is the cheapest for the user — it requires zero code knowledge beyond semantic intent — and the most powerful when the language's evaluator can reify its own computation tree.
 
-Source: https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model and http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html
+Sources: https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model and http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html
 
 ### 8.11. Dynamic Invariant Detection — Daikon
 
@@ -866,7 +854,7 @@ This is useful for fault isolation because inferred invariants summarize what th
 
 The language-design lesson: **make values observable at semantic program points**. If the compiler can expose function entries/exits, loop heads, object fields, algebraic data constructors, and effect boundaries in a typed trace format, invariant mining becomes much more accurate than raw memory observation. Daikon is the population-statistics sibling to CBI (§8.4): both extract bug signal from many runs, with Daikon mining invariants and CBI mining failure-correlated predicates.
 
-Source: https://plse.cs.washington.edu/daikon/ and https://plse.cs.washington.edu/daikon/pubs/
+Sources: https://plse.cs.washington.edu/daikon/ and https://plse.cs.washington.edu/daikon/pubs/
 
 ---
 
@@ -890,7 +878,7 @@ Go's runtime emits **scheduler events** — goroutine creation, blocking on chan
 
 The design takeaway is that Go's day-one investment in scheduler-event metadata pays compounding dividends for tooling. Async debugging in Go does not require stitching, post-hoc reconstruction, or third-party introspection libraries — the runtime just hands over the information.
 
-Source: https://github.com/go-delve/delve and https://pkg.go.dev/runtime/trace
+Sources: https://github.com/go-delve/delve and https://pkg.go.dev/runtime/trace
 
 ### 9.3. Kotlin — Coroutine Object Metadata + Parallel Stacks
 
@@ -908,7 +896,7 @@ V8 and Chrome DevTools maintain "async stack traces" by **recording the call sta
 
 The mechanism is **runtime cooperation paid at every suspension point**: each await pushes its current stack into a side data structure keyed by the resulting promise/microtask. Resumption reads the saved stack and stitches it as the "async caller." For users this is invisible; for V8 the steady-state cost is real but bounded, and the design has been the de-facto template for every modern JavaScript runtime debugger.
 
-Source: https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/ and https://developer.chrome.com/blog/devtools-modern-web-debugging/
+Sources: https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/ and https://developer.chrome.com/blog/devtools-modern-web-debugging/
 
 ### 9.5. Rust — `tokio-console` + Future Introspection
 
@@ -918,7 +906,7 @@ Rust's async story is the most retrofitted of the four. Async functions desugar 
 
 The retrofit cost is visible in the architecture: tokio-console is a separate crate, requires opt-in instrumentation, and only works for Tokio (other Rust async runtimes — async-std, smol, glommio — need their own equivalents). Compare with Go (§9.2) where every binary's runtime is debuggable by Delve out of the box. The lesson generalizes: **a language that retrofits async pays the debugger tax for years afterward in the form of fragmented, runtime-specific tooling**.
 
-Source: https://github.com/tokio-rs/console and https://tokio.rs/blog/2021-12-announcing-tokio-console
+Sources: https://github.com/tokio-rs/console and https://tokio.rs/blog/2021-12-announcing-tokio-console
 
 ---
 
@@ -938,7 +926,7 @@ The trade-offs: 5–15× slowdown and 5–10× memory overhead from shadow state
 
 The design lineage: TSan descends from Helgrind (Valgrind) and inspires RacerD (Facebook, static). Go's built-in race detector (`go build -race`) is a TSan runtime with Go-specific happens-before rules for channels, `sync` primitives, and the scheduler. The language-design lesson: **if the runtime owns synchronization primitives** (Go's `go`, channels, mutex; a language's actor runtime; a language's effect system), happens-before tracking can be exhaustive with low overhead because every synchronization point is a known call site.
 
-Source: https://research.google.com/pubs/archive/35604.pdf and https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs
+Sources: https://research.google.com/pubs/archive/35604.pdf and https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs
 
 ### 10.2. Systematic Concurrency Schedule Exploration
 
@@ -948,7 +936,7 @@ Microsoft CHESS pioneered this for threaded programs using schedule bounding and
 
 The language-design lesson: **if the language owns tasks, channels, actors, or effects, it can own the scheduler in tests**. A debugger can then show "the schedule that caused the bug" as a first-class artifact, not just a stack trace. Pairs naturally with the happens-before tracking of §10.1 — schedule exploration finds the schedule, sanitizers diagnose what happens on it.
 
-Source: https://www.microsoft.com/en-us/research/project/chess/, https://github.com/tokio-rs/loom, and https://apple.github.io/foundationdb/testing.html
+Sources: https://www.microsoft.com/en-us/research/project/chess/, https://github.com/tokio-rs/loom, and https://apple.github.io/foundationdb/testing.html
 
 ### 10.3. Deadlock and Liveness Debugging
 
@@ -958,7 +946,7 @@ Classic thread dumps expose blocked threads, owned locks, and wait stacks; JVM t
 
 The language-design lesson: **debug wait relationships explicitly**. If the runtime has structured concurrency, channels, actors, promises, mutexes, and cancellation, it can maintain a wait-for graph: task A awaits future B, B waits for timer C, actor D waits for mailbox message E. A debugger can then answer "why is this task stuck?" directly.
 
-Source: https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html, https://go.dev/doc/diagnostics, https://docs.kernel.org/locking/lockdep-design.html, and https://github.com/tokio-rs/console
+Sources: https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html, https://go.dev/doc/diagnostics, https://docs.kernel.org/locking/lockdep-design.html, and https://github.com/tokio-rs/console
 
 ---
 
@@ -976,7 +964,7 @@ The original contribution relevant to language design is **`/proc/<pid>/coredump
 
 **Managed-runtime cores are often useless** to a generic debugger. A kernel-generated core of a .NET process captures the managed-heap *bytes* but not the object-header metadata needed to walk the heap without SOS (Son of Strike, the .NET debugger extension). The same is true of JVM cores without the SA (Serviceability Agent) plugin. The lesson: a language runtime that wants usable post-mortem support must provide a **runtime-aware dumper** (CoreCLR's `createdump`, HotSpot's `jcmd GC.heap_dump`, V8 heap snapshots) that emits a format its debugger understands, *in addition to* the generic core. Generic cores catch native-frame crashes; runtime-aware dumps catch managed-state bugs.
 
-Source: https://www.sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html and https://www.moritz.systems/blog/lldb-core-dump-support-improvements/
+Sources: https://www.sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html and https://www.moritz.systems/blog/lldb-core-dump-support-improvements/
 
 ### 11.2. kdump — kexec Capture Kernel + the `crash` Utility
 
@@ -990,7 +978,7 @@ The **`crash` utility** (Dave Anderson, Red Hat) is a **kernel-aware debugger** 
 
 **`pstore`** is the embedded-system variant. No reserved memory for a capture kernel, so the kernel writes oops traces and console log to persistent storage — ACPI ERST, MTD flash, or `ramoops` backed by DRAM that survives a soft reboot — for retrieval after the next boot. Useful when the bug reboots the machine before kdump can run.
 
-Source: https://www.kernel.org/doc/html/v5.19/admin-guide/kdump/kdump.html and https://kernel-internals.org/debugging/kdump/
+Sources: https://www.kernel.org/doc/html/v5.19/admin-guide/kdump/kdump.html and https://kernel-internals.org/debugging/kdump/
 
 ### 11.3. KGDB + KDB — Dual Frontends Over a Shared Debug Core
 
@@ -1020,7 +1008,7 @@ Embedded debugging has constraints no desktop debugger faces: no OS, no filesyst
 
 The generalizable lesson is a pattern also seen in debuginfod (§7.4): **the host is rich, the target is poor — push work to the host**. A language runtime targeting constrained environments should ask, for every runtime feature, what can be deferred, indexed, or decoded off-target. defmt is the `.debug_info` of embedded logging.
 
-Source: https://github.com/knurling-rs/defmt and https://probe.rs/docs
+Sources: https://github.com/knurling-rs/defmt and https://probe.rs/docs
 
 ### 11.5. JTAG / SWD / OpenOCD Hardware Debugging
 
@@ -1030,7 +1018,7 @@ OpenOCD is the classic open-source bridge from probes to GDB remote protocol. `p
 
 The language-design lesson: **embedded debugging is a target ABI, not just a tool**. Panic formatting, stack unwinding, symbol names, frame pointers, no-std allocators, and debug sections must work when the only communication channel is a probe reading memory.
 
-Source: https://openocd.org/doc/html/index.html and https://developer.arm.com/documentation/ihi0031/latest/
+Sources: https://openocd.org/doc/html/index.html and https://developer.arm.com/documentation/ihi0031/latest/
 
 ### 11.6. Production Crash Pipelines: Minidumps, Symbolication, and Grouping
 
@@ -1040,7 +1028,7 @@ This is a debugger technique because most deployed bugs are debugged after the f
 
 The language-design lesson: **standardize the crash artifact early**. A new language should define panic/crash metadata, build IDs, symbol lookup, async stack capture, source-map/debug-info integration, and privacy controls as part of its tooling story. The build-ID symbol distribution side is covered in §7.4 (debuginfod); minidumps are the artifact format that pairs with it.
 
-Source: https://chromium.googlesource.com/breakpad/breakpad, https://chromium.googlesource.com/crashpad/crashpad, and https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
+Sources: https://chromium.googlesource.com/breakpad/breakpad, https://chromium.googlesource.com/crashpad/crashpad, and https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files
 
 ---
 
@@ -1058,7 +1046,7 @@ The **TLA+ Debugger** (2024) extends this with **interactive state-space explora
 
 This is a *debugger for specifications*. The "program" is a TLA+ spec, the "bug" is an invariant violation, the "trace" is the minimal path to the violation. No live process exists to step; the trace is a finite graph the debugger walks. The design lesson: **for any verification tool whose output is a counterexample, the debugger is a navigable view of that counterexample, not a separate artifact.** SPIN and Alloy deliver similar experiences for their respective formalisms.
 
-Source: https://learntla.com/topics/toolbox.html and https://discuss.tlapl.us/msg06620.html
+Sources: https://learntla.com/topics/toolbox.html and https://discuss.tlapl.us/msg06620.html
 
 ### 12.2. Lean / Coq / Agda InfoView — Proof State as Debugger
 
@@ -1077,7 +1065,7 @@ The deeper claim: **in a language where the primary object is a proof (not a pro
 
 See `DEBUGGERS.md §6.2` for Hazel's analogue in ordinary functional programming: incomplete expressions still typecheck and partially evaluate. InfoView is the proof-construction analogue; the underlying idea — **every editor state is meaningful; feedback is continuous** — is shared.
 
-Source: https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf and https://github.com/leanprover/vscode-lean4
+Sources: https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf and https://github.com/leanprover/vscode-lean4
 
 ---
 
@@ -1174,7 +1162,7 @@ Rows grouped by chapter, in chapter order.
 
 ## 14. References
 
-References are grouped by the chapter that first cites them. Within each chapter they roughly follow subsection order, with some broad background references grouped by topic rather than by exact first mention.
+References are grouped by chapter and roughly follow subsection order. Broad background references may be grouped by topic rather than exact first mention.
 
 ### Chapter 1 — Breakpoint Mechanisms
 

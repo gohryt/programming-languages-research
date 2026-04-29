@@ -2,46 +2,29 @@
 
 Research on observability, tracing, profiling, instrumentation, and runtime event pipelines — the "always-on" side of runtime introspection, as distinct from pause-and-inspect debugging.
 
-Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`. Memory disciplines and runtime memory architectures — GC, allocators, ownership, regions, hardware tagging, concurrent reclamation — are in `MEMORY.md`; memory-specific tracing mechanisms (heap snapshots, allocation sampling) currently live alongside their host event-pipeline entries in this document rather than being split out. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`. Module systems, package identity, and dynamic module loading are in `MODULES.md`.
+Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`; breakpoint-like systems appear here only when their patching or probe machinery is useful for tracing. Memory disciplines and runtime memory architectures — GC, allocators, ownership, regions, hardware tagging, concurrent reclamation — are in `MEMORY.md`; memory-specific tracing mechanisms (heap snapshots, allocation sampling) currently live alongside their host event-pipeline entries in this document rather than being split out. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`. Module systems, package identity, and dynamic module loading are in `MODULES.md`.
 
 ---
 
 ## 1. Bytecode and Code Patching
 
-Mechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site. The common axis across the entries below is the cost when a probe is *not* installed: a reserved NOP, a predicted short jump, a single-byte flag read, or literally nothing. Enabling a probe becomes a runtime patch at that exact site, paid only where the user asked.
+Mechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site. The common axis across the entries below is the cost when a probe is *not* installed: a reserved NOP, a predicted short jump, a single-byte flag read, or literally nothing. Debugger breakpoints use many of the same tricks, but this chapter focuses on the patch-site and disabled-overhead design that tracing systems can reuse.
 
 ### 1.1. Luau — LOP_BREAK
 
-Luau (Roblox's Lua fork) rejects the standard Lua `debug.sethook()` mechanism entirely. Hooks are not free — even when the hook function is a no-op, the interpreter must check and call it on every instruction, line, or function entry. This is a per-instruction tax that every program pays whether or not anyone is debugging. Luau calls this unacceptable and instead uses two techniques:
+Luau (Roblox's Lua fork) rejects the standard Lua `debug.sethook()` model because a hook check on every instruction, line, or function entry creates a global tax even when no tool is active. Instead, it treats observation as bytecode patching: the target opcode is replaced with `LOP_BREAK`, while a parallel `debuginsn[]` array stores the original instruction for restoration.
 
-**Breakpoints:** The bytecode opcode at the target location is overwritten with `LOP_BREAK`. A parallel `debuginsn[]` array stores the original opcodes. When `LOP_BREAK` executes, the debugger is notified. When the breakpoint is cleared, the original opcode is restored from `debuginsn[]`.
-
-**Single-stepping:** A separate interpreter loop handles step mode. This loop is structurally identical to the main loop but includes per-instruction callbacks. The interpreter switches between the fast loop and the debug loop as needed.
-
-The result is zero overhead when no breakpoints are set. The bytecode stream is identical to the non-debug case. Cost is paid only at the exact instructions that have breakpoints, not globally. This is one of the cleanest approaches for bytecode interpreters in this survey.
+The tracing lesson is the disabled-overhead model, not the debugger UI: do not add a branch to every interpreter dispatch just because some instructions might be observed later. Patch only the requested sites, keep the normal bytecode stream identical when no probe is active, and pay dispatch cost only at enabled probes.
 
 Source: https://luau.org/performance/ — "Epsilon-overhead debugger" section.
 
 ### 1.2. Erlang BeamAsm — Jump Target Patching
 
-Erlang's BeamAsm JIT emits a small prologue at the start of every function:
+Erlang's BeamAsm JIT emits a tiny function prologue with a predicted jump over a shared instrumentation fragment. Normal execution pays one predictable branch; enabling observation changes a jump offset so control falls through to the fragment. Because the patch is a single byte on x86, it can be installed cheaply, and BeamAsm's W^X-compatible dual mapping lets writes go through a writable alias while execution uses the executable alias.
 
-```
-0x0: short jmp 6                    ; skip to actual code (2 bytes)
-0x2: nop                             ; padding (1 byte)
-0x3: call breakpoint_fragment        ; shared breakpoint handler (5 bytes)
-0x8: actual code...
-```
+For tracing, the transferable idea is a compact per-function patch site with a shared slow path. The debugger-specific breakpoint semantics belong in `DEBUGGERS.md`; the tracing-relevant property is that function-entry observation can be enabled without rewriting whole functions or leaving a global hot-path hook active.
 
-Normal execution: the `short jmp 6` skips directly to the real code at offset 0x8. Cost: one taken branch, which the CPU predicts perfectly after the first execution.
-
-To set a breakpoint: patch the jump offset from 6 to 1. The jump now lands on the `nop` at 0x2, falls through to the `call breakpoint_fragment` at 0x3. The shared fragment checks flags and calls into the runtime.
-
-Patching a single byte (the jmp offset) is atomic on x86. No locks, no stop-the-world required. The breakpoint fragment is shared across all functions, so code size overhead is minimal. Furthermore, because BeamAsm uses W^X-compatible dual-mapped memory (one executable page, one writable page backed by the same physical memory), the writes go to the writable mapping and appear in the executable one without cache coherency issues.
-
-This is impressively elegant. The prologue is only 8 bytes, the normal-case cost is one perfectly-predicted branch, and enabling a breakpoint is a single byte write.
-
-Source: https://www.erlang.org/doc/apps/erts/beamasm — "Tracing and NIF Loading" section.
+Sources: https://www.erlang.org/doc/apps/erts/beamasm — "Tracing and NIF Loading" section.
 
 ### 1.3. Linux ftrace / eBPF — NOP-to-CALL Patching
 
@@ -55,9 +38,9 @@ Source: https://docs.ebpf.io/linux/concepts/trampolines/
 
 ### 1.4. Wasmtime — NOP Padding with INT 3 Replacement
 
-Wasmtime's Winch baseline compiler inserts a `nop` between the native code for each WebAssembly instruction. To set a breakpoint, the `nop` is replaced with `int3`. The SIGTRAP signal handler catches it, identifies the Wasm instruction, and notifies the debugger.
+Wasmtime's Winch baseline compiler reserves patch space by inserting a `nop` between native-code fragments corresponding to WebAssembly instructions. A tool can replace that reserved byte with a trap instruction and recover the Wasm instruction from side metadata.
 
-Same principle as ftrace, applied to JIT-compiled code. The NOP reservation at compile time makes runtime patching trivial. Still early in development but the design is sound.
+Same principle as ftrace, applied to JIT-compiled code: reserve cheap patch sites while generating code, keep them inert when no tool is active, and use side tables to map patched native locations back to language-level positions.
 
 Source: https://hackmd.io/@hvqFkDgPTuGNcu-NiycXZQ/SyXX166Yp
 
@@ -91,7 +74,7 @@ The consequence is that ftrace can produce entry+exit pairs for *every* kernel f
 
 The design pattern is broadly useful: whenever a tracer needs paired entry/exit events but can only afford to patch one location, **hijack the return address and share a single return handler**. The same pattern appears in user-space profilers (e.g., uftrace's `-P funcgraph`), which is what makes `function_graph`-style output — timed, indented call trees — a tooling category of its own, distinct from both flat samplers (§11.3) and event streams (§3).
 
-Source: https://docs.kernel.org/trace/ftrace.html and https://lwn.net/Articles/370423/
+Sources: https://docs.kernel.org/trace/ftrace.html and https://lwn.net/Articles/370423/
 
 ### 1.9. eBPF CO-RE — Load-Time Offset Relocation via BTF
 
@@ -103,7 +86,7 @@ The payoff is a one-shot relocation with zero steady-state tax: the relocated pr
 
 The broader consequence is an entire tooling category becoming viable. Distributable precompiled BPF binaries (the modern bcc tools, Parca Agent, Pyroscope eBPF profiler) only became practical once CO-RE removed the runtime-clang dependency; bpftrace one-liners became kernel-version-portable for the same reason. For a new language targeting kernel observability, CO-RE demonstrates a reusable pattern: **ship a compact typed description of the target alongside the emitted code, and let the loader patch the offsets**. The same idea can generalize to userspace uprobes where equivalent type metadata is available for the target binary, and to any instrumentation surface whose layout drifts across versions.
 
-Source: https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html and https://nakryiko.com/posts/bpf-core-reference-guide/ and https://docs.kernel.org/bpf/btf.html and https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html
+Sources: https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html and https://nakryiko.com/posts/bpf-core-reference-guide/ and https://docs.kernel.org/bpf/btf.html and https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html
 
 ### 1.10. LLVM XRay — Compiler-Inserted Patchable Function Sleds
 
@@ -115,7 +98,7 @@ XRay supports multiple instrumentation kinds: function entry, function exit, tai
 
 For a new language, the reusable lesson is direct: **reserve patchable trace sleds in generated code and emit a side table that lets the runtime patch them selectively**. This gives the language an always-available production tracing surface without forcing every function call through a hook check.
 
-Source: https://llvm.org/docs/XRay.html and https://llvm.org/docs/XRayExample.html and https://llvm.org/doxygen/XRayInstrumentation_8cpp_source.html
+Sources: https://llvm.org/docs/XRay.html and https://llvm.org/docs/XRayExample.html and https://llvm.org/doxygen/XRayInstrumentation_8cpp_source.html
 
 ### 1.11. Linux kprobes, kretprobes, TRACE_EVENT, and BPF fentry/fexit
 
@@ -127,13 +110,13 @@ BPF `fentry` and `fexit` are the modern low-overhead middle ground. They attach 
 
 The language-runtime analogue is valuable. A runtime should distinguish **stable semantic tracepoints** from **unstable implementation probes**. Stable events are for production tools and compatibility promises; implementation probes are for experts diagnosing a specific build. A typed metadata format, like BTF, can make both safer by letting trace programs read arguments and fields by type rather than by guessed offsets.
 
-Source: https://docs.kernel.org/trace/kprobetrace.html and https://docs.kernel.org/trace/events.html and https://docs.kernel.org/bpf/btf.html and https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/
+Sources: https://docs.kernel.org/trace/kprobetrace.html and https://docs.kernel.org/trace/events.html and https://docs.kernel.org/bpf/btf.html and https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/
 
 ---
 
 ## 2. Cooperative Safepoints and Managed Handoff
 
-The runtime does not trap at arbitrary instructions; instead it arranges for threads to notice a stop request at points already safe for the implementation — a loop back-edge, a method boundary, an existing branch the interpreter already takes. The cost axis is the size of the "am I stopped?" check on the hot path, weighed against what it enables (GC, debugger attach, sampling) — and the recurring hazard is that sampling-at-safepoints yields structurally biased profiles.
+The runtime does not trap at arbitrary instructions; instead it arranges for threads to notice a handoff request at points already safe for the implementation — a loop back-edge, a method boundary, an existing branch the interpreter already takes. The cost axis is the size of the hot-path check, weighed against what it enables: GC, low-intrusion attach, profiler coordination, or runtime-owned sampling. Debugger attach is one consumer; the tracing concern is how to add cooperative observation without biasing profiles or taxing every instruction.
 
 ### 2.1. HotSpot JVM — Safepoint Polling Page
 
@@ -153,19 +136,9 @@ Source: https://shipilev.net/jvm/anatomy-quarks/22-safepoint-polls/
 
 ### 2.2. CPython 3.14 — PEP 768 Safe External Debugger Interface
 
-CPython's traditional `sys.settrace()` has measurable overhead even when idle, because the interpreter's evaluation loop must check the trace function pointer on every instruction.
+CPython's traditional `sys.settrace()` has measurable overhead even when idle, because the interpreter's evaluation loop must check tracing state on every instruction. PEP 768 introduces a lower-overhead handoff path: a pending-call flag is checked through the existing `eval_breaker` branch, which the interpreter already uses for signals and periodic work.
 
-PEP 768 (accepted March 2025) introduces an effectively zero-hot-path-overhead alternative. A `debugger_pending_call` field is added to `PyThreadState`, and a check is inserted into the existing `eval_breaker` path — a branch the interpreter already takes for signals and periodic tasks. Since `debugger_pending_call` is never set during normal execution, the common path keeps using the existing predicted branch rather than adding an independent tracing branch to every bytecode dispatch.
-
-An external debugger attaches by:
-1. Locating `PyRuntime` in the target process via ELF/Mach-O section offsets.
-2. Writing a script path into `debugger_script_path` in the target's memory.
-3. Setting `debugger_pending_call = 1` and arming the `eval_breaker`.
-4. The interpreter picks it up at the next safe point and executes the script.
-
-Rather than injecting code at arbitrary points, the debugger signals the interpreter to execute code at the next safe opportunity. This works *with* the interpreter's natural execution flow rather than against it. The check piggybacks on an existing branch, adding no new independent branch to the hot path.
-
-PyPy independently implemented the same mechanism after seeing the PEP, confirming its generality.
+The tracing lesson is the piggybacked safepoint check. Instead of adding a new branch to every bytecode dispatch or injecting code at arbitrary PCs, the runtime exposes a cooperative rendezvous point that external tools can arm. The interpreter then performs the requested work at the next safe opportunity. PyPy independently adopted the same shape, suggesting the pattern generalizes beyond CPython.
 
 Source: https://peps.python.org/pep-0768/
 
@@ -173,7 +146,7 @@ Source: https://peps.python.org/pep-0768/
 
 While garbage collectors traditionally require runtime tracking of roots, `zerogc` is an experimental Rust project that literally offloads root tracking to the compiler. By abusing Rust's lifetime system and the borrow checker, it tracks roots and enforces safepoints entirely at compile time. Modifying pointers has mathematically zero runtime cost (the GC pointer is just a `Copy` reference). Safepoints are explicit blocks, and between those safepoints, the tracing overhead is strictly zero because the compiler guarantees mathematically that no roots are lost.
 
-Source: https://docs.rs/zerogc and https://github.com/DuckLogic/zerogc
+Sources: https://docs.rs/zerogc and https://github.com/DuckLogic/zerogc
 
 ### 2.4. Safepoint Bias and `AsyncGetCallTrace`
 
@@ -181,13 +154,13 @@ Safepoint polling (§2.1) is elegant as a stop-the-world mechanism, but it quiet
 
 **`AsyncGetCallTrace` (AGCT)** is Sun's undocumented back-door, exported so their own Studio profiler could sample outside safepoints. It walks Java frames directly from a signal handler, *without* the safepoint handshake — hence *async*, hence can crash if the JVM mutates the stack mid-walk. Andrei Pangin's **async-profiler** productionized it by installing a SIGSEGV handler, catching AGCT's failure cases, and chaining to the JVM's own deoptimization handler. Its other design trick is merging two sources: `perf_events` gives the native stack (kernel → libjvm → JIT code); AGCT gives the Java frames (including inlined methods). async-profiler walks the native stack until it hits JIT territory, then hands off to AGCT — one unified flame graph across kernel, JNI, JVM internals, and Java.
 
-**JEP 509 "JFR CPU-Time Profiling" (JDK 25, 2025)** is OpenJDK's supported path toward reducing this reliance on unsupported internals. Status: experimental and Linux-focused, not a universal replacement for every AGCT use case. JFR grows a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased. The JEP explicitly names async-profiler's reliance on unsupported internals as motivation.
+**JEP 509 "JFR CPU-Time Profiling" (JDK 25, 2025)** is OpenJDK's supported path toward reducing this reliance on unsupported internals. Status (JDK 25, 2025): experimental and Linux-focused, not a universal replacement for every AGCT use case. JFR grows a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased. The JEP explicitly names async-profiler's reliance on unsupported internals as motivation.
 
 For a new language: design the async-safe stack-walk API *up front*. Retrofitting it cost OpenJDK roughly 15 years of tool-author workarounds. Go (§3.5) sidestepped the same problem by pairing unconditional frame pointers with Go 1.14's asynchronous preemption — SIGPROF samples can now land anywhere, not just at cooperative safepoints.
 
 Safepoint bias is the *software* instance of a more general pattern: *the sample's reported PC is not the PC that caused the event*. The *hardware* instance is PMU interrupt skid, where the pipeline has moved on by the time a counter-overflow interrupt fires — addressed by PEBS / IBS / SPE (§5.5). A new language needs both problems solved: async-safe stack walks above, precise PMU records below.
 
-Source: https://plv.colorado.edu/papers/mytkowicz-pldi10.pdf and https://github.com/async-profiler/async-profiler and https://openjdk.org/jeps/509 and http://psy-lob-saw.blogspot.com/2016/02/why-most-sampling-java-profilers-are-fucking-terrible.html
+Sources: https://plv.colorado.edu/papers/mytkowicz-pldi10.pdf and https://github.com/async-profiler/async-profiler and https://openjdk.org/jeps/509 and http://psy-lob-saw.blogspot.com/2016/02/why-most-sampling-java-profilers-are-fucking-terrible.html
 
 ---
 
@@ -205,7 +178,7 @@ JEP 328 set explicit success metrics: **at most 1% out-of-the-box overhead on SP
 
 The trade-off is scope. JFR is excellent for JVM-centric troubleshooting, but it is not a source-level debugger, and it does not give you arbitrary native process introspection the way OS-level tracing or DBI tools do.
 
-Source: https://openjdk.org/jeps/328 and https://docs.oracle.com/javacomponents/jmc-5-4/jfr-runtime-guide/about.htm
+Sources: https://openjdk.org/jeps/328 and https://docs.oracle.com/javacomponents/jmc-5-4/jfr-runtime-guide/about.htm
 
 ### 3.2. Event Tracing for Windows (ETW) — Provider / Controller / Consumer Sessions
 
@@ -217,7 +190,7 @@ The original side here is the **session model**. Multiple providers can be compo
 
 The downside is ecosystem complexity. ETW is immensely capable, but provider discovery, schema evolution, event volume management, and tooling ergonomics are all non-trivial. The mechanism is excellent; the human factors are harder.
 
-Source: https://learn.microsoft.com/en-us/windows-hardware/test/wpt/sessions and https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/about-event-tracing-for-drivers and https://learn.microsoft.com/en-us/windows-hardware/test/wpt/event-tracing-for-windows
+Sources: https://learn.microsoft.com/en-us/windows-hardware/test/wpt/sessions and https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/about-event-tracing-for-drivers and https://learn.microsoft.com/en-us/windows-hardware/test/wpt/event-tracing-for-windows
 
 ### 3.3. .NET EventPipe — Cross-Platform Runtime Tracing via Diagnostic Port
 
@@ -229,7 +202,7 @@ The session API also exposes the design directly. A client can request rundown d
 
 The limitation is scope: EventPipe only sees **managed code and the runtime itself**. If you need kernel events, native stacks for arbitrary unmanaged libraries, or whole-system scheduling context, you still have to go out to ETW, `perf_events`, or other OS-native tools.
 
-Source: https://learn.microsoft.com/en-us/dotnet/core/diagnostics/eventpipe and https://learn.microsoft.com/en-us/dotnet/core/diagnostics/microsoft-diagnostics-netcore-client and https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace
+Sources: https://learn.microsoft.com/en-us/dotnet/core/diagnostics/eventpipe and https://learn.microsoft.com/en-us/dotnet/core/diagnostics/microsoft-diagnostics-netcore-client and https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace
 
 ### 3.4. GHC Eventlog + ThreadScope — Runtime-Native Parallel Timeline
 
@@ -241,7 +214,7 @@ GHC developers also explicitly contrast eventlog with heavier profiling modes. E
 
 It is not an interactive debugger, and it is obviously Haskell-specific. But as a runtime-aware design for understanding concurrency and parallelism, it is original and worth adding.
 
-Source: https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html and https://www.haskell.org/ghc/blog/20190924-eventful-ghc.html and https://manpages.ubuntu.com/manpages/jammy/man1/threadscope.1.html
+Sources: https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html and https://www.haskell.org/ghc/blog/20190924-eventful-ghc.html and https://manpages.ubuntu.com/manpages/jammy/man1/threadscope.1.html
 
 ### 3.5. Go `runtime/trace` — Partitioned Execution Traces and Flight Recorder
 
@@ -253,7 +226,7 @@ The other Go contribution is the **pprof `profile.proto` format** used by `runti
 
 Because Go 1.14 added asynchronous preemption (SIGURG-delivered `asyncPreempt` that synthesizes a safepoint at many otherwise non-cooperative PCs), its SIGPROF-driven CPU profiler is much less tied to cooperative safepoints than older managed-runtime profilers. It can still lose or bias samples because of signal delivery, runtime state, cgo/native frames, and unwinding constraints, but it avoids the worst HotSpot-style safepoint bias of §2.4. This is one of the clearer cases where language-level runtime decisions (frame-pointer discipline + async preemption) pay down profiling pathology that other managed runtimes still work around via AGCT-style side doors.
 
-Source: https://go.dev/blog/execution-traces-2024 and https://go.dev/blog/flight-recorder and https://github.com/golang/proposal/blob/master/design/60773-execution-tracer-overhaul.md and https://blog.felixge.de/waiting-for-go1-21-execution-tracing-with-less-than-one-percent-overhead/ and https://github.com/google/pprof/blob/main/proto/profile.proto
+Sources: https://go.dev/blog/execution-traces-2024 and https://go.dev/blog/flight-recorder and https://github.com/golang/proposal/blob/master/design/60773-execution-tracer-overhaul.md and https://blog.felixge.de/waiting-for-go1-21-execution-tracing-with-less-than-one-percent-overhead/ and https://github.com/google/pprof/blob/main/proto/profile.proto
 
 ### 3.6. DTrace D and bpftrace — Safety-Constrained DSLs with Aggregation Primitives
 
@@ -267,7 +240,7 @@ The other DTrace contribution is the **provider / module / function / name** pro
 
 The principle: when the workload is "let many users install ad-hoc observations into a production kernel," the tracer's language must be restricted enough that safety is structural, not reviewed. DTrace established this; eBPF + bpftrace confirms it. Contrast with ETW (§3.2), which is a push-from-provider event bus — DTrace is pull-by-query, and the two models compose well (an ETW-style session can feed into a bpftrace-style aggregation pipeline).
 
-Source: https://www.usenix.org/legacy/event/usenix04/tech/general/full_papers/cantrill/cantrill.pdf and https://illumos.org/books/dtrace/chp-intro.html and https://github.com/bpftrace/bpftrace and https://www.brendangregg.com/blog/2018-10-08/dtrace-for-linux-2018.html and https://lwn.net/Articles/852112/
+Sources: https://www.usenix.org/legacy/event/usenix04/tech/general/full_papers/cantrill/cantrill.pdf and https://illumos.org/books/dtrace/chp-intro.html and https://github.com/bpftrace/bpftrace and https://www.brendangregg.com/blog/2018-10-08/dtrace-for-linux-2018.html and https://lwn.net/Articles/852112/
 
 ### 3.7. LTTng and CTF — Lockless Per-CPU Ring Buffers Across Kernel and Userspace
 
@@ -277,7 +250,7 @@ That wire format is **CTF (Common Trace Format)**, now at CTF 2. It is a standar
 
 The design lesson is that **buffer discipline and wire format are separable design decisions**. LTTng treats them as two orthogonal standards: any producer that emits CTF can be analyzed by any CTF consumer, and any lockless-per-CPU producer can target any binary format. The combination — lockless per-CPU production into CTF — is what makes LTTng a viable backbone for high-frequency kernel-plus-userspace correlation in production systems.
 
-Source: https://lttng.org/docs/ and https://www.kernel.org/doc/ols/2006/ols2006v1-pages-209-224.pdf and https://www.dorsal.polymtl.ca/files/publications/desnoyers-mcc09-final.pdf
+Sources: https://lttng.org/docs/ and https://www.kernel.org/doc/ols/2006/ols2006v1-pages-209-224.pdf and https://www.dorsal.polymtl.ca/files/publications/desnoyers-mcc09-final.pdf
 
 ### 3.8. Apple `os_signpost` + Instruments — One Emission, Three Modalities
 
@@ -289,7 +262,7 @@ The mechanical trick that makes this cheap enough to leave on in shipping apps i
 
 The design insight worth carrying forward: **a tracing API that emits one payload but supports three viewing projections (text log, timeline interval, aggregate metric) is strictly more useful than three separate APIs with three separate emission costs**. ETW (§3.2) decouples provider from viewer but still makes the provider author shape events per-viewer; Apple's design pushes the projection decision entirely into the consumer.
 
-Source: https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf and https://developer.apple.com/documentation/os/recording-performance-data and https://developer.apple.com/videos/play/wwdc2018/405/ and https://forums.swift.org/t/custom-string-interpolation-and-compile-time-interpretation-applied-to-logging/18799
+Sources: https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf and https://developer.apple.com/documentation/os/recording-performance-data and https://developer.apple.com/videos/play/wwdc2018/405/ and https://forums.swift.org/t/custom-string-interpolation-and-compile-time-interpretation-applied-to-logging/18799
 
 ### 3.9. Linux `io_uring` Tracing — When the Syscall Boundary Stops Being the Tracing Boundary
 
@@ -301,7 +274,7 @@ The robust production answer is **first-party tracepoints inside the io_uring su
 
 The broader structural lesson is the one worth carrying forward: **shared-memory-queue IPC is a tracing blindspot that requires cooperation from the subsystem being traced**. Any transport where the syscall boundary is crossed once per *batch* rather than per *operation* — DPDK, SPDK, RDMA verbs, Vulkan command buffers, GPU submit queues — has the same property. The operation semantics live primarily in user/kernel shared memory; externally attached probes can be useful for expert diagnosis, but stable causality requires first-party semantic tracepoints. This is the inverse of the DTrace/eBPF "probe anything" promise of §3.6 and a strong argument for language/runtime tracepoints (§3.1 / §3.3 / §3.5) as a *primary* design target rather than an afterthought.
 
-Source: https://kernel.dk/io_uring.pdf and https://kernel.dk/axboe-kr2022.pdf and https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h and https://lwn.net/Articles/1063853/ and https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
+Sources: https://kernel.dk/io_uring.pdf and https://kernel.dk/axboe-kr2022.pdf and https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h and https://lwn.net/Articles/1063853/ and https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
 
 ### 3.10. Database Query Tracing — Every Engine Reinvents ETW for Itself
 
@@ -315,7 +288,7 @@ Database engines have their own tracing subsystems parallel to ETW (§3.2), JFR 
 
 The pattern across all three: **mature DB engines reinvent ETW for themselves** because operator-level visibility requires in-engine instrumentation. The runtime is a database, the events are plan-node transitions, and the design space is the same one ETW / JFR / EventPipe already mapped out at the OS / VM level. Complement rather than compete with §12.3 OpenTelemetry's `db.statement` attribute: OTEL sees the query from outside, XE / auto_explain / Performance Schema see it from inside.
 
-Source: https://www.postgresql.org/docs/current/auto-explain.html and https://www.postgresql.org/docs/current/pgstatstatements.html and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server and https://dev.mysql.com/doc/refman/en/performance-schema.html
+Sources: https://www.postgresql.org/docs/current/auto-explain.html and https://www.postgresql.org/docs/current/pgstatstatements.html and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server and https://dev.mysql.com/doc/refman/en/performance-schema.html
 
 ### 3.11. MoarVM Telemetry, snapper, and Heap Snapshots
 
@@ -323,7 +296,7 @@ Raku's MoarVM ships production-grade language-runtime observability built around
 
 Tooling: **`App::MoarVM::HeapAnalyzer`** is a CLI shell over the binary format; **`moarperf`** (timo, last release 2020 but still working) is a web UI; the now-discontinued Comma IDE integrated the same. The architectural design — snapper thread + opcode-level Telemetry events + a binary heap-snapshot format with offline analyzer tools — sits squarely in the JFR / EventPipe / `runtime/trace` family (§§3.1, 3.3, 3.5), but for a smaller, less-known runtime. Worth recording as evidence that a small-team VM can ship credible always-on observability if the binary format and the analyzer are co-designed from the start — with the caveat that bus-factor is real: moarperf's last release was 2020 and the analyzer ecosystem is small enough that a single maintainer's departure is meaningful risk.
 
-Source: https://docs.raku.org/type/Telemetry and https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c and https://github.com/timo/moarperf
+Sources: https://docs.raku.org/type/Telemetry and https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c and https://github.com/timo/moarperf
 
 ---
 
@@ -341,7 +314,7 @@ Tracy and Spall are instrumentation-based profilers popular in game development,
 
 Both demonstrate that with careful engineering, instrumentation overhead can be low enough to leave enabled in development builds permanently. The 2–12ns per span cost is negligible compared to the microseconds or milliseconds that actual work takes, but the visibility gained is transformative.
 
-Source: https://github.com/wolfpld/tracy and https://gravitymoth.com/spall/spall-web.html
+Sources: https://github.com/wolfpld/tracy and https://gravitymoth.com/spall/spall-web.html
 
 ### 4.2. Ruby YARV — Historical Trace Instructions and TracePoint
 
@@ -349,7 +322,7 @@ Older YARV designs included `trace` instructions at compile time at line boundar
 
 This is best treated as the historical bytecode-level design point rather than a blanket description of modern Ruby internals. Ruby issue #14104 documents work to remove trace instructions, so the durable lesson is not "Ruby still uses trace opcodes everywhere," but that compile-time insertion of trace points with a runtime toggle has a measurable disabled cost — negligible per point, but not literally zero — and can become a substantial part of an interpreter's instruction-set surface. Modern Ruby TracePoint should therefore be read as the user-facing tracing abstraction, with implementation details varying by version.
 
-Source: https://docs.ruby-lang.org/en/master/TracePoint.html and https://bugs.ruby-lang.org/issues/14104
+Sources: https://docs.ruby-lang.org/en/master/TracePoint.html and https://bugs.ruby-lang.org/issues/14104
 
 ### 4.3. Erlang dbg — Match Specification Tracing in Production
 
@@ -366,7 +339,7 @@ This is routinely used in production Erlang systems to diagnose issues without r
 
 The `recon` library by Fred Hebert wraps `dbg` in safety rails (rate limiting, automatic timeout) to make production tracing even safer.
 
-Source: https://www.erlang.org/doc/apps/runtime_tools/dbg.html and https://ferd.github.io/recon/recon_trace.html
+Sources: https://www.erlang.org/doc/apps/runtime_tools/dbg.html and https://ferd.github.io/recon/recon_trace.html
 
 ### 4.4. Tcl — Variable and Execution Traces
 
@@ -381,7 +354,7 @@ Tcl's approach is notable for making tracing a *language-level* concept rather t
 
 The limitation is overhead: execution traces on hot commands add a function call per step. But for debugging and development, where the goal is understanding rather than performance, this is acceptable.
 
-Source: https://www.tcl-lang.org/cgi-bin/tct/tip/86.html and https://wiki.tcl-lang.org/page/Tracing+with+enterstep
+Sources: https://www.tcl-lang.org/cgi-bin/tct/tip/86.html and https://wiki.tcl-lang.org/page/Tracing+with+enterstep
 
 ### 4.5. GraalVM Truffle — AST Wrapper Node Instrumentation
 
@@ -393,7 +366,7 @@ This means the cost of instrumentation is paid only in interpreted mode or durin
 
 This is arguably the most sophisticated approach to "zero overhead when disabled" in this survey: not through patching, but through treating instrumentation as part of the program's optimizable AST.
 
-Source: https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/ and https://www.graalvm.org/latest/graalvm-as-a-platform/implement-instrument/
+Sources: https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/ and https://www.graalvm.org/latest/graalvm-as-a-platform/implement-instrument/
 
 ### 4.6. HUGLO — Hyper-Ultra-Giga Low-Overhead Ruby Profiler
 
@@ -411,7 +384,7 @@ Stack correlation is the hard part. The sampler pauses each registered thread an
 
 **profiler.firefox.com** is the frontend — a React/Redux SPA that natively renders Gecko's profile format and also imports Linux `perf script` output, Android SimplePerf, Chrome `trace_event` JSON, Android Studio profiler, and dhat. A Chrome extension (2024) starts Chrome's internal profiler and hands the trace straight to the Firefox Profiler for analysis. Mozilla is explicitly positioning profiler.firefox.com as a universal viewer, the same pattern as Perfetto (§11.2).
 
-Source: https://firefox-source-docs.mozilla.org/tools/profiler/index.html and https://firefox-source-docs.mozilla.org/tools/profiler/markers-guide.html and https://firefox-source-docs.mozilla.org/tools/profiler/code-overview.html and https://github.com/firefox-devtools/profiler and https://profiler.firefox.com/
+Sources: https://firefox-source-docs.mozilla.org/tools/profiler/index.html and https://firefox-source-docs.mozilla.org/tools/profiler/markers-guide.html and https://firefox-source-docs.mozilla.org/tools/profiler/code-overview.html and https://github.com/firefox-devtools/profiler and https://profiler.firefox.com/
 
 ---
 
@@ -421,15 +394,11 @@ Mechanisms where a CPU, SoC, or physical substrate captures execution data witho
 
 ### 5.1. Intel Processor Trace / magic-trace — Hardware Branch Recording
 
-Intel Processor Trace (PT), available since Skylake, records every branch taken by the CPU into a compact bitstream. The hardware writes trace packets that bypass the cache, so the only overhead is reduced memory bandwidth (~1 GB/s). On most workloads this is unmeasurable — under 5%.
+Intel Processor Trace (PT), available since Skylake, records taken branches into a compact hardware bitstream. The tracing value is that branch capture happens without compiler instrumentation; the cost is mainly trace bandwidth and post-processing decode.
 
-Jane Street built `magic-trace` on top of PT. It uses PT's ring buffer mode combined with a hardware breakpoint trigger: PT continuously records into a ring buffer, and when a trigger function is called (or the program crashes), magic-trace snapshots the last ~10ms of execution. The result is a complete function-call timeline viewable in Perfetto.
+Jane Street's `magic-trace` is the user-facing example: it runs PT in a circular buffer, snapshots recent control flow on a trigger, and converts the decoded stream into a function-call timeline viewable in Perfetto. `DEBUGGERS.md §2.10` covers the retrospective debugging workflow; this section keeps the tracing substrate: hardware branch packets are cheap to collect but become useful only after symbolization, frame reconstruction, and timeline export.
 
-This is transformative for tail latency debugging: leave magic-trace attached in production, trigger on "this request took too long," and you get a full trace of everything that happened leading up to the slow event. No instrumentation, no log statements, no reproduction needed.
-
-PT can also be used via `perf record` and viewed in LLDB. But the raw instruction-level traces are overwhelming; magic-trace's contribution is making the data *useful* by converting it to a function-call timeline.
-
-Source: https://blog.janestreet.com/magic-trace/ and https://thume.ca/2023/12/02/tracing-methods/
+Sources: https://blog.janestreet.com/magic-trace/ and https://thume.ca/2023/12/02/tracing-methods/
 
 ### 5.2. Hardware LBR (Last Branch Record) — Silent Branch History
 
@@ -453,7 +422,7 @@ What is original here is that the "tracer" is not a patch, a signal, a runtime c
 
 The limitation is deployment reality. Whether CoreSight is useful depends on what the SoC actually implemented, how much trace buffer space exists, and whether you have the capture hardware and tooling to retrieve it. But conceptually it is one of the cleanest answers to "how do I trace without perturbing timing?"
 
-Source: https://developer.arm.com/documentation/102520/latest/ and https://developer.arm.com/documentation/100232/latest/
+Sources: https://developer.arm.com/documentation/102520/latest/ and https://developer.arm.com/documentation/100232/latest/
 
 ### 5.4. Zero-Overhead Profiling via EM Emanations (ZoP)
 
@@ -475,7 +444,7 @@ The trade-off axis is cost vs precision vs attribution granularity. Cost when of
 
 Skid is the *hardware* dual of the safepoint bias described in §2.4: both are "the sample's reported PC is not the PC that actually caused the event," expressed at different layers. PEBS/IBS/SPE fix the hardware layer; JEP 509 / async-profiler / AGCT fix the software layer; a new language needs both.
 
-Source: https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol3/o_fe12b1e2a880e0ce-711.html and https://lwn.net/Articles/521959/ and http://www.paradyn.org/petascale2013/slides/eranian13.pdf and https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/white-papers/AMD_IBS_paper_EN.pdf and https://github.com/jlgreathouse/AMD_IBS_Toolkit/blob/master/ibs_with_perf_events.txt and https://man7.org/linux/man-pages/man1/perf-arm-spe.1.html and https://lwn.net/Articles/711591/ and https://www.intel.com/content/www/us/en/developer/articles/technical/timed-process-event-based-sampling-tpebs.html
+Sources: https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol3/o_fe12b1e2a880e0ce-711.html and https://lwn.net/Articles/521959/ and http://www.paradyn.org/petascale2013/slides/eranian13.pdf and https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/white-papers/AMD_IBS_paper_EN.pdf and https://github.com/jlgreathouse/AMD_IBS_Toolkit/blob/master/ibs_with_perf_events.txt and https://man7.org/linux/man-pages/man1/perf-arm-spe.1.html and https://lwn.net/Articles/711591/ and https://www.intel.com/content/www/us/en/developer/articles/technical/timed-process-event-based-sampling-tpebs.html
 
 ### 5.6. ARM Cortex-M ITM / SWO — Application Instrumentation on One Debug Pin
 
@@ -487,7 +456,7 @@ The trade-off is bandwidth vs pin budget. Cost when off is literally zero (`TRCE
 
 **SEGGER RTT** is the counterpoint worth naming. Instead of serializing over a dedicated trace pin, the firmware writes to a RAM ring buffer, and the J-Link probe reads that RAM over the SWD debug link while the CPU runs — the Cortex-M debug AHB-AP supports coherent background memory access without halting. The cost is a small RAM buffer (~500 B ROM, ~1 KB RAM typical) and a `memcpy`-equivalent, but bandwidth jumps to 2 MB/s+ on a single standard debug pin with no TPIU/SWO clock configuration required. The broader mechanical argument worth extracting: **on architectures where the debug interface can do coherent background memory reads, treating the debugger as a polling consumer of a RAM buffer is strictly faster than any dedicated serial trace output short of full parallel trace.**
 
-Source: https://developer.arm.com/documentation/ddi0439/b/Instrumentation-Trace-Macrocell-Unit/ITM-functional-description and https://developer.arm.com/documentation/ddi0439/b/Data-Watchpoint-and-Trace-Unit and https://arm-software.github.io/CMSIS_6/v6.0.0/Core/group__ITM__Debug__gr.html and https://kb.segger.com/SWO and https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/ and https://blog.segger.com/current-state-of-the-trace-market/
+Sources: https://developer.arm.com/documentation/ddi0439/b/Instrumentation-Trace-Macrocell-Unit/ITM-functional-description and https://developer.arm.com/documentation/ddi0439/b/Data-Watchpoint-and-Trace-Unit and https://arm-software.github.io/CMSIS_6/v6.0.0/Core/group__ITM__Debug__gr.html and https://kb.segger.com/SWO and https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/ and https://blog.segger.com/current-state-of-the-trace-market/
 
 ---
 
@@ -503,7 +472,7 @@ Because interpreters like CPython and CRuby store their stack frames and thread 
 
 The trick only works for interpreters with predictable memory layouts. But the principle generalizes: if a VM stores its state in a known memory layout, an external observer can read it at any time without disturbing execution. Tristan Hume notes this could be extended to native programs: push context info onto a known data structure, and have an external process sample it via `process_vm_readv` or eBPF.
 
-Source: https://github.com/benfred/py-spy and https://thume.ca/2023/12/02/tracing-methods/
+Sources: https://github.com/benfred/py-spy and https://thume.ca/2023/12/02/tracing-methods/
 
 ### 6.2. strace + seccomp-bpf — The Paradigmatic "Wrong Default" Tracer
 
@@ -513,7 +482,7 @@ The fix (strace 5.3+, GSoC 2018/2019 work by Paul Chaignon and others) is `--sec
 
 The broader lesson is the same as §1.5 USDT and §3.6 DTrace: **separate the cheap guard from the expensive payload**. strace's original design fused them; every syscall paid the ptrace cost whether it was being traced or not. seccomp-bpf retrofits the two-phase pattern, and the measured result is a 25× win with no change in observable semantics.
 
-Source: https://pchaigno.github.io/strace/2019/10/02/introducing-strace-seccomp-bpf.html and https://archive.fosdem.org/2020/schedule/event/debugging_strace_perfotmance/
+Sources: https://pchaigno.github.io/strace/2019/10/02/introducing-strace-seccomp-bpf.html and https://archive.fosdem.org/2020/schedule/event/debugging_strace_perfotmance/
 
 ### 6.3. ltrace — PLT Patching for Library-Call Tracing
 
@@ -533,7 +502,7 @@ Crashpad's load-bearing design choice is that the dump handler runs **out of pro
 
 Relationship to Linux core dumps: a `core` file captures *entire* process memory (gigabytes on modern apps), has no structured metadata stream for arbitrary crash keys, and requires matching debuginfo on the analysis host. Minidumps are the opposite: application-curated "just enough to walk the stack and categorize the crash," with deliberate cost/fidelity trade-offs the application owner controls. They are also a *standardized interchange format* — the same file opens in Google's `minidump_stackwalk`, Microsoft's WinDbg, and LLDB's minidump support — which makes them closer to a universal crash-trace format than core dumps have ever been.
 
-Source: https://chromium.googlesource.com/crashpad/crashpad/+/HEAD/doc/overview_design.md and https://chromium.googlesource.com/breakpad/breakpad/+/HEAD/docs/stack_walking.md
+Sources: https://chromium.googlesource.com/crashpad/crashpad/+/HEAD/doc/overview_design.md and https://chromium.googlesource.com/breakpad/breakpad/+/HEAD/docs/stack_walking.md
 
 ---
 
@@ -599,7 +568,7 @@ The other key design idea is temporal decoupling: record first with modest overh
 
 The cost is the cost of emulation and whole-system setup. But as a design pattern — **record once, replay many times, compose heavyweight analyses on the replay** — PANDA is one of the best examples in the space.
 
-Source: https://panda.re/ and https://www.ndss-symposium.org/wp-content/uploads/bar2021_23001_paper.pdf
+Sources: https://panda.re/ and https://www.ndss-symposium.org/wp-content/uploads/bar2021_23001_paper.pdf
 
 ### 7.6. APM Auto-Instrumentation Agents — Managed-Runtime DBI at Class-Load
 
@@ -613,7 +582,7 @@ The production-safety story hinges on **Muzzle** (DataDog, adopted by OpenTeleme
 
 The design lesson: **span injection without source changes, via load-time bytecode rewriting in managed runtimes**, is the dominant production path for APM adoption. It is DBI (§7.1, §7.2) reframed for a world where the "binary" is `.class` / `.dll` / `.pyc` and the "basic block" is a method. Cross-link §2 Cooperative Safepoints (class retransformation in HotSpot uses safepoints for the swap) and §12.3 OpenTelemetry (agents are where OTEL semantic conventions actually get populated for applications that weren't written with OTEL in mind).
 
-Source: https://docs.oracle.com/en/java/javase/21/docs/api/java.instrument/java/lang/instrument/Instrumentation.html and https://bytebuddy.net/ and https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/contributing/javaagent-structure.md and https://github.com/DataDog/dd-trace-java/blob/master/docs/how_instrumentations_work.md and https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/profiling/icorprofilercallback-interface and https://opentelemetry.io/docs/zero-code/python/
+Sources: https://docs.oracle.com/en/java/javase/21/docs/api/java.instrument/java/lang/instrument/Instrumentation.html and https://bytebuddy.net/ and https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/contributing/javaagent-structure.md and https://github.com/DataDog/dd-trace-java/blob/master/docs/how_instrumentations_work.md and https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/profiling/icorprofilercallback-interface and https://opentelemetry.io/docs/zero-code/python/
 
 ---
 
@@ -659,7 +628,7 @@ The key insight: compiler-based instrumentation is dramatically cheaper than bin
 
 All sanitizers are integrated into Clang/LLVM and GCC. They compose with coverage-guided fuzzing (§9) to form the most powerful automated bug-finding pipeline available.
 
-Source: https://github.com/google/sanitizers/wiki/addresssanitizeralgorithm and https://releases.llvm.org/20.1.0/tools/clang/docs/AddressSanitizer.html
+Sources: https://github.com/google/sanitizers/wiki/addresssanitizeralgorithm and https://releases.llvm.org/20.1.0/tools/clang/docs/AddressSanitizer.html
 
 ---
 
@@ -685,7 +654,7 @@ The combination of fuzzing + sanitizers is transformative: fuzzing generates inp
 
 A compiler that can instrument code for coverage feedback (as LLVM's SanitizerCoverage does) gives fuzzing support for free. A language runtime with built-in coverage tracking enables fuzzing without compiler modifications.
 
-Source: https://llvm.org/docs/LibFuzzer.html and https://lcamtuf.coredump.cx/afl/
+Sources: https://llvm.org/docs/LibFuzzer.html and https://lcamtuf.coredump.cx/afl/
 
 ---
 
@@ -703,7 +672,7 @@ Traditional profilers tell you where time is spent. Coz tells you where time *ma
 
 Mean overhead is ~17%. The technique requires "progress points" — markers where the developer indicates meaningful work completion (e.g., end of a request, end of a frame). This is a small annotation burden but essential for defining what "throughput" means.
 
-Source: https://web.cs.umass.edu/publication/docs/2014/UM-CS-2014-010.pdf and https://blog.acolyer.org/2015/10/14/coz-finding-code-that-counts-with-causal-profling/
+Sources: https://web.cs.umass.edu/publication/docs/2014/UM-CS-2014-010.pdf and https://blog.acolyer.org/2015/10/14/coz-finding-code-that-counts-with-causal-profling/
 
 ---
 
@@ -725,15 +694,13 @@ Source: https://thume.ca/2021/03/14/iforests/
 
 ### 11.2. Perfetto, Fuchsia Trace Format, and the Universal-Viewer Pattern
 
-**Perfetto** (Google, 2018, open-source) is a production system-wide tracing platform with three layers: an instrumentation **SDK** (C++, with bindings and language-level tracing libraries), a **tracing service** that multiplexes producer processes into per-CPU ring buffers, and a **web UI** (ui.perfetto.dev) that renders the resulting protobuf-formatted traces. The service is the Linux-ported descendant of Android's systrace / atrace substrate; the UI is what ate the older Chrome `chrome://tracing` viewer. Because the wire format is a well-defined protobuf, any tool that can produce Perfetto protos — kernel ftrace converters, eBPF probes, custom application instrumentation — gets a zoomable, searchable timeline without writing rendering code.
+**Perfetto** (Google, 2018, open-source) is a production system-wide tracing platform with three layers: an instrumentation SDK, a tracing service that multiplexes producers into buffers, and a web UI that renders protobuf-formatted traces. Because the wire format is documented, kernel ftrace converters, eBPF probes, runtime events, and custom application instrumentation can all land in the same zoomable timeline.
 
-The **Fuchsia Trace Format (FTF)** is the other half of the story: a compact binary event format from Fuchsia's tracing stack, designed for very low-overhead producer-side event emission. Perfetto's native interchange/storage format is protobuf `TracePacket`; Chrome trace JSON is the older import-friendly format. FTF can participate in the same viewer/exporter ecosystem through conversion/import paths, but it should not be confused with Perfetto's native wire format. The combination — cheap producer formats where needed, Perfetto protos for interchange, Perfetto UI for rendering — makes "universal viewer" a real claim rather than a marketing one. Any timestamped event data can reach the timeline with a small exporter.
+The **Fuchsia Trace Format (FTF)** illustrates the producer-side half of the universal-viewer pattern: use a compact emission format where hot-path cost matters, then convert into Perfetto `TracePacket` or another interchange format for storage and visualization. Chrome trace JSON remains the older import-friendly path. The important distinction is capture format vs viewer format; they do not have to be identical.
 
-The "universal-viewer pattern" this enables is architectural. Tristan Hume's "All My Favorite Tracing Tools" illustrates it by composing several data sources against a single viewer: eBPF probes on kernel network-packet paths recording every packet's metadata into a ring buffer at 1 million packets/second with no measurable overhead; userspace event correlation via the "syscall-abuse" trick (calling a syscall with a fast error path like `faccessat2` with invalid arguments, then tracing that syscall in eBPF, for ~700ns-per-event correlation markers with no dedicated library); Fuchsia Trace Format at sub-10ns when spans need to stay cheap. Every data source, one timeline.
+The meta-insight is architectural: the tracing ecosystem is fragmented across dozens of capture tools, but they become composable if they can export to a common viewer or wire format. Perfetto plays that role for timelines, much as pprof (§14.2) does for profiles and CTF (§3.7) does for structured event streams. The SQL/query side of Perfetto is covered from the debugger-analysis angle in `DEBUGGERS.md §2.12`.
 
-The meta-insight worth carrying forward: the tracing ecosystem is fragmented across dozens of tools, but they can be *composed* if they share a wire format. The bottleneck is usually not collecting data — it is making data *viewable*. Perfetto's protobuf format is the universal adapter that makes any data source useful, the same role pprof (§14.2) plays for profiles and CTF (§3.7) plays for structured event streams.
-
-Source: https://perfetto.dev/ and https://perfetto.dev/docs/reference/trace-packet-proto and https://thume.ca/2023/12/02/tracing-methods/
+Sources: https://perfetto.dev/ and https://perfetto.dev/docs/reference/trace-packet-proto and https://thume.ca/2023/12/02/tracing-methods/
 
 ### 11.3. Flame Graphs — Brendan Gregg's Alphabetical-Merge Trick
 
@@ -749,7 +716,7 @@ Three Gregg variants add substantial diagnostic power without changing the rende
 
 Modern renderers (speedscope, pprof `-http`, flamegraph.com, Grafana Phlare, Perfetto) all re-implement the same stack-collapse + alphabetical-sort + SVG-or-Canvas-rectangle recipe. The input to every one of them is Gregg's "folded stack" format — one stack per line, frames separated by semicolons, trailing count. That this plain-text format survived for 15 years as the interchange standard is itself a design insight.
 
-Source: https://www.brendangregg.com/flamegraphs.html and https://queue.acm.org/detail.cfm?id=2927301 and https://github.com/brendangregg/FlameGraph and https://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html
+Sources: https://www.brendangregg.com/flamegraphs.html and https://queue.acm.org/detail.cfm?id=2927301 and https://github.com/brendangregg/FlameGraph and https://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html
 
 ### 11.4. Off-CPU Flame Graphs — The Dual of On-CPU Sampling
 
@@ -761,7 +728,7 @@ The resulting "off-CPU flame graph" uses the same rendering as §11.3 but with w
 
 The caveat Gregg emphasizes: off-CPU and on-CPU widths are not directly comparable. On-CPU time has a fixed budget of N seconds × M cores per wall-clock second; off-CPU time is unbounded (a thread can be blocked for arbitrary duration). The two flame graphs should be read independently, not subtracted or merged. Wakeup-stack analysis (who unblocked this thread?) is the natural follow-up and remains an active area.
 
-Source: https://www.brendangregg.com/offcpuanalysis.html and https://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html and http://brendangregg.com/blog/2016-01-20/ebpf-offcpu-flame-graph.html
+Sources: https://www.brendangregg.com/offcpuanalysis.html and https://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html and http://brendangregg.com/blog/2016-01-20/ebpf-offcpu-flame-graph.html
 
 ---
 
@@ -777,7 +744,7 @@ The paper's central engineering claim is that at Google scale, tracing every req
 
 The lineage worth naming briefly: Dapper (2010, Google-internal) → **Zipkin** (Twitter Hack Week 2012, effectively "Dapper for Thrift" on Finagle/Scribe/Cassandra) → **OpenTracing** (2016, vendor-neutral API) and **OpenCensus** (2017, Google's combined tracing+metrics library) → **Jaeger** (Uber 2017, Go rewrite with push architecture, later a CNCF hosted project) → **OpenTelemetry** (2019, CNCF-brokered merger of OpenTracing and OpenCensus, covered in §12.3).
 
-Source: https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/ and https://static.googleusercontent.com/media/research.google.com/en//archive/papers/dapper-2010-1.pdf and https://blog.x.com/engineering/en_us/a/2012/distributed-systems-tracing-with-zipkin and https://www.uber.com/us/en/blog/distributed-tracing/
+Sources: https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/ and https://static.googleusercontent.com/media/research.google.com/en//archive/papers/dapper-2010-1.pdf and https://blog.x.com/engineering/en_us/a/2012/distributed-systems-tracing-with-zipkin and https://www.uber.com/us/en/blog/distributed-tracing/
 
 ### 12.2. Head-Based vs Tail-Based Sampling
 
@@ -787,7 +754,7 @@ The trade-off is buffering cost. Head-based pipelines scale trivially — every 
 
 The **Consistent Probability Sampling** extension (OpenTelemetry TraceState spec) encodes a rejection threshold `T` directly in TraceState so downstream tiers can *lower* but not *raise* the sampling rate consistently with the root's decision. This is the modern refinement of Dapper's trace-ID-based sampling: a hierarchical sampling pipeline that preserves probability coherence end-to-end, rather than letting each tier roll its own dice.
 
-Source: https://opentelemetry.io/docs/concepts/sampling/ and https://opentelemetry.io/docs/specs/otel/trace/tracestate-probability-sampling/ and https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor
+Sources: https://opentelemetry.io/docs/concepts/sampling/ and https://opentelemetry.io/docs/specs/otel/trace/tracestate-probability-sampling/ and https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor
 
 ### 12.3. OpenTelemetry — The Observability Standard
 
@@ -806,7 +773,7 @@ OTEL has become the de facto standard, with official SDKs for Go, Java, Python, 
 
 The connection to language design: if a language runtime provides built-in context propagation (similar to Racket's continuation marks, covered in `DEBUGGERS.md §3.6`, or Go's `context.Context`), distributed tracing becomes a first-class capability rather than a library concern. The runtime can automatically create spans for function calls, propagate context across async boundaries, and correlate traces with local profiling data.
 
-Source: https://opentelemetry.io/docs/concepts/signals/traces/ and https://opentelemetry.io/docs/concepts/context-propagation/
+Sources: https://opentelemetry.io/docs/concepts/signals/traces/ and https://opentelemetry.io/docs/concepts/context-propagation/
 
 ### 12.4. Pivot Tracing — Dynamic Queries Over Distributed Causality
 
@@ -816,7 +783,7 @@ The load-bearing primitive is the **happened-before join** (`⋈→`), a relatio
 
 The design insight worth preserving for a language-design audience: **baggage + dynamic probes** is a viable primitive stack for *retroactive* questions ("which tenant's traffic caused this disk-read latency spike?"), not just pre-declared spans. This is qualitatively different from OpenTelemetry, where every attribute a trace can carry must be added to the instrumentation ahead of time. The cost-when-off is effectively nil (no probes installed); cost-when-on scales with baggage size and probe frequency. It remains a research system, not a production one, but as a data point for "what could static-span tracing be replaced with?" it is the cleanest example.
 
-Source: https://sigops.org/s/conferences/sosp/2015/current/2015-Monterey/printable/122-mace.pdf and https://doi.org/10.1145/2815400.2815415
+Sources: https://sigops.org/s/conferences/sosp/2015/current/2015-Monterey/printable/122-mace.pdf and https://doi.org/10.1145/2815400.2815415
 
 ---
 
@@ -834,7 +801,7 @@ This layer introduces its own failure modes. Sampling by frequency ("99 Hz") and
 
 For a new language, the design pattern is to separate **sample trigger**, **sample transport**, and **stack attribution**. The runtime may expose a safe self-sampling path, register code metadata so external profilers can unwind it, or provide a per-thread/per-CPU ring buffer for samples. Whatever the choice, the profiler must report lost samples and throttling explicitly; silent drops are worse than lower sample rates.
 
-Source: https://man7.org/linux/man-pages/man2/perf_event_open.2.html and https://www.brendangregg.com/perf.html and https://man7.org/linux/man-pages/man2/setitimer.2.html and https://man7.org/linux/man-pages/man7/signal-safety.7.html
+Sources: https://man7.org/linux/man-pages/man2/perf_event_open.2.html and https://www.brendangregg.com/perf.html and https://man7.org/linux/man-pages/man2/setitimer.2.html and https://man7.org/linux/man-pages/man7/signal-safety.7.html
 
 ### 13.2. Frame Pointers — Zero Walk Cost, 1–3% Steady-State Tax
 
@@ -844,7 +811,7 @@ The cost is structural: one general-purpose register is reserved for the frame p
 
 In 2022–2024 this consensus reversed. **Fedora 38** (April 2023) and **Ubuntu 24.04** (April 2024) shipped with frame pointers re-enabled by default, with Canonical and Red Hat both publishing detailed rationales: the 1–3% cost is paid once across the distribution, but the *diagnostic* value — continuous profiling, production flame graphs, and crash stack traces that actually work — is paid in dividends for every debugging session, for every user. Python followed with PEP 831 (frame pointers for CPython). Brendan Gregg's "The Return of the Frame Pointers" (2024) is the definitive narrative.
 
-Source: https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer and https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default and https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html and https://peps.python.org/pep-0831/
+Sources: https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer and https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default and https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html and https://peps.python.org/pep-0831/
 
 ### 13.3. DWARF `.eh_frame` / CFI — Zero Tax, Expensive Walk
 
@@ -854,7 +821,7 @@ The design win: zero steady-state cost. Registers and instructions are unperturb
 
 The design cost: the unwind rules are an expressive stack-machine / interpreted program, and every frame requires evaluating its FDE (Frame Description Entry) instructions. In practice, walking a DWARF stack from a signal handler is so slow that it can dominate the profile of the profiler itself. Red Hat's unwinder deep-dive reports DWARF walking is roughly 20–40× slower than frame-pointer walks. Ian Lance Taylor's `.eh_frame` series explains why: the bytecode was designed for exception-handling correctness, not sampler-friendly speed.
 
-Source: https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding and https://www.airs.com/blog/archives/460
+Sources: https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding and https://www.airs.com/blog/archives/460
 
 ### 13.4. Linux ORC Unwinder — DWARF Without the Bytecode
 
@@ -862,7 +829,7 @@ Josh Poimboeuf's **ORC** (Oops Rewind Capability) unwinder, merged into Linux 4.
 
 Measured speedup vs DWARF in the kernel is 20–40×. The space cost is an extra ~1.3 MB per kernel build. The conceptual win is that **objtool validates unwind correctness statically** — if the kernel's code doesn't admit a consistent unwind table, the build fails. This is a design pattern worth naming: when unwinding is load-bearing, emit the table as a *first-class build output* validated by a static analyzer, rather than trusting whatever the compiler happened to emit.
 
-Source: https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html and https://lwn.net/Articles/728339/ and https://lwn.net/Articles/727553/
+Sources: https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html and https://lwn.net/Articles/728339/ and https://lwn.net/Articles/727553/
 
 ### 13.5. SFrame — DWARF Minus Everything DWARF Doesn't Need
 
@@ -870,7 +837,7 @@ Source: https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html and ht
 
 The result is a metadata format whose fast-path walk is comparable to frame-pointer walking — fast enough to use from a signal handler at sustained sampling rates — without the 1–3% steady-state tax. The trade-off: SFrame cannot unwind through all the edge cases DWARF handles (signal trampolines, hand-written assembly, exotic calling conventions), so a production profiler needs a fallback path when SFrame is absent. The SFrame and frame-pointer communities are converging on a "both/either" model: ship both, let the sampler pick per thread.
 
-Source: https://sourceware.org/binutils/docs/sframe-spec.html and https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe and https://lwn.net/Articles/930622/ and https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs
+Sources: https://sourceware.org/binutils/docs/sframe-spec.html and https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe and https://lwn.net/Articles/930622/ and https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs
 
 ### 13.6. LBR Call-Stack Sampling — Hardware Shortcut
 
@@ -890,7 +857,7 @@ The dividend compounds. Felix Geisendörfer's 2023 work on Go's execution tracer
 
 For a new language: "always emit frame pointers" is the single most consequential profilability decision. The 1–3% cost is measurable; the cost of not making it is a decade of tool-author workarounds (see §2.4 on async-profiler). The decision is cheapest when made on day one — retrofitting FP discipline onto an established ABI is much harder.
 
-Source: https://go.googlesource.com/proposal/+/master/design/24543-non-cooperative-preemption.md and https://blog.felixge.de/reducing-gos-execution-tracer-overhead-with-frame-pointer-unwinding/
+Sources: https://go.googlesource.com/proposal/+/master/design/24543-non-cooperative-preemption.md and https://blog.felixge.de/reducing-gos-execution-tracer-overhead-with-frame-pointer-unwinding/
 
 ---
 
@@ -906,17 +873,17 @@ The cost-when-on is negligible *per machine* precisely because any one machine i
 
 The load-bearing design trick is **attribution by build ID**. Every Google binary embeds a build identifier; profiles can be re-aggregated by function × binary version, turning the profile store into a *longitudinal* performance archive. You can diff CPU cost of function `X` across last week's and this week's release, attributing regressions to commits. Without build IDs, profiles from a rolling fleet are unattributable noise. This is the same design pattern that makes source-map versioning work for JavaScript debugging, applied to profile metadata.
 
-Source: https://research.google/pubs/google-wide-profiling-a-continuous-profiling-infrastructure-for-data-centers/ and https://research.google.com/pubs/archive/36575.pdf
+Sources: https://research.google/pubs/google-wide-profiling-a-continuous-profiling-infrastructure-for-data-centers/ and https://research.google.com/pubs/archive/36575.pdf
 
 ### 14.2. pprof `profile.proto` as Lingua Franca
 
-Go's pprof format — originally `runtime/pprof`'s output schema (§3.5), documented in `profile.proto` — became the *de-facto* industry wire format for profiles. Parca, Pyroscope / Grafana Phlare, Google Cloud Profiler, Polar Signals, and Datadog all ingest pprof. Status: OpenTelemetry Profiling was still in progress as of 2026, and it converges on the same shape.
+Go's pprof format — originally `runtime/pprof`'s output schema (§3.5), documented in `profile.proto` — became the *de-facto* industry wire format for profiles. Parca, Pyroscope / Grafana Phlare, Google Cloud Profiler, Polar Signals, and Datadog all ingest pprof. Status (as of 2026-04): OpenTelemetry Profiling was still in progress, and it converges on the same shape.
 
 The format's design is deliberately profile-type-agnostic: a generic `Sample → [Location] → Mapping` graph with arbitrary `value` dimensions (so CPU, heap, goroutine, block, mutex, and custom profiles all share one schema), a string table for interning, and gzip compression. This is the profiling equivalent of what OTLP did for traces and what CTF (§3.7) does for event streams: one interchange format that lets producers and consumers evolve independently.
 
 For a new language: if your runtime emits profiles, emit them in pprof. The entire observability tool ecosystem will ingest them without adapter code, and users get free compatibility with continuous-profiling backends they haven't even chosen yet.
 
-Source: https://github.com/google/pprof/blob/main/proto/profile.proto and https://github.com/google/pprof
+Sources: https://github.com/google/pprof/blob/main/proto/profile.proto and https://github.com/google/pprof
 
 ### 14.3. Parca — Open-Source GWP via eBPF
 
@@ -926,7 +893,7 @@ The eBPF-side unwinder is worth naming specifically: Parca / Polar Signals prepr
 
 The storage layer is **FrostDB**, a columnar database designed for profile ingestion and query. Profiles are decomposed into sample-value columns (CPU time, allocated bytes, goroutine counts) and metadata columns (function name, file, line, build ID). Queries are SQL-like aggregations over the columnar layout — the pprof ecosystem's answer to Dremel.
 
-Source: https://parca.dev/docs/concepts and https://www.polarsignals.com/blog/posts/2022/11/29/dwarf-based-stack-walking-using-ebpf
+Sources: https://parca.dev/docs/concepts and https://www.polarsignals.com/blog/posts/2022/11/29/dwarf-based-stack-walking-using-ebpf
 
 ### 14.4. Grafana Pyroscope — Multi-Tenant Profile Aggregation
 
@@ -934,7 +901,7 @@ Source: https://parca.dev/docs/concepts and https://www.polarsignals.com/blog/po
 
 The distinctive feature is **deep integration with distributed tracing** (§12): profiles are tagged with trace and span IDs, so a developer viewing an OpenTelemetry trace can jump directly to the CPU flame graph of the specific span's work. This closes the "profile → request" correlation loop that Dapper-style tracing left open — see a slow span, see exactly which functions consumed the time. Datadog Continuous Profiler and Google Cloud Profiler offer similar correlation in their managed forms.
 
-Source: https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/ and https://grafana.com/docs/pyroscope/latest/reference-server-api
+Sources: https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/ and https://grafana.com/docs/pyroscope/latest/reference-server-api
 
 ### 14.5. Managed Continuous Profilers — Datadog, Google Cloud Profiler
 
@@ -942,7 +909,7 @@ Source: https://grafana.com/docs/pyroscope/latest/introduction/continuous-profil
 
 The common design across all continuous profilers: the steady-state overhead target is 1–5% CPU sustained, not 0%. This is a conscious trade — you give up a small fraction of throughput in exchange for always knowing where the other 95–99% went. Pair it with span-to-profile correlation (§14.4) and you get per-request attribution for the spans that matter without paying per-request cost for the spans that don't.
 
-Source: https://docs.cloud.google.com/profiler/docs/concepts-profiling and https://docs.datadoghq.com/profiler/
+Sources: https://docs.cloud.google.com/profiler/docs/concepts-profiling and https://docs.datadoghq.com/profiler/
 
 ---
 
@@ -956,7 +923,7 @@ GPU workloads cross a boundary that none of the prior mechanisms handle cleanly:
 
 The "registered string handles" optimization is worth naming: `NVTX3_FUNC_RANGE` pre-interns range names so the hot-path call is a pointer push rather than a `strcmp` in the profiler. This is the same "cheap guard, expensive payload" discipline as DTrace USDT (§1.5) applied to GPU-workload annotations, and the direct analogue of Tracy's scoped zones (§4.1) and OpenTelemetry spans (§12.3) for the GPU domain.
 
-Source: https://nvidia.github.io/NVTX/ and https://github.com/NVIDIA/NVTX
+Sources: https://nvidia.github.io/NVTX/ and https://github.com/NVIDIA/NVTX
 
 ### 15.2. CUPTI + Nsight Systems — Cross-Clock-Domain Correlation
 
@@ -966,15 +933,15 @@ The load-bearing detail for GPU tracing is that CUPTI's `CUpti_ActivityKernel` r
 
 **Nsight Systems** (NVIDIA's system profiler) composes NVTX + CUPTI + OS-level perf-like sampling into a single timeline, adding GPU metric sampling (SM occupancy, tensor-core activity, PCIe/NVLink throughput) as separate tracks. It is the production end-state of the "universal timeline" pattern §11.2 describes for general tracing, specialized for GPU workloads.
 
-Source: https://docs.nvidia.com/cupti/ and https://developer.nvidia.com/nsight-systems and https://docs.nvidia.com/nsight-systems/UserGuide/
+Sources: https://docs.nvidia.com/cupti/ and https://developer.nvidia.com/nsight-systems and https://docs.nvidia.com/nsight-systems/UserGuide/
 
 ### 15.3. ROCm rocTracer / rocprofiler — AMD Equivalent
 
-AMD's ROCm stack mirrors NVIDIA's three-layer model: **rocTracer** for runtime-API callback tracing, **ROC-TX** for NVTX-equivalent application annotations, and **rocprof** / **ROCProfiler-SDK** for counter and hardware-trace collection. The legacy stack (rocTracer + rocprof v1/v2) is being superseded by **ROCprofiler-SDK / rocprofv3** with an EoS for the legacy tools scheduled around 2026-Q2.
+AMD's ROCm stack mirrors NVIDIA's three-layer model: **rocTracer** for runtime-API callback tracing, **ROC-TX** for NVTX-equivalent application annotations, and **rocprof** / **ROCProfiler-SDK** for counter and hardware-trace collection. The legacy stack (rocTracer + rocprof v1/v2) is being superseded by **ROCprofiler-SDK / rocprofv3** with an EoS for the legacy tools scheduled for around 2026-Q2.
 
 The distinctive detail is the output format: `rocprof` emits **Chrome-tracing-compatible JSON**, so AMD GPU traces can be loaded directly into Perfetto (§11.2) or the Chrome DevTools tracing viewer without adapter code. This is a deliberate interoperability choice — AMD did not invent a new format, it adopted the one the existing tracing-viewer ecosystem already understood.
 
-Source: https://rocm.docs.amd.com/projects/roctracer/en/latest/ and https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.6.0/rocprof.html
+Sources: https://rocm.docs.amd.com/projects/roctracer/en/latest/ and https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.6.0/rocprof.html
 
 ### 15.4. Perfetto GPU Render-Stage Events
 
@@ -998,7 +965,7 @@ Instrumentation enters Score-P through four routes simultaneously: **compiler ho
 
 The design insight worth carrying forward is the **consortium-backbone pattern**: when multiple tools need the same instrumentation surface, the leverage is in standardizing the measurement layer so every tool benefits from improvements to any one of them. PAPI, `PMPI_*`, and Score-P together illustrate how HPC made this work at community scale.
 
-Source: https://www.vi-hps.org/projects/score-p/overview/overview.html and https://perftools.pages.jsc.fz-juelich.de/cicd/scorep/tags/latest/html/instrumentation.html
+Sources: https://www.vi-hps.org/projects/score-p/overview/overview.html and https://perftools.pages.jsc.fz-juelich.de/cicd/scorep/tags/latest/html/instrumentation.html
 
 ### 16.2. OTF2 — Per-Rank Lockless Parallel Trace Format
 
@@ -1008,13 +975,13 @@ The 2011 design paper (Eschweiler, Wagner, Geimer, Knüpfer, Nagel, Wolf — Par
 
 Scalasca's analysis engine **`scout`** is itself a parallel MPI program that reads each local OTF2 trace on the same rank that produced it, then does a distributed replay matching `MPI_Send`/`MPI_Recv` pairs and collective entry timestamps to classify "Late Sender", "Late Receiver", "Wait at Barrier", "Wait at N×N" patterns. It computes **delay cost** (the root-cause region upstream of the visible wait) and **critical path** — a fundamentally different analysis model from an APM waterfall, because the causality graph is over MPI messages, not HTTP spans.
 
-Source: https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/docs/otf2-2.2/html/index.html and https://ebooks.iospress.nl/publication/26566 and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.6/docs/manual/scout.html
+Sources: https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/docs/otf2-2.2/html/index.html and https://ebooks.iospress.nl/publication/26566 and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.6/docs/manual/scout.html
 
 ### 16.3. Vampir — Server-Side Rendering for Trillion-Event Traces
 
 **Vampir** (TU Dresden ZIH) is the canonical OTF2 visualizer. The distinctive rendering choice: **VampirServer runs as an MPI job alongside the trace files on the HPC filesystem**; the GUI is a thin client that requests aggregated time slices at the zoom level currently visible. This is how Vampir displays traces that do not fit in the visualization host's RAM — the server lives where the data lives, and the client renders whatever resolution fits on screen. Perfetto's implicit in-order forest (§11.1) is the same level-of-detail pattern, but single-machine; Vampir scales it across the cluster that captured the trace in the first place.
 
-Source: https://vampir.eu/ and https://tu-dresden.de/zih/forschung/projekte/vampir
+Sources: https://vampir.eu/ and https://tu-dresden.de/zih/forschung/projekte/vampir
 
 ### 16.4. TAU — Dyninst-Based Attach and Parallel Profiler Lineage
 
@@ -1022,7 +989,7 @@ Source: https://vampir.eu/ and https://tu-dresden.de/zih/forschung/projekte/vamp
 
 For a new language targeting HPC workloads, the practical implication is concrete: speak OTF2 and the `PMPI_*` profiling interface, not OTLP. TAU and Score-P cover the instrumentation side; Vampir and Scalasca cover analysis; OTF2 is the wire format that makes them interchangeable.
 
-Source: https://www.cs.uoregon.edu/research/tau/docs/html-docs/latest/usersguide/usersguide.html and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.5/help/scalasca_patterns-2.5.html
+Sources: https://www.cs.uoregon.edu/research/tau/docs/html-docs/latest/usersguide/usersguide.html and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.5/help/scalasca_patterns-2.5.html
 
 ---
 
@@ -1200,7 +1167,7 @@ Designs for inter-rank causality, trillions of events, and the `PMPI_*` / OpenMP
 
 ## 18. References
 
-References are grouped by the chapter that first cites them. Within each chapter they follow subsection order.
+References are grouped by chapter and roughly follow subsection order. Broad background references may be grouped by topic rather than exact first mention.
 
 ### Chapter 1 — Bytecode and Code Patching
 

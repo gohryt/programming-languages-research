@@ -2,9 +2,9 @@
 
 Research on the data structures and encodings used to represent programs internally — concrete syntax trees, abstract syntax trees, source-adjacent IRs, mid-level IRs, SSA forms, CPS/ANF, e-graphs, bytecode, multi-level IR architectures, effect-/region-/capability-annotated IRs, persistent and content-addressed IRs, domain-specific representations, Forth-style direct representations, and target-adjacent IRs.
 
-This document treats each representation as an artifact in its own right: the design pressures behind its data layout, what it makes cheap, what it makes expensive, and where it sits in the language's compilation pipeline. Parser-side AST layout (Cuik postfix, Zig token-indexing, red-green construction) is in `PARSERS.md §3`, where the framing is parse-time data flow. IR-as-optimization-substrate (CPS/ANF/SSA correspondence, MLIR dialects, instruction-selection DSLs, Turboshaft, Mojo POP) is in `COMPILERS.md §6` and §1.4, where the framing is the transformation passes that consume each form. This document picks up the broader survey those two leave: lossless trees as a tooling substrate, the bytecode family as a portability target, e-graphs as equality-saturating representations, content-addressed code, and the named mid-level IRs (Rust MIR, Zig ZIR/AIR, Google JSIR, Mojo KGEN/POP, Ballerina BIR) treated at greater length. The unifying axis across chapters is *what the representation is for*: source fidelity, optimization, portability, abstraction layering, security analysis, or storage identity.
+This document is the canonical catalogue for program representations. It treats each representation as an artifact in its own right: the design pressures behind its data layout, what it makes cheap, what it makes expensive, and where it sits in a language pipeline. `PARSERS.md §3` keeps only the parse-time view of parser output, and `COMPILERS.md §6` keeps only the compiler-pass view of IR consumers. This file owns the broader representation survey: lossless trees as tooling substrates, AST layouts, source-adjacent IRs, mid-level IRs, SSA forms, bytecode families, e-graphs, content-addressed code, effect-/region-/capability-annotated forms, Forth-style direct representations, and target-adjacent artifacts. The unifying axis across chapters is *what the representation is for*: source fidelity, optimization, portability, abstraction layering, security analysis, or storage identity.
 
-Cross-references into this document live in `PARSERS.md §3` (parser-side AST layouts) and `COMPILERS.md §6` (IRs beyond SSA), with both chapters keeping their existing entries and adding pointers here for the broader survey.
+When other research documents mention a representation, they should usually keep a short, consumer-specific capsule and point here for the full data-structure treatment.
 
 ---
 
@@ -66,7 +66,7 @@ C# and VB.NET's compiler API uses a two-layer tree: immutable, position-free **g
 
 The original contribution is treating *width-only* nodes as the storage representation. Most position-aware ASTs store absolute offsets per node, paying for them on every edit. Roslyn pays for absolute positions only when the user navigates, and even then only for the path actually visited. This is why Roslyn supports massive solutions (~1M-line solutions in Visual Studio) with sub-second incremental responses.
 
-Source: https://ericlippert.com/2012/06/08/red-green-trees/ and https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax
+Sources: https://ericlippert.com/2012/06/08/red-green-trees/ and https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax
 
 ### 2.2. rust-analyzer rowan
 
@@ -74,7 +74,7 @@ rowan is the Rust port of Roslyn's red-green design, used by rust-analyzer and a
 
 rowan is also content-agnostic: the language-specific node kind enum is supplied by the consumer. The same library powers Rust, Typst, Lelwel-generated grammars, and several DSL projects. This separation of concrete-syntax-tree mechanics from language-specific node types is what makes rowan a reusable lossless-tree library rather than a Rust-specific component.
 
-Source: https://github.com/rust-analyzer/rowan and https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html
+Sources: https://github.com/rust-analyzer/rowan and https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html
 
 ### 2.3. SwiftSyntax
 
@@ -82,7 +82,7 @@ Apple's SwiftSyntax is the official syntax library for Swift, modelled on Roslyn
 
 The reason for the stronger guarantee: SwiftSyntax is the boundary for Swift macros (SE-0382, SE-0389, Swift 5.9+). A user-written macro receives a SwiftSyntax tree and returns one; compile then continues with the rewritten tree. If round-trip were lossy, every macro expansion would silently mangle source. The cost is that every macro plugin compiles a non-trivial SwiftSyntax dependency into its binary, which has been a recurring source of macro build-time complaints in Xcode.
 
-Source: https://github.com/swiftlang/swift-syntax and https://github.com/swiftlang/swift-evolution/blob/main/proposals/0389-attached-macros.md
+Sources: https://github.com/swiftlang/swift-syntax and https://github.com/swiftlang/swift-evolution/blob/main/proposals/0389-attached-macros.md
 
 ### 2.4. Lezer (CodeMirror 6)
 
@@ -114,7 +114,7 @@ ASDL (Wang, Appel, Korn, Serra; 1997) is a language for describing tree-shaped d
 
 The contribution that earns it a place here is *the schema as the ground truth*. Without a schema, every consumer of an AST has to reinvent its node taxonomy and carry its drift over time. With ASDL, the tree shape is one file — visitors, traversals, and serializers are generated from it. This is the same design philosophy as ungrammar (§3.7), but two decades older.
 
-Source: https://www.cs.princeton.edu/research/techreps/TR-554-97 and https://docs.python.org/3/library/ast.html
+Sources: https://www.cs.princeton.edu/research/techreps/TR-554-97 and https://docs.python.org/3/library/ast.html
 
 ---
 
@@ -260,7 +260,7 @@ rustc's MIR is the borrow checker's native IR. CFG of basic blocks; statements a
 
 MIR was introduced in 2016 specifically because borrow checking on the AST had become unmaintainable — non-lexical lifetimes (NLL) and later Polonius (`MEMORY.md §1.2`) require a flow-sensitive representation. MIR's CFG gave the borrow checker a clean substrate, and const-eval, drop elaboration, exhaustiveness checking, and miri (`DEBUGGERS.md §8.8`) all became cleaner on MIR than they were on the AST. Lowering to LLVM IR happens after MIR-level passes complete.
 
-Source: https://rustc-dev-guide.rust-lang.org/mir/index.html and https://blog.rust-lang.org/2016/04/19/MIR.html
+Sources: https://rustc-dev-guide.rust-lang.org/mir/index.html and https://blog.rust-lang.org/2016/04/19/MIR.html
 
 ### 5.2. Zig ZIR (Zig Intermediate Representation)
 
@@ -334,7 +334,7 @@ Specifically: `jshir` represents `if`/`while`/`for`/`logical_expression` as MLIR
 
 The lesson generalizes: an IR designed for *security analysis* — taint propagation, dataflow tracking, source recovery — has different fidelity requirements than an IR designed for codegen. JSIR shows MLIR's region machinery accommodating both: structured control as regions for source fidelity, SSA values for dataflow.
 
-Source: https://github.com/google/jsir and https://arxiv.org/abs/2507.17691
+Sources: https://github.com/google/jsir and https://arxiv.org/abs/2507.17691
 
 ---
 
@@ -364,7 +364,7 @@ HotSpot's C2 (server-tier JIT) uses Cliff Click's Sea-of-Nodes IR: a graph where
 
 The cost is that the IR is harder to print, debug, and reason about than linear SSA, and global scheduling on every pass adds compile-time overhead. HotSpot accepts these costs because peak code quality matters more for long-running server workloads. The same IR style appears in V8 TurboFan (§6.4) and Graal — all server-tier JITs that prioritize peak throughput.
 
-Source: Click (1995) "From Quads to Graphs" and https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html
+Sources: Click (1995) "From Quads to Graphs" and https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html
 
 ### 6.4. V8 TurboFan
 
@@ -478,7 +478,7 @@ Source: https://github.com/egraphs-good/egglog
 
 Cranelift adopted egg-based e-graphs for its mid-end optimizer in 2022, replacing its previous peephole-rewriter. The rewriter's rules — strength reduction, algebraic identities, GVN — express as ISLE (`COMPILERS.md §13.2`) patterns over the e-graph. The acyclic-egraph (aegraph) variant Cranelift uses is a restricted form of e-graph that disallows cycles, making extraction easier.
 
-This is the largest production deployment of e-graphs as of 2025. Trade-offs: e-graphs use more memory than mutable IRs (every rewrite preserves the original alongside the new form), and extraction has to choose among equivalent programs. Cranelift's choice of acyclic e-graphs accepts some expressiveness loss for predictable extraction.
+As of 2025, this is the largest production deployment of e-graphs. Trade-offs: e-graphs use more memory than mutable IRs (every rewrite preserves the original alongside the new form), and extraction has to choose among equivalent programs. Cranelift's choice of acyclic e-graphs accepts some expressiveness loss for predictable extraction.
 
 Source: https://github.com/bytecodealliance/rfcs/blob/main/accepted/cranelift-egraph.md
 
@@ -604,7 +604,7 @@ LLVM's main pipeline has two IRs: target-independent **LLVM IR** (§6.1) for hig
 
 The two-level split exists because target-independent and target-dependent optimizations have different concerns: target-independent passes care about value flow and aliasing; target-dependent passes care about register pressure, instruction latencies, and ABI conventions. A single IR could carry both, but at the cost of either being too high-level for codegen or too low-level for analysis.
 
-Source: https://llvm.org/docs/LangRef.html and https://llvm.org/docs/MIRLangRef.html
+Sources: https://llvm.org/docs/LangRef.html and https://llvm.org/docs/MIRLangRef.html
 
 ### 10.3. Rust HIR → THIR → MIR Cascade
 
@@ -872,7 +872,7 @@ GCC has two target-adjacent IRs: GIMPLE (high-level, target-agnostic) and RTL (R
 
 The two-IR design predates LLVM's MIR by decades. GIMPLE is the substrate for most GCC optimization passes (loop transformations, scalar optimizations, vectorization). RTL is for register allocation, scheduling, and machine-code emission. The transition between GIMPLE and RTL happens after target-independent optimization.
 
-Source: https://gcc.gnu.org/onlinedocs/gccint/GIMPLE.html and https://gcc.gnu.org/onlinedocs/gccint/RTL.html
+Sources: https://gcc.gnu.org/onlinedocs/gccint/GIMPLE.html and https://gcc.gnu.org/onlinedocs/gccint/RTL.html
 
 ### 15.3. Cranelift MachInst
 
@@ -904,7 +904,7 @@ Object file formats — ELF (Linux/BSD), Mach-O (macOS/iOS), COFF/PE (Windows) �
 
 For language designers, the object file format constrains what compilers can express. Stack-unwind tables (DWARF `.eh_frame`, SFrame, ORC), debug info (`.debug_*`), build IDs, symbol exports — all live in section conventions defined by the format. A new language emitting native code must speak ELF/Mach-O/COFF or rely on a backend (LLVM, Cranelift, GCC) that does.
 
-Source: https://refspecs.linuxfoundation.org/elf/elf.pdf and https://github.com/aidansteele/osx-abi-macho-file-format-reference
+Sources: https://refspecs.linuxfoundation.org/elf/elf.pdf and https://github.com/aidansteele/osx-abi-macho-file-format-reference
 
 ---
 
@@ -1082,7 +1082,7 @@ Rows grouped by chapter, in chapter order. Each row's Examples column ends with 
 
 ## 17. References
 
-References are grouped by the chapter that first cites them. Within each chapter they roughly follow subsection order.
+References are grouped by chapter and roughly follow subsection order. Broad background references may be grouped by topic rather than exact first mention.
 
 ### Chapter 2 — Concrete Syntax Trees and Lossless Representations
 

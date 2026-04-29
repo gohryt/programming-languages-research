@@ -2,7 +2,7 @@
 
 Research on compile-time and runtime memory disciplines — ownership and borrowing, region inference, reference-counting compilation, modern C++ safety initiatives, hardware tagging and capabilities, tracing GC architectures, allocators, formal verification of memory safety, concurrent reclamation, and capability-based authority.
 
-This document spans both compile-time analyses and runtime systems. The compile-time half (regions, ownership, RC compilation) extends `COMPILERS.md §16` (Perceus, MLKit/Cyclone basics, Vale generational references) rather than duplicating it — entries flagged with cross-references show what is added beyond the existing summary. The runtime half (tracing GC, allocators, hardware mechanisms, concurrent reclamation) is in scope here but explicitly *out of scope* for `COMPILERS.md`. Sanitizers as observability tools live in `TRACERS.md §8`; see `DEBUGGERS.md §8.8` for the operational aliasing model behind Miri, and see `MEMORY.md §8.11` for the formal-model side. Capability-based modularity at the binary boundary (Wasm Components, WASI worlds) is covered here from the authority angle and in `MODULES.md §13` from the module-system angle. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
+This document is the canonical owner for memory-model and memory-safety research. It spans both compile-time analyses and runtime systems: ownership and borrowing, regions, reference-counting compilation, tracing GC, allocators, hardware mechanisms, verified memory safety, concurrent reclamation, and capability-based authority. `COMPILERS.md §16` keeps only the compiler-pass view of selected techniques — where IR must expose ownership, regions, RC operations, or runtime checks so optimization can remove or lower them. Sanitizers as observability tools live in `TRACERS.md §8`; see `DEBUGGERS.md §8.8` for the operational aliasing model behind Miri, and see `MEMORY.md §8.11` for the formal-model side. Capability-based modularity at the binary boundary (Wasm Components, WASI worlds) is covered here from the authority angle and in `MODULES.md §13` from the module-system angle. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
 
 ---
 
@@ -16,7 +16,7 @@ Rust's defining mechanism is the borrow checker: every reference has a region/li
 
 The technical advances NLL ships with: (1) MIR-based dataflow that computes "loans live at point P" via constraint propagation; (2) two-phase borrows that split a `&mut` into a reservation phase (read-only) and an activation phase, enabling patterns like `vec.push(vec.len())` that would otherwise alias; (3) reborrowing rules that let `&mut *p` produce a fresh inner borrow, re-enabling `p` after the inner borrow ends.
 
-Source: https://blog.rust-lang.org/2022/08/05/nll-by-default.html and https://rust-lang.github.io/rfcs/2025-nll.html and https://smallcultfollowing.com/babysteps/blog/2017/03/01/nested-method-calls-via-two-phase-borrowing/
+Sources: https://blog.rust-lang.org/2022/08/05/nll-by-default.html and https://rust-lang.github.io/rfcs/2025-nll.html and https://smallcultfollowing.com/babysteps/blog/2017/03/01/nested-method-calls-via-two-phase-borrowing/
 
 ### 1.2. Rust — Polonius
 
@@ -24,7 +24,7 @@ Niko Matsakis's **Polonius** is a reformulation of borrow-checking as a per-CFG-
 
 Co-developed with `a-mir-formality`, a formal model of MIR + the trait system used to derive the location-insensitive subset that ships first. The end-state goal is a single reformulation of the borrow checker that passes more programs and is easier to reason about.
 
-Source: https://rust-lang.github.io/polonius/ and https://blog.rust-lang.org/inside-rust/2023/10/06/polonius-update/ and https://rust-lang.github.io/rust-project-goals/2026/polonius.html
+Sources: https://rust-lang.github.io/polonius/ and https://blog.rust-lang.org/inside-rust/2023/10/06/polonius-update/ and https://rust-lang.github.io/rust-project-goals/2026/polonius.html
 
 ### 1.3. Rust — Stacked Borrows and Tree Borrows
 
@@ -34,7 +34,7 @@ These are not borrow-checkers but *operational aliasing models* — they define 
 
 Tree Borrows is an experimental aliasing model available in Miri, not the established default model. Stacked Borrows remains the more established operational model for Miri-based aliasing checks today, while Tree Borrows is a promising candidate being evaluated because it accepts more real unsafe-Rust patterns without giving up the optimization story. The mechanical aliasing-detection side is covered from the debugger angle in `DEBUGGERS.md §8.8`; the formal-soundness side appears in §8.11 below.
 
-Source: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://www.ralfj.de/blog/2018/08/07/stacked-borrows.html and https://dl.acm.org/doi/10.1145/3735592
+Sources: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://www.ralfj.de/blog/2018/08/07/stacked-borrows.html and https://dl.acm.org/doi/10.1145/3735592
 
 ### 1.4. Rust — Pin/Unpin and Async Lifetimes
 
@@ -42,13 +42,13 @@ Library-level rather than language-level mechanism for *address stability*, need
 
 Pin stabilized in Rust 1.33 (February 2019); async/await in 1.39 (November 2019). The library-only character is unusual: Rust's ownership machinery is rich enough to express "addresses are stable until destruction" without a new language feature.
 
-Source: https://doc.rust-lang.org/std/pin/ and https://rust-lang.github.io/async-book/part-reference/pinning.html and https://without.boats/blog/pin/
+Sources: https://doc.rust-lang.org/std/pin/ and https://rust-lang.github.io/async-book/part-reference/pinning.html and https://without.boats/blog/pin/
 
 ### 1.5. Rust — View Types (Work in Progress)
 
 Proposed extension to express partial/disjoint borrows of struct fields in function signatures, eliminating today's spurious inter-procedural borrow conflicts. Syntax `&mut {f1, f2} self` records *multiple* loans (one per named field) instead of a single whole-struct loan, so two methods accessing disjoint field sets compose. Niko Matsakis's "maximally minimal" design pairs explicit field lists with potential row-polymorphism inference; the competing RFC #3736 ("Partial Types") generalizes to nested products. This remains a design-space discussion / pre-RFC area rather than a stabilized Rust feature.
 
-Source: https://smallcultfollowing.com/babysteps/blog/2026/03/21/view-types-max-min/ and https://smallcultfollowing.com/babysteps/series/view-types/ and https://github.com/rust-lang/rfcs/pull/3736
+Sources: https://smallcultfollowing.com/babysteps/blog/2026/03/21/view-types-max-min/ and https://smallcultfollowing.com/babysteps/series/view-types/ and https://github.com/rust-lang/rfcs/pull/3736
 
 ### 1.6. Hylo — Mutable Value Semantics and Subscripts
 
@@ -56,7 +56,7 @@ Dimi Racordon and Dave Abrahams's **Hylo** (formerly Val) achieves memory safety
 
 The distinctive primitive is **subscripts** that `yield` rather than `return`: `subscript min(x: yielded T, y: yielded T): T { if cond { &x } else { &y } }`. The caller gets temporary access to a part of an existing value, with the variant (`let`/`inout`/`sink`) chosen at the call site. No lifetime annotations exist in surface syntax: aliasing constraints are inferred from projection nesting because a projection's lifetime is always "until the call returns." The Swiftlet calculus (Racordon-Abrahams, JOT 2022) is the formal grounding.
 
-Source: https://www.hylo-lang.org/ and https://docs.hylo-lang.org/language-tour/subscripts and https://www.jot.fm/issues/issue_2022_02/article2.pdf
+Sources: https://www.hylo-lang.org/ and https://docs.hylo-lang.org/language-tour/subscripts and https://www.jot.fm/issues/issue_2022_02/article2.pdf
 
 ### 1.7. Mojo — `owned`/`borrowed`/`inout` with ASAP Destruction
 
@@ -64,7 +64,7 @@ Modular's **Mojo** grafts Rust-style ownership onto Python syntax with one disti
 
 Mojo's "origins" (lifetime parameters) are tracked symbolically by the compiler; per-field destruction tracks partial moves of struct fields independently. Ownership shipped with the first public release in 2023; lifetimes/origins stabilized 2024–2026.
 
-Source: https://docs.modular.com/mojo/manual/values/ownership/ and https://docs.modular.com/mojo/manual/lifecycle/death/ and https://www.modular.com/blog/deep-dive-into-ownership-in-mojo
+Sources: https://docs.modular.com/mojo/manual/values/ownership/ and https://docs.modular.com/mojo/manual/lifecycle/death/ and https://www.modular.com/blog/deep-dive-into-ownership-in-mojo
 
 ### 1.8. Swift — Law of Exclusivity and Noncopyable Types
 
@@ -72,15 +72,15 @@ Swift adds compile-time + runtime exclusivity enforcement on top of an ARC-manag
 
 **SE-0390 noncopyable structs/enums** (Swift 5.9, 2023): `struct Foo: ~Copyable` suppresses the implicit `Copyable` conformance; values have unique ownership and may declare a `deinit`. SE-0427 (Swift 6.0, 2024) extends this to generics via a default `Copyable` constraint that can be suppressed with `~Copyable`. **SE-0377 parameter modifiers** make `consuming`/`borrowing` part of the API contract; `consuming` methods can use `discard self` to suppress `deinit`. This is Swift's clearest move into the Rust-adjacent design space — opt-in linearity layered on an ARC-managed language.
 
-Source: https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md and https://github.com/apple/swift-evolution/blob/main/proposals/0390-noncopyable-structs-and-enums.md and https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md
+Sources: https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md and https://github.com/apple/swift-evolution/blob/main/proposals/0390-noncopyable-structs-and-enums.md and https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md
 
 ### 1.9. Austral — Linear Types as the Primary Mechanism
 
 Fernando Borretti's **Austral** uses linearity (every linear value used *exactly* once) as the load-bearing safety primitive, not an opt-in. The linearity checker fits in roughly 600 lines of OCaml. Linear types double as **capabilities**: the entrypoint receives a `RootCapability` and APIs require passing capability values (`EnvCap`, `FileSystemCap`, etc.) — supply-chain attacks become a type error since capabilities cannot be forged or stashed in globals.
 
-Region-tagged borrows (`borrow` statement introducing a fresh region type `R`) re-enable shared/mutable references inside a lexical scope without losing the linearity invariant, by ensuring references cannot escape the region. The language is designed for "fits-in-head" simplicity: the linearity rules fit on one page; the compiler is small enough to be auditable. Status: 1.0.0-alpha in 2023.
+Region-tagged borrows (`borrow` statement introducing a fresh region type `R`) re-enable shared/mutable references inside a lexical scope without losing the linearity invariant, by ensuring references cannot escape the region. The language is designed for "fits-in-head" simplicity: the linearity rules fit on one page; the compiler is small enough to be auditable. Status (2023): 1.0.0-alpha.
 
-Source: https://austral-lang.org/spec/spec.html and https://borretti.me/article/how-australs-linear-type-checker-works and https://borretti.me/article/how-capabilities-work-austral
+Sources: https://austral-lang.org/spec/spec.html and https://borretti.me/article/how-australs-linear-type-checker-works and https://borretti.me/article/how-capabilities-work-austral
 
 ### 1.10. Pony — Reference Capabilities
 
@@ -88,15 +88,15 @@ Sylvan Clebsch's **Pony** has six per-reference capabilities — `iso` (read/wri
 
 `consume` and `recover` blocks let capability-changing assignments happen safely: `consume` ends an alias to allow reassignment; `recover` lifts the capability of objects constructed inside it, so a freshly built `ref` graph can become `iso` if the recover block could only see sendable inputs. The same system reappears from the capability/authority angle in §10.1 below — Pony is the cleanest example of one mechanism doing both ownership and ocap work.
 
-Source: https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html and https://tutorial.ponylang.io/reference-capabilities/capability-matrix.html and https://www.ponylang.io/media/papers/fast-cheap.pdf
+Sources: https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html and https://tutorial.ponylang.io/reference-capabilities/capability-matrix.html and https://www.ponylang.io/media/papers/fast-cheap.pdf
 
 ### 1.11. Linear Haskell — Multiplicity-Polymorphic Arrows
 
 GHC's `-XLinearTypes` (Bernardy et al., POPL 2018; shipped GHC 9.0, February 2021) puts linearity on the *function arrow* (`a %1 -> b`), not on types. A linear function promises "if my result is consumed once, my argument is consumed once," but can still be applied to unrestricted values. The **multiplicity-polymorphic arrow** `a %m -> b` with `m :: Multiplicity` (`One` or `Many`) lets `map`, `(.)`, etc. be reused unmodified for both linear and non-linear callers — solving the "code duplication" problem that kept linear types out of mainstream FP for thirty years.
 
-All non-GADT data constructors are linear by default, so existing types like `(,)` and `[]` get useful linear types for free; existing programs continue to type-check. The implementation cost in GHC was ~1,150 lines. "Linear Constraints" (PACMPL 2021) layers an inferred `=∘` arrow on top for ergonomics. Status: experimental in GHC 9.12.
+All non-GADT data constructors are linear by default, so existing types like `(,)` and `[]` get useful linear types for free; existing programs continue to type-check. The implementation cost in GHC was ~1,150 lines. "Linear Constraints" (PACMPL 2021) layers an inferred `=∘` arrow on top for ergonomics. Status (GHC 9.12): experimental.
 
-Source: https://arxiv.org/abs/1710.09756 and https://downloads.haskell.org/~ghc/latest/docs/users_guide/exts/linear_types.html
+Sources: https://arxiv.org/abs/1710.09756 and https://downloads.haskell.org/~ghc/latest/docs/users_guide/exts/linear_types.html
 
 ### 1.12. Idris 2, Granule, Clean — Multiplicities, Graded Types, Uniqueness
 
@@ -104,7 +104,7 @@ Three adjacent mechanisms worth naming as a group, none requiring full per-entry
 
 **Idris 2** (Edwin Brady) uses **Quantitative Type Theory**: every binder has a multiplicity 0 / 1 / ω, where 0 = erased at runtime, 1 = used exactly once, ω = unrestricted. Unifies linearity *and* erasure: types are 0-quantity; runtime values are 1 or ω. **Granule** combines linear types with **graded modal types** — `a [n]` says "use `a` exactly `n` times" where `n` ranges over a user-chosen semiring (naturals, intervals, security levels), generalizing linear `!` to track fine-grained co-effects. **Clean uniqueness types** (since the 1990s) use `*T` for "no other reference exists, destructive update is safe"; semantically distinct from linearity (Clean is about graphs, linearity about lambda terms; uniqueness is about the past, linearity about the future).
 
-Source: https://arxiv.org/abs/2104.00480 and https://granule-project.github.io/ and https://wiki.clean.cs.ru.nl/download/html_report/CleanRep.2.2_11.htm
+Sources: https://arxiv.org/abs/2104.00480 and https://granule-project.github.io/ and https://wiki.clean.cs.ru.nl/download/html_report/CleanRep.2.2_11.htm
 
 ---
 
@@ -118,7 +118,7 @@ Grossman, Morrisett, Jim, Hicks, Wang, Cheney's **Cyclone** (PLDI 2002) is a saf
 
 The annotation burden was empirically tractable: porting legacy C, only ~6% of an 8% changed-line set were region annotations. Cyclone's algorithm is bidirectional type-checking with effect inference — not full Hindley-Milner reconstruction. Tracked unique/RC pointers were added in the 2006 SCP follow-up. Cyclone is the canonical "explicit regions, modest annotation cost" reference and the direct ancestor of Rust's lifetime annotations.
 
-Source: https://www.cs.umd.edu/projects/cyclone/papers/cyclone-regions.pdf and https://www.cs.umd.edu/projects/PL/cyclone/scp.pdf and https://www.cs.cornell.edu/Projects/cyclone/online-manual/main-screen008.html
+Sources: https://www.cs.umd.edu/projects/cyclone/papers/cyclone-regions.pdf and https://www.cs.umd.edu/projects/PL/cyclone/scp.pdf and https://www.cs.cornell.edu/Projects/cyclone/online-manual/main-screen008.html
 
 ### 2.2. Tofte–Talpin / MLKit — Automatic Region Inference
 
@@ -126,13 +126,13 @@ The canonical "no annotations, all inferred" baseline. Tofte–Talpin's stack-of
 
 Algorithm specification: unification + constraint-solving. Mads Tofte / Martin Elsman's syntax-directed Algorithm R (TOPLAS 1998) uses Algorithm-W-style unification with fixed-point iteration to handle polymorphic-recursive regions; Birkedal–Tofte's alternative is constraint-based. MLKit ships the syntax-directed one. Storage-mode / multiplicity inference further refines representations after inference. Annotation burden: zero; inference power: very strong, with classic pathologies (region "stuck" until end of program — the leak problem, partly fixed by Aiken–Fähndrich–Levien 1995's relaxed LIFO).
 
-Source: https://elsman.com/mlkit/pdf/toplas98.pdf and https://elsman.com/mlkit/pdf/retro.pdf
+Sources: https://elsman.com/mlkit/pdf/toplas98.pdf and https://elsman.com/mlkit/pdf/retro.pdf
 
 ### 2.3. MLKit + GC and Parallel Region Inference
 
 Two recent extensions of the MLKit line worth naming separately. Elsman & Hallenberg (JFP 2021) combine region inference with tag-free generational GC: per-region collectors are specialised by exploiting *typed regions*, and write barriers are minimised. Empirically the combination often beats either technique alone — regions handle the common case (short-lived data freed in bulk), GC handles the pathological case (long-lived data with complex sharing). Elsman & Henriksen (PLDI 2023) deliver parallel region inference for MLKit with leaf threads, avoiding allocation races. Together these papers update the 1990s MLKit story to a multicore world.
 
-Source: https://elsman.com/mlkit/pdf/jfp2021.pdf and https://elsman.com/mlkit/pdf/parreg-pldi23.pdf
+Sources: https://elsman.com/mlkit/pdf/jfp2021.pdf and https://elsman.com/mlkit/pdf/parreg-pldi23.pdf
 
 ### 2.4. Verona — Per-Region Pluggable Strategies and Behaviour-Oriented Concurrency
 
@@ -140,7 +140,7 @@ Microsoft Research / Imperial / Uppsala's **Verona** is a concurrent OO language
 
 **Behaviour-Oriented Concurrency** (BoC, OOPSLA 2023) replaces actors with `when` behaviours that asynchronously acquire exclusive access to multiple `cown`-wrapped regions atomically — solving the "atomic update of N actors" problem actors leave open. **Dynamic Region Ownership** (PLDI 2025) is a *dynamic* enforcement of the same discipline retrofitted into Python, relevant to the free-threaded CPython work. Verona is the most ambitious modern composition of regions + concurrency + memory-strategy choice.
 
-Source: https://dl.acm.org/doi/10.1145/3622846 and https://www.microsoft.com/en-us/research/publication/dynamic-region-ownership-for-concurrency-safety/ and https://github.com/microsoft/verona
+Sources: https://dl.acm.org/doi/10.1145/3622846 and https://www.microsoft.com/en-us/research/publication/dynamic-region-ownership-for-concurrency-safety/ and https://github.com/microsoft/verona
 
 ### 2.5. Encore — Capabilities-as-Regions for Active Objects
 
@@ -148,15 +148,15 @@ Brandauer, Castegren, Clarke, Wrigstad et al.'s **Encore** (UpScale, 2015–2018
 
 Encore is the cleanest example of "capabilities-as-regions" at the language level — closer in shape to Pony than to Cyclone, but with a stronger emphasis on parallel-combinator coordination.
 
-Source: https://ebjohnsen.org/publication/15-encore/15-encore.pdf and https://eliasc.github.io/
+Sources: https://ebjohnsen.org/publication/15-encore/15-encore.pdf and https://eliasc.github.io/
 
 ### 2.6. Vale — Region-Borrowing Prototype and Group Borrowing
 
-Evan Ovadia's **Vale** layers region borrowing on top of generational references (covered in `COMPILERS.md §16.3`). The first region-borrowing prototype shipped July 2023: pure functions and `region` blocks can temporarily make data immutable, eliminating generation checks for code inside the block. The August 2025 **Group Borrowing** proposal (Nick Smith, endorsed by Ovadia) is a *zero-overhead* alternative to aliasable-xor-mutable — adds mutable aliasing without RC/GC/generational refs, described as cleaner than Vale's regions, still draft. Hybrid-Generational Memory was effectively abandoned after ~32 iterations; Ovadia explicitly says regions + generational refs subsumed it.
+Evan Ovadia's **Vale** layers region borrowing on top of generational references. `COMPILERS.md §16.3` summarizes the compiler-pass angle: runtime generation checks are inserted explicitly, then eliminated where region and immutability analysis proves them redundant. The first region-borrowing prototype shipped July 2023: pure functions and `region` blocks can temporarily make data immutable, eliminating generation checks for code inside the block. The August 2025 **Group Borrowing** proposal (Nick Smith, endorsed by Ovadia) is a *zero-overhead* alternative to aliasable-xor-mutable — adds mutable aliasing without RC/GC/generational refs, described as cleaner than Vale's regions, still draft. Hybrid-Generational Memory was effectively abandoned after ~32 iterations; Ovadia explicitly says regions + generational refs subsumed it.
 
 Annotation burden is opt-in: programs run without regions; add `pure`/region annotations only where you want zero generation checks. This is the "regions as immutability projection" design point — distinct from regions as deallocation discipline.
 
-Source: https://verdagon.dev/blog/regions-prototype and https://verdagon.dev/blog/group-borrowing and https://verdagon.dev/grimoire/grimoire
+Sources: https://verdagon.dev/blog/regions-prototype and https://verdagon.dev/blog/group-borrowing and https://verdagon.dev/grimoire/grimoire
 
 ### 2.7. ASAP — As-Static-As-Possible
 
@@ -164,13 +164,13 @@ Raphaël Proust's **ASAP** (Cambridge PhD 2017) is fully automatic, *no annotati
 
 Followed up by Nathan Corbyn's Cambridge Part II (2020) with an LLVM backend and benchmarks vs. Boehm GC. The most aggressive "no-annotation, no-GC" point in the design space.
 
-Source: https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-908.pdf and https://nathancorbyn.com/nc513.pdf
+Sources: https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-908.pdf and https://nathancorbyn.com/nc513.pdf
 
 ### 2.8. Boyapati — Single-Owner Regions for RTSJ Java
 
 Boyapati, Salcianu, Beebee, Rinard (PLDI 2003) fuse ownership types and region types for RTSJ Java. Every object has an owner (object or region); the ownership relation is acyclic; encapsulation and outlives are statically enforced. This eliminates RTSJ runtime checks for scoped-memory access, significantly faster than dynamic checks. The work directly influenced Encore's and Pony's later capability designs and is the cleanest "regions + ownership types" combination on a JVM-class language.
 
-Source: https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf and https://dl.acm.org/doi/10.1145/781131.781168
+Sources: https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf and https://dl.acm.org/doi/10.1145/781131.781168
 
 ### 2.9. RC-Immix Region Coloring (Runtime Layout)
 
@@ -178,13 +178,13 @@ Not a region *language* feature but a *runtime* layout technique. Shahriyar, Bla
 
 Region granularity is independent of language-level region semantics — purely a layout/locality optimization. The lesson is that the same word means two different things in this chapter and chapter 6: programmer-visible regions vs. allocator-internal regions.
 
-Source: https://www.steveblackburn.org/pubs/papers/rcix-oopsla-2013.pdf and http://arxiv.org/pdf/2210.17175v1
+Sources: https://www.steveblackburn.org/pubs/papers/rcix-oopsla-2013.pdf and http://arxiv.org/pdf/2210.17175v1
 
 ---
 
 ## 3. Compile-Time Reference Counting
 
-Reference counting as a *compilation strategy* — the compiler inserts inc/dec/reset/reuse operations from a static analysis, not the programmer. The axis is *how cycles are handled* (banned by linearity, banned by language rule, programmer-managed weak refs, runtime cycle collector) and *how in-place mutation is enabled* (compile-time uniqueness proof vs. runtime RC == 1 check). The chapter extends `COMPILERS.md §16.1` (Perceus core) and `§1.6` (Roc lambda sets) with newer developments and additional languages.
+Reference counting as a *compilation strategy* — the compiler inserts inc/dec/reset/reuse operations from a static analysis, not the programmer. The axis is *how cycles are handled* (banned by linearity, banned by language rule, programmer-managed weak refs, runtime cycle collector) and *how in-place mutation is enabled* (compile-time uniqueness proof vs. runtime RC == 1 check). This chapter owns the memory-model survey; `COMPILERS.md §16.1` keeps the shorter compiler-pass capsule for Perceus, and `COMPILERS.md §1.6` covers Roc lambda sets from the monomorphization/defunctionalization angle.
 
 ### 3.1. Swift ARC — SIL-Level RC Optimization
 
@@ -192,17 +192,17 @@ Swift compiler-inserts strong/weak/unowned RC ops on every assignment, with aggr
 
 The `is_unique` / COW primitive lowers to `Builtin.isUnique`, enabling `Array`/`Set`/`String` value semantics to mutate in place when RC == 1; the optimizer treats `is_unique` as a write to preserve a +1 retain across it. ARC code motion (retain sinking + release hoisting via iterative dataflow in `ARCCodeMotion.cpp`), epilogue-release matching, `TempRValueElimination`, and devirtualized-release stripping for stack-promoted classes round out the toolkit. Cycles are not collected — the programmer uses `weak` (zeroing) or `unowned` (trap-on-use). ObjC bridge forces atomic ops on bridged classes; Swift-native classes use non-atomic fast paths when statically provable single-threaded. Steady CPU overhead is ~10–30% in pointer-heavy code; weak refs are 2–3× more expensive than strong because of side-table indirection.
 
-Source: https://github.com/swiftlang/swift/blob/main/stdlib/public/SwiftShims/RefCount.h and https://apple-swift.readthedocs.io/en/latest/ARCOptimization.html and https://github.com/swiftlang/swift/blob/main/docs/WeakReferences.md
+Sources: https://github.com/swiftlang/swift/blob/main/stdlib/public/SwiftShims/RefCount.h and https://apple-swift.readthedocs.io/en/latest/ARCOptimization.html and https://github.com/swiftlang/swift/blob/main/docs/WeakReferences.md
 
 ### 3.2. Perceus — Frame-Limited Reuse, FIP, TRMC
 
-Extends `COMPILERS.md §16.1`. Three significant developments since 2022:
+Compiler-pass capsule in `COMPILERS.md §16.1`; details and later developments live here. Three significant developments since 2022:
 
 **Frame-Limited Reuse** (Lorenzen-Leijen, ICFP 2022): drop-guided reuse formally proven *frame-limited* — peak heap grows by at most a constant factor — replacing fragile size-pairing reuse with a robust derivation rule. **FIP / FP² calculus** (ICFP 2023): the `fip` keyword statically certifies a function uses zero allocation and constant stack; covers splay trees, finger trees, merge/quick sort, and generically derived in-place `map`. **TRMC + first-class constructor contexts** (POPL 2023; JFP 2024): tail-recursion modulo context generalizes TRMc to CPS, monoids, and evaluation contexts; the hybrid implementation uses Perceus heap semantics so call/cc and effect handlers stay sound.
 
 Together these turn Perceus from a refcount-with-reuse system into a complete *compile-time imperative-from-functional* programming model — purely functional source, in-place mutation in the binary, with formal frame bounds.
 
-Source: https://www.microsoft.com/en-us/research/wp-content/uploads/2023/07/flreuse.pdf and https://dl.acm.org/doi/10.1145/3607840 and https://antonlorenzen.de/trmc-jfp.pdf
+Sources: https://www.microsoft.com/en-us/research/wp-content/uploads/2023/07/flreuse.pdf and https://dl.acm.org/doi/10.1145/3607840 and https://antonlorenzen.de/trmc-jfp.pdf
 
 ### 3.3. Lobster — Lifetime-Analysis Borrow-Check-Lite
 
@@ -210,13 +210,13 @@ Wouter van Oortmerssen's **Lobster** is a statically-typed Python-ish language u
 
 Cycles are banned in practice; if leaked, reported at exit with a human-readable diagnostic. Cost is claimed within an order of magnitude of C, far above Python/Lua. The "leak report at exit" is a clever pragmatic move: the cycle problem is pushed back to the programmer, but with tooling support rather than silent leaks.
 
-Source: https://aardappel.github.io/lobster/language_reference.html and https://aardappel.github.io/lobster/philosophy.html and http://strlen.com/language-design-overview/
+Sources: https://aardappel.github.io/lobster/language_reference.html and https://aardappel.github.io/lobster/philosophy.html and http://strlen.com/language-design-overview/
 
 ### 3.4. Roc Morphic + Lambda Sets
 
 Extends `COMPILERS.md §1.6`. Roc combines **Morphic** (borrow-based RC inference, eliminates most inc/dec) + Perceus reuse + LLVM. Two recent updates worth recording. A Morphic alias-analysis bug surfaced in December 2024 (issue #7367): incorrect in-place mutation when `joinpoint`/`jump` form loops, prompting PR #7370 to *limit Morphic to trivial analysis* until fixed — a useful lesson on the difficulty of proving uniqueness across CFG back-edges. New lambda syntax `|a, b| expr` (issue #7465, January 2025) is purely syntactic but lands alongside continued investment in lambda-set specialization and "ambient" lambda-set inference for type-class method dispatch. The upstream `morphic-lang/morphic` is the cleaner reference implementation than the Roc embedding.
 
-Source: https://github.com/roc-lang/roc/issues/7367 and https://github.com/morphic-lang/morphic and https://www.roc-lang.org/fast
+Sources: https://github.com/roc-lang/roc/issues/7367 and https://github.com/morphic-lang/morphic and https://www.roc-lang.org/fast
 
 ### 3.5. Nim ARC / ORC — Hooks, Sink/Lent, YRC Threadsafe Cycle Collector
 
@@ -224,7 +224,7 @@ Nim's `--gc:arc` desugars `ref` into hook-driven RC + move semantics; `--gc:orc`
 
 The proposed **YRC threadsafe cycle collector** work (PR #25495) explores striped per-thread queues for acyclic atomic RC plus a single global Bacon collector for cyclic refs, with deferred RC updates and TLA+ model-checked invariants. Treat it as an active design / implementation effort rather than established Nim behavior. ARC alone leaks cycles; ORC catches them via Bacon trial-deletion. ARC is competitive with manual C in seq-heavy code; ORC adds latency-stable cycle scans.
 
-Source: https://nim-lang.github.io/Nim/destructors.html and https://github.com/nim-lang/RFCs/issues/177 and https://github.com/nim-lang/Nim/pull/25495
+Sources: https://nim-lang.github.io/Nim/destructors.html and https://github.com/nim-lang/RFCs/issues/177 and https://github.com/nim-lang/Nim/pull/25495
 
 ### 3.6. Lean 4 — Atomic-vs-Persistent RC Sentinels
 
@@ -232,7 +232,7 @@ Ullrich & de Moura's Lean 4 compiler (2019+) inserts explicit `inc`/`dec`/`reset
 
 `isExclusive`-guarded primitives — `Array.set`, `Array.swap` — test RC == 1 and mutate in place, else copy, giving pure functional semantics with imperative speed; `dbgTraceIfShared` helps locate accidental sharing. **PersistentArray** is an HAMT-style trie with a tail buffer mutated in place under unique RC, used pervasively in Lean's elaborator/tactic state — making RC a first-class enabler of an entire compiler architecture. Cycles are banned by language (no mutable cycles in pure Lean values). Comparable to OCaml in functional code; matches imperative when reuse fires.
 
-Source: https://lean-lang.org/doc/reference/latest/Run-Time-Code/Reference-Counting/ and https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h and https://docs.lean-lang.org/functional_programming_in_lean/Programming___-Proving___-and-Performance/Insertion-Sort-and-Array-Mutation/
+Sources: https://lean-lang.org/doc/reference/latest/Run-Time-Code/Reference-Counting/ and https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h and https://docs.lean-lang.org/functional_programming_in_lean/Programming___-Proving___-and-Performance/Insertion-Sort-and-Array-Mutation/
 
 ---
 
@@ -246,31 +246,31 @@ In June 2025 Sean Baxter publicly described Profiles as having won the committee
 
 The technical fault lines: **Stroustrup/Sutter** — annotations should be exceptional; most existing C++ can be made safer by recompilation + restrictions + library hardening; viral `safe`/lifetime annotations are unacceptable disruption. **Baxter** — without language-level aliasing/exclusivity information, sound lifetime safety is impossible; Profiles risk replicating existing static analyzers without delivering verifiable guarantees. **Current direction** — Profiles have the stronger political/cultural fit because they preserve C++'s no-rewrite ethos. Critics continue to argue that Profiles cannot deliver sound memory safety; supporters frame them as pragmatic, incremental improvement on existing code.
 
-Source: https://open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2759r0.pdf and https://wg21.link/P3586 and https://www.theregister.com/2025/09/16/safe_c_proposal_ditched/
+Sources: https://open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2759r0.pdf and https://wg21.link/P3586 and https://www.theregister.com/2025/09/16/safe_c_proposal_ditched/
 
 ### 4.2. Lifetime Profile — P1179 in MSVC and Clang
 
 Local-only static analysis identifying generalized "Owner"/"Pointer" types via type categories to detect dangling/use-after-free at compile time without whole-program annotation. Acyclic CFG analysis with ~5% compile-time overhead; identifies Owner (e.g. `unique_ptr`, `string`) vs. Pointer (e.g. `string_view`, iterators) generically; uses `gsl::Owner`, `gsl::Pointer`, `clang::lifetimebound` attributes to refine.
 
-Partially shipped in MSVC (warnings 26486–26489 in C++ Core Check) since 2019; **upstreamed to Clang trunk** as `-Wlifetime-safety` (Clang 23+). As of early 2026, lifetime/profile work is not normative C++26. The active path is a non-normative language-safety white paper plus compiler experiments and flags, with possible later standardization into a lifetime profile.
+Partially shipped in MSVC (warnings 26486–26489 in C++ Core Check) since 2019; **upstreamed to Clang trunk** as `-Wlifetime-safety` (Clang 23+). Status (as of early 2026): lifetime/profile work is not normative C++26. The active path is a non-normative language-safety white paper plus compiler experiments and flags, with possible later standardization into a lifetime profile.
 
-Source: https://wg21.link/p1179 and http://clang.llvm.org/docs/LifetimeSafety.html and https://devblogs.microsoft.com/cppblog/lifetime-profile-update-in-visual-studio-2019-preview-2/
+Sources: https://wg21.link/p1179 and http://clang.llvm.org/docs/LifetimeSafety.html and https://devblogs.microsoft.com/cppblog/lifetime-profile-update-in-visual-studio-2019-preview-2/
 
 ### 4.3. Stroustrup's Profiles Framework
 
 Opt-in, scope-applicable bundles of guarantees (bounds, type, lifetime, arithmetic) that a conforming compiler must enforce — restrictions on existing C++ rather than new syntax, with the explicit goal of "fixing existing code by recompilation." Three retained syntactic constructs in P3589: `[[profiles::enforce(...)]]`, `[[profiles::suppress(...)]]`, and the post-Hagenberg `[[profiles::exempt]]` for whole-header opt-out. Initial profiles (P3081 R2): `std::type`, `std::bounds`, `std::lifetime`, plus aggregate `std::strict`. Each rule must be decidable at compile time (allowing injected runtime checks).
 
-Stroustrup's framing (P3651/P3704): profiles do not change valid-program semantics, are independent of new features, and trace back decades to Core Guidelines work. Status: not adopted normatively for C++26 as of early 2026; forwarded instead into the parallel language safety white paper. Gabriel Dos Reis has an experimental implementation, and broad VS analyzer support exists for ~4 Core Guidelines profiles already.
+Stroustrup's framing (P3651/P3704): profiles do not change valid-program semantics, are independent of new features, and trace back decades to Core Guidelines work. Status (as of early 2026): not adopted normatively for C++26; forwarded instead into the parallel language safety white paper. Gabriel Dos Reis has an experimental implementation, and broad VS analyzer support exists for ~4 Core Guidelines profiles already.
 
-Source: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3081r2.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3589r2.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3651r0.pdf
+Sources: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3081r2.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3589r2.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3651r0.pdf
 
 ### 4.4. Safe C++ — P3390 / Circle
 
 Sean Baxter's **Safe C++** grafts Rust-style affine types + invasive borrow checker onto C++ as a `#feature on safety` mode with a parallel `std2` standard library. Viral `safe`-specifier and full Mid-Level IR-based NLL borrow checking. New reference syntax `T^` / `const T^` (mutable/shared borrow) with explicit lifetime parameters and outlives-constraints; `rel` relocation operator; choice types (Rust-style enums) with safe pattern matching; affine (move-only) value semantics enforcing law of exclusivity.
 
-P3444 alternative ("Memory Safety without Lifetime Parameters") uses `T%` reference with a single invented lifetime per call — eliminates explicit lifetime annotation burden at cost of expressivity. Implemented end-to-end in Circle (single-author Clang fork); proves a borrow-checker-equipped C++ subset is feasible. Effectively dead in WG21 as of 2026; Baxter publicly stopped work mid-2025 ("The Rust safety model is unpopular with the committee"). His critique site enumerates concrete reasons Profiles cannot achieve sound memory safety without aliasing information.
+P3444 alternative ("Memory Safety without Lifetime Parameters") uses `T%` reference with a single invented lifetime per call — eliminates explicit lifetime annotation burden at cost of expressivity. Implemented end-to-end in Circle (single-author Clang fork); proves a borrow-checker-equipped C++ subset is feasible. Status (as of early 2026): effectively dead in WG21; Baxter publicly stopped work mid-2025 ("The Rust safety model is unpopular with the committee"). His critique site enumerates concrete reasons Profiles cannot achieve sound memory safety without aliasing information.
 
-Source: https://safecpp.org/P3390R0.html and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3444r0.html and https://www.circle-lang.org/draft-profiles.html
+Sources: https://safecpp.org/P3390R0.html and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3444r0.html and https://www.circle-lang.org/draft-profiles.html
 
 ### 4.5. cppfront / Cpp2 — Syntax Reform with Safety Defaults
 
@@ -278,7 +278,7 @@ Herb Sutter's alternative-syntax frontend transpiles to today's C++; safety beco
 
 Compiles to standard C++20 — drop-in into existing build systems with all existing tooling. Personal experiment (Sutter); not on the standardization track. Provides empirical evidence for Profiles-style "safe defaults" claims.
 
-Source: https://hsutter.github.io/cppfront/ and https://hsutter.github.io/cppfront/cpp2/safety/ and https://herbsutter.com/2025/03/
+Sources: https://hsutter.github.io/cppfront/ and https://hsutter.github.io/cppfront/cpp2/safety/ and https://herbsutter.com/2025/03/
 
 ### 4.6. Fil-C — InvisiCaps and FUGC
 
@@ -286,13 +286,13 @@ Filip Pizlo's **Fil-C** is a fanatically-compatible memory-safe C/C++ compiler u
 
 Compiles unmodified Linux userspace (Linux From Scratch); supports pthreads, signals, mmap, C++ exceptions, atomics, SIMD intrinsics. Based on Clang 20.1.8. Active single-developer project; ~1.5× slowdown best case, ~4× worst. Not standardized but increasingly cited as the "what a sound C/C++ memory-safety solution actually looks like" reference point.
 
-Source: https://github.com/pizlonator/fil-c/ and https://fil-c.org/invisicaps.html and https://github.com/pizlonator/fil-c/blob/deluge/Manifesto.md
+Sources: https://github.com/pizlonator/fil-c/ and https://fil-c.org/invisicaps.html and https://github.com/pizlonator/fil-c/blob/deluge/Manifesto.md
 
 ### 4.7. C++26 Hazard Pointers and RCU
 
 Standardized lock-free safe deferred reclamation, adopted for C++26 (`<hazard_pointer>` header). API: `std::hazard_pointer`, `std::hazard_pointer_obj_base<T,D>`, `make_hazard_pointer()`, `protect()` / `try_protect()` / `reset_protection()` / `retire()`. Subset of Concurrency TS2 (N4895); reference implementation in Facebook Folly in heavy production use since 2017. **RCU (P2545)** is adopted alongside: per-thread quiescent-state tracking; readers in critical sections, writers retire old versions; Folly-derived implementation; complementary to hazard pointers (HP ≈ scalable refcount; RCU ≈ scalable RW-lock). The mechanism details belong to §9 below; here we note only that C++26 is the first ISO standard to ship them as primitive vocabulary.
 
-Source: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf and https://en.cppreference.com/w/cpp/header/hazard_pointer.html and https://wg21.link/P2545R0
+Sources: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf and https://en.cppreference.com/w/cpp/header/hazard_pointer.html and https://wg21.link/P2545R0
 
 ### 4.8. Hardened libc++ / MSVC STL / libstdc++ — P3471
 
@@ -300,13 +300,13 @@ The clearest normative C++26 standard-library hardening / bounds-checking memory
 
 Google reports significant CVE-class elimination from rolling out `fast` mode in production. Standardized as P3471R4 in C++26; vendor-shipping but mostly opt-in. The pragmatic C++ safety story is: Profiles for the language layer is unfinished; library hardening is what's actually shipping.
 
-Source: https://github.com/microsoft/STL/wiki/STL-Hardening and https://learn.microsoft.com/en-us/cpp/overview/cpp-conformance-improvements
+Sources: https://github.com/microsoft/STL/wiki/STL-Hardening and https://learn.microsoft.com/en-us/cpp/overview/cpp-conformance-improvements
 
 ### 4.9. Standard Smart Pointers, `span`, `observer_ptr`
 
 Vocabulary types encoding ownership/aliasing intent, the baseline for the Profiles approach. `std::span` (C++20) is the canonical replacement for `T*, size_t` pairs; in hardened libc++ its iterators carry bounds. `observer_ptr<T>` (proposed N4282, "world's dumbest smart pointer" expressing non-owning intent) was never standardized; stuck in `std::experimental` after years; the Profiles era reduces motivation. `unique_ptr` / `shared_ptr` / `weak_ptr` are RAII-based heap ownership; recognized by Clang's lifetime analysis as Owner/Pointer types and form the substrate Profiles enforce against. The lesson: C++'s ownership story is library-level vocabulary types, not language-level affinity — and the Profiles approach doubles down on that choice.
 
-Source: https://open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4282.pdf and https://cppreference.com/w/cpp/experimental/observer_ptr.html
+Sources: https://open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4282.pdf and https://cppreference.com/w/cpp/experimental/observer_ptr.html
 
 ---
 
@@ -320,7 +320,7 @@ ARM's **Memory Tagging Extension** stores a 4-bit tag per 16-byte granule, both 
 
 Overhead: Scudo + MTE SYNC ≈ 12% geomean SPECrate, MTE ASYNC ≈ 4% (NanoTag, 2025). Originally marketed as "near-zero" — real cost is non-trivial in SYNC. Shipping on Pixel 8/9 (opt-in), Apple MIE on recent A-series devices with exact SoC coverage and default-on scope treated as time-sensitive (see §5.2), and upcoming flagship Android SoCs. The **TIKTAG attack** (2024) demonstrated speculative tag leakage on Pixel 8.
 
-Source: https://android.googlesource.com/platform/bionic/+/main/docs/mte.md and https://arxiv.org/pdf/2509.22027 and https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/
+Sources: https://android.googlesource.com/platform/bionic/+/main/docs/mte.md and https://arxiv.org/pdf/2509.22027 and https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/
 
 ### 5.2. Apple Memory Integrity Enforcement (MIE)
 
@@ -328,7 +328,7 @@ Apple's **MIE** is Apple's announced memory-tagging architecture for recent A-se
 
 Apple pushed Arm to specify **EMTE** (2022) so synchronous tag-check is cheap enough for production rather than debug-only. **Tag Confidentiality Enforcement (TCE)** is the response to TIKTAG: pointer-offset clamping (<4 GB), Spectre-v1 hardening, poisoning patterns (`0x2BAD`), VA layout tricks to prevent speculative tag leakage. Apple reports broad system coverage and an Enhanced Security path for third-party apps, but the exact default-on scope should be checked against current Apple platform documentation. This is an important production existence proof that MTE-class safety can move beyond debug-only deployments.
 
-Source: https://security.apple.com/blog/memory-integrity-enforcement/ and https://8ksec.io/mie-deep-dive-kernel/ and https://developer.apple.com/videos/play/meet-with-apple/206/
+Sources: https://security.apple.com/blog/memory-integrity-enforcement/ and https://8ksec.io/mie-deep-dive-kernel/ and https://developer.apple.com/videos/play/meet-with-apple/206/
 
 ### 5.3. HWASan — Software-Tagged ASan via Top-Byte-Ignore
 
@@ -340,13 +340,13 @@ Source: https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
 
 Cryptographic MAC (QARMA-based) over upper pointer bits, signed/verified by dedicated PAC instructions; enforces pointer integrity for CFI / ROP / JOP defence. Five keys (IA / IB / DA / DB / GA) with separate signing domains; Apple extends with up to 9 modifier types and hardware diversifiers in XNU; LR signing on call boundaries for backward-edge CFI. Universal on Apple silicon since A12 / M1; mandatory in iOS / macOS kernels; available on most ARMv8.3+ SoCs; Linux uses for in-kernel CFI on arm64. The **PACMAN attack** (2022) showed speculative bypass — mitigated in current Apple silicon. PAC sits at the "pointer integrity, not bounds" point — orthogonal to MTE.
 
-Source: https://www.usenix.org/system/files/usenixsecurity23-cai-zechao.pdf and https://projectzero.google/2019/02/examining-pointer-authentication-on.html and https://cap.csail.mit.edu/sites/default/files/research-pdfs/PACMAN-%20Attacking%20ARM%20Pointer%20Authentication%20with%20Speculative%20Execution.pdf
+Sources: https://www.usenix.org/system/files/usenixsecurity23-cai-zechao.pdf and https://projectzero.google/2019/02/examining-pointer-authentication-on.html and https://cap.csail.mit.edu/sites/default/files/research-pdfs/PACMAN-%20Attacking%20ARM%20Pointer%20Authentication%20with%20Speculative%20Execution.pdf
 
 ### 5.5. Intel CET — Shadow Stacks and Indirect Branch Tracking
 
 Intel's **Control-flow Enforcement Technology** combines a hardware shadow stack (CALL pushes return addr; RET checks mismatch → #CP fault) and Indirect Branch Tracking (indirect CALL/JMP must land on `ENDBR` opcode). Shadow stack lives in special read-only-to-userspace pages; speculation also limited to ~2 instructions past non-ENDBR targets (Alder Lake+). Ships on Tiger Lake (11th gen, 2020) and later, AMD Zen 3+. Linux: CET-IBT in 5.18, **userspace shadow stack in 6.4 (2023)**. Windows 11 enables Hardware-enforced Stack Protection. Mainstream now.
 
-Source: https://docs.kernel.org/next/x86/shstk.html and https://www.phoronix.com/news/Intel-CET-IBT-For-Linux-5.18
+Sources: https://docs.kernel.org/next/x86/shstk.html and https://www.phoronix.com/news/Intel-CET-IBT-For-Linux-5.18
 
 ### 5.6. CHERI / Morello / CheriBSD
 
@@ -354,7 +354,7 @@ Cambridge / SRI International's **CHERI** replaces 64-bit pointers with 128-bit 
 
 Morello is a research prototype, not commercial. CheriBSD 25.03 is the reference OS. **Wind River joined the CHERI Alliance in April 2026** (porting VxWorks/Helix to CHERI on RISC-V). Production silicon still pending — Morello successor not announced. Programming-model details, including compartments, in §10.2 below.
 
-Source: https://www.cl.cam.ac.uk/research/security/ctsrd/pdfs/202411-iccd-cap-contracts.pdf and https://www.cheribsd.org/release-notes/25.03/index.html and https://www.businesswire.com/news/home/20260421249526/en/Wind-River-Joins-the-CHERI-Alliance
+Sources: https://www.cl.cam.ac.uk/research/security/ctsrd/pdfs/202411-iccd-cap-contracts.pdf and https://www.cheribsd.org/release-notes/25.03/index.html and https://www.businesswire.com/news/home/20260421249526/en/Wind-River-Joins-the-CHERI-Alliance
 
 ### 5.7. CHERIoT — Microcontroller CHERI
 
@@ -362,13 +362,13 @@ Source: https://www.cl.cam.ac.uk/research/security/ctsrd/pdfs/202411-iccd-cap-co
 
 CHERIoT is the most plausible near-term CHERI deployment: avoiding the Morello-class store-buffer cost by targeting MCUs where pointer-size growth is acceptable and compartmentalisation is the killer feature.
 
-Source: https://cheriot.org/sail/specification/release/2025/11/03/cheriot-1.0.html and https://github.com/Microsoft/cheriot-ibex and https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/
+Sources: https://cheriot.org/sail/specification/release/2025/11/03/cheriot-1.0.html and https://github.com/Microsoft/cheriot-ibex and https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/
 
 ### 5.8. SoftBound / CETS / LowFat — Software-Pointer Bounds Research
 
 Pure software pointer-based bounds (SoftBound) and identifier-based temporal safety (CETS) via LLVM IR instrumentation with disjoint metadata; LowFat encodes bounds in pointer's bit-pattern via aligned size-class allocator. Overhead: SoftBound ~83% spatial, +CETS = ~116% combined. LowFat much cheaper for heap (single-digit %) at the cost of no sub-object detection. Research only; influence visible in HWASan/MTE designs and CHERI's pointer-with-metadata model; never deployed in production toolchains. Worth naming for design genealogy.
 
-Source: http://acg.cis.upenn.edu/softbound/ and https://acg.cis.upenn.edu/papers/ismm10_cets.pdf and https://github.com/GJDuck/LowFat
+Sources: http://acg.cis.upenn.edu/softbound/ and https://acg.cis.upenn.edu/papers/ismm10_cets.pdf and https://github.com/GJDuck/LowFat
 
 ### 5.9. Memory Protection Keys — MPK / PKU / Arm POE
 
@@ -376,7 +376,7 @@ Source: http://acg.cis.upenn.edu/softbound/ and https://acg.cis.upenn.edu/papers
 
 Intel Skylake-SP (2017)+ server, Tiger Lake+ client; AMD Zen 3+; ARMv8.9 FEAT_S1POE (2024+ silicon). Linux pkey APIs upstream. Used in WebAssembly sandboxes, OpenSSL key isolation, JIT W^X. The fast cross-domain switch (no TLB flush) is what makes MPK uniquely useful for in-process compartmentalisation.
 
-Source: https://kernel.org/doc/html/latest/core-api/protection-keys.html and https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
+Sources: https://kernel.org/doc/html/latest/core-api/protection-keys.html and https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
 
 ### 5.10. SPARC ADI and Intel MPX — Lessons from Predecessors
 
@@ -386,7 +386,7 @@ Two cautionary tales whose lessons informed every later design.
 
 **Intel MPX** (deprecated, removed post-Tiger Lake) failed for concrete reasons: up to 50% slowdown, 4× page faults, cache pressure from bounds-table walks; only 4 bounds registers → constant spill/fill into bounds tables; no temporal safety; ABI-breaking; false positives on legal C idioms; broken with multithreading and SGX/TSX. GCC dropped support, Clang never added it. The MPX failure pattern — too few hardware resources, no temporal coverage, ABI breakage — directly informed MTE / CET / CHERI designs.
 
-Source: https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-application-data-integrity-adi.html and https://arxiv.org/pdf/2009.06490
+Sources: https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-application-data-integrity-adi.html and https://arxiv.org/pdf/2009.06490
 
 ---
 
@@ -406,7 +406,7 @@ Zhao, Blackburn, McKinley's **LXR** (PLDI 2022) combines reference counting with
 
 Research collector implemented atop MMTk; not in production but actively developed. Challenges the C4 / ZGC / Shenandoah cost premise — that latency requires concurrent copying — by showing brief regular STW + RC can hit *both* better throughput and better tail latency.
 
-Source: https://www.steveblackburn.org/pubs/papers/lxr-pldi-2022.pdf and https://arxiv.org/pdf/2210.17175v1
+Sources: https://www.steveblackburn.org/pubs/papers/lxr-pldi-2022.pdf and https://arxiv.org/pdf/2210.17175v1
 
 ### 6.3. MMTk — Memory Management Toolkit
 
@@ -414,23 +414,23 @@ Portable, language-agnostic GC framework written in Rust providing a catalog of 
 
 Shipped experimentally with Ruby 3.4 (MarkSweep only currently, Immix in testing). Julia binding active. V8 binding stalled. OpenJDK binding most mature. The "GC as portable library" idea is what makes LXR-class research immediately transferable to multiple production runtimes.
 
-Source: https://github.com/mmtk and https://railsatscale.com/2025-01-08-new-for-ruby-3-4-modular-garbage-collectors-and-mmtk/
+Sources: https://github.com/mmtk and https://railsatscale.com/2025-01-08-new-for-ruby-3-4-modular-garbage-collectors-and-mmtk/
 
 ### 6.4. ZGC — Colored Pointers and Self-Healing Load Barriers
 
 OpenJDK's **ZGC** is a concurrent region-based compacting collector using colored 64-bit pointers with metadata bits and load barriers to translate stale references on the fly, achieving sub-millisecond pauses independent of heap size up to 16 TB. Colored pointers — Marked0/Marked1/Remapped/Finalizable bits embedded in the high bits of 64-bit references; a load barrier resolves stale pointers without an STW remap phase. Self-healing barriers update the loaded reference back into the field, ensuring each barrier slow path fires at most once per location. **Generational ZGC** (JEP 439, JDK 21+) added a young generation with store barriers for young/old tracking; in JDK 25 it became the *only* ZGC implementation (legacy non-generational mode removed).
 
-Status: production since JDK 15. Generational ZGC is the only ZGC mode in JDK 25 LTS, which does not imply ZGC is the default JVM collector; Linux/Windows/macOS.
+Status (JDK 25): production since JDK 15. Generational ZGC is the only ZGC mode in JDK 25 LTS, which does not imply ZGC is the default JVM collector; Linux/Windows/macOS.
 
-Source: https://openjdk.org/jeps/439 and https://wiki.openjdk.java.net/display/zgc
+Sources: https://openjdk.org/jeps/439 and https://wiki.openjdk.java.net/display/zgc
 
 ### 6.5. Shenandoah — Load Reference Barriers
 
 Red Hat / OpenJDK's **Shenandoah** is a concurrent compacting collector that performs object relocation in parallel with the application, with pause times in low milliseconds independent of heap size. Evolved from Brooks-style forwarding-pointer indirection on every read (JDK 12) to **load reference barriers** (JDK 13) that fire only at reference-load definition sites, eliminating primitive-read overhead. Self-fixing barriers (JDK 14): the slow path CAS-updates the field back to the to-space copy, so each location pays the slow path at most once. Connection-matrix region tracking instead of card-table-style remembered sets; supports heaps up to ~4 TB; generational mode (JEP 404) introduced experimentally.
 
-Status: production-ready since JDK 15; default in Red Hat builds; widely used for latency-sensitive Java workloads.
+Status (as of 2026-04): production-ready since JDK 15; default in Red Hat builds; widely used for latency-sensitive Java workloads.
 
-Source: https://developers.redhat.com/blog/2019/06/27/shenandoah-gc-in-jdk-13-part-1-load-reference-barriers and https://developers.redhat.com/blog/2020/03/04/shenandoah-gc-in-jdk-14-part-1-self-fixing-barriers
+Sources: https://developers.redhat.com/blog/2019/06/27/shenandoah-gc-in-jdk-13-part-1-load-reference-barriers and https://developers.redhat.com/blog/2020/03/04/shenandoah-gc-in-jdk-14-part-1-self-fixing-barriers
 
 ### 6.6. G1 — Predictive Pause-Time Regional Collection
 
@@ -444,7 +444,7 @@ Source: https://docs.oracle.com/en/java/javase/24/gctuning/garbage-first-garbage
 
 Azul's **Continuously Concurrent Compacting Collector** (production since 2010) is the direct ancestor of ZGC and Shenandoah. Generational pauseless collector using a Loaded Value Barrier (LVB) read barrier to support concurrent compaction, concurrent remapping, and concurrent incremental-update tracing. Simultaneous-generational concurrency: young and old generation collections run concurrently and independently, never blocking each other. LVB read barrier ensures every loaded reference is "self-healed" to a safe form, allowing relocation without STW remap. OS-kernel virtual-memory enhancements (originally on Linux) sustain the high VM mapping rate required for pauseless operation. The sole collector in Azul Prime (formerly Zing).
 
-Source: https://www.azul.com/products/components/pgc/ and https://dl.acm.org/doi/10.1145/1993478.1993491
+Sources: https://www.azul.com/products/components/pgc/ and https://dl.acm.org/doi/10.1145/1993478.1993491
 
 ### 6.8. Go — Hybrid-Barrier Tricolor Concurrent Mark-Sweep
 
@@ -452,7 +452,7 @@ Go's GC is concurrent non-generational, non-compacting tricolor mark-sweep with 
 
 Trade-off is no compaction (potential fragmentation), no generations (every GC is full-heap), but excellent tail latency and predictable behaviour. The most consequential design choice is *not having generations* — Go bet that the generational hypothesis would not hold for its actual workloads, and the bet has held up.
 
-Source: https://go.dev/doc/gc-guide and https://go.dev/src/runtime/mgc.go
+Sources: https://go.dev/doc/gc-guide and https://go.dev/src/runtime/mgc.go
 
 ### 6.9. Erlang/BEAM — Per-Process Heaps
 
@@ -460,25 +460,25 @@ Each lightweight process owns a private generational copying (Cheney-style) heap
 
 Production for decades; the model many actor/ML runtimes (Pony, Akka tuning) emulate. Per-process heaps make the generational hypothesis *less* relevant: the dominant reclamation mechanism is process death, not generational age. The lesson: if a runtime owns the actor model, it can build memory management around process lifecycles instead of object lifecycles.
 
-Source: https://www.erlang.org/doc/apps/erts/garbagecollection.html and https://erlang.org/doc/efficiency_guide/processes.html
+Sources: https://www.erlang.org/doc/apps/erts/garbagecollection.html and https://erlang.org/doc/efficiency_guide/processes.html
 
 ### 6.10. OCaml 5 — Multicore Domain GC
 
 OCaml 5.0 (December 2022) shipped a stop-the-world parallel minor copying collector + mostly-concurrent mark-sweep major collector, with one private minor heap per *domain* and a shared major heap. STW parallel minor collection: all domains promote in parallel; conflicting promotions of the same object are serialized via interrupts. Idempotent marking + disjoint sweeping on the shared major heap — domains can mark the same object redundantly and each sweeps only its own pool slice; tiny STW only at major-cycle end. Dirty-stack tracking for fibers: stacks not currently running may temporarily violate the strong tricolor invariant, cleaned at minor GCs. Backwards-compatible with single-domain code and the C API. The cleanest example of retrofitting multicore onto a previously single-threaded GC.
 
-Source: https://fun-ocaml.com/2024/slides/multicore-gc.pdf and https://github.com/ocaml-multicore/docs/blob/main/ocaml_5_design.md
+Sources: https://fun-ocaml.com/2024/slides/multicore-gc.pdf and https://github.com/ocaml-multicore/docs/blob/main/ocaml_5_design.md
 
 ### 6.11. V8 Orinoco — Hybrid Generational Concurrent
 
 V8's **Orinoco** combines parallel, concurrent, and incremental techniques across a generational heap (Scavenger young-gen + Mark-Compact major) to push GC work off the main JS thread. Concurrent marking with helper threads + write-barrier-tracked refs; main thread does only a brief marking-finalization pause. Parallel Scavenger and parallel compaction reduced compaction time from ~7 ms to under 2 ms; concurrent sweeping runs alongside JS execution. Black allocation, parallel remembered-set processing, and Oilpan integration for Blink/C++ tracing across the JS heap boundary. Default in Chrome / Node.js; stable production since ~2017.
 
-Source: https://v8.dev/blog/trash-talk and https://v8.dev/blog/orinoco
+Sources: https://v8.dev/blog/trash-talk and https://v8.dev/blog/orinoco
 
 ### 6.12. Lua 5.4 — Optional Generational Mode
 
 Optional generational mode (opt-in via `collectgarbage("generational")`) added alongside the default incremental tricolor collector; not the default because it doesn't help large-data-structure workloads. Two-cycle aging (G_NEW → G_SURVIVAL → G_OLD0/1/G_OLD) — objects must survive *two* GC cycles to become old, fixing the inaccurate single-cycle promotion of the failed Lua 5.2 generational experiment. Minor / major multipliers (default 20% / 100% of last-major heap) tune frequency; can degrade to incremental temporarily under stress. Forward-barrier driven; old objects touched by a write transition to G_TOUCHED states tracked in a separate gray list. The cleanest example of "generational hypothesis is workload-specific" — Lua makes it opt-in deliberately.
 
-Source: https://www.lua.org/manual/5.4/manual.html and https://www.lua.org/source/5.4/lgc.h.html
+Sources: https://www.lua.org/manual/5.4/manual.html and https://www.lua.org/source/5.4/lgc.h.html
 
 ### 6.13. MoarVM GC — Generational, Parallel STW, Per-Thread Nursery
 
@@ -486,7 +486,7 @@ Raku's MoarVM ships a generational, parallel, precise, *moving* GC. "Parallel" h
 
 The in-flight PR #1861 ("Dedicated nursery memory area") reserves a single ~1 GB virtual region at startup for nursery allocation so the nursery-membership test on the write barrier collapses to a bounds check — eliminating pointer-following on the hot path. The general lesson for new-language design: even without colored pointers (§6.4) or load-reference barriers (§6.5), an aggressive per-thread nursery + bounds-check write barrier delivers respectable latency on a workload (Raku) where most allocations die young. This is the design point a language can hit *without* committing to a full concurrent-collector engineering investment, and it composes naturally with continuation-based concurrency (`COMPILERS.md §14.6`) — per-thread nurseries are the right granularity when async work is captured as continuations on OS threads.
 
-Source: https://www.moarvm.org/features.html and https://github.com/MoarVM/MoarVM/blob/master/src/gc/collect.c and https://github.com/MoarVM/MoarVM/pull/1861
+Sources: https://www.moarvm.org/features.html and https://github.com/MoarVM/MoarVM/blob/master/src/gc/collect.c and https://github.com/MoarVM/MoarVM/pull/1861
 
 ---
 
@@ -500,7 +500,7 @@ Daan Leijen's **mimalloc** (Microsoft Research) uses page-local sharded free lis
 
 Production users: Lean and Koka runtime (its design driver), Redis, .NET runtime experiments, Swift / Python ref-counting backends.
 
-Source: https://www.microsoft.com/en-us/research/wp-content/uploads/2019/06/mimalloc-tr-v1.pdf and https://microsoft.github.io/mimalloc/modes.html and https://github.com/microsoft/mimalloc
+Sources: https://www.microsoft.com/en-us/research/wp-content/uploads/2019/06/mimalloc-tr-v1.pdf and https://microsoft.github.io/mimalloc/modes.html and https://github.com/microsoft/mimalloc
 
 ### 7.2. snmalloc — Lock-Free Message-Passing Return-to-Owner
 
@@ -508,7 +508,7 @@ Microsoft Research's **snmalloc** uses lock-free message-passing — instead of 
 
 Default malloc in the Verona language runtime; available as Rust crate / `LD_PRELOAD` shim. The "return-to-owner" model is the cleanest answer to producer-consumer cross-thread free patterns where standard thread-cache designs accumulate orphaned blocks.
 
-Source: https://www.microsoft.com/en-us/research/publication/issm-2019-proceedings-of-the-2019-acm-sigplan-international-symposium-on-memory-management/ and https://github.com/microsoft/snmalloc
+Sources: https://www.microsoft.com/en-us/research/publication/issm-2019-proceedings-of-the-2019-acm-sigplan-international-symposium-on-memory-management/ and https://github.com/microsoft/snmalloc
 
 ### 7.3. TCMalloc + Temeraire — Per-CPU + Hugepage-Aware
 
@@ -516,7 +516,7 @@ Google's **TCMalloc** (the modern open-source reincarnation, separate from gperf
 
 Production: Google's entire datacenter fleet (search, YouTube, Borg jobs). The OSDI 2021 paper documents fleet-CPU savings — TCMalloc + Temeraire is optimised for *aggregate* CPU cost across millions of machines, not per-allocation throughput.
 
-Source: https://google.github.io/tcmalloc/design and https://google.github.io/tcmalloc/temeraire.html and https://storage.googleapis.com/pub-tools-public-publication-data/pdf/cebd5a9f6e300184fd762f190ffd8978b724e0c8.pdf
+Sources: https://google.github.io/tcmalloc/design and https://google.github.io/tcmalloc/temeraire.html and https://storage.googleapis.com/pub-tools-public-publication-data/pdf/cebd5a9f6e300184fd762f190ffd8978b724e0c8.pdf
 
 ### 7.4. jemalloc — Decay-Purge and Multi-Arena
 
@@ -524,7 +524,7 @@ Jason Evans's **jemalloc** is a multi-arena allocator (round-robin arena assignm
 
 Production: FreeBSD libc, Firefox, Redis, Cassandra, Rust historically (2015–2018), Meta's server fleet. The decay-purge model is what gives jemalloc its excellent long-tail behaviour on long-running servers.
 
-Source: https://people.freebsd.org/~jasone/jemalloc/bsdcan2006/jemalloc.pdf and https://github.com/jemalloc/jemalloc
+Sources: https://people.freebsd.org/~jasone/jemalloc/bsdcan2006/jemalloc.pdf and https://github.com/jemalloc/jemalloc
 
 ### 7.5. Scudo — Hardened Allocator with First-Class MTE
 
@@ -532,7 +532,7 @@ LLVM's **Scudo** is a hardened `malloc` derived from LLVM Sanitizers' `CombinedA
 
 Default allocator in Android 11+ (non-Svelte) and Fuchsia. The "hardening, not detection" framing is important — Scudo aims to make bugs unexploitable, not visible.
 
-Source: https://llvm.org/docs/ScudoHardenedAllocator.html and https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/scudo/standalone
+Sources: https://llvm.org/docs/ScudoHardenedAllocator.html and https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/scudo/standalone
 
 ### 7.6. GrapheneOS hardened_malloc
 
@@ -540,7 +540,7 @@ Source: https://llvm.org/docs/ScudoHardenedAllocator.html and https://github.com
 
 GrapheneOS system-wide via Bionic; usable on glibc/musl Linux as `LD_PRELOAD`. Sits at the most-aggressive end of the security/throughput trade-off — accepts substantial overhead for maximum exploit mitigation.
 
-Source: https://github.com/GrapheneOS/hardened_malloc and https://synacktiv.com/en/publications/exploring-grapheneos-secure-allocator-hardened-malloc
+Sources: https://github.com/GrapheneOS/hardened_malloc and https://synacktiv.com/en/publications/exploring-grapheneos-secure-allocator-hardened-malloc
 
 ### 7.7. PartitionAlloc — Type-Aware Partitioning and MiraclePtr
 
@@ -548,7 +548,7 @@ Chrome's **PartitionAlloc** uses type/size-aware partitioning — different "par
 
 All Chromium-derived browsers (Chrome, Edge, Brave, Opera) — billions of users. MiraclePtr is the most consequential exploit-mitigation deployed at scale on a memory-unsafe codebase.
 
-Source: https://chromium.googlesource.com/chromium/src/+/HEAD/base/allocator/partition_allocator/PartitionAlloc.md and https://security.googleblog.com/2022/09/use-after-freedom-miracleptr.html
+Sources: https://chromium.googlesource.com/chromium/src/+/HEAD/base/allocator/partition_allocator/PartitionAlloc.md and https://security.googleblog.com/2022/09/use-after-freedom-miracleptr.html
 
 ### 7.8. Mesh — Compaction Without Relocation via mremap
 
@@ -556,7 +556,7 @@ Bobby Powers et al.'s **Mesh** (PLDI 2019) implements "compaction without reloca
 
 The "compact without moving" idea is unique in the allocator literature — virtual memory is what makes it possible.
 
-Source: https://people.cs.umass.edu/~mcgregor/papers/19-pldi.pdf and https://github.com/plasma-umass/Mesh
+Sources: https://people.cs.umass.edu/~mcgregor/papers/19-pldi.pdf and https://github.com/plasma-umass/Mesh
 
 ### 7.9. rpmalloc — Span-Aligned Lock-Free Cache
 
@@ -570,7 +570,7 @@ Source: https://github.com/mjansson/rpmalloc
 
 Production: Eclipse 4diac FORTE IEC 61499 runtime, Linux distros (in-kernel and userland tools), Ravenscar / hard-RT firmware, multimedia codecs, network appliances. The only allocator in this chapter giving a hard worst-case bound — the right choice when latency determinism is the goal.
 
-Source: http://www.gii.upv.es/tlsf/ and https://github.com/mattconte/tlsf
+Sources: http://www.gii.upv.es/tlsf/ and https://github.com/mattconte/tlsf
 
 ### 7.11. Hoard — Provable Blowup Bounds
 
@@ -578,7 +578,7 @@ Emery Berger's **Hoard** (ASPLOS 2000) is the foundational scalable malloc — c
 
 Most subsequent allocators (jemalloc, tcmalloc) cite Hoard as ancestor. Worth naming for design genealogy.
 
-Source: https://people.cs.umass.edu/~emery/pubs/berger-asplos2000.pdf and https://emeryberger.github.io/Hoard/
+Sources: https://people.cs.umass.edu/~emery/pubs/berger-asplos2000.pdf and https://emeryberger.github.io/Hoard/
 
 ### 7.12. Language-Level Allocator APIs — Zig, Odin, C3, Jai, Beef, Hare, D
 
@@ -610,7 +610,7 @@ The reusable design space is clear:
 
 A practical language design can combine these approaches: explicit allocator parameters for low-level library APIs; a scoped context allocator for high-level application code; a built-in temporary arena with lexical or frame reset; and debug allocator modes that make leaks, double-frees, and escaped temp allocations fail loudly.
 
-Source: https://zig.guide/standard-library/allocators/ and https://github.com/ziglang/zig/blob/master/lib/std/heap.zig and https://odin-lang.org/docs/overview/ and https://pkg.odin-lang.org/base/runtime/ and https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin and https://c3-lang.org/language-common/memory/ and https://c3-lang.org/misc-advanced/debugging/ and https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md and https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced and https://www.beeflang.org/docs/language-guide/memory/ and https://docs.harelang.org/rt and https://harelang.org/documentation/usage/freestanding.html and https://dlang.org/phobos/std_experimental_allocator.html and https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
+Sources: https://zig.guide/standard-library/allocators/ and https://github.com/ziglang/zig/blob/master/lib/std/heap.zig and https://odin-lang.org/docs/overview/ and https://pkg.odin-lang.org/base/runtime/ and https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin and https://c3-lang.org/language-common/memory/ and https://c3-lang.org/misc-advanced/debugging/ and https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md and https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced and https://www.beeflang.org/docs/language-guide/memory/ and https://docs.harelang.org/rt and https://harelang.org/documentation/usage/freestanding.html and https://dlang.org/phobos/std_experimental_allocator.html and https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html
 
 ---
 
@@ -624,7 +624,7 @@ Jung, Jourdan, Krebbers, Dreyer (POPL 2018) deliver the first mechanized soundne
 
 Research artifact; influences official Rust language decisions but not a developer-facing tool. Found unsoundness bugs in Rust's standard library. The reference work for "Rust unsafe is sound when used correctly," and the foundation every later Rust verifier builds on or compares to.
 
-Source: https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf and https://people.mpi-sws.org/~jung/thesis.html
+Sources: https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf and https://people.mpi-sws.org/~jung/thesis.html
 
 ### 8.2. Iris — Higher-Order Concurrent Separation Logic
 
@@ -632,45 +632,45 @@ Jung, Krebbers et al.'s **Iris** is a language-generic higher-order concurrent s
 
 Foundation for RustBelt, RefinedRust, RefinedC, many other verifications; used in 50+ research projects. The closest thing the field has to a universal substrate for separation-logic verification.
 
-Source: https://iris-project.org/ and https://www.cambridge.org/core/journals/journal-of-functional-programming/article/iris-from-the-ground-up-a-modular-foundation-for-higherorder-concurrent-separation-logic/26301B518CE2C52796BFA12B8BAB5B5F
+Sources: https://iris-project.org/ and https://www.cambridge.org/core/journals/journal-of-functional-programming/article/iris-from-the-ground-up-a-modular-foundation-for-higherorder-concurrent-separation-logic/26301B518CE2C52796BFA12B8BAB5B5F
 
 ### 8.3. Verus — SMT-Backed Linear-Permission Verifier
 
 Lattuada, Hance, Cho, Brun, Subasinghe, Zhou, Howell, Parno, Hawblitzel deliver SMT-backed verification of full functional correctness for Rust, leveraging Rust's linear types as ghost permissions to verify both safe and unsafe code with low annotation overhead. **Linear ghost permissions** let ghost code carry capability tokens (e.g. raw-pointer permissions) borrow-checked exactly like real Rust. **Tri-modal language** separates `spec` (uncomputable, unrestricted), `proof` (linear, ghost), and `exec` (compiled) modes. SMT-tuning — per-function `rlimit`, isolated bit-vector reasoning, encoder optimizations — yields 3–61× speedups vs prior tools.
 
-Used at Google for kernel verification (Android pKVM/NRKernel), at Amazon, and inside Linux kernel verification work. Verified case studies include OS page tables, NUMA-aware data-structure replication, crash-safe storage, and a concurrent memory allocator (~6.1K LoC impl + 31K LoC proof). Status: among the most production-relevant Rust verifiers in this survey as of 2026.
+Used at Google for kernel verification (Android pKVM/NRKernel), at Amazon, and inside Linux kernel verification work. Verified case studies include OS page tables, NUMA-aware data-structure replication, crash-safe storage, and a concurrent memory allocator (~6.1K LoC impl + 31K LoC proof). Status (as of 2026-04): among the most production-relevant Rust verifiers in this survey.
 
-Source: https://www.microsoft.com/en-us/research/publication/verus-a-practical-foundation-for-systems-verification/ and https://github.com/verus-lang/verus and https://verus-lang.github.io/verus/guide/
+Sources: https://www.microsoft.com/en-us/research/publication/verus-a-practical-foundation-for-systems-verification/ and https://github.com/verus-lang/verus and https://verus-lang.github.io/verus/guide/
 
 ### 8.4. Prusti — Auto-Active via Viper
 
 ETH Zurich's **Prusti** is an auto-active deductive verifier for Rust that translates programs to Viper (intermediate verification language) and uses Viper's permission-based reasoning + Z3. **Ownership-to-separation lift**: derives the separation-logic permission framing automatically from Rust's borrow-checker output, so users write only functional pre/postconditions. **Pledges**: specification mechanism for reasoning about borrow-expirations (final values after the lifetime ends). **Default panic-freedom**: verifies absence of overflows / array OOB / unwrap panics with no annotations. Open-source, available as VSCode extension (Prusti Assistant); restricted to safe Rust subset; used in industrial pilots and academic teaching but no major production code base verified.
 
-Source: https://www.pm.inf.ethz.ch/research/prusti.html and https://github.com/viperproject/prusti-dev
+Sources: https://www.pm.inf.ethz.ch/research/prusti.html and https://github.com/viperproject/prusti-dev
 
 ### 8.5. Creusot — Prophetic Borrows in WhyML
 
 Inria's **Creusot** is an auto-active verifier that translates Rust MIR to WhyML (Why3's IR), using a "prophetic" encoding to handle mutable borrows in a purely functional setting. **Prophetic borrows**: the `^x` operator denotes the future final value of a borrow, allowing Rust mutable references to be encoded as (current, prophecy) pairs in a functional logic (RustHorn / RustHornBelt heritage). **Pearlite** specification language: ML-style logical syntax with ghost code, snapshots, and trait-aware predicates. **Why3 multi-prover backend** discharges VCs via Z3, CVC4/CVC5, Alt-Ergo simultaneously. Open-source v0.11 (April 2026); growing test suite with verified Vec/sort/binary-search/iterators; not yet shipping inside production-critical software.
 
-Source: https://hal.inria.fr/hal-03737878/document and https://github.com/creusot-rs/creusot
+Sources: https://hal.inria.fr/hal-03737878/document and https://github.com/creusot-rs/creusot
 
 ### 8.6. Aeneas — LLBC to Pure Functional Programs
 
 Son Ho & Protzenko's **Aeneas** translates a borrow-checked Rust subset (LLBC) into a pure lambda-calculus, eliminating heap reasoning so users prove properties in F\* / Coq / Lean / HOL4 over functional programs. **LLBC + symbolic borrow semantics** gives a pure functional semantics to safe Rust, including mutable borrows. **Backward functions**: a novel encoding that turns a mutable borrow's "give back the updated value" into a pure function call, sidestepping prophecies. Borrow-checker proven sound via symbolic execution (ICFP 2024 follow-up). Active research toolchain; used by Microsoft (Protzenko) for crypto-adjacent verification; safe-Rust only today, with separation-logic extensions for unsafe in progress.
 
-Source: https://arxiv.org/pdf/2206.07185 and https://github.com/AeneasVerif/aeneas
+Sources: https://arxiv.org/pdf/2206.07185 and https://github.com/AeneasVerif/aeneas
 
 ### 8.7. RefinedRust — Foundational Refinement Types
 
 Gaeher, Sammler, Jung, Krebbers, Dreyer (PLDI 2024) deliver a refinement-type system for Rust producing foundational Coq proofs (machine-checked, no trusted automation), sound w.r.t. an Iris/RustBelt model and supporting both safe and unsafe code. **Radium**: realistic operational semantics for real Rust (vs. RustBelt's idealized lambdaRust), including place semantics. **Refined ownership types** combine ownership with refinement predicates; semantic model in Iris extends RustBelt's lifetime logic with new borrow flavors for unsafe code. **Foundational guarantee**: tool emits Coq scripts; the type checker is not in TCB. Research prototype; case study verifies a variant of `std::Vec` including unsafe pointer manipulation.
 
-Source: https://iris-project.org/pdfs/2024-pldi-refinedrust.pdf and https://dl.acm.org/doi/10.1145/3656422
+Sources: https://iris-project.org/pdfs/2024-pldi-refinedrust.pdf and https://dl.acm.org/doi/10.1145/3656422
 
 ### 8.8. VeriFast — Symbolic Execution for C, Java, Rust
 
 Bart Jacobs's **VeriFast** is a modular symbolic-execution-based separation-logic verifier for sequential and multithreaded C, Java, and (recently) Rust. **Predicate-based heap layouts** with explicit fold/unfold ghost commands; users write predicates, lemmas, and contracts inline. **Higher-order ghost code** including lemma function pointers for fine-grained concurrency. **Featherweight VeriFast**: Coq-mechanized soundness of the symbolic-execution core. Mature open-source tool used in industrial-scale case studies (JavaCard applets, OS components); user-facing trust includes the symbolic executor.
 
-Source: http://people.cs.kuleuven.be/~bart.jacobs/verifast/ and https://verifast.github.io/verifast-docs/
+Sources: http://people.cs.kuleuven.be/~bart.jacobs/verifast/ and https://verifast.github.io/verifast-docs/
 
 ### 8.9. F\* / Low\* / KaRaMeL — Project Everest's HACL\*, EverCrypt
 
@@ -678,7 +678,7 @@ Dependently typed ML with effects (F\*) plus a verified C-extractable subset (Lo
 
 HACL\* / EverCrypt code ships in **Mozilla Firefox NSS** (Curve25519, ChaCha20, Poly1305 since NSS 3.33+), the **Linux kernel** (WireGuard VPN), **mbedTLS**, **Microsoft WinQuic**, the **Tezos blockchain**, and the **ElectionGuard SDK**. The deepest real-world deployment of formal verification for memory-safe code. The lesson: cryptographic primitives are the killer app for formal verification — small, performance-critical, well-specified, and security-load-bearing.
 
-Source: https://hacl-star.github.io/Overview.html and https://www.microsoft.com/en-us/research/project/project-everest-verified-secure-implementations-https-ecosystem/ and https://fstar-lang.org/oplss2019/EverCrypt-06282019.pdf
+Sources: https://hacl-star.github.io/Overview.html and https://www.microsoft.com/en-us/research/project/project-everest-verified-secure-implementations-https-ecosystem/ and https://fstar-lang.org/oplss2019/EverCrypt-06282019.pdf
 
 ### 8.10. CompCert Memory Model
 
@@ -686,7 +686,7 @@ Leroy, Appel, Blazy, Stewart's CompCert provides a block-based memory model shar
 
 CompCert C is a commercial verified compiler (AbsInt) used in DO-178C avionics certification; the memory model is the de facto standard reused by VST, Iris-CompCert linkages, and many follow-on works. The "memory model that supports verified compilation *and* verified user code" is the load-bearing engineering choice.
 
-Source: https://compcert.org/doc/html/compcert.common.Separation.html and https://www.cambridge.org/core/books/abs/program-logics-for-certified-compilers/compcert-memory-model/BC069D42EA52CDBE871A22C118A2C74B
+Sources: https://compcert.org/doc/html/compcert.common.Separation.html and https://www.cambridge.org/core/books/abs/program-logics-for-certified-compilers/compcert-memory-model/BC069D42EA52CDBE871A22C118A2C74B
 
 ### 8.11. Stacked Borrows / Tree Borrows — Formal Model Side
 
@@ -694,7 +694,7 @@ The same operational aliasing models from §1.3 above also have a *formal* role:
 
 The key role for language design: an aliasing model is simultaneously a *runtime checker* (Miri; see `DEBUGGERS.md §8.8`), a *language-level discipline* (see `MEMORY.md §1.3`), and a *theorem about the compiler* (this section). All three views must agree. Stacked Borrows remains the established model for today's Miri-based checking; Tree Borrows is an experimentally implemented successor candidate with stronger acceptance and formal results.
 
-Source: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf
+Sources: https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf and https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf
 
 ---
 
@@ -708,7 +708,7 @@ Maged Michael's **hazard pointers** (2002 / 2004): each thread publishes single-
 
 Cost: ~1 store + 1 fence (often a full `mfence` on x86) per protected read; retire is amortized O(H · N) scan. Production: Folly `hazptr`, OpenBSD/Concurrency Kit, McKenney's RCU "hazard variant," **C++26 `std::hazard_pointer`** (P2530R3).
 
-Source: https://www.cs.otago.ac.nz/cosc440/readings/hazard-pointers.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf
+Sources: https://www.cs.otago.ac.nz/cosc440/readings/hazard-pointers.pdf and https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf
 
 ### 9.2. RCU — Read-Copy-Update
 
@@ -716,7 +716,7 @@ Paul McKenney's **RCU** (Linux 2002): readers execute lightweight critical secti
 
 Cost: reader 0–2 instructions (preempt-disable); writer `synchronize_rcu()` blocks ms-scale; `call_rcu()` async. Worst-case retention: unbounded under stalled readers (a CPU never quiescing blocks a grace period). Production: Linux kernel (everywhere — VFS dcache, networking, modules), liburcu (userspace), QEMU.
 
-Source: https://www.kernel.org/doc/html/latest/RCU/Design/Requirements/Requirements.html and https://liburcu.org/
+Sources: https://www.kernel.org/doc/html/latest/RCU/Design/Requirements/Requirements.html and https://liburcu.org/
 
 ### 9.3. QSBR — Quiescent-State-Based Reclamation
 
@@ -724,7 +724,7 @@ Variant of EBR/RCU where threads explicitly announce quiescent points (no live r
 
 Cost: reader zero per access; one relaxed store per quiescent point. Trade-off: requires cooperative threads that periodically reach a "no references held" state — incompatible with arbitrary library code. Production: liburcu-qsbr, DPDK `rte_rcu_qsbr` (packet-loop quiescence model), Linux user-mode QSBR.
 
-Source: https://liburcu.org/ and https://doc.dpdk.org/guides-20.11/prog_guide/rcu_lib.html
+Sources: https://liburcu.org/ and https://doc.dpdk.org/guides-20.11/prog_guide/rcu_lib.html
 
 ### 9.4. Epoch-Based Reclamation — Crossbeam in Rust
 
@@ -732,7 +732,7 @@ Keir Fraser's EBR (2003): a global epoch counter advances when all threads in cr
 
 Worst-case retention: unbounded — a single stalled/preempted thread holding a pin freezes reclamation globally (the canonical EBR weakness). **Crossbeam (Rust)** adapts EBR to Rust's affine type system: `Guard` RAII pin + `Atomic<T>` / `Shared<'g, T>` whose lifetime is bounded by the guard, statically preventing use-after-pin. Lifetime-parameterised shared pointers convert reclamation safety into a borrow-check obligation. GhostCell composes with crossbeam to give zero-cost branded interior mutability for graph-shaped lock-free structures. Foundation of most Rust lock-free libraries.
 
-Source: http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-579.html and https://docs.rs/crossbeam-epoch/
+Sources: http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-579.html and https://docs.rs/crossbeam-epoch/
 
 ### 9.5. Hazard Eras
 
@@ -744,7 +744,7 @@ Source: https://github.com/pramalhe/ConcurrencyFreaks/blob/master/papers/hazarde
 
 Wen et al. (PPoPP 2018): threads reserve a finite epoch interval; blocks track birth/retire epoch; freeable when no reservation interval intersects the block's lifetime. TagIBR, 2GEIBR, POIBR variants trading throughput for space; avoids per-dereference fence; bounded space like HP. University of Rochester library; basis for many subsequent comparisons.
 
-Source: https://www.cs.rochester.edu/u/scott/papers/2018_PPoPP_IBR.pdf and https://github.com/urcs-sync/Interval-Based-Reclamation
+Sources: https://www.cs.rochester.edu/u/scott/papers/2018_PPoPP_IBR.pdf and https://github.com/urcs-sync/Interval-Based-Reclamation
 
 ### 9.7. Wait-Free Eras
 
@@ -756,7 +756,7 @@ Source: https://www.ssrg.ece.vt.edu/papers/ppopp20.pdf
 
 Nikolaev & Ravindran (PODC 2019 / PLDI 2021) apply distributed reference counting only at reclamation time (not on access), with retired objects threaded into a shared list whose handle pointers carry the per-thread reference counts. Reclamation workload self-balances across threads (any thread may free). Snapshot-free and transparent — no thread (un)registration. Hyaline-S delivers HP-grade memory bounds with EBR-grade throughput. Works on x86, ARM, PPC, MIPS with LL/SC or DWCAS. Reference C/C++ implementation in `rusnikola/lfsmr`.
 
-Source: https://arxiv.org/pdf/1905.07903 and https://github.com/rusnikola/lfsmr
+Sources: https://arxiv.org/pdf/1905.07903 and https://github.com/rusnikola/lfsmr
 
 ### 9.9. Stamp-It
 
@@ -794,13 +794,13 @@ Capabilities are unforgeable tokens binding *designation* and *authority*: holdi
 
 The deeper claim: rcaps are simultaneously alias-discipline (ownership) *and* (via `tag`/sendability) actor-level object capability. Pony is the cleanest example of one mechanism doing both jobs. Subtype lattice `iso^ <: trn^ <: {ref, val} <: box <: tag` plus rules like "alias of `iso` is `tag`" give a static region system with zero annotation overhead.
 
-Source: https://www.ponylang.io/media/papers/fast-cheap.pdf and https://tutorial.ponylang.io/reference-capabilities/recovering-capabilities.html
+Sources: https://www.ponylang.io/media/papers/fast-cheap.pdf and https://tutorial.ponylang.io/reference-capabilities/recovering-capabilities.html
 
 ### 10.2. CHERI C/C++ — Programming Model and Compartments
 
 The hardware ISA is in §5.6. From the *programming model* angle: every C pointer becomes a 128-bit hardware capability with bounds + permissions + tag; the source language is mostly unchanged but pointer provenance is enforced. **Pure-capability C/C++**: integer-pointer casts narrow but never forge authority; ABI changes are largely invisible, but `intptr_t` and similar idioms surface compiler diagnostics. **Sealed capabilities** provide opaque, unforgeable handles for entry points and authority-bearing objects, but they do not by themselves solve temporal safety: freeing an object does not automatically revoke every outstanding capability without an accompanying revocation, quarantine, or allocation discipline. The CHERI C/C++ toolchain is mature in CheriBSD.
 
-Source: https://github.com/CTSRD-CHERI/cheri-c-programming and https://www.cl.cam.ac.uk/research/security/ctsrd/
+Sources: https://github.com/CTSRD-CHERI/cheri-c-programming and https://www.cl.cam.ac.uk/research/security/ctsrd/
 
 ### 10.3. CHERIoT Compartments — Embedded Ocap
 
@@ -808,7 +808,7 @@ CHERIoT extends the CHERI programming model with first-class **compartment annot
 
 This is one of the cleanest existing C-language ocap designs, possible because CHERIoT made compartments a first-class hardware-checked boundary. Treat availability and deployment status as hardware- and vendor-specific; see `MEMORY.md §5.7`.
 
-Source: https://cheriot.org/book/language_extensions.html and https://cheriot.org/rtos/sealing/2025/11/06/sealing.html
+Sources: https://cheriot.org/book/language_extensions.html and https://cheriot.org/rtos/sealing/2025/11/06/sealing.html
 
 ### 10.4. Newspeak / E — Object Capabilities
 
@@ -816,7 +816,7 @@ Mark Miller's "All Authority Accessed Only by References" thesis: authority is c
 
 Newspeak is active as a Smalltalk-family OSS language; E's ideas live on in Agoric, Spritely, Cap'n Proto, and SES (now in TC39 process as "Hardened JS"). The reference works for ocap design.
 
-Source: https://erights.org/elib/capability/ode/ode-capabilities.html and https://bracha.org/newspeak.pdf
+Sources: https://erights.org/elib/capability/ode/ode-capabilities.html and https://bracha.org/newspeak.pdf
 
 ### 10.5. WASI / Wasm Component Model — Resource Handles
 
@@ -834,19 +834,19 @@ Microsoft Research's **Singularity** introduced Software-Isolated Processes (SIP
 
 Research; Midori discontinued 2015 but ideas seeded C# nullable refs, async, and Project Verona. The cleanest "ocap as language design choice" reference for type-safe language families.
 
-Source: https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/ and https://www.microsoft.com/en-us/research/project/singularity/
+Sources: https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/ and https://www.microsoft.com/en-us/research/project/singularity/
 
 ### 10.7. seL4 / EROS — Verified Capability Kernels
 
 Capability kernels where every kernel object (TCB, CNode, frame, endpoint) is named only by a capability stored in a CSpace; user-level *retypes* untyped memory into kernel objects, so memory allocation policy lives outside the verified kernel. **Untyped capabilities** + **retype**: kernel never allocates implicitly; all in-kernel memory consumption is authorized. **Formal proof of authority confinement** (Isabelle/HOL refinement down to C): take-grant-style bound proven on the actual implementation. **Reply capabilities**: single-use return tokens making RPC exactly-once and revocation-safe. seL4 deployed in safety-critical/defense; Coyotos archived; EROS academic.
 
-Source: https://docs.sel4.systems/Tutorials/capabilities.html and https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/
+Sources: https://docs.sel4.systems/Tutorials/capabilities.html and https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/
 
 ### 10.8. Cap'n Proto / CapTP
 
 Distributed object capabilities with the network protocol descended from E's CapTP — interface refs are first-class wire types, and *promise pipelining* lets dependent calls travel in one round trip. **Promise pipelining**: pre-send calls against the *result* of an in-flight call, eliminating chatty RPC patterns; equivalent to E's eventual-send composition. **Three-vat introduction**: secure handoff of a capability from vat A to C via B without B gaining authority. **Distributed acyclic GC** (Spritely Goblins, Agoric): cross-vat ref counting with the ocap invariant preserved. Cap'n Proto in production at Cloudflare Workers; OCapN (Spritely + Agoric) in active standardization.
 
-Source: https://capnproto.org/rpc.html and https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html
+Sources: https://capnproto.org/rpc.html and https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html
 
 ### 10.9. Joe-E / Caja / SES — Hardened JS
 
@@ -864,7 +864,7 @@ Source: https://spritely.institute/goblins/
 
 Steel is a concurrent separation logic embedded in F\*; capabilities are *separation-logic resources* (`slprop`) representing exclusive ownership of memory regions, threaded through Hoare quintuples. AC-matching tactics + SMT for frame inference; selectors abstracting resources for SMT-friendly specs; SteelCore soundness fully mechanized in F\*. Production verification work appears in Project Everest (HACL\*, EverParse, EverCrypt; see `MEMORY.md §8.9`). The cleanest example of "capabilities as separation-logic resources" in a verified-systems language.
 
-Source: https://project-everest.github.io/assets/steel.pdf and https://github.com/FStarLang/steel
+Sources: https://project-everest.github.io/assets/steel.pdf and https://github.com/FStarLang/steel
 
 ---
 
@@ -877,7 +877,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Technique | Annotation Cost | Inference Power | Key Trade-off | Examples |
 |---|---|---|---|---|
 | MIR-CFG NLL | Lifetime params on signatures | Liveness over CFG | Most production-mature; well-understood | Rust 1.31+ (§1.1) |
-| Polonius / Datalog reformulation | Same as NLL | Per-CFG-point loan liveness | Accepts more programs; alpha-status as of 2026 | rustc -Zpolonius (§1.2) |
+| Polonius / Datalog reformulation | Same as NLL | Per-CFG-point loan liveness | Accepts more programs; alpha-status as of 2026-04 | rustc -Zpolonius (§1.2) |
 | Stacked / Tree Borrows | None (operational model) | Defines UB for unsafe | Tree Borrows rejects 54% fewer programs | Miri (§1.3, §8.11) |
 | Pin/Unpin | Library-only | Address stability | Self-referential async state machines | Rust async (§1.4) |
 | View types (proposed) | Field lists in signature | Disjoint partial borrows | Pre-RFC | Rust (§1.5) |
@@ -1040,7 +1040,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 
 ## 12. References
 
-References are grouped by the chapter that first cites them. Within each chapter they follow subsection order.
+References are grouped by chapter and roughly follow subsection order. Broad background references may be grouped by topic rather than exact first mention.
 
 ### Chapter 1 — Ownership and Borrowing
 
