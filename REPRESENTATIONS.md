@@ -262,6 +262,18 @@ The pragmatic consequence: Babel's representation is the same shape across all p
 
 Source: https://babeljs.io/docs/babel-parser
 
+### 4.8. Kotlin K2 / FIR — Frontend IR for the Compiler-vs-IDE Split
+
+JetBrains' **K2 compiler** (stable in Kotlin 2.0, May 2024; available behind a flag since Kotlin 1.7) is a complete frontend rewrite of Kotlin's compiler. Where the original frontend (henceforth "K1") was structured around IntelliJ's PSI (Program Structure Interface) — a syntax-tree-with-resolved-bindings shape inherited from IntelliJ's general-purpose Java/Kotlin tooling — K2 introduces **FIR (Frontend Intermediate Representation)** as a purpose-built IR for the compiler frontend, separate from the IDE's PSI. JetBrains reports 1.7×–2× faster compilation on average, with substantially better type-inference precision and dramatically improved smart-cast behaviour.
+
+The architectural change worth recording is the *separation of editor PSI from compiler IR*. Pre-K2 Kotlin used PSI throughout the compiler frontend, which meant compiler-internal data structures were inherited from IDE concerns: nodes carry editor-tracking metadata, are mutable, and have lifecycles tied to editor sessions. K2 introduces an immutable, build-tool-friendly FIR with explicit phases (raw FIR → resolved FIR → IR for backend), each stage adding semantic information without modifying earlier stages. The compiler's inference algorithms — historically the slowest part of K1 because they re-traversed the PSI graph — operate on the FIR's denser representation directly.
+
+The lesson generalises: **compiler frontends shared with IDE tooling pay an architectural tax that an IDE-independent compiler IR can avoid**. K2's separation mirrors a similar move in rust-analyzer's architecture (`COMPILERS.md §18.1`) where the IDE has its own data structures for navigation while the type checker runs against a separate query graph. For language designers, the relevant question is whether to share data structures with editor tooling (lower upfront cost, accumulates pain) or design an IR-first frontend with editor support layered on top (higher upfront cost, scales better).
+
+Status (as of 2026-04): K2 is the default Kotlin compiler for all builds since 2.0; K1 is deprecated. JetBrains is migrating IntelliJ's own Kotlin support to K2 incrementally — IDE-side adoption lagged the compiler-side rollout because IntelliJ's existing PSI consumers (refactoring, find-usages, navigation) had to be updated for FIR-derived data. The migration is the production existence proof that K2 is a complete replacement, not just an experimental rewrite.
+
+Sources: https://kotlinlang.org/docs/k2-compiler-migration-guide.html and https://blog.jetbrains.com/kotlin/2023/02/k2-kotlin-2-0/ and https://www.baeldung.com/kotlin/k2-compiler-guide
+
 ---
 
 ## 5. Mid-Level IRs
@@ -575,7 +587,7 @@ WebAssembly is a stack-based bytecode designed for portability and verification.
 
 Wasm's structured control flow is the design choice that distinguishes it from JVM bytecode. JVM allows arbitrary jump targets within a method, requiring stackmap frames for verification; Wasm's structured form makes verification single-pass and decoder-friendly. Cross-reference: `COMPILERS.md §24.2` covers Wasm's in-place interpreter (Virgil); here the focus is the format itself.
 
-Status (as of 2026-04): the **Wasm GC reference types proposal** has shipped cross-browser. WasmGC adds typed `struct` and `array` heap types managed by the host's GC, plus `funcref`/`externref` reference types and downcast/upcast operations — sufficient for Java, Kotlin, Dart, Scheme, OCaml, and other GC-required languages to compile to Wasm without bundling their own GC into linear memory. Production rollout: Chrome 119 (October 2023), Firefox 120 (late 2023), Safari 18.2 (early 2025); cross-browser baseline as of 2025. The `wasm-gc` proposal is the substrate for Kotlin/Wasm, Dart Web (replacing dart2js for a class of workloads), and Scala.js' experimental Wasm backend. **WebAssembly 3.0** (drafted 2025) consolidates GC, multiple-memories, tail calls, exception handling, and 64-bit memory addressing into a single specification milestone. Cross-reference for the WASI Component Model and Preview 3 native async on top of this substrate: `MODULES.md §11.3`.
+Status (as of 2026-04): the **Wasm GC reference types proposal** has shipped cross-browser. WasmGC adds typed `struct` and `array` heap types managed by the host's GC, plus `funcref`/`externref` reference types and downcast/upcast operations — sufficient for Java, Kotlin, Dart, Scheme, OCaml, and other GC-required languages to compile to Wasm without bundling their own GC into linear memory. Production rollout: Chrome 119 (October 2023), Firefox 120 (late 2023), Safari 18.2 (early 2025); cross-browser baseline as of 2025. The `wasm-gc` proposal is the substrate for Kotlin/Wasm, Dart Web (replacing dart2js for a class of workloads), and Scala.js' experimental Wasm backend. **WebAssembly 3.0** (completed September 2025) consolidates GC, multiple-memories, tail calls, exception handling with `exnref`, 64-bit memory addressing, threads, SIMD, and JS string builtins into a single specification milestone. The stack-switching proposal — relevant to language-runtime concurrency primitives — did *not* land in 3.0 and continues toward a subsequent milestone (concurrency angle at `CONCURRENCY.md §5.6`). Cross-reference for the WASI Component Model and Preview 3 native async on top of this substrate: `MODULES.md §11.3`.
 
 Sources: https://webassembly.github.io/spec/core/ and https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md and https://devnewsletter.com/p/state-of-webassembly-2026/
 
@@ -719,7 +731,7 @@ Source: https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf
 
 **Viper / Silver** (ETH Zurich, Schwerhoff, Müller et al., 2015+) is the **separation-logic equivalent**: an imperative VIL where assertions are separation-logic predicates with explicit ownership transfer (`acc(x.f, write)` is "the program holds write-permission to field f of x"). **Prusti** (`MEMORY.md §8.4`) compiles Rust to Viper; **Nagini** compiles annotated Python to Viper; **VerCors** compiles Java/PVL to Viper; **Gobra** compiles Go to Viper. The frontends share Viper's permission-based reasoning rather than reinventing it per language. Distinct from Boogie: Viper has separation logic primitives in the core language, where Boogie axiomatises them via per-frontend encodings.
 
-**WhyML** (Why3, INRIA — Filliâtre, Marché, Paskevich, 2010+) is the **functional VIL**: a purely-functional ML-like language with refinement types and ghost code, used by **Frama-C** (C verification via the C-to-WhyML compiler), **SPARK** (Ada verification), and **Creusot** (`MEMORY.md §8.5` — Rust verification via prophetic borrows). WhyML's distinctive choice is **multi-prover backend dispatch**: a single Why3 verification condition is offered to Z3, CVC4/CVC5, Alt-Ergo, Vampire, and Coq simultaneously, with the user choosing which prover to pursue per goal. This makes Why3 robust to per-prover regressions and lets users combine SMT speed with interactive-prover precision on hard goals.
+**WhyML** (Why3, INRIA — Filliâtre, Marché, Paskevich, 2010+) is the **functional VIL**: a purely-functional ML-like language with refinement types and ghost code, used by **Frama-C** (C verification via the C-to-WhyML compiler), **SPARK** (Ada verification — full treatment of SPARK as the longest-running production formal-verification toolchain at `MEMORY.md §8.12`), and **Creusot** (`MEMORY.md §8.5` — Rust verification via prophetic borrows). WhyML's distinctive choice is **multi-prover backend dispatch**: a single Why3 verification condition is offered to Z3, CVC4/CVC5, Alt-Ergo, Vampire, and Coq simultaneously, with the user choosing which prover to pursue per goal. This makes Why3 robust to per-prover regressions and lets users combine SMT speed with interactive-prover precision on hard goals.
 
 **F\* Low\* / KaRaMeL pipeline** (Project Everest) is the systems-verification VIL family (covered from the verification-result side in `MEMORY.md §8.9`). F\* is the surface language with effects and refinement; **Low\*** (ICFP 2017) is the C-extractable subset with a stack/heap memory model; **KaRaMeL** (formerly KreMLin) extracts Low\* programs to readable C. The IR-design lesson is that **a verification-focused IL paired with a code-extractable subset gives both proof and production binary from one source** — HACL\*, EverCrypt, EverParse, and the Linux kernel WireGuard implementation all ship via this pipeline.
 
@@ -1036,6 +1048,7 @@ Rows grouped by chapter, in chapter order. Each row's Examples column ends with 
 | AOT-oriented JS HIR | Hermes optimizer pre-bytecode | Optimized for ship-only-bytecode | Hermes HIR (§4.5) |
 | Self-specializing AST as IR | Partial evaluation = compilation | One data structure for both phases | Truffle / GraalVM (§4.6) |
 | Plugin-rewritten ESTree | Visitor passes mutate AST | Shape-stable across plugin pipeline | Babel (§4.7) |
+| Compiler-IR-vs-editor-PSI split | Immutable FIR phases (raw → resolved → backend IR) | 1.7–2× faster compilation; better inference precision | IDE side must migrate from PSI consumers | Kotlin K2 / FIR (§4.8) |
 
 ### 16.4. Mid-level IRs
 
@@ -1212,6 +1225,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 6a. GraalPy — https://www.graalvm.org/python/
 6b. TruffleRuby — https://www.graalvm.org/ruby/
 7. @babel/parser — https://babeljs.io/docs/babel-parser
+8. Kotlin K2 compiler migration guide — https://kotlinlang.org/docs/k2-compiler-migration-guide.html
+9. JetBrains blog — The K2 Compiler Is Going Stable in Kotlin 2.0 — https://blog.jetbrains.com/kotlin/2023/02/k2-kotlin-2-0/
+10. Baeldung — Kotlin K2 Compiler Overview — https://www.baeldung.com/kotlin/k2-compiler-guide
 
 ### Chapter 5 — Mid-Level IRs
 

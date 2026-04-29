@@ -296,6 +296,16 @@ The lesson generalises: **for I/O-bound services where per-request isolation is 
 
 Sources: https://activej.io/async-io/eventloop and https://activej.io/boot/workers and https://activej.io/ and https://github.com/activej/activej
 
+### 3.13. Bun — Zig-Implemented JS Runtime over JavaScriptCore
+
+Jarred Sumner / Oven's **Bun** (since 2022; v1.0 September 2023) is the production Zig data point in the JavaScript runtime space — an all-in-one runtime, bundler, package manager, and test runner implemented in approximately 700 KLOC of Zig over the **JavaScriptCore** engine (Apple's Safari engine), explicitly *not* V8. The architectural choice is: pick the engine optimised for cold-start latency (JSC's interpreter-tier startup beats V8 Ignition's by a wide margin), pair it with Zig's manual memory management and zero-cost FFI, and unify what Node ships as separate tools (`npm`, `webpack`, `jest`, `tsc --watch`) into one binary with shared runtime infrastructure.
+
+Distinct from Node.js (V8 + libuv): Bun's I/O loop is custom-written in Zig, supports io_uring on Linux, and exposes Node-compatible APIs (`fs`, `http`, `child_process`, `cluster`) plus Web-standard APIs (`fetch`, `WebSocket`, `Response`) on the same runtime. The package manager is content-addressed (a global cache shared across projects), much faster than `npm install` on cold cache, and uses a binary lockfile format (`bun.lock`). The bundler is Webpack-API-compatible but written in Zig and competitive with esbuild and Rolldown (`PACKAGING.md §4` modern JS toolchain).
+
+Status (as of 2026-04): production-stable; deployed at scale by Vercel (some Edge functions), Railway (default Node-replacement), several SaaS startups. Distinct from Deno (`PACKAGING.md §3.7`), which is V8-based and capability-sandboxed; Bun targets the "drop-in faster Node" deployment where capability sandboxing is not the goal. The lesson generalises: **a unified-toolchain runtime in a systems language with manual memory management can leapfrog the Node-as-separate-tools baseline**, with the catch that JavaScriptCore-specific behaviour (different from V8's) sometimes surfaces as compatibility gaps.
+
+Sources: https://bun.com/ and https://bun.com/docs/runtime and https://github.com/oven-sh/bun
+
 ---
 
 ## 4. Async/Await and Futures
@@ -384,6 +394,18 @@ Status (as of 2026-04): production at massive scale — entire ASP.NET Core ecos
 
 Sources: https://learn.microsoft.com/en-us/dotnet/csharp/asynchronous-programming/ and https://devblogs.microsoft.com/dotnet/how-async-await-really-works/ and https://learn.microsoft.com/en-us/dotnet/api/system.threading.synchronizationcontext
 
+### 4.10. Rust — Async Fn in Traits and RPITIT (Stabilised 1.75)
+
+Rust 1.75 (December 2023) stabilised two long-awaited features: **`async fn` in traits (AFIT)** and **return-position `impl Trait` in traits (RPITIT)**. Before 1.75, an `async fn` in a trait required the `async-trait` crate, which boxed the returned future via `Pin<Box<dyn Future>>` — adding heap allocation per call and obscuring the future type from the optimiser. With AFIT, `trait Service { async fn handle(&self, req: Request) -> Response; }` desugars natively without boxing.
+
+The technical mechanism is **anonymous generic associated types**. An `async fn` in a trait desugars to a regular method returning `impl Future<Output = T>`, which itself desugars to a generic associated type — one anonymous `type` parameter on the trait, instantiated per implementor. RPITIT is the same mechanism for non-async return-position impl Trait: `trait Iterator { fn windows(&self, n: usize) -> impl Iterator<Item = ...>; }` produces a per-implementor type without naming an associated type explicitly.
+
+The Send-bound-polymorphism gap remains the open design question. A trait with `async fn handle(&self) -> Response` cannot directly express "the returned future is `Send` if `Self: Sync`" — the kind of bound-propagation `async-trait`'s `Box<dyn Future + Send>` made trivial. **Return Type Notation (RTN)** is the experimental syntax addressing this: `T: Service<handle(): Send>` lets a generic constraint name the auto-traits of the returned future. Status (as of 2026-04): RTN is unstable behind `feature(return_type_notation)`, with stabilisation discussed for 2026.
+
+The lesson generalises: **stabilising `async fn` in traits requires the type system to express anonymous associated types and auto-trait propagation orthogonally**. Languages designing async from scratch can avoid this by committing to one shape (Swift's Send by default; Go's mandatory mutex discipline) or by accepting boxed futures (C# Tasks, JS Promises). Rust's stabilisation is the production existence proof that "async, generics, and explicit Send bounds" can coexist, with the cost being years of careful type-system work and an ongoing surface (RTN, `Box<dyn Trait + Send>` ergonomics) still being polished.
+
+Sources: https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits/ and https://rust-lang.github.io/rfcs/3498-lifetime-capture-rules-2024.html and https://blog.rust-lang.org/inside-rust/2024/09/26/rtn-call-for-testing.html
+
 ---
 
 ## 5. Stackful Coroutines, Fibers, Continuations, and Virtual Threads
@@ -422,6 +444,18 @@ Sources:
 
 - https://ocaml.org/manual/effects.html
 - https://kcsrk.info/papers/retro-concurrency_pldi_21.pdf
+
+### 5.6. Wasm 3.0 Stack Switching — Coroutines on a Browser Runtime
+
+§5.2 covers WasmFX / typed continuations as a forward-looking proposal; **WebAssembly 3.0** (announced September 2025) consolidated several long-running proposals into one milestone: GC, memory64, exception handling with `exnref`, threads, SIMD, and JS string builtins all shipped cross-browser through 2024–2025. The stack-switching proposal, however, did *not* land in Wasm 3.0 — it remains a separate ongoing effort targeting a subsequent milestone, with reference implementation in Wasmtime (`wasm-tools` 2025+) and partial browser implementations behind flags.
+
+The stack-switching primitives matter for the broader concurrency-substrate question because they let a single Wasm instance manage **multiple execution stacks concurrently** through typed continuation operations: `cont.new` to create a fresh continuation from a function, `resume` to enter or re-enter it (passing values), `suspend` to yield from inside the continuation back to the caller. The instruction set is structured to compile every higher-level concurrency primitive (§5.2 lists fibers, lightweight threads, coroutines, generators, async/await, effect handlers) without privileging any one of them — a Wasm-level analogue of OCaml 5 effects (§5.5) or Raku's continuations (§11.6) but at the binary-format layer.
+
+The interaction with **JSPI (JavaScript Promise Integration)** — already shipping in Chrome 126+ — is worth recording. JSPI lets Wasm code call JS Promise-returning functions and *suspend* the Wasm computation until the Promise resolves, without forcing the Wasm side to be authored in CPS or to drive its own scheduler. Stack switching generalises this: JSPI is essentially a single-purpose application of the same mechanism, specialised for the Wasm ↔ JS boundary. Once stack switching ships, JSPI becomes one consumer of it rather than the only one.
+
+Status (as of 2026-04): Wasm 3.0 is shipping in production (covered in `REPRESENTATIONS.md §9.8`); stack switching is in late-Phase Wasm-CG progression with WasmFX as the reference implementation. The lesson generalises: **a cross-vendor binary format can ship structured stack-switching primitives** — historically a per-language concern in §5 — making language-runtime concurrency portable across Wasm hosts (browsers, Wasmtime, WAMR, Bun, Node). For new languages targeting Wasm, the design question is whether to compile to current Wasm 3.0 (CPS-transform required for resumable computation) or wait for stack switching to ship and use it natively.
+
+Sources: https://webassembly.org/news/2025-09-17-wasm-3.0/ and https://github.com/WebAssembly/stack-switching/blob/main/proposals/stack-switching/Explainer.md and https://wasmfx.dev/specs/explainer/
 
 ---
 
@@ -555,6 +589,23 @@ Trade-off: reactive streams add **operator-stack debugging cost** (a stack trace
 Status (as of 2026-04): production at huge scale across Spring (Reactor), Netflix services (RxJava, then Reactor), Akka deployments (Akka Streams). The paradigm is mature enough that the JDK absorbed the four interfaces as `java.util.concurrent.Flow` in JDK 9 (2017). For a new language with channels, the design question is whether to standardise a backpressure protocol at the language level (the Reactive Streams choice) or leave it to library-level convention (the Go choice).
 
 Sources: https://www.reactive-streams.org/ and https://projectreactor.io/ and https://github.com/ReactiveX/RxJava and https://doc.akka.io/docs/akka/current/stream/
+
+### 7.8. Cap'n Web — JS-Native RPC with Object Capabilities
+
+Cloudflare's **Cap'n Web** (Kenton Varda, September 2025; open-source under MIT) is a JavaScript-native RPC protocol that ports the Cap'n Proto / CapTP design (`MEMORY.md §10.8`) to the browser-and-server JavaScript ecosystem. The implementation is under 10 kB gzipped, written in pure TypeScript with zero runtime dependencies; it runs in browsers, Cloudflare Workers, Node.js, Bun, Deno, and any modern JavaScript runtime, using either WebSocket or HTTP-batch transport.
+
+The distinguishing properties versus REST or gRPC:
+
+- **Object capabilities** — the wire protocol carries first-class references to remote objects, not just method calls on flat services. A handler can return an opaque capability that the caller can store, pass to a third party, or invoke later. The capability cannot be forged; the only way to obtain one is to receive it from someone who already has it (the Granovetter introduction principle, `MEMORY.md §10.4`).
+- **Promise pipelining** — pre-send calls against the *result* of an in-flight call without waiting for the round-trip. `db.users.find(123).getProfile().then(p => ...)` becomes a single round trip: the server resolves `find(123)`, immediately invokes `getProfile()` on the result, and ships back the final profile. This is the same mechanism Cap'n Proto pioneered for native code, applied to JavaScript.
+- **Bidirectional RPC** — both ends of a connection can call each other's exported objects; there is no client-vs-server asymmetry in the protocol.
+- **Sandboxing-friendly** — the call graph is a DAG of object references, and untrusted code that does not hold a capability cannot invoke methods on objects it cannot reach. This is the load-bearing property for Cloudflare's dynamic-Workers AI-agent sandbox: sandboxed agents can only call out through capabilities the host explicitly granted.
+
+Distinct from gRPC (HTTP/2 + Protobuf, no capabilities, no pipelining): gRPC's contract is a static schema; Cap'n Web's contract is a graph of typed objects that evolves through introduction. Distinct from Cap'n Proto's native CapTP (`MEMORY.md §10.8`): Cap'n Web is JavaScript-native (TypeScript types replace Cap'n Proto's schema files) and ships a serialisation suited to JSON-shaped browser code rather than the binary on-the-wire encoding Cap'n Proto uses.
+
+The lesson generalises: **object-capability RPC is now economically deployable in browser-and-server JavaScript** — historically the niche where REST and JSON dominated because capability protocols were too complex. Cap'n Web's <10 kB footprint plus the Cloudflare Workers ecosystem reach mean ocap-based service composition is now a credible alternative to REST-with-OAuth-tokens for new JavaScript-stack designs.
+
+Sources: https://blog.cloudflare.com/capnweb-javascript-rpc-library/ and https://github.com/cloudflare/capnweb and https://blog.cloudflare.com/dynamic-workers/
 
 ---
 
@@ -787,6 +838,10 @@ The following tables collapse the body chapters into three orthogonal axes — e
 | Interaction-combinator parallel runtime | Graph rewrites of disjoint active pairs | No programmer annotations; scales to GPU lanes | Constant-factor overhead; research-grade | Bend / HVM2 (§3.11) |
 | Primary/worker reactor topology | N isolated single-threaded eventloops + primary balancer | Per-worker isolation without shared-heap coordination | No within-worker concurrency; horizontal scaling only | ActiveJ Eventloop + Workers (§3.12) |
 | Thread-per-core io_uring runtime | Pinned single-thread executor per core + io_uring submission | Cache-locality, predictable latency, no cross-core contention | No work stealing; load imbalance must be handled by sharding | Glommio, Monoio (§3.4) |
+| All-in-one runtime in systems language | JavaScriptCore + Zig I/O + bundler + package manager | Drop-in faster Node; unified toolchain | JSC-vs-V8 compatibility gaps | Bun (§3.13) |
+| Async fn in trait via anonymous GATs | RPITIT desugars to per-impl associated types | No `Box<dyn Future>` overhead | Send-bound polymorphism still in flight | Rust 1.75+ AFIT/RPITIT (§4.10) |
+| Wasm-level structured stack switching | `cont.new`/`resume`/`suspend` typed continuations | Portable concurrency primitives across Wasm hosts | Not yet shipped in browsers | Wasm stack switching / WasmFX (§5.6) |
+| JS-native object-capability RPC | Promise pipelining + bidirectional capabilities | <10 kB; sandboxing-friendly | New ecosystem; gRPC interop is per-project | Cap'n Web (§7.8) |
 
 ### 14.2. Coordination mechanisms
 
@@ -843,6 +898,7 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 8. Pony reference capabilities paper — https://www.ponylang.io/media/papers/fast-cheap.pdf
 9. Swift Sendable proposal — https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md
 10. WasmFX explainer — https://wasmfx.dev/specs/explainer/
+11. Koka language documentation — https://koka-lang.github.io/koka/doc/
 
 ### Chapter 3 — Scheduler Architectures
 
@@ -877,6 +933,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 29. ActiveJ repository — https://github.com/activej/activej
 30. Glommio repository — https://github.com/DataDog/glommio
 31. Monoio repository — https://github.com/bytedance/monoio
+32. Bun runtime home — https://bun.com/
+33. Bun runtime documentation — https://bun.com/docs/runtime
+34. Bun repository — https://github.com/oven-sh/bun
 
 ### Chapter 4 — Async/Await and Futures
 
@@ -895,6 +954,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 13. C# Asynchronous Programming with async and await — https://learn.microsoft.com/en-us/dotnet/csharp/asynchronous-programming/
 14. "How async/await really works in C#" (Stephen Toub, .NET Blog) — https://devblogs.microsoft.com/dotnet/how-async-await-really-works/
 15. .NET `SynchronizationContext` API reference — https://learn.microsoft.com/en-us/dotnet/api/system.threading.synchronizationcontext
+16. Rust blog — Announcing async fn and RPIT in traits — https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits/
+17. RFC 3498 — Lifetime capture rules 2024 — https://rust-lang.github.io/rfcs/3498-lifetime-capture-rules-2024.html
+18. Inside Rust blog — Return type notation MVP call for testing — https://blog.rust-lang.org/inside-rust/2024/09/26/rtn-call-for-testing.html
 
 ### Chapter 5 — Stackful Coroutines, Fibers, Continuations, and Virtual Threads
 
@@ -903,6 +965,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 3. OpenJDK Loom `VirtualThread` source — https://github.com/openjdk/loom/blob/fibers/src/java.base/share/classes/java/lang/VirtualThread.java
 4. OCaml effect handlers manual — https://ocaml.org/manual/effects.html
 5. Retrofitting effect handlers onto OCaml — https://kcsrk.info/papers/retro-concurrency_pldi_21.pdf
+6. WebAssembly 3.0 release announcement — https://webassembly.org/news/2025-09-17-wasm-3.0/
+7. Wasm stack-switching proposal explainer — https://github.com/WebAssembly/stack-switching/blob/main/proposals/stack-switching/Explainer.md
 
 ### Chapter 6 — Actors, Mailboxes, and Supervision
 
@@ -931,6 +995,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 9. Project Reactor — https://projectreactor.io/
 10. ReactiveX / RxJava — https://github.com/ReactiveX/RxJava
 11. Akka Streams documentation — https://doc.akka.io/docs/akka/current/stream/
+12. Cap'n Web announcement (Cloudflare) — https://blog.cloudflare.com/capnweb-javascript-rpc-library/
+13. Cap'n Web repository — https://github.com/cloudflare/capnweb
+14. Cloudflare — Sandboxing AI agents (dynamic Workers + Cap'n Web) — https://blog.cloudflare.com/dynamic-workers/
 
 ### Chapter 8 — Structured Concurrency and Cancellation
 

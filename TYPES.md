@@ -57,6 +57,18 @@ A practical compiler often separates:
 - typed syntax or high-level typed representation;
 - diagnostic explanation data.
 
+### 1.6. Fixed vs pluggable type systems
+
+A type system can be **fixed** (the language ships with one type discipline that is part of its semantics) or **pluggable** (additional type checkers can be loaded as compiler plug-ins, each enforcing extra invariants on top of the base type system). Most production languages take the fixed path: the type system *is* the language. The pluggable path treats the base type system as a foundation and lets external checkers refine it for application-specific properties.
+
+**Java's Checker Framework** (Mernst et al., ISSTA 2008+) is the longest-running production example. The Java compiler exposes JSR 308 type-annotation hooks, and the Checker Framework registers as a `javac` plug-in to enforce additional disciplines on annotated code: nullness (`@Nullable`, `@NonNull`), tainting (`@Tainted`, `@Untainted`), units of measurement (`@m`, `@s`, `@kg`), array index bounds (`@IndexFor("array")`, `@LTLengthOf`), regex syntax validity (`@Regex`), initialization (`@UnderInitialization`), interning, format strings, internationalization (`@Localized`), and many more — each shipped as an independent checker module that runs alongside the standard Java type system. None are part of Java itself; all are pluggable disciplines whose enforcement happens at compile time only.
+
+The architectural distinction from refinement types (§7.4): refinement types embed the predicate language inside the type system, requiring the language designer to commit to one discipline. Pluggable types let multiple disciplines coexist orthogonally, with each checker independently developed and deployed. The cost is that pluggable disciplines cannot share type-inference machinery — each checker re-runs its own analysis, which can be slow if many are active at once. The benefit is incremental adoption: a Java codebase can adopt nullness checking today, units-of-measurement next quarter, and tainting once the threat model demands it, without changing the base language.
+
+The lesson generalises: **a language whose type system is intentionally pluggable enables researchers and security teams to ship type disciplines without language-committee buy-in**. Status (as of 2026-04): the Checker Framework is the canonical production deployment; experimental work on partial rely-guarantee reasoning for pluggable types (UWPLSE, 2024) is exploring how pluggable disciplines compose without losing the soundness of any individual checker. For language designers, the trade-off is between fixed-but-coherent (Rust, Haskell, OCaml) and pluggable-but-modular (Java + Checker Framework) — the right choice depends on whether the language wants the type system to be a closed semantic commitment or an open extension surface.
+
+Sources: https://checkerframework.org/manual/ and https://homes.cs.washington.edu/~mernst/pubs/pluggable-checkers-issta2008.pdf and https://uwplse.org/2024/06/10/rely-guarantee-for-pluggable-types.html
+
 ---
 
 ## 2. Historical Through-Line, 1960–2026
@@ -643,6 +655,18 @@ The lesson generalises: **for languages whose primary use case demands determini
 
 Sources: https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference and https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf
 
+### 11.7. Frank — Bidirectional Effect Types Without Effect Variables
+
+Lindley, McBride, Hillerström, Convent et al.'s **Frank** (initial paper "Do Be Do Be Do", POPL 2014/2017; expanded JFP article "Doo Bee Doo Bee Doo", 2020) is a strict functional language whose distinguishing contribution is **effect polymorphism without effect variables in source code**. Where Koka (§11.2) and Effekt (§11.4) require programmers to write effect rows like `<exn,async>` explicitly on function types, Frank achieves the same expressive power through a *bidirectional* effect-typing rule: the effect set a function may perform is propagated structurally through type checking, and the source language has no syntax for naming an effect variable.
+
+The mechanical core is the **adjustment**. A Frank arrow `[E1] A -> [E2] B` says "in an ambient effect set adjusted by `E1` going in, returning a value of `B` adjusted by `E2`." Effect handlers (called *operators* in Frank) take continuation-style arguments and are pattern-matched against effect signatures; the typing rule for operator application threads the ambient effect set through the bidirectional check, and the language never needs an explicit `forall e. e in ...` quantifier the way ML-style row variables would.
+
+**Multi-handlers** are Frank's other distinctive primitive: an operator can simultaneously interpret commands from *several* effect sources at once, without disturbing direct-style code. Where a Koka handler decides what to do with one effect at a time, a Frank multi-handler can specify the joint behaviour of (say) `state` and `nondet` together — useful for coordination patterns where the two effects must agree on action ordering. This is the type-system reason Unison's *abilities* (covered in §11.2 as one of the production effect-handler languages) chose Frank as their basis: the bidirectional discipline scales better in practice than an explicit-row-variable ML extension would.
+
+Status (as of 2026-04): research-grade; Frank itself is a small implementation maintained by the authors at Edinburgh and Cambridge. The lesson generalises: **effect-row syntax in source code is not the only way to express effect polymorphism** — bidirectional propagation (§5.3) extended to effects is a viable alternative, and the same mechanism that lets a language elide many type annotations on values can elide them on effects. For language designers building from scratch, Frank is the existence proof that effect polymorphism does not require user-visible effect variables; the cost is that error messages must be carefully designed to expose the inferred effect set when bidirectional propagation fails.
+
+Sources: https://homepages.inf.ed.ac.uk/slindley/papers/frankly-jfp.pdf and https://arxiv.org/pdf/1611.09259 and https://homepages.inf.ed.ac.uk/slindley/papers/frankly-draft-march2014.pdf
+
 ---
 
 ## 12. Linear, Affine, Ownership, and Resource Types
@@ -785,6 +809,8 @@ The technique families below collapse the chapter-level material into a comparis
 | Union/intersection types | Dynamic-language migration, narrowing | Subtyping lattice and flow analysis | Can be expensive and unsound if pragmatic | (§7.2, §7.3) |
 | Gradual typing | Migration from dynamic code | Runtime casts/contracts and blame | Runtime overhead and boundary complexity | (§1.1) |
 | Refinement types | Strong invariants over values | SMT integration and decidability policy | Solver unpredictability | (§7.4); production tooling — LiquidHaskell, Dafny, Stainless, Whiley, Flux, F\* (§7.5) |
+| Pluggable type system | Application-specific extra disciplines | One javac plug-in per discipline; cannot share inference machinery | Researchers/security ship checkers without language-committee buy-in | Java + Checker Framework (§1.6) |
+| Bidirectional effect typing without effect variables | Adjustment-driven effect propagation; multi-handlers | Effect polymorphism without user-visible row variables | Error messages must expose inferred effect set | Frank (§11.7) |
 | Dependent types | Proofs and precise invariants | Elaborator, holes, unification, kernel | High implementation complexity | (§10.1, §10.3, §6.9); Cubical Agda / HoTT (§10.5) |
 | Effect systems | Purity, capabilities, checked effects | Effect rows/sets and handler typing | Annotation and inference complexity | (§11.1, §11.2, §11.3); Effekt second-class capabilities (§11.4) |
 | Session types | Statically-typed communication protocols | Linearity discipline + duality + (for MPST) projection | Production tooling research-grade; integrates with channels and actors | Sing#, Scribble, Rust mpstthree (§11.5) |
@@ -823,6 +849,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 5. Scala 3 / Dotty Type System Internals — https://dotty.epfl.ch/docs/internals/type-system.html
 6. Scaling DOT to Scala — Soundness — https://scala-lang.org/blog/2016/02/17/scaling-dot-soundness.html
 7. A path to DOT: formalizing fully path-dependent types — https://dl.acm.org/doi/10.1145/3360571
+8. Checker Framework manual — https://checkerframework.org/manual/
+9. Mernst et al. — Practical Pluggable Types for Java (ISSTA 2008) — https://homes.cs.washington.edu/~mernst/pubs/pluggable-checkers-issta2008.pdf
+10. UWPLSE — Partial Rely-Guarantee Reasoning for Pluggable Types (2024) — https://uwplse.org/2024/06/10/rely-guarantee-for-pluggable-types.html
 
 ### Chapter 2 — Historical Through-Line, 1960–2026
 
@@ -944,6 +973,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 14. Session types in Rust (sessionrs) — https://github.com/sessionrs/sessionrs
 15. Verse Language Reference (Epic Games / UEFN) — https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference
 16. Verse: A Functional-Logic Language with Failure-Effect (Peyton Jones et al.) — https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf
+17. Frank — Doo Bee Doo Bee Doo (JFP 2020) — https://homepages.inf.ed.ac.uk/slindley/papers/frankly-jfp.pdf
+18. Frank — Do Be Do Be Do (POPL 2017 arXiv) — https://arxiv.org/pdf/1611.09259
+19. Frank — Do Be Do Be Do draft (March 2014) — https://homepages.inf.ed.ac.uk/slindley/papers/frankly-draft-march2014.pdf
 
 ### Chapter 12 — Linear, Affine, Ownership, and Resource Types
 

@@ -899,6 +899,26 @@ Language-level model and empirical acceptance results are in §1.3; runtime/Miri
 
 Source: https://iris-project.org/pdfs/2025-pldi-treeborrows.pdf
 
+### 8.12. SPARK / Ada — Industrial Auto-Active Verification
+
+AdaCore's **SPARK** (subset of Ada with formal-verification annotations, descended from work at Praxis/Altran in the 1980s) is the longest-running production formal-verification toolchain — used in DO-178C avionics, EAL-rated security products, railway signalling, and increasingly Linux-kernel and CHERI-related verification. Where Verus (§8.3), Prusti (§8.4), and Creusot (§8.5) target Rust, SPARK targets Ada with the same auto-active discipline: pre/postconditions on subprograms, loop invariants, type predicates, and dependency contracts (`Depends`, `Global`) discharged by an SMT solver via Why3 (`REPRESENTATIONS.md §11.8` covers Why3 as a verification IL).
+
+The SPARK design is unusually mature in production:
+
+- **Five proof levels** (`Stone`, `Bronze`, `Silver`, `Gold`, `Platinum`) corresponding to absence-of-runtime-errors, initialization correctness, key-property partial proof, full functional correctness, and worst-case-execution-time bounds. Each level extends the previous; teams adopt incrementally without requiring full Platinum across an entire codebase.
+- **Ghost code** — `Ghost` aspect on declarations marks them as proof-only, automatically erased before code generation. Lets specifications express invariants over data structures without runtime cost.
+- **Proof contexts** declared explicitly with `pragma SPARK_Mode` per package — pragma can be `On`, `Off`, or `Auto` per declaration, allowing incremental migration of an Ada codebase to SPARK section by section.
+- **Multi-prover backend via Why3** — same Z3 / CVC4 / CVC5 / Alt-Ergo dispatch the rest of the Why3 ecosystem uses (`REPRESENTATIONS.md §11.8`). This is where SPARK shares infrastructure with Frama-C, Creusot, and other Why3-based verifiers.
+- **Liquid-types-style refinement** — type predicates (`Subtype X is Integer with Predicate => X mod 2 = 0`) provide a refinement-typing surface integrated with the rest of Ada's type system, comparable to LiquidHaskell (`TYPES.md §7.5`) but with a longer production history.
+
+Status (as of 2026-04): production deployment includes Ariane-class space launchers, Boeing avionics, Eurofighter Typhoon flight control, NVIDIA security firmware, thousands of certified-system codebases. AdaCore's 2025 retrospective covers Wind River's CHERI Alliance partnership (relevant to `MEMORY.md §5.6` CHERI), expanded LLM-generated-code verification studies (SCITEPRESS 2025), and increasing FAA/EASA acceptance of SPARK as a DO-178C verification path.
+
+Distinct from CompCert (§8.10): CompCert verifies a *compiler*; SPARK verifies *application code*. Distinct from Verus (§8.3): Verus targets Rust with Rust's ownership for soundness; SPARK targets Ada with Ada's strong-typing-plus-contracts for soundness — both are auto-active, both use SMT, but the source language constraints differ. Distinct from F\*/Low\* (§8.9): F\* is dependently-typed with effects; SPARK is first-order Ada plus refinement.
+
+The lesson generalises: **a production-mature formal-verification toolchain takes decades to mature**. SPARK's lineage is over 35 years old; Ada's was already 15 years old when SPARK began. For new languages contemplating formal verification as a feature, the cost is not just the verification IL (Why3, Boogie, Viper — all covered in `REPRESENTATIONS.md §11.8`) but also the multi-decade community investment in proof patterns, certifying-authority acceptance, and educational material. Easier to *target* an existing verifier than to ship a new one.
+
+Sources: https://www.adacore.com/blog/year-in-review-2025-a-transformative-year-for-high-integrity-software-at-adacore and https://archive.fosdem.org/2025/schedule/event/fosdem-2025-4879-understanding-liquid-types-contracts-and-formal-verification-with-ada-spark/ and https://www.scitepress.org/Papers/2025/134619/134619.pdf and https://hackernoon.com/the-language-that-refuses-to-crash-why-ada-still-matters-in-2025
+
 ---
 
 ## 9. Concurrent Memory Reclamation
@@ -1055,7 +1075,7 @@ Sources: https://docs.sel4.systems/Tutorials/capabilities.html and https://cacm.
 
 ### 10.8. Cap'n Proto / CapTP
 
-Distributed object capabilities with the network protocol descended from E's CapTP — interface refs are first-class wire types, and *promise pipelining* lets dependent calls travel in one round trip. **Promise pipelining**: pre-send calls against the *result* of an in-flight call, eliminating chatty RPC patterns; equivalent to E's eventual-send composition. **Three-vat introduction**: secure handoff of a capability from vat A to C via B without B gaining authority. **Distributed acyclic GC** (Spritely Goblins, Agoric): cross-vat ref counting with the ocap invariant preserved. Cap'n Proto in production at Cloudflare Workers; OCapN (Spritely + Agoric) in active standardization.
+Distributed object capabilities with the network protocol descended from E's CapTP — interface refs are first-class wire types, and *promise pipelining* lets dependent calls travel in one round trip. **Promise pipelining**: pre-send calls against the *result* of an in-flight call, eliminating chatty RPC patterns; equivalent to E's eventual-send composition. **Three-vat introduction**: secure handoff of a capability from vat A to C via B without B gaining authority. **Distributed acyclic GC** (Spritely Goblins, Agoric): cross-vat ref counting with the ocap invariant preserved. Cap'n Proto in production at Cloudflare Workers; OCapN (Spritely + Agoric) in active standardization. **Cap'n Web** (Cloudflare 2025) is the JavaScript-native sibling of the same protocol family, ported to TypeScript with the same promise-pipelining and capability semantics; runtime/coordination angle is canonical at `CONCURRENCY.md §7.8`.
 
 Sources: https://capnproto.org/rpc.html and https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html
 
@@ -1226,6 +1246,7 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | F\*/Low\*/KaRaMeL | Memory safety + functional correctness | ~3–5× | Firefox, Linux, mbedTLS, Tezos | (§8.9) |
 | CompCert memory model | Compiler correctness substrate | Foundational | Avionics DO-178C | (§8.10) |
 | Stacked/Tree Borrows | UB definition for unsafe Rust | Operational | Stacked Borrows established in Miri; Tree Borrows experimental | (§8.11) |
+| SPARK / Ada | Auto-active functional correctness on Ada | 5 proof levels, multi-prover via Why3 | DO-178C avionics, NVIDIA firmware, ~35-year lineage | (§8.12) |
 
 ### 11.10. Concurrent memory reclamation
 
@@ -1413,8 +1434,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 23. CHERIoT-RTOS publication — https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/
 24. SoftBound project page — http://acg.cis.upenn.edu/softbound/
 25. CETS ISMM 2010 paper — https://acg.cis.upenn.edu/papers/ismm10_cets.pdf
-28. LowFat allocator — https://github.com/GJDuck/LowFat
-29. Connor et al. — MPK security (USENIX Security 2020) — https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
+26. LowFat allocator — https://github.com/GJDuck/LowFat
+27. Connor et al. — MPK security (USENIX Security 2020) — https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf
 
 ### Chapter 6 — Tracing GC Architectures
 
@@ -1545,6 +1566,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 21. VeriFast docs — https://verifast.github.io/verifast-docs/
 22. EverCrypt OPLSS 2019 — https://fstar-lang.org/oplss2019/EverCrypt-06282019.pdf
 23. CompCert memory model chapter (Cambridge) — https://www.cambridge.org/core/books/abs/program-logics-for-certified-compilers/compcert-memory-model/BC069D42EA52CDBE871A22C118A2C74B
+24. AdaCore — Year in Review 2025 — https://www.adacore.com/blog/year-in-review-2025-a-transformative-year-for-high-integrity-software-at-adacore
+25. FOSDEM 2025 — Understanding liquid types, contracts and formal verification with Ada/SPARK — https://archive.fosdem.org/2025/schedule/event/fosdem-2025-4879-understanding-liquid-types-contracts-and-formal-verification-with-ada-spark/
+26. Cramer et al. — Verifying LLM-Generated Code with SPARK (SCITEPRESS 2025) — https://www.scitepress.org/Papers/2025/134619/134619.pdf
+27. The Language That Refuses to Crash (Hackernoon, 2025) — https://hackernoon.com/the-language-that-refuses-to-crash-why-ada-still-matters-in-2025
 
 ### Chapter 9 — Concurrent Memory Reclamation
 

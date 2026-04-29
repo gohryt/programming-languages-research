@@ -1172,6 +1172,25 @@ The lesson for a language designer: **if cross-compilation to multiple radically
 
 Sources: https://haxe.org/manual/introduction.html and https://haxe.org/ and https://github.com/HaxeFoundation/haxe and https://lib.haxe.org/
 
+### 8.19. Pkl — Apple's Class-Based Configuration Language
+
+Apple's **Pkl** (introduced February 2024, open-source under Apache 2.0; pronounced "Pickle") is a typed configuration language that occupies the same design slot as CUE (§8.17): generate JSON, YAML, property lists, or other structured configuration formats from a typed source language. Where CUE's discipline is *unification on a lattice* (types and values inhabit the same lattice; composition is unification), Pkl takes the *class-based object-oriented* path — classes with inheritance, abstract members, late-binding, and amend-and-extend overrides, all structurally typed and compile-time validated.
+
+The distinguishing properties:
+
+- **Late binding with abstract members** — a base class can declare an abstract field that a subclass must override; the abstract designation is part of the type, and the type checker rejects instantiation of an abstract class.
+- **Type predicates** (`Int(this > 0)`, `String(matches(...))`) — refinement-typed integers and strings, validated at evaluation time. Integration-style predicate refinement, comparable to Ada SPARK's `Predicate` aspect (§5.5) but in a configuration context.
+- **Amend-and-extend** — `(existingObject) { foo = newValue }` produces a copy of `existingObject` with `foo` overridden. Composes deeply through nested objects without commitment to either declarative-merge (CUE) or imperative-mutate (Helm) semantics.
+- **Multi-format output** — one Pkl file can emit JSON, YAML, .plist, .pcf (Pkl Configuration Format), .properties, or arbitrary user-defined output via `output.text` and renderers. The same source generates Kubernetes manifests, GitHub Actions workflows, and Helm values without parallel maintenance.
+- **Native bindings** for Java, Kotlin, Swift, Go, and Node — Pkl files can be evaluated by host applications and produce typed records in the host language. This closes the typing loop: configuration written in Pkl is type-checked at evaluation time *and* type-checked at consumption time by the host.
+- **Module system with URL-shaped imports** — `import "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.uri@1.0.0#/URI.pkl"` (URL-shaped imports with version pinning, similar to Deno `PACKAGING.md §3.7`).
+
+Distinct from CUE (§8.17): Pkl is imperative-OO with classes; CUE is declarative-lattice with unification. Distinct from Jsonnet (a JSON-templating language pre-dating both): Pkl has a richer type system, while Jsonnet is dynamically typed. Distinct from HCL (Terraform's configuration language): HCL is declarative without a real type system; Pkl is class-based with type checking.
+
+Production: Apple uses Pkl extensively internally for service configuration; external adoption includes several large-scale Kubernetes-and-Helm deployments where Helm's untyped templating became unmaintainable. Status (as of 2026-04): pre-1.0 (~0.27+) but production-stable per Apple's own usage. The lesson generalises: **typed configuration languages are converging on "real type system + multi-format output"**, with the design choice between unification (CUE) and class-based (Pkl) reflecting whether the audience prefers declarative or object-oriented thinking. For language designers asking "should I have a configuration sub-language?" — the answer is increasingly yes, and the design space is now well-mapped.
+
+Sources: https://pkl-lang.org/index.html and https://github.com/apple/pkl and https://pkl-lang.org/blog/introducing-pkl.html
+
 ---
 
 ## 9. Research and Advanced Module Calculi
@@ -1514,6 +1533,7 @@ The previous chapters now cover enough of the design space to support direct com
 | Deno (`PACKAGING.md §3.7`) | Module URL + content hash | HTTPS URL with version path; lockfile pins SHA-256 | None (URL-shaped) | No central registry; URL identity = distribution identity |
 | Mojo (§8.16) | File-as-module | Filename + dotted package path | Medium-high | Compile-time-elaborated parametric IR shipped pre-instantiation |
 | CUE (§8.17) | Directory-as-package on lattice | `cue.mod/module.cue` manifest + Go-style import path | Medium | CUE module proxy |
+| Pkl (§8.19) | File-as-module + classes with amend-and-extend | URL-shaped `import "package://..."` with version pinning | Medium | pkl-lang.org package registry |
 | Carbon (§9.12) | Library inside package | `package`/`library` declaration | Toolchain-managed | BUILD-file mapping; modules from day 1 |
 
 ### 12.2. Import semantics
@@ -1733,6 +1753,7 @@ References are grouped by the chapter that first cites them. Within each chapter
 8. Go language specification — Packages — https://go.dev/ref/spec#Packages
 9. Go module reference — https://go.dev/ref/mod
 10. Go blog — Package names — https://go.dev/blog/package-names
+10b. Russ Cox — Semantic import versioning — https://research.swtch.com/vgo-import
 11. Odin overview — Packages and Imports — https://odin-lang.org/docs/overview/#packages
 12. Odin overview — Import statements — https://odin-lang.org/docs/overview/#import-statements
 
@@ -1879,6 +1900,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 57. Haxe language home — https://haxe.org/
 58. Haxe repository — https://github.com/HaxeFoundation/haxe
 59. Haxelib package directory — https://lib.haxe.org/
+60. Pkl language home — https://pkl-lang.org/index.html
+61. Pkl repository — https://github.com/apple/pkl
+62. Introducing Pkl — Apple Open Source — https://pkl-lang.org/blog/introducing-pkl.html
 
 ### Chapter 9 — Research and Advanced Module Calculi
 

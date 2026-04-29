@@ -329,7 +329,46 @@ The design lesson generalises: **content-addressed lockfiles (§4.1) prove what 
 
 Sources: https://www.sigstore.dev/ and https://slsa.dev/ and https://github.com/sigstore/cosign and https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds and https://openssf.org/blog/2024/05/17/where-does-your-software-really-come-from/
 
-### 4.9. Design Lessons from Build Systems and Registries
+### 4.9. Rust-Based Modern JS Toolchain — esbuild, swc, oxc, biome, Rolldown, rspack, Turbopack
+
+The JavaScript build-tool ecosystem migrated wholesale to Rust between 2022 and 2026. This is a single ecosystem-wide phenomenon worth recording because the migration pattern recurs in other ecosystems (Python's `uv`/`ruff`, Ruby's `prism`) and offers concrete data on rewriting a mature toolchain in a systems language without breaking ecosystem compatibility.
+
+Key tools and their roles:
+
+- **swc** (Donny Kim, 2017+) — Rust TypeScript/JavaScript compiler used by Next.js, Vercel, Deno's `deno bundle` (legacy), and Parcel. Drop-in faster replacement for Babel.
+- **esbuild** (Evan Wallace, 2020+) — Go-based bundler/minifier; predates the Rust wave but established the "compiled bundler" template that the Rust tools followed.
+- **oxc** (The Oxc Project, 2023+) — Rust JavaScript/TypeScript toolchain: parser, linter, type-checker, formatter, all in one Rust workspace. Goal is "one Rust crate replaces the Babel + ESLint + Prettier + tsc stack."
+- **biome** (BiomeJS, 2023+; descendant of Rome Tools) — Rust formatter + linter; faster than Prettier + ESLint with less configuration friction.
+- **Rolldown** (Rolldown team, VoidZero, 2024+) — Rust-based bundler designed as a drop-in replacement for both Rollup (production) and esbuild (dev). Vite 6 (2025) ships Rolldown as its production bundler, replacing the two-bundler split (esbuild for dev, Rollup for production) that defined Vite 1–5.
+- **rspack** (ByteDance, 2023+) — Rust bundler with Webpack API compatibility. Status (as of 2026-04): Rspack 2.0 (April 2026) is production-default for several large ByteDance and Alibaba codebases. Drop-in faster Webpack.
+- **Turbopack** (Vercel, 2022+) — Rust bundler tightly integrated with Next.js. Distinct from Rspack (general Webpack-compatible) by being Next.js-specific in scope.
+- **lightningcss** (Devon Govett, 2022+) — Rust CSS parser/transformer/minifier; faster than PostCSS for the common case.
+
+The architectural commonality: each tool re-implements a JavaScript-ecosystem standard (Webpack, Rollup, ESLint, Babel, Prettier, PostCSS) in Rust, exposing the existing JS-API surface so user code does not need to migrate. The Rust performance margin is substantial — typically 5–20× faster on cold builds, with proportionally smaller margin on warm builds. The cost is incremental ecosystem fragmentation: Rust-based plugins and JS-based plugins are largely incompatible, so each Rust tool re-implements ecosystem plugins it inherits in JavaScript.
+
+The lesson generalises: **a mature ecosystem can be re-implemented in a faster systems language one tool at a time, with API compatibility as the governing constraint**. For language designers shipping a new ecosystem, the choice between "fast tools from day one in a systems language" (Rust, Zig, Go) and "tools written in the language itself" (Python's pip, Ruby's bundler, npm in Node) has a clear answer in 2026: faster tools win developer mindshare quickly enough that the rewrite is forced eventually. Ship in a systems language from day 1.
+
+Sources: https://oxc.rs/ and https://rolldown.rs/ and https://rspack.rs/ and https://biomejs.dev/ and https://swc.rs/ and https://lightningcss.dev/
+
+### 4.10. PyO3 + maturin — Python–Rust Cross-Language Packaging
+
+The ecosystem-spanning case worth recording: **PyO3** (David Hewitt et al.; ecosystem maintained collaboratively, since 2017) is the canonical Rust crate for writing Python extension modules; **maturin** (Konstantin Stadler, since 2018) is the build tool that packages PyO3-based crates into Python wheels (`.whl`) following PEP 517/518. Together they make Rust the primary language for new performance-critical Python extensions, displacing the historical C/C++ + setuptools stack.
+
+The mechanical pieces:
+
+- **PyO3 macro surface** — `#[pyclass]` annotates a Rust struct as a Python class; `#[pymethods]` annotates an `impl` block as a Python method table; `#[pyfunction]` exposes a Rust function to Python. The macros emit FFI glue against Python's C API at compile time. ABI3 mode (`abi3-py38` feature) targets the stable Python ABI so a single wheel works for Python 3.8+ across CPython versions.
+- **maturin build modes** — `develop` for in-place editable installs during development; `build` for wheel production; `publish` for uploading to PyPI; `sdist` for source-distribution archives. Cross-compilation to Linux/macOS/Windows via `maturin build --target` and `--release` flags.
+- **PyPI distribution** — wheels built by maturin are statically-compiled native extensions; users `pip install` them and the binary runs without a Rust toolchain on the consumer's machine. The wheel naming (`mypackage-0.1.0-cp310-cp310-linux_x86_64.whl`) encodes the Python version + ABI + platform so pip selects the right wheel automatically.
+
+The ecosystem reach is significant. Major Python packages with PyO3-based Rust extensions include **Polars** (DataFrame library, faster than pandas for large datasets), **Pydantic** v2 (validation core rewritten from Cython to Rust), **cryptography** (the canonical Python cryptography library, mostly Rust as of 2022), **tokenizers** (Hugging Face), **ruff** (Python linter rewriting flake8+isort+pyupgrade in Rust), **uv** (Astral's pip+venv replacement), **orjson** (fast JSON serialisation), and dozens more. PyPI ships hundreds of millions of PyO3-based wheel downloads per month.
+
+Distinct from older C-extension toolchains (`Cython`, `cffi`, `pybind11` for C++): PyO3 + maturin make the *cross-language packaging* concern transparent. A Python user `pip install`s a package without knowing Rust is involved, and wheel selection automatically picks the native binary for the user's platform. The cost is that source distributions require a Rust toolchain to build, which can complicate hermetic-build pipelines (§4.6 Nix/Guix); maturin's wheel-only distribution mitigates this for most consumers.
+
+The lesson generalises: **a high-quality cross-language packaging toolchain can shift an ecosystem's "extension language" choice within a few years**. Python's extension language was C/C++ for 30 years; PyO3 + maturin shifted it to Rust within five. The success conditions are (a) the systems language has a stable C ABI to target, (b) the build tool fits the host language's existing packaging conventions (PEP 517/518 in this case), and (c) the new extensions ship binary distributions so end users don't need the new toolchain. For language designers building a host language with C-ABI-compatible FFI, this is the cleanest production template for cross-language extension packaging.
+
+Sources: https://pyo3.rs/ and https://github.com/PyO3/pyo3 and https://www.maturin.rs/ and https://github.com/PyO3/maturin
+
+### 4.11. Design Lessons from Build Systems and Registries
 
 The build-system-and-registry layer adds several specific lessons not visible at the language level:
 
@@ -403,6 +442,13 @@ Rows are grouped by topic; within a topic, ordering follows the body text.
 | Combinatorial variant selection | Concretisation per dependency tuple | Spack (§4.6) |
 | Vendoring | Source committed to repo | Go, idiomatic for hermetic builds (§4.4) |
 
+### 5.6. Toolchain evolution and cross-language packaging
+
+| Pattern | Mechanism | Examples |
+|---|---|---|
+| Wholesale rewrite of an ecosystem's toolchain in a faster systems language | API-compatible Rust replacements; user code unchanged | Rust-based JS toolchain — oxc, rolldown, rspack, turbopack, biome, swc, lightningcss (§4.9) |
+| Cross-language extension packaging | Macro-based FFI binding + wheel-format cross-compile | PyO3 + maturin for Python–Rust extensions (§4.10) |
+
 ---
 
 ## 6. Open Design Questions
@@ -454,6 +500,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 12. JSR — JavaScript Registry — https://jsr.io/docs
 13. Deno security and permissions — https://docs.deno.com/runtime/fundamentals/security/
 14. Deno blog — JSR Q4 update — https://deno.com/blog/jsr_q4
+15. Zig build-system tutorial — https://ziglang.org/learn/build-system/
+16. Odin overview — Packages — https://odin-lang.org/docs/overview/#packages
 
 ### Chapter 4 — Build Systems, Workspaces, Lockfiles, and Registries
 
@@ -485,3 +533,13 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 26. cosign repository — https://github.com/sigstore/cosign
 27. GitHub Artifact Attestations — https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds
 28. OpenSSF — Where Does Your Software (Really) Come From? — https://openssf.org/blog/2024/05/17/where-does-your-software-really-come-from/
+29. Oxc — The JavaScript Oxidation Compiler — https://oxc.rs/
+30. Rolldown — JavaScript bundler in Rust — https://rolldown.rs/
+31. Rspack — Fast Rust-based bundler — https://rspack.rs/
+32. Biome — Toolchain for the web — https://biomejs.dev/
+33. swc — Rust-based platform for the Web — https://swc.rs/
+34. Lightning CSS — https://lightningcss.dev/
+35. PyO3 — Rust bindings for Python — https://pyo3.rs/
+36. PyO3 repository — https://github.com/PyO3/pyo3
+37. maturin — Build and publish Rust-Python packages — https://www.maturin.rs/
+38. maturin repository — https://github.com/PyO3/maturin

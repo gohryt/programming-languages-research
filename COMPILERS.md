@@ -146,6 +146,26 @@ The lesson generalises: **for gradually-typed languages with optional annotation
 
 Sources: https://create.roblox.com/docs/luau/native-code-gen and https://luau.org/news/2025-12-19-luau-recap-runtime-2025/ and https://devforum.roblox.com/t/optimizing-native-code-performance-with-type-hints-and-magic/4247690
 
+### 1.13. Codon — Whole-Program Python AOT to LLVM
+
+Shajii et al.'s **Codon** (MIT/Exaloop, PLDI 2023) is a Python-syntax compiler that produces standalone native binaries via LLVM, *without* CPython runtime overhead. Where Cinder/Pyston/Pyjion (§1.10) and the CPython JIT (§1.1) work *with* Python's reference-counted dynamic semantics, Codon abandons them: it imposes static type inference on a Python subset, monomorphises generic code at compile time, and emits LLVM IR with no heap-tag dispatch on hot paths. Reported speedups are 10–100× on numeric and string-heavy workloads, with C-competitive performance where Codon's inferred types are tight enough.
+
+The architectural choice is "compile a Python *dialect*, not the language itself": full CPython-extension semantics, dynamic class modification, and ad-hoc reflection are not supported. In exchange, Codon offers domain-extensibility through a **plugin SDK** — the same compiler infrastructure backs Seq (computational genomics) and other domain-specific Codon dialects, each adding domain-typed primitives without forking the toolchain. Distinct from Numba (§1.14), which JIT-compiles selected functions inside an otherwise standard CPython process; Codon replaces CPython entirely.
+
+Status (as of 2026-04): production-stable; Exaloop ships Codon under a source-available license with commercial deployments in computational biology and high-frequency data processing. The lesson generalises: **a typed Python dialect plus whole-program AOT** is a different point in the Python-acceleration design space from any JIT, and pays off when partial Python compatibility is acceptable.
+
+Sources: https://github.com/exaloop/codon and https://news.mit.edu/2023/codon-python-based-compiler-achieve-orders-magnitude-speedups-0314 and https://dl.acm.org/doi/abs/10.1145/3578360.3580275
+
+### 1.14. Numba — Decorator-Driven Python LLVM JIT
+
+Lam, Pitrou, Seibert et al.'s **Numba** (Anaconda, 2012+) takes the opposite position from Codon (§1.13): instead of replacing CPython, it lives *inside* a normal CPython process and compiles selected functions on demand. The `@jit` (or `@njit` — "no-Python" mode) decorator marks a function for JIT compilation; on first call, Numba's frontend infers Python and NumPy types from the call's actual arguments, lowers a typed IR, and emits machine code via **llvmlite** (Numba's LLVM Python binding, ~14 MB vs LLVM's full ~100 MB — a project deliverable in its own right).
+
+The deployment niche is *numerical and array-heavy* code: Numba shines on tight `for` loops over NumPy arrays, ufuncs, and reductions, where type inference reliably collapses to fixed numeric types. The compiled function reuses NumPy's memory layout directly, so no marshalling cost crosses the JIT boundary. **GPU support** via `@cuda.jit` extends the same decorator surface to CUDA kernels; **AOT mode** lets functions be compiled ahead of time and cached across processes. The price of staying inside CPython is real — anything that calls Python C-extension functions whose signatures Numba can't infer falls back to "object mode" with full CPython dispatch overhead, often eliminating the speedup entirely.
+
+The lesson generalises: **a decorator-driven JIT operating on a typed subset of an existing dynamic language is a viable middle ground** between full-language acceleration (CPython JIT, §1.1) and language-replacement compilation (Codon, §1.13). The cost is the typed-subset boundary; the benefit is incremental adoption — users add `@jit` to their hot loops without rewriting the program. PyPy and GraalPy occupy adjacent points (whole-language acceleration); Cython occupies another (typed-extension compilation).
+
+Sources: https://numba.pydata.org/ and https://github.com/numba/llvmlite and https://numba.pydata.org/numba-doc/dev/user/jit.html
+
 ---
 
 ## 2. Memory Management in Compilers
@@ -787,6 +807,25 @@ The design trade-off is principled: if compile-time code is ordinary language co
 
 Sources: https://github.com/BSVino/JaiPrimer/wiki/Metaprogramming and https://en.wikipedia.org/wiki/JAI_(programming_language)
 
+### 12.12. C++26 Reflection — P2996 Static Reflection
+
+C++26 introduces **static reflection** as a first-class language feature via P2996 (Sutter, Childers, Faisal, Snyder et al.; voted into the C++26 working draft 2024–2025; current revision P2996R13, June 2025). Two new operators define the surface: `^^expr` (the *lift* operator) reflects an entity into a compile-time `std::meta::info` value, and `[: meta-expr :]` (the *splice* operator) substitutes a reflected value back into source position as an identifier, type, or expression. The reflection model is a curated subset of what Daveed Vandevoorde's earlier **P1240** specified, dropping the most contentious features (raw token splicing, generative function emission) for a conservative MVP that committee members judged shippable.
+
+The mechanical primitives:
+
+- **`std::meta::info`** — the type of every compile-time reflection value. A consteval-only opaque handle; cannot be runtime-stored.
+- **Member iteration** — `members_of(^^MyType)` returns a `std::vector<info>` of every non-special member, allowing template-free iteration over fields, methods, base classes, and enumerators.
+- **Splice substitution** — `[:r:]` produces a name, type, or expression depending on what `r` reflects; `template_arguments_of`, `type_of`, `name_of`, `is_class`, `is_enum` complete the meta-query API.
+- **`define_aggregate`** — generates an aggregate type at consteval time; the principal generative-code-emission primitive (more constrained than P1240's earlier proposal).
+
+The most consequential application is **eliminating `<type_traits>` and SFINAE-heavy generic code**: every metafunction in the standard's traits library can be re-expressed as a few-line consteval function over reflection. Production targets include replacing **Qt's `moc`** (the Meta-Object Compiler that has shipped as an external preprocessor since the 1990s precisely because C++ lacked reflection), Boost.PFR's structural reflection over POD types, automatic JSON/protobuf serialisation, and ORM column mappings.
+
+Status (as of 2026-04): voted into C++26 working draft; GCC and Clang shipping experimental support behind `-freflection`-style flags, with significant fixes through GCC 15 / Clang 19+. MSVC has not yet announced an implementation date. Distinct from D's CTFE + `__traits` (§12.7) and Zig's `comptime` (§12.1): C++26 reflection is more constrained (consteval-only, no token splicing, no raw code generation in the MVP) but designed to compose cleanly with C++'s template + concept system. Distinct from Rust proc macros (§12.2): reflection runs *during* template instantiation rather than as a separate pre-compilation phase, so generated code participates in normal type checking and overload resolution rather than producing tokens that the parser re-ingests.
+
+The lesson generalises beyond C++: **a reflection MVP can be valuable even when generative code emission is left out** — the ability to *query* type structure compositionally eliminates the most painful 80% of template-metaprogramming use cases without committing to the full Lisp-macro design space. For language designers, P2996 is the cleanest production data point on "reflection without macros" — a useful intermediate between Rust's procedural macros and Zig's full compile-time evaluation.
+
+Sources: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2996r0.html and https://isocpp.org/files/papers/P2996R13.html and https://wiki.qt.io/C%2B%2B_reflection_(P2996)_and_moc
+
 ---
 
 ## 13. Lightweight Compiler Backends
@@ -947,6 +986,32 @@ Sister technique inside ActiveJ: **Specializer (§17.4)** uses ASM directly (not
 The lesson generalises: **a productive expression-based DSL over the host runtime's bytecode-emission library** (ASM for JVM, IL emit API for CLR, V8's `Wasm.builder()` style APIs for Wasm-emitting Java code) substantially lowers the cost of runtime code generation for query engines, serializer codecs, expression evaluators, and DI frameworks. The cost is one library between user and bytecode; the benefit is dropping the floor of "should I codegen this?" from "only if it's worth a 1000-line ASM exercise" to "if I have an AST or schema to specialise against, yes."
 
 Sources: https://activej.io/codegen and https://activej.io/codegen/examples and https://central.sonatype.com/artifact/io.activej/activej-codegen
+
+### 13.11. QuickJS — Tiny Embeddable JavaScript Engine
+
+Fabrice Bellard's **QuickJS** (released 2019, with Charlie Gordon as co-maintainer; **QuickJS-NG** is the active community fork as of 2024) is the standout small-footprint JavaScript engine — the design slot V8 and SpiderMonkey explicitly do not target. Built around an interpreter-only execution model (no JIT), QuickJS compiles to a ~210 KB shared library, supports nearly the full ECMAScript 2023 specification including BigInt, modules, async/await, generators, proxies, and regular expressions — implemented in roughly 70 KLOC of portable C99.
+
+The architectural choice is "interpreter density first, peak performance never": where V8 Ignition (§1.8) hands off to TurboFan/Maglev (§14) for hot code, QuickJS interprets to the end. Hand-tuned bytecode dispatch, NaN-boxed value representation (§3.1), and reference counting with cycle collection provide the small heap footprint and deterministic memory model that JIT-bearing engines cannot match in embedded scenarios. The runtime fits in tens of KB of RAM after stripping unused features at compile time, opening deployment targets V8 cannot reach: smartcards, ESP32/Cortex-M MCUs, IoT devices, and constrained sandboxes.
+
+Production: **TXIKI.JS** (small Node-alternative runtime over QuickJS-NG and libuv), several embedded JavaScript-in-firmware projects, and Bellard's own QuickJS-based systems. Distinct from MoarVM lego JIT (§13.5), which is a template-direct-emit JIT for a non-JS language; distinct from Hermes (`REPRESENTATIONS.md §9.11`), which is also JIT-less but ships pre-compiled bytecode rather than parsing JS source on device.
+
+The lesson generalises: **a JIT-less interpreter is a viable production design for any language target where deployment constraints (memory, code-signing, deterministic timing, audit complexity) outweigh peak throughput**. QuickJS demonstrates this for JavaScript at production scale; for new languages targeting embedded or sandboxed deployment, "no JIT, tiny runtime, good interpreter dispatch" is a recoverable design point.
+
+Sources: https://bellard.org/quickjs/ and https://github.com/quickjs-ng/quickjs and https://bellard.org/quickjs/quickjs.html
+
+### 13.12. Wasmer, WAVM, WAMR — Alternative Wasm Runtimes
+
+Wasmtime (Bytecode Alliance) is the Wasm runtime cited throughout this document, but the broader Wasm runtime ecosystem includes three alternatives worth recording, each making a different point in the runtime-design space.
+
+**Wasmer** (Wasmer Inc., 2019+) is the only Wasm runtime shipping **three swappable backends**: SinglePass (instant compilation, naive codegen — for fast startup or short-lived workloads), Cranelift (the same backend used by Wasmtime, balanced compile-vs-quality), and **LLVM** (peak performance via the full LLVM pipeline at the cost of seconds of compilation per module). Wasmer's Universal Binary format ships pre-compiled object files so cold-start can skip codegen entirely — a deployment angle Wasmtime does not target. Production users include serverless platforms (Wasmer Edge), runtime-isolated UDFs in databases, and embedded scripting in Rust/C++ applications.
+
+**WAVM** (Andrew Scheidecker, 2017+) is the LLVM-pure Wasm runtime — every Wasm function compiles via LLVM to native code with no SinglePass-style fallback. The design point is "Wasm as a compile target for high-performance numerics," where LLVM-quality code generation is mandatory. Production niche is narrower than Wasmer's; the runtime is C++17 with optional dependencies on libxml2 (debug info) and libffi (FFI bindings).
+
+**WAMR (WebAssembly Micro Runtime)** is the Bytecode Alliance's *embedded-target* sibling to Wasmtime — written in C, designed for memory budgets in the kilobytes, with classic interpreter, fast interpreter, AOT, and JIT execution modes selected at build time. WAMR is what runs on ESP32, Cortex-M, and other MCU-class hardware where Wasmtime's Rust runtime would be too heavy. It is the Wasm analogue of QuickJS (§13.11) — interpreter-density-first, peak-performance-never — but for a different source language.
+
+The trade-off axis across the three: **compilation strategy diversity (Wasmer)**, **LLVM-only pure performance (WAVM)**, **embedded-target footprint (WAMR)**. Wasmtime + Cranelift sits in the middle as the production default. Combined with §22 (BPF/eBPF JIT) and §24 (Wasm streaming compile), this rounds out the Wasm-runtime landscape: Wasmtime for general-purpose deployment, Wasmer for backend choice, WAVM for compute-heavy workloads, WAMR for embedded.
+
+Sources: https://wasmer.io/ and https://github.com/wasmerio/wasmer and https://github.com/WAVM/WAVM and https://github.com/bytecodealliance/wasm-micro-runtime
 
 ---
 
@@ -1262,6 +1327,20 @@ For a new language, partial content-addressing (hashing compiled artifacts by IR
 
 Sources: https://www.unison-lang.org/docs/the-big-idea/ and https://softwaremill.com/trying-out-unison-part-1-code-as-hashes/
 
+### 18.4. TypeScript — Project References and Incremental Build Info
+
+TypeScript's incremental story differs from rustc/Salsa (§18.1) in important architectural ways. Where Salsa is a generic memoizing query framework retrofitted onto rust-analyzer, TypeScript ships **two complementary mechanisms** baked into the compiler itself.
+
+**Project references** (TypeScript 3.0, 2018) split a large codebase into independently-buildable sub-projects via `tsconfig.json`'s `references` field. Each sub-project produces declaration files (`.d.ts`) plus a build-info file (`.tsbuildinfo`) that records its declarations' hashes. Downstream sub-projects depend only on the *published declarations* of upstream projects, not on their source — so editing an implementation file inside a leaf project does not invalidate sibling projects whose interfaces are unchanged. `tsc --build` (and `tsc -b`) walks the reference graph, rebuilds only out-of-date projects, and reuses the cached `.tsbuildinfo` for the rest.
+
+**`--incremental`** (TypeScript 3.4, 2019) operates within a single project: the compiler emits a `.tsbuildinfo` recording per-file hashes, dependency edges (which file imports which), and which files contributed to which output. On the next build, files whose hashes haven't changed are skipped, and reverse-dependency walking determines the minimal set to recheck. This is closer to traditional makefile-style incremental compilation than to Salsa's demand-driven memoisation.
+
+The combination is unusually effective for monorepo-scale TypeScript: a multi-MLOC codebase split into hundreds of project-referenced sub-projects, each with `--incremental` enabled, recompiles a single-file edit in well under a second on warm cache. Distinct from Salsa (§18.1) and rust-analyzer's query graph: TypeScript's mechanism is *file-granularity*, not symbol-granularity, so a one-character edit to a hot import-graph file still invalidates the file. Distinct from Bazel/Buck build-graph caching (`PACKAGING.md §4.5`): project references operate inside the language compiler and use language-level interface stability, not build-system-level content hashing of intermediate outputs.
+
+The lesson is that **a language compiler can layer two incremental mechanisms — one for cross-project boundaries (interface-driven), one for intra-project files (hash-driven)** — without committing to a generalised query framework. For language designers, project references demonstrate that "publish typed interfaces as a stable boundary" is a viable architecture without going as far as Rust's separately-compiled crate model or OCaml's `.mli` discipline.
+
+Sources: https://www.typescriptlang.org/docs/handbook/project-references.html and https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-0.html and https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-4.html
+
 ---
 
 ## 19. Type-System Outputs and Compiler Consequences
@@ -1428,6 +1507,23 @@ The compilation lesson generalises beyond SQL: **IVM is a distinct compilation p
 Status (as of 2026-04): Materialize is in production for real-time dashboards, live anomaly detection, and operational analytics; competitors include **RisingWave** (similar IVM model), **Epsio** (IVM as a layer over PostgreSQL), and IVM features in PostgreSQL, ClickHouse, and Snowflake (more limited, view-maintenance-only). The **timely dataflow** runtime underneath Materialize is a separate research artifact also worth noting for its handling of fixed-point queries (recursive views) — a use case where batch SQL engines struggle.
 
 Sources: https://materialize.com/ and https://materialize.com/blog/olvm/ and https://materializedview.io/p/everything-to-know-incremental-view-maintenance and https://github.com/TimelyDataflow/differential-dataflow
+
+### 21.7. Velox — Vectorized Execution Engine as a Library
+
+Pedreira et al.'s **Velox** (Meta, VLDB 2022; open source 2022+) is a composable C++ vectorized execution engine — distributed as a *library* rather than as a complete database — designed to be reused across multiple data-processing engines. Where DuckDB (§21.4) and Photon (§21.2) ship as full systems with their own SQL frontends, Velox is the *backend half*: a pluggable execution engine that other systems integrate. As of 2026-04 it powers **Spark Gluten** (Velox-accelerated Spark via the Apache Gluten project), **Presto/Prestissimo** (the Velox-based Presto worker), and several internal Meta data-processing systems.
+
+The architectural pillars:
+
+- **Vector primitives over Arrow-shaped columnar data** — every operator is a function over `RowVector`, `FlatVector`, `DictionaryVector`, `ConstantVector`, `LazyVector` types. The same vector representations Apache Arrow defines, so Velox interoperates trivially with the broader Arrow ecosystem.
+- **Adaptive optimisation at runtime** — Velox specialises operator implementations based on observed data: if a column proves nullable-but-rarely-null, its kernel switches to a fast-path that handles nulls via branch prediction; if a join key proves to have low cardinality, the hash table morphs into a dictionary lookup. This adaptivity replaces some of the planner-time decisions HyPer (§21.1) compiles into the query plan.
+- **First-class support for complex types** — nested structs, lists, maps, and decimals get full vectorized treatment, where many SQL engines fall back to row-by-row processing for non-scalar columns.
+- **Separable from any one query language** — Velox accepts plans expressed in its own internal IR, and existing engines (Presto SQL, Spark SQL, Substrait) compile their query plans *to* that IR. This is why Velox is a "unified execution engine" — Meta runs multiple data-processing systems against the same execution backend.
+
+Distinct from DuckDB's choice (§21.4) to reject JIT compilation entirely: Velox uses a *combination* of vectorized interpretation and selective LLVM codegen depending on the operator. Distinct from differential dataflow + Materialize (§21.6): Velox targets one-shot query execution, not incrementally maintained materialised views. Distinct from Apache Arrow Gandiva (§21.5): Gandiva is a per-expression LLVM JIT library; Velox is the entire post-plan execution engine including operators, scheduling, memory management, and I/O.
+
+The lesson generalises: **a column-vectorized engine designed as a library, not a system, can amortise across multiple frontends** — the same execution-engine design pattern that LLVM established for compiler backends, applied to query execution. The cost is that Velox cannot make end-to-end planning decisions (it sees the plan after the frontend's planner is done); the benefit is that one execution-engine investment serves many SQL dialects and several distributed-execution architectures.
+
+Sources: https://github.com/facebookincubator/velox and https://research.facebook.com/publications/velox-metas-unified-execution-engine/ and https://velox-lib.io/ and https://engineering.fb.com/2023/03/09/open-source/velox-open-source-execution-engine/
 
 ---
 
@@ -2041,6 +2137,8 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Production Python JITs | Method JIT + inliner + type specialization | ~30–50% wins on Instagram-scale workloads | Large codebase + full-time team | Cinder/CinderX, Pyston, Pyjion (§1.10) |
 | PHP 8 IR-based JIT | DynASM origin + standalone SSA IR framework | Mid-sized IR for sub-ms JIT budgets | Curated optimization set | PHP 8 IR (§1.11) |
 | Type-annotation-driven gradual JIT | `--!native` + type-hint specialization | Bypasses speculation; production at billions/day | Wrong annotations = UB | Roblox Luau native (§1.12) |
+| Whole-program Python AOT | LLVM via typed Python dialect | 10–100× speedups; standalone binary | Drops full-CPython compatibility | Codon (§1.13) |
+| Decorator-driven Python LLVM JIT | `@jit` + llvmlite | Fast NumPy loops without full-language JIT | Object-mode fallback eliminates speedup | Numba (§1.14) |
 | Arena allocation | One large region | ~2ns per allocation | No individual free | bumpalo, every compiler (§2.1) |
 | String interning | Hash table + buffer | One hash per new string | O(1) equality after intern | rustc Symbol, V8 (§2.2) |
 | Hash consing | Hash table + structure | One hash per construction | O(1) structural equality | BDDs, type representations (§2.2) |
@@ -2094,6 +2192,7 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | CREATE / DOES> defining words | Dictionary entry + deferred action | Compile-time codegen, zero macro infra | Scoped to defining-word patterns | Forth (every dialect) (§12.9) |
 | Three-stage comptime pipeline | Parse → interpret → elaborate | Compile-time work as MLIR pass | Pipeline complexity vs macro expander | Mojo `@parameter` (§12.10) |
 | `#run` + AST mutation + build-as-code | Compiler-as-library API | Metaprogramming = ordinary code | Compiler must be library-first | Jai (§12.11) |
+| Static reflection via lift/splice operators | `^^expr` + `[: r :]` over `std::meta::info` | Reflection without macros; eliminates SFINAE | Consteval-only MVP; no token splicing | C++26 P2996 (§12.12) |
 | QBE backend | ~14K lines C99 | ~50–70% LLVM perf, instant compile | Limited targets, fewer opts | cproc (§13.1) |
 | Cranelift + ISLE | DSL-driven lowering | Fast compile, e-graph mid-end | Less mature than LLVM | Wasmtime, rustc debug (§13.2) |
 | TPDE single-pass | Adapter-based framework | 10x faster than LLVM -O0 | No cross-function opts | LLVM IR fast mode (§13.3) |
@@ -2104,6 +2203,10 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Whole-program type-inference compilation | Closed-world flow + escape + alias analysis | 0.6–4× of `gcc -O2` from Scheme source | Super-linear compile time; no sep-compile or eval | Stalin (§13.8) |
 | Whole-program monomorphisation + defunctionalization + contification | SSA pipeline of ~20 small passes | C-competitive on numeric SML; HOL4 production scale | No separate compilation; minutes-scale compile times | MLton (§13.9) |
 | Productive expression DSL over JVM bytecode | Lisp-like AST → ASM → cached generated class | Drops floor of "should I codegen?" for managed-runtime apps | JVM-only; runtime not compile-time | ActiveJ Codegen (§13.10) |
+| Tiny embeddable JS engine | NaN-boxed RC + cycle collector | ~210 KB, fits in tens of KB RAM after stripping | No JIT; interpreter-only | QuickJS / QuickJS-NG (§13.11) |
+| Multi-backend Wasm runtime | SinglePass / Cranelift / LLVM swappable backends | Pick compile-vs-quality per workload | Triple maintenance burden | Wasmer (§13.12) |
+| LLVM-only Wasm runtime | All Wasm via full LLVM pipeline | Peak performance for compute-heavy workloads | Seconds of compile-per-module | WAVM (§13.12) |
+| Embedded Wasm runtime | C, kilobyte-budget, multi-mode execution | Wasmtime-class semantics on MCU-class hardware | Per-mode build configuration | WAMR (§13.12) |
 | Trace-based JIT | Trace recording | Auto-inlining, cross-function opt | Trace explosion on branchy code | LuaJIT, PyPy (§14.1) |
 | OSR / Deoptimization | Stack frame mapping | Tier switch mid-execution | Complex frame reconstruction | V8, HotSpot, SpiderMonkey (§14.2) |
 | Basic Block Versioning | Per-block specialized variants | Type specialization without tracing | Code duplication | Ruby YJIT (§14.3) |
@@ -2130,6 +2233,7 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Query-based compilation | Memoized demand-driven | Minimal recompilation | Architectural complexity | rustc, Salsa, rust-analyzer (§18.1) |
 | Parallel codegen units | Split per-function compile | Near-linear core scaling | Lost cross-module inlining | rustc CGUs, LLVM parallel (§18.2) |
 | Content-addressed code by hash | Hash-keyed codebase DB | Distributed compute, renames free | Ecosystem friction (no text files) | Unison (§18.3) |
+| Project references + `--incremental` | `.tsbuildinfo` per project + per-file hashes | Sub-second rebuild on multi-MLOC monorepo | File-granularity, not symbol-granularity | TypeScript (§18.4) |
 | Typed elaboration boundary | Rich surface → typed core | Backend isolation from source type system | Requires stable typed metadata | Lean, Rust HIR/THIR, Swift SIL (§19.1) |
 | Evidence / dictionary / witness passing | Implicit facts become IR values | Ordinary optimizer can specialize them | ABI and calling-convention pressure | Haskell, Swift, Rust traits (§19.2) |
 | Effect handler lowering | Handler evidence or continuations | Typed effects become executable control flow | Runtime/ABI co-design | Koka, OCaml 5 (§19.3) |
@@ -2143,6 +2247,7 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | JVM bytecode SQL codegen | Janino runtime classes | Reuses HotSpot JIT | Class-loading overhead | Spark Tungsten (§21.3) |
 | LLVM expression JIT library | Per-expression native code | Caches by signature | Narrow scope (no joins) | Apache Arrow Gandiva (§21.5) |
 | Differential dataflow + IVM | Delta-based operator graph + materialised views | Always-current materialised state, sub-ms latency | Long-lived views only, not one-shot queries | Materialize, RisingWave, Epsio (§21.6) |
+| Vectorized execution engine as library | Arrow-shaped vectors + adaptive operator specialisation | One backend amortised across many SQL frontends | Cannot make end-to-end planning decisions | Velox / Spark Gluten / Prestissimo (§21.7) |
 | BPF verifier + in-kernel JIT | Static analysis + native emit | Safe user code in kernel | Restricted source language | Linux BPF/eBPF (§22.1) |
 | Move bytecode verifier | Linear-resource discipline + reference safety + ability lattice | Largest-deployment linear-types verifier | Smart-contract-shaped programs only | Move VM (Aptos/Sui) (§22.2) |
 | Hot module reload | Two versions simultaneously | Uptime under upgrade | Requires process-isolated model | Erlang BEAM (§23.1) |
@@ -2213,6 +2318,12 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 25. Roblox — Luau Native Code Generation — https://create.roblox.com/docs/luau/native-code-gen
 26. Luau Recap for 2025: Runtime — https://luau.org/news/2025-12-19-luau-recap-runtime-2025/
 27. Luau native code with type hints — https://devforum.roblox.com/t/optimizing-native-code-performance-with-type-hints-and-magic/4247690
+28. Codon repository (Exaloop) — https://github.com/exaloop/codon
+29. MIT News — Codon Python compiler — https://news.mit.edu/2023/codon-python-based-compiler-achieve-orders-magnitude-speedups-0314
+30. Shajii et al. — Codon: a Compiler for High-Performance Pythonic Applications (PLDI 2023) — https://dl.acm.org/doi/abs/10.1145/3578360.3580275
+31. Numba — A High Performance Python Compiler — https://numba.pydata.org/
+32. llvmlite — lightweight LLVM Python binding — https://github.com/numba/llvmlite
+33. Numba `@jit` documentation — https://numba.pydata.org/numba-doc/dev/user/jit.html
 
 ### Chapter 2 — Memory Management in Compilers
 
@@ -2323,6 +2434,9 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 15. Mojo Parameterization — https://docs.modular.com/stable/mojo/manual/parameters/
 16. Jai Metaprogramming (BSVino's JaiPrimer) — https://github.com/BSVino/JaiPrimer/wiki/Metaprogramming
 17. Jai (programming language) — https://en.wikipedia.org/wiki/JAI_(programming_language)
+18. P2996R0 — Reflection for C++26 (initial revision) — https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2996r0.html
+19. P2996R13 — Reflection for C++26 — https://isocpp.org/files/papers/P2996R13.html
+20. Qt wiki — C++ reflection (P2996) and moc — https://wiki.qt.io/C%2B%2B_reflection_(P2996)_and_moc
 
 ### Chapter 13 — Lightweight Compiler Backends
 
@@ -2347,6 +2461,13 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 19. ActiveJ Codegen examples — https://activej.io/codegen/examples
 20. activej-codegen on Maven Central — https://central.sonatype.com/artifact/io.activej/activej-codegen
 21. LuaJIT DynASM — https://luajit.org/dynasm.html
+22. QuickJS (Bellard) — https://bellard.org/quickjs/
+23. QuickJS-NG — https://github.com/quickjs-ng/quickjs
+24. QuickJS specification — https://bellard.org/quickjs/quickjs.html
+25. Wasmer — https://wasmer.io/
+26. Wasmer repository — https://github.com/wasmerio/wasmer
+27. WAVM — https://github.com/WAVM/WAVM
+28. WebAssembly Micro Runtime (WAMR) — https://github.com/bytecodealliance/wasm-micro-runtime
 
 ### Chapter 14 — Trace-Based JIT & Speculative Optimization
 
@@ -2408,6 +2529,9 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 3. rustc Codegen Backend Guide — https://rustc-dev-guide.rust-lang.org/backend/codegen.html
 4. Unison: The Big Idea — https://www.unison-lang.org/docs/the-big-idea/
 5. Trying out Unison, part 1: code as hashes (SoftwareMill) — https://softwaremill.com/trying-out-unison-part-1-code-as-hashes/
+6. TypeScript Handbook — Project References — https://www.typescriptlang.org/docs/handbook/project-references.html
+7. TypeScript 3.0 release notes — https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-0.html
+8. TypeScript 3.4 release notes (`--incremental`) — https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-4.html
 
 ### Chapter 19 — Type-System Outputs and Compiler Consequences
 
@@ -2440,6 +2564,10 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 10. Materialize — Online View Maintenance (OLVM) — https://materialize.com/blog/olvm/
 11. Everything to Know About Incremental View Maintenance — https://materializedview.io/p/everything-to-know-incremental-view-maintenance
 12. Differential dataflow repository — https://github.com/TimelyDataflow/differential-dataflow
+13. Velox repository — https://github.com/facebookincubator/velox
+14. Pedreira et al. — Velox: Meta's Unified Execution Engine (VLDB 2022) — https://research.facebook.com/publications/velox-metas-unified-execution-engine/
+15. Velox project site — https://velox-lib.io/
+16. Meta engineering — Introducing Velox — https://engineering.fb.com/2023/03/09/open-source/velox-open-source-execution-engine/
 
 ### Chapter 22 — BPF and eBPF JIT
 
