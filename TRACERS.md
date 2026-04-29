@@ -142,9 +142,9 @@ The tracing lesson is the piggybacked safepoint check. Instead of adding a new b
 
 Source: https://peps.python.org/pep-0768/
 
-### 2.3. Rust `zerogc` — Zero-Overhead Tracing GC via the Borrow Checker
+### 2.3. Rust `zerogc` — Compile-Time Root Tracking via the Borrow Checker
 
-While garbage collectors traditionally require runtime tracking of roots, `zerogc` is an experimental Rust project that literally offloads root tracking to the compiler. By abusing Rust's lifetime system and the borrow checker, it tracks roots and enforces safepoints entirely at compile time. Modifying pointers has mathematically zero runtime cost (the GC pointer is just a `Copy` reference). Safepoints are explicit blocks, and between those safepoints, the tracing overhead is strictly zero because the compiler guarantees mathematically that no roots are lost.
+`zerogc` is an experimental Rust project that offloads GC root tracking to the compiler: lifetimes and the borrow checker enforce safepoints and root visibility statically, so pointer mutation has zero steady-state cost and tracing overhead between safepoints is strictly zero. The broader compile-time GC-root-tracking discipline overlaps with ownership/borrowing in `MEMORY.md §1`; this entry stays self-contained for now and is recorded here because the resulting safepoint shape is the cooperative-handoff pattern of this chapter.
 
 Sources: https://docs.rs/zerogc and https://github.com/DuckLogic/zerogc
 
@@ -166,7 +166,7 @@ Sources: https://plv.colorado.edu/papers/mytkowicz-pldi10.pdf and https://github
 
 ## 3. Runtime-Native Event Pipelines
 
-Event emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically. What separates this family from §1 code-patching is that the events are part of the runtime's own semantics — GC pauses, scheduler transitions, query-plan nodes, signpost intervals — not a layer over raw instructions. Entries span JVM, .NET, Windows kernel, Linux kernel, Erlang, Haskell, Go, Apple, and database engines; the mechanism shape (providers + sessions + ring buffers) is remarkably consistent across very different runtimes.
+Event emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically. What separates this family from §1 code-patching is that the events are part of the runtime's own semantics — GC pauses, scheduler transitions, query-plan nodes, signpost intervals — not a layer over raw instructions. Entries span JVM, .NET, Windows kernel, Linux kernel, Erlang, Haskell, Go, Apple, database engines, the MoarVM language runtime, and the kernel-event-instrumentation tier (PCP for long-horizon metrics, Sysdig for syscall capture, Falco for security rule evaluation); the mechanism shape (providers + sessions + ring buffers) is remarkably consistent across very different runtimes.
 
 ### 3.1. JDK Flight Recorder (JFR) — Thread-Local Buffers + Global Circular Buffer
 
@@ -220,7 +220,7 @@ Sources: https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_contr
 
 Go's `runtime/trace` is a first-party execution tracer emitting runtime-semantic events — `GoCreate`, `GoStart`, `GoBlock{Recv,Send,Select,Sync,Cond}`, `GoSysCall`, `GCStart`, plus user-defined `Task` and `Region` spans. Buffers are **per-P** (per scheduler processor), written without locks, and serialization is split from emission. Dmitry Vyukov's original 2014 design targeted ~35% overhead; Felix Geisendörfer and Nick Ripley brought it below 1% by Go 1.21 primarily by switching to **frame-pointer-based unwinding**. Go has kept frame pointers available by default on key production architectures for years, making tracebacks a pointer chase rather than a DWARF decode on those platforms; see §13.7 for the policy history.
 
-The Go 1.22 execution-tracer overhaul (Michael Knyszek) changed the on-wire shape from one monolithic trace to a sequence of **self-contained generations**. Each partition is a complete mini-trace that a reader can parse independently; the historical "buffer the whole thing in RAM to sort events" pain disappears. This is the load-bearing change that enabled Go 1.25's **`FlightRecorder` API** — a fixed-size in-memory circular buffer holding the last ~N seconds of runtime events, flushed on application-side trigger (error, SLO breach, user command). Directly parallel to JFR (§3.1), reached via a partition/generation model instead of a global circular buffer.
+The Go 1.22 execution-tracer overhaul (Michael Knyszek) changed the on-wire shape from one monolithic trace to a sequence of **self-contained generations**. Each partition is a complete mini-trace that a reader can parse independently; the historical "buffer the whole thing in RAM to sort events" pain disappears. This is the load-bearing change that enabled Go 1.25's **`FlightRecorder` API** — a fixed-size in-memory circular buffer holding the last ~N seconds of runtime events, flushed on application-side trigger (error, SLO breach, user command). Status (as of 2026-04): shipped in Go 1.25 (released 2025-08). Directly parallel to JFR (§3.1), reached via a partition/generation model instead of a global circular buffer.
 
 The other Go contribution is the **pprof `profile.proto` format** used by `runtime/pprof`. Rather than repeat the interchange-format details here, §14.2 covers why pprof became the common wire format for CPU, heap, goroutine, block, mutex, and custom profiles.
 
@@ -256,13 +256,13 @@ Sources: https://lttng.org/docs/ and https://www.kernel.org/doc/ols/2006/ols2006
 
 Apple's platform tracing (macOS 10.12 / iOS 10, 2016) is structured around three primitives that share one emission backend: **`os_log`** (structured logging), **`os_signpost`** (scoped intervals + markers), and **`os_activity`** (activity trees / causal grouping). A single `os_signpost_interval_begin`/`_end` pair is simultaneously a structured-log entry in `log show` / Console, a flame-bar interval in Instruments's Points-of-Interest track, and an input to Instruments's aggregation (duration stats, event counts). The developer writes one call site; tooling chooses the projection.
 
-The mechanical trick that makes this cheap enough to leave on in shipping apps is **compile-time format extraction**. Swift's `OSLogMessage` uses custom string interpolation plus a dedicated SIL optimization pass (apple/swift PR 24336) that splits an interpolated message at compile time into a `StaticString` format plus typed, length-encoded dynamic arguments. The runtime never parses `printf`-style format strings at emission — it emits a tiny binary payload into the persistent **`.tracev3`** ring under `/var/db/diagnostics`, collected by `logd` and projected into text, signpost, or metric views on demand. Cost when off is effectively zero (disabled subsystems elide the call at the log-handle level); cost when on is a `memcpy` of a pre-encoded payload to a per-process shared buffer.
+The mechanical trick that makes this cheap enough to leave on in shipping apps is **compile-time format extraction**: the call site is split at compile time into a static format descriptor plus typed length-encoded dynamic arguments, so the runtime never parses `printf`-style format strings at emission. It emits a tiny binary payload into the persistent **`.tracev3`** ring under `/var/db/diagnostics`, collected by `logd` and projected into text, signpost, or metric views on demand. Cost when off is effectively zero (disabled subsystems elide the call at the log-handle level); cost when on is a `memcpy` of a pre-encoded payload to a per-process shared buffer.
 
 **Signpost IDs** reify causal grouping across threads with explicit `Process` / `Thread` / `System` matching scopes; paired with `os_activity`, the unified system gives an OS-enforced causality model — the same abstraction Go's `runtime/trace` tasks/regions (§3.5) and JFR's event stacks (§3.1) rediscovered independently. **Instruments** is the native viewer: template-based, with CPU sampling, allocation, network, thread-state, and signpost tracks unified on one timeline. It has been around since 2007 (originally DTrace-based); signposts as first-class timeline intervals date from WWDC 2018.
 
 The design insight worth carrying forward: **a tracing API that emits one payload but supports three viewing projections (text log, timeline interval, aggregate metric) is strictly more useful than three separate APIs with three separate emission costs**. ETW (§3.2) decouples provider from viewer but still makes the provider author shape events per-viewer; Apple's design pushes the projection decision entirely into the consumer.
 
-Sources: https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf and https://developer.apple.com/documentation/os/recording-performance-data and https://developer.apple.com/videos/play/wwdc2018/405/ and https://forums.swift.org/t/custom-string-interpolation-and-compile-time-interpretation-applied-to-logging/18799
+Sources: https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf and https://developer.apple.com/documentation/os/recording-performance-data and https://developer.apple.com/videos/play/wwdc2018/405/
 
 ### 3.9. Linux `io_uring` Tracing — When the Syscall Boundary Stops Being the Tracing Boundary
 
@@ -270,7 +270,7 @@ Sources: https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg
 
 This breaks every traditional tracing assumption. `strace` (§6.2) sees at most one `io_uring_enter` per batch — or nothing at all with SQPOLL — and cannot decode the individual SQEs that submission carried; `strace` issue #109 is the canonical "strace cannot trace io_uring" bug. Kernel kprobes attached to VFS functions see the operations fire but without the io_uring dispatch context needed to attribute them. The "trace at the syscall boundary" discipline is structurally blind here.
 
-The robust production answer is **first-party tracepoints inside the io_uring subsystem itself**: `io_uring_submit_sqe` (per-SQE, where strace sees one batched enter), `io_uring_complete` (per-CQE), plus `io_uring_queue_async_work`, `io_uring_link`, `io_uring_poll_arm`/`_poll_wake`, `io_uring_cqring_wait`, `io_uring_cqe_overflow`, and about a dozen others defined in `include/trace/events/io_uring.h`. External probes can observe fragments of the path, but without subsystem-provided semantic events they are unstable and cannot reliably reconstruct per-SQE/per-CQE causality. Tools consume the tracepoints via `perf trace`, bpftrace (§3.6), and specialized io_uring analyzers; causal reconstruction across submit and complete is a join on the `user_data` cookie each SQE carries. Cost when on is the standard NOP-patched tracepoint cost (§1.3), zero when off — the expensive axis is *volume*, since busy rings emit millions of CQEs per second, so consumers typically aggregate in-kernel via bpftrace maps rather than streaming raw events.
+The robust production answer is **first-party tracepoints inside the io_uring subsystem itself**. Status (as of 2026-04): the names below are taken from `include/trace/events/io_uring.h` in mainline Linux and have evolved as the subsystem has grown — readers should consult the kernel source for the version they target. Representative tracepoints include `io_uring_submit_sqe` (per-SQE, where strace sees one batched enter), `io_uring_complete` (per-CQE), `io_uring_queue_async_work`, `io_uring_link`, `io_uring_poll_arm`/`_poll_wake`, `io_uring_cqring_wait`, `io_uring_cqe_overflow`, and about a dozen others. External probes can observe fragments of the path, but without subsystem-provided semantic events they are unstable and cannot reliably reconstruct per-SQE/per-CQE causality. Tools consume the tracepoints via `perf trace`, bpftrace (§3.6), and specialized io_uring analyzers; causal reconstruction across submit and complete is a join on the `user_data` cookie each SQE carries. Cost when on is the standard NOP-patched tracepoint cost (§1.3), zero when off — the expensive axis is *volume*, since busy rings emit millions of CQEs per second, so consumers typically aggregate in-kernel via bpftrace maps rather than streaming raw events.
 
 The broader structural lesson is the one worth carrying forward: **shared-memory-queue IPC is a tracing blindspot that requires cooperation from the subsystem being traced**. Any transport where the syscall boundary is crossed once per *batch* rather than per *operation* — DPDK, SPDK, RDMA verbs, Vulkan command buffers, GPU submit queues — has the same property. The operation semantics live primarily in user/kernel shared memory; externally attached probes can be useful for expert diagnosis, but stable causality requires first-party semantic tracepoints. This is the inverse of the DTrace/eBPF "probe anything" promise of §3.6 and a strong argument for language/runtime tracepoints (§3.1 / §3.3 / §3.5) as a *primary* design target rather than an afterthought.
 
@@ -280,13 +280,13 @@ Sources: https://kernel.dk/io_uring.pdf and https://kernel.dk/axboe-kr2022.pdf a
 
 Database engines have their own tracing subsystems parallel to ETW (§3.2), JFR (§3.1), and EventPipe (§3.3), because query-plan tracing needs to see operator-level events (scan, join, sort, hash-build, lock-acquire, async-I/O-request) that OS-level tracing cannot see. Three engines illustrate the design space.
 
-**SQL Server Extended Events (XE)** is the cleanest structural match to ETW. Launched in SQL 2008 to replace SQL Profiler, its architecture is literally **packages → events → actions → predicates → sessions → dispatcher/buffers → targets**, with targets including `ring_buffer`, `event_file`, `histogram`, `event_counter`, `pair_matching`, and — tellingly — `etw_classic_sync_target`, which just forwards into OS ETW. The design insight is that **predicates are evaluated synchronously on the firing thread before any buffer write**, so filtered-out events cost only a predicate evaluation. This is ETW-for-queries, with the same provider/session/target topology but at query-plan-node granularity.
+**SQL Server Extended Events (XE)** mirrors ETW's topology — packages → events → actions → predicates → sessions → dispatcher/buffers → targets — and even ships an `etw_classic_sync_target` that forwards events into OS ETW. The design point worth naming is that **predicates are evaluated synchronously on the firing thread before any buffer write**, so filtered-out events cost only a predicate evaluation.
 
-**PostgreSQL** takes a different approach: no structured event bus, instead a set of global function-pointer **executor hooks** (`ExecutorStart_hook`, `ExecutorRun_hook`, `ExecutorFinish_hook`, `ExecutorEnd_hook`, `planner_hook`, `post_parse_analyze_hook`) that extensions chain at `_PG_init()` time. `auto_explain` is a ~300-line extension that wraps `ExecutorStart` to install `INSTRUMENT_ALL` and wraps `ExecutorEnd` to emit EXPLAIN output when `log_min_duration` is exceeded. Cost when off is zero (one null-pointer compare); cost when on with `log_analyze=true` is real — PostgreSQL reads the clock at every plan-node boundary, identical to `EXPLAIN ANALYZE` overhead. **`pg_stat_statements`** sits on the same executor hook with a different aggregator: it canonicalizes the parse tree into a query ID (literals replaced by `$n`) and accumulates per-ID counters — PostgreSQL's answer to a metrics endpoint rather than an event stream.
+**PostgreSQL** takes the opposite path: no event bus, instead a small set of global function-pointer **executor hooks** (`ExecutorStart/Run/Finish/End_hook`, `planner_hook`, `post_parse_analyze_hook`) that extensions chain at `_PG_init()`. `auto_explain` and `pg_stat_statements` are two consumers of the same hook surface — the former emits per-query plan-tree text when `log_min_duration` is exceeded; the latter canonicalizes parse trees into query IDs (literals replaced by `$n`) and accumulates per-ID counters as a metrics endpoint.
 
-**MySQL Performance Schema** (since 5.7) inverts the interface entirely. Instead of a consumer API with exporters, it materializes events into **in-memory tables** — `events_statements_current`, `events_waits_history_long`, `events_stages_summary_by_thread_by_event_name`, and many more — inside a dedicated `PERFORMANCE_SCHEMA` storage engine. The DBA queries events via ordinary `SELECT`. Instrumentation lives in the server C++ source with versioned rows in `setup_instruments`; `setup_consumers` is a runtime on/off switch. When an instrument's consumer is disabled, the hot path is an atomic-read of a boolean — the same design point as DTrace's is-enabled probes (§1.5).
+**MySQL Performance Schema** (since 5.7) inverts the interface entirely: events materialize into in-memory tables (`events_statements_current`, `events_waits_history_long`, `events_stages_summary_by_thread_by_event_name`) inside a dedicated `PERFORMANCE_SCHEMA` storage engine, queried via ordinary `SELECT`. With the consumer disabled, the hot path is an atomic-read of a boolean — the cheap-guard / expensive-payload pattern (§1.5) again.
 
-The pattern across all three: **mature DB engines reinvent ETW for themselves** because operator-level visibility requires in-engine instrumentation. The runtime is a database, the events are plan-node transitions, and the design space is the same one ETW / JFR / EventPipe already mapped out at the OS / VM level. Complement rather than compete with §12.3 OpenTelemetry's `db.statement` attribute: OTEL sees the query from outside, XE / auto_explain / Performance Schema see it from inside.
+The chapter takeaway: **mature DB engines reinvent ETW for themselves** because operator-level visibility requires in-engine instrumentation. The runtime is a database, the events are plan-node transitions, and the design space is the same one ETW / JFR / EventPipe already mapped out at the OS / VM level. Complement rather than compete with §12.3 OpenTelemetry's `db.statement` attribute: OTEL sees the query from outside, XE / auto_explain / Performance Schema see it from inside.
 
 Sources: https://www.postgresql.org/docs/current/auto-explain.html and https://www.postgresql.org/docs/current/pgstatstatements.html and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine and https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server and https://dev.mysql.com/doc/refman/en/performance-schema.html
 
@@ -298,11 +298,25 @@ Tooling: **`App::MoarVM::HeapAnalyzer`** is a CLI shell over the binary format; 
 
 Sources: https://docs.raku.org/type/Telemetry and https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c and https://github.com/timo/moarperf
 
+### 3.12. PCP, Sysdig, and Falco — Kernel-Layer Telemetry Beyond Runtime Pipelines
+
+Three Linux-ecosystem tracing systems that occupy a different niche from the runtime-native event pipelines of §§3.1–3.11. They instrument the OS kernel rather than the language runtime, and they answer different questions about a system's behaviour.
+
+**Performance Co-Pilot (PCP)** (Red Hat, 2000+) is a metrics-collection and analysis framework that predates eBPF and has unusually long-horizon retention discipline. A long-running daemon (`pmcd`) collects metrics from per-domain agents (`pmda`s for the kernel, MySQL, PostgreSQL, JVM, Apache, NFS, BIND, and dozens of others), retains time-series in a binary archive format that survives across reboots, and exposes them to query clients (`pminfo`, `pmval`, `pmrep`, Grafana via the PCP datasource). Distinct from Prometheus: per-host architecture with archives shipped to central storage, not pull-from-central scraping. Distinct from eBPF (§§1.7, 1.11): agent-based with stable per-domain plugin contracts, not in-kernel-program-based. The strength is **decade-long historical retention** of metrics with consistent schema across kernel and application domains, which makes it the canonical telemetry stack for production-incident retrospectives at companies running PCP for many years.
+
+**Sysdig** (Sysdig, Inc., 2014+) wraps system calls in a tcpdump-like UI: `sysdig` captures all syscalls and kernel-tracepoint events into a file or live stream, with filters resembling Wireshark's display filters (`fd.type=ipv4 and proc.name=nginx and evt.type=connect`). Distinct from `strace` (§6.2): designed for whole-system observation rather than single-process attachment, with optimised in-kernel capture rather than ptrace per syscall. Modern Sysdig uses eBPF (§§1.7, 1.11) as the capture mechanism, with the original kernel-module path as fallback for older kernels. The "tcpdump for syscalls" framing is the design lesson: a generic capture-and-filter tool over a uniform per-event schema scales to investigations that would require dozens of `strace` / `perf` / `ftrace` invocations to reconstruct.
+
+**Falco** (Sysdig, Inc., 2016+; CNCF graduated 2024) is the security-tracing layer on top of Sysdig: a rule engine evaluating syscall events against threat-detection rules (`spawned_process_in_container_with_unexpected_image`, `outbound_connection_from_unauthorized_user`, `write_to_etc_directory_outside_install_phase`) and emitting alerts. Production use in Kubernetes runtime security (Sysdig Secure, Aqua, Prisma Cloud, RedHat ACS). The architectural contribution: **kernel-event-based runtime threat detection at container scale** — a single Falco daemon per node observes every syscall in every container and can flag anomalies that file-integrity-monitor or process-list-scan tools would miss.
+
+The design lesson distinguishing these from §§3.1–3.11: **the runtime-native event pipelines instrument the language runtime; PCP, Sysdig, and Falco instrument the OS kernel**. Both layers are valuable; they answer different questions. Language-runtime tracing tells you why your async task is slow; kernel-syscall tracing tells you why your container is making unexpected network calls. A complete production observability story usually needs both, and the wire-format choice (CTF §3.7, OpenTelemetry §12.3, Falco's JSON, PCP's archive) is what determines whether the two layers correlate cleanly.
+
+Sources: https://pcp.io/ and https://sysdig.com/blog/sysdig-vs-strace/ and https://falco.org/ and https://github.com/falcosecurity/falco
+
 ---
 
 ## 4. Instrumentation Profilers
 
-Tools that build a per-span or per-event record explicitly at sites the developer (or the language) chose, in contrast to the sampling profilers of §13 and §14 that interrupt arbitrary code at a fixed cadence. The cost model is per-annotated-site, not per-wall-clock-sample, and the distinguishing engineering challenge is making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production builds.
+Tools that build a per-span or per-event record explicitly at sites the developer (or the language) chose, in contrast to the sampling profilers of §13 and §14 that interrupt arbitrary code at a fixed cadence. The cost model is per-annotated-site, not per-wall-clock-sample, and the distinguishing engineering challenge is making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production builds. The chapter also covers the vendor-maintained microarchitecture-aware production analysers — Intel **VTune** and AMD **μProf** for Linux/Windows microarchitectural diagnostics; Microsoft **PerfView** and **Windows Performance Analyzer (WPA)** for ETW-native .NET-and-kernel profiling — that pair tightly with the runtime/OS event providers no third-party tool maintains as comprehensively.
 
 ### 4.1. Tracy / Spall — Nanosecond Instrumentation Profilers
 
@@ -386,6 +400,47 @@ Stack correlation is the hard part. The sampler pauses each registered thread an
 
 Sources: https://firefox-source-docs.mozilla.org/tools/profiler/index.html and https://firefox-source-docs.mozilla.org/tools/profiler/markers-guide.html and https://firefox-source-docs.mozilla.org/tools/profiler/code-overview.html and https://github.com/firefox-devtools/profiler and https://profiler.firefox.com/
 
+### 4.8. VTune Profiler and AMD μProf — Vendor-Maintained Microarchitecture-Aware Profilers
+
+Intel **VTune Profiler** and AMD's symmetric **μProf** are commercial-grade production profilers exposing the full PMU surface (§5.5) plus vendor-specific microarchitectural-analysis features. The architectural distinction from the open-source profilers of §§4.1, 13, 14 is **microarchitecture-aware analysis pipelines**: VTune ships with **Top-Down Microarchitecture Analysis (TMAM)** — a hierarchical decomposition of execution time into **front-end-bound**, **back-end-bound**, **bad-speculation**, and **retiring** categories, with deeper sub-categories at each level — that requires per-microarchitecture PMU event mapping the open-source ecosystem cannot maintain at the same depth or release cadence. The TMAM mapping is updated for each new Intel microarchitecture (Skylake → Ice Lake → Sapphire Rapids → Granite Rapids) as part of VTune's release.
+
+Distinguishing analysis modes:
+
+- **Memory Access Analysis** (PEBS-LL, §5.5): per-load latency distribution, which DRAM channel served the request, NUMA-domain attribution, cache-miss source attribution (L1/L2/L3/DRAM/remote-socket).
+- **Microarchitecture Exploration**: TMAM-driven hot-path breakdown showing which CPU pipeline stage (fetch, decode, execute, retire) is the bottleneck for each function, broken down per-instruction.
+- **Threading Analysis**: critical-path analysis through synchronisation primitives, lock-contention attribution, OpenMP/TBB parallelism-efficiency metrics including imbalance and serial-region cost.
+- **GPU Offload Analysis**: cross-CPU/GPU timeline integration analogous to Nsight Systems §15.2 but for Intel iGPU and Intel Arc / Data Center GPU Max parts.
+- **HPC Performance Characterization**: vectorisation, FLOPS, memory-bandwidth-vs-roofline analysis with ISA-aware code-path classification.
+
+**AMD μProf** is the equivalent on AMD silicon, with **IBS** (§5.5) as the precise-sampling primitive instead of PEBS, and AMD-microarchitecture-specific TMAM analogue. Both run on Linux and Windows; both ship CPU-microarchitecture documentation that translates raw PMU counter values into actionable diagnostics. **Apple's Instruments** (§3.8) plays a similar vendor-maintained role for Apple Silicon, with M-series-specific analysis templates, though without a published TMAM-equivalent.
+
+The production-tools lesson is that **microarchitecture-aware analysis requires vendor cooperation**: the PMU event mapping and TMAM decomposition are Intel/AMD/Apple intellectual property updated per silicon generation. Open-source profilers (perf, async-profiler §2.4) expose the raw events; VTune / μProf / Instruments supply the interpretation layer. For workloads where microarchitectural efficiency matters (HPC, low-latency trading, high-throughput servers, AI inference), this interpretation is what distinguishes production performance work from raw sample collection.
+
+Status (as of 2026-04): both VTune and μProf are free-as-in-beer (registration-walled binaries), supported on Linux and Windows; VTune additionally supports macOS for collection but not full analysis. Neither is open-source; both rely on the open-source perf substrate underneath.
+
+Sources: https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html and https://www.amd.com/en/developer/uprof.html and https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2024-0/top-down-microarchitecture-analysis-method.html
+
+### 4.9. PerfView and Windows Performance Analyzer — ETW-Native Profiling Stacks
+
+Vance Morrison's **PerfView** (Microsoft, 2011+; open-source 2014) is the canonical .NET performance and memory analyser, and **Windows Performance Analyzer (WPA)** is the GUI for ETW (§3.2). Both occupy the Windows-side equivalent of Linux's perf + flame-graph + heaptrack ecosystem, with deeper integration into the .NET runtime and the Windows kernel ETW substrate. Vendor-maintained, Windows-only, and tightly coupled to ETW's kernel and user-mode provider catalogue.
+
+**PerfView** is structured around four modes:
+
+- **CPU sampling** via ETW: kernel-side sampling (`PROFILE` ETW provider) plus stackwalk events. PerfView ingests the resulting `.etl` file and produces flame graphs, stack-aggregated views, and call-tree breakdowns. Distinct from Linux perf (`§13.1`): PerfView lives entirely on top of ETW, so its cost when off is zero (no sampling running), and its cost when on is identical to ETW's kernel sampling overhead.
+- **GC and allocation analysis**: per-allocation site stack capture via the .NET CLR ETW provider, with heap-walk integration so users can see "this allocation site allocated 4 GB of strings, 99% of which were retained by this static field." This is the canonical .NET memory-leak diagnosis path; comparable in scope to Java Flight Recorder's allocation profiling (§3.1) but with substantially deeper allocation-site stacks via ETW's stackwalk events.
+- **Wall-clock blocking analysis**: combines CPU samples with thread-blocking events (lock acquire, await suspension, synchronous I/O) to produce an "off-CPU-aware" wall-clock profile. Distinct from on-CPU flame graphs (§11.3) by accounting for blocked time, similar to off-CPU flame graphs (§11.4) but driven by ETW thread-state events rather than eBPF.
+- **`.NET Counters`**: low-overhead always-on counters (allocation rate, GC time, working-set, exception rate, tiered-compilation events) viewable live via `dotnet-counters` or recorded in PerfView.
+
+**WPA** is the more general Windows-side analyser. It ingests ETL traces from any ETW provider (kernel scheduling, file I/O, network, DirectX, Win32, custom application providers) and renders configurable timeline + table views. WPA is Microsoft's answer to Perfetto (`§11.2`) for Windows-native trace analysis: same "universal trace timeline" pattern, ETW as the single capture format, GUI for visual exploration plus scriptable analysis via WPA Profile XML files. WPA's **Generic Events** view exposes any provider's emitted events; **Stack views** drill into kernel-stackwalk-augmented event traces; **CPU Usage (Sampled)** is the WPA flame-graph equivalent.
+
+The production-tools lesson is similar to VTune / μProf (§4.8): **vendor-maintained Windows analyser stacks pair tightly with the runtime/OS event providers**. PerfView's value over generic profilers comes from understanding .NET CLR ETW events (GC start/stop, JIT compilation, exception throw, type-load, tier-up to optimised code) at the same depth that VTune understands Intel PMU events. WPA's value comes from understanding kernel ETW providers (scheduler context-switch reasons, page-fault sources, file-I/O wait categories, registry access patterns) that no third-party tool maintains as comprehensively.
+
+Distinct from Linux ecosystem: where Linux observability is fragmented across perf, ftrace, eBPF, bpftrace, Sysdig, and a dozen GUI tools, the Windows ecosystem is **ETW-as-substrate plus PerfView/WPA-as-analyser**, much more vertically integrated. The downside is platform lock-in; the upside is consistent UX and deep semantic awareness of Microsoft platform events.
+
+Status (as of 2026-04): PerfView is open-source (MIT) and continues to track .NET runtime evolution (now covering .NET 8+, AOT-compiled binaries, and `JsonEventSource`). WPA ships in the **Windows Performance Toolkit**, part of the Windows Assessment and Deployment Kit (ADK). Both are free; both remain Windows-only.
+
+Sources: https://github.com/microsoft/perfview and https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer and https://learn.microsoft.com/en-us/dotnet/core/diagnostics/perfview-tool
+
 ---
 
 ## 5. Hardware Tracing
@@ -396,7 +451,7 @@ Mechanisms where a CPU, SoC, or physical substrate captures execution data witho
 
 Intel Processor Trace (PT), available since Skylake, records taken branches into a compact hardware bitstream. The tracing value is that branch capture happens without compiler instrumentation; the cost is mainly trace bandwidth and post-processing decode.
 
-Jane Street's `magic-trace` is the user-facing example: it runs PT in a circular buffer, snapshots recent control flow on a trigger, and converts the decoded stream into a function-call timeline viewable in Perfetto. `DEBUGGERS.md §2.10` covers the retrospective debugging workflow; this section keeps the tracing substrate: hardware branch packets are cheap to collect but become useful only after symbolization, frame reconstruction, and timeline export.
+Jane Street's `magic-trace` is the user-facing example: it runs PT in a circular buffer, snapshots recent control flow on a trigger, and converts the decoded stream into a function-call timeline viewable in Perfetto. Status (as of 2026-04): magic-trace is open-source and actively maintained; it requires Intel PT (Skylake or newer) and Linux. `DEBUGGERS.md §2.10` covers the retrospective debugging workflow; this section keeps the tracing substrate: hardware branch packets are cheap to collect but become useful only after symbolization, frame reconstruction, and timeline export.
 
 Sources: https://blog.janestreet.com/magic-trace/ and https://thume.ca/2023/12/02/tracing-methods/
 
@@ -426,7 +481,7 @@ Sources: https://developer.arm.com/documentation/102520/latest/ and https://deve
 
 ### 5.4. Zero-Overhead Profiling via EM Emanations (ZoP)
 
-Zero-Overhead Profiling takes literal "zero overhead" to the physical layer. Instead of adding software instrumentation or hardware performance counters, ZoP analyzes the electromagnetic (EM) emanations naturally generated by the CPU during program execution. The system runs a training phase to map EM waveforms to code paths, and then records the uninstrumented program during actual execution. By matching the waveforms, it tracks the execution path with >94% accuracy, completely avoiding any modifications to the target system or memory footprint.
+Zero-Overhead Profiling takes literal "zero overhead" to the physical layer by analyzing **electromagnetic (EM) emanations** — the radio-frequency signals that any switching CMOS circuit unintentionally radiates as it executes — rather than adding software instrumentation or hardware performance counters. ZoP runs a training phase to map EM waveforms to code paths, then records the uninstrumented program during actual execution. By matching the waveforms, it tracks the execution path with >94% accuracy, completely avoiding any modifications to the target system or memory footprint.
 
 Source: https://sites.gatech.edu/ece-alenka/wp-content/uploads/sites/463/2016/09/ZoP.pdf
 
@@ -454,7 +509,7 @@ The DWT (Data Watchpoint and Trace) unit feeds the same ITM fabric. Four DWT com
 
 The trade-off is bandwidth vs pin budget. Cost when off is literally zero (`TRCENA` bit clear in `CoreDebug->DEMCR`; stimulus writes to disabled ports silently drop). Cost when on per event is a single 32-bit store plus an optional FIFO-stall if the SWO link saturates — ITM ports support blocking or drop-on-full per port. The ceiling is the SWO link itself (commonly ≤2 Mbit/s practical; SEGGER's measurements put sustained throughput around 0.3–1 MB/s). That is orders of magnitude below ETM's parallel trace port, but ETM requires 4–8 dedicated trace-port pins and a trace-capable debug probe.
 
-**SEGGER RTT** is the counterpoint worth naming. Instead of serializing over a dedicated trace pin, the firmware writes to a RAM ring buffer, and the J-Link probe reads that RAM over the SWD debug link while the CPU runs — the Cortex-M debug AHB-AP supports coherent background memory access without halting. The cost is a small RAM buffer (~500 B ROM, ~1 KB RAM typical) and a `memcpy`-equivalent, but bandwidth jumps to 2 MB/s+ on a single standard debug pin with no TPIU/SWO clock configuration required. The broader mechanical argument worth extracting: **on architectures where the debug interface can do coherent background memory reads, treating the debugger as a polling consumer of a RAM buffer is strictly faster than any dedicated serial trace output short of full parallel trace.**
+**SEGGER RTT** is the counterpoint worth naming. Instead of serializing over a dedicated trace pin, the firmware writes to a RAM ring buffer, and the J-Link probe reads that RAM over the SWD debug link while the CPU runs — the Cortex-M debug AHB-AP supports coherent background memory access without halting. The cost is a small RAM buffer (~500 B ROM, ~1 KB RAM typical) and a `memcpy`-equivalent, but bandwidth jumps to 2 MB/s+ on a single standard debug pin with no TPIU/SWO clock configuration required. The broader mechanical argument worth extracting: **on architectures where the debug interface can do coherent background memory reads, treating the debugger as a polling consumer of a RAM buffer is strictly faster than any dedicated serial trace output short of full parallel trace.** See `DEBUGGERS.md §11.4` for the on-target debug-probe workflow (defmt, probe-rs, RTT/ITM consumption from the host side).
 
 Sources: https://developer.arm.com/documentation/ddi0439/b/Instrumentation-Trace-Macrocell-Unit/ITM-functional-description and https://developer.arm.com/documentation/ddi0439/b/Data-Watchpoint-and-Trace-Unit and https://arm-software.github.io/CMSIS_6/v6.0.0/Core/group__ITM__Debug__gr.html and https://kb.segger.com/SWO and https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/ and https://blog.segger.com/current-state-of-the-trace-market/
 
@@ -480,7 +535,7 @@ Sources: https://github.com/benfred/py-spy and https://thume.ca/2023/12/02/traci
 
 The fix (strace 5.3+, GSoC 2018/2019 work by Paul Chaignon and others) is `--seccomp-bpf`: attach a seccomp-bpf cBPF filter that returns `SECCOMP_RET_TRACE` only for the syscalls the user asked about. Everything else runs native. The same benchmark drops to **1.475×** — a 25× reduction just from filtering in-kernel instead of in the tracer. Architectural footnote: seccomp filters are inherited by children but cannot be attached to an already-running process, so `strace -p PID --seccomp-bpf` cannot benefit — attach-to-existing still pays the double-stop.
 
-The broader lesson is the same as §1.5 USDT and §3.6 DTrace: **separate the cheap guard from the expensive payload**. strace's original design fused them; every syscall paid the ptrace cost whether it was being traced or not. seccomp-bpf retrofits the two-phase pattern, and the measured result is a 25× win with no change in observable semantics.
+The broader lesson is the cheap-guard / expensive-payload pattern (§1.5) retrofitted in-kernel: strace's original design fused the two and every syscall paid the ptrace cost regardless, while seccomp-bpf evaluates the filter inline and only takes the ptrace path for matching syscalls. The measured result is a 25× win with no change in observable semantics.
 
 Sources: https://pchaigno.github.io/strace/2019/10/02/introducing-strace-seccomp-bpf.html and https://archive.fosdem.org/2020/schedule/event/debugging_strace_perfotmance/
 
@@ -572,13 +627,13 @@ Sources: https://panda.re/ and https://www.ndss-symposium.org/wp-content/uploads
 
 ### 7.6. APM Auto-Instrumentation Agents — Managed-Runtime DBI at Class-Load
 
-Commercial APM (DataDog, New Relic, Dynatrace, AppDynamics, Elastic APM) and open-source OpenTelemetry auto-instrumentation both rewrite application bytecode at class-load time to inject spans into unmodified third-party libraries. This is conceptually DBI at a coarser granularity than Frida Stalker (§7.1) or MAMBO (§7.2) — rewriting at the class-or-function boundary in managed runtimes instead of the basic block in native code.
+Status (as of 2026-04): commercial APM (DataDog, New Relic, Dynatrace, AppDynamics, Elastic APM) and open-source OpenTelemetry auto-instrumentation both rewrite application bytecode at class-load time to inject spans into unmodified third-party libraries. This is conceptually DBI at a coarser granularity than Frida Stalker (§7.1) or MAMBO (§7.2) — rewriting at the class-or-function boundary in managed runtimes instead of the basic block in native code.
 
 The JVM entry point is **`java.lang.instrument`** via `-javaagent:foo.jar`. The agent JAR declares a `Premain-Class`, registers a `ClassFileTransformer` whose `transform(ClassLoader, String, Class, ProtectionDomain, byte[])` returns rewritten bytes before each class is defined, and optionally uses `retransformClasses` to patch already-loaded classes. The dominant rewriting library is **Byte Buddy** (Rafael Winterhalter), which wraps ASM the way LLVM wraps machine code: a declarative matcher DSL (`isPublic().and(named("someMethod"))`) plus `@Advice.OnMethodEnter` / `@Advice.OnMethodExit` annotations. The advice class is **a template copied byte-for-byte into the target method** — it cannot call helper methods on itself because it is inlined. OpenTelemetry, DataDog, New Relic, Dynatrace, and Elastic APM all sit on Byte Buddy for this reason.
 
 The .NET analogue is the **CLR Profiling API**: `ICorProfilerCallback::JITCompilationStarted` plus `GetILFunctionBody` / `SetILFunctionBody` to swap IL before JIT. Python has no VM-level hook — agents rely on `sitecustomize.py` or `-m opentelemetry-instrument` wrapping, then `wrapt.ObjectProxy` to replace functions in already-imported modules. Ruby and Node rely on `require` / `import` ordering plus monkey-patching. The granularity difference matters: JVM and CLR agents can instrument arbitrary third-party JARs or DLLs without source or restart, while Python / Ruby / Node agents need their wrappers installed before the target is first imported.
 
-The production-safety story hinges on **Muzzle** (DataDog, adopted by OpenTelemetry): each instrumentation declares the external symbols it touches, and at agent startup a reference-matcher validates every external class/method/field against the actual user classpath. If the versions don't match, the instrumentation silently skips — so a Kafka-3.x instrumentation does not explode on a Kafka-2.x classpath. This is build-time-plus-startup-time safety for runtime bytecode rewriting, and is what makes these agents deployable by operators who do not know which library versions the application actually uses. Class-loader isolation is the mirror image of Frida's target-hiding (§7.1): the agent ships its own SDK (OpenTelemetry SDK, DD writer pool, Byte Buddy itself) under `inst/` with extension `.classdata`, loaded by a custom `AgentClassLoader` so the application's classloader cannot see it and cannot version-conflict with the application's own dependencies.
+The production-safety story hinges on **Muzzle** (DataDog, adopted by OpenTelemetry): each instrumentation declares the external symbols it touches, and at agent startup a reference-matcher validates them against the actual user classpath, silently skipping instrumentations whose target version doesn't match. This is what makes these agents deployable by operators who do not know which library versions the application actually uses. Class-loader isolation is the mirror image of Frida's target-hiding (§7.1): the agent ships its own SDK and rewriter library in an isolated classloader so the application's own classloader cannot see them and cannot version-conflict with the application's own dependencies.
 
 The design lesson: **span injection without source changes, via load-time bytecode rewriting in managed runtimes**, is the dominant production path for APM adoption. It is DBI (§7.1, §7.2) reframed for a world where the "binary" is `.class` / `.dll` / `.pyc` and the "basic block" is a method. Cross-link §2 Cooperative Safepoints (class retransformation in HotSpot uses safepoints for the swap) and §12.3 OpenTelemetry (agents are where OTEL semantic conventions actually get populated for applications that weren't written with OTEL in mind).
 
@@ -758,7 +813,7 @@ Sources: https://opentelemetry.io/docs/concepts/sampling/ and https://openteleme
 
 ### 12.3. OpenTelemetry — The Observability Standard
 
-OpenTelemetry (OTEL) is the de facto standard for distributed tracing, metrics, and logging across service boundaries. It defines:
+Status (as of 2026-04): OpenTelemetry (OTEL) is the de facto standard for distributed tracing, metrics, and logging across service boundaries. It defines:
 
 - **Traces**: a tree of spans representing the path of a request through a distributed system. Each span has a trace ID, span ID, parent span ID, start/end timestamps, attributes (key-value metadata), and events (timestamped log entries within a span).
 - **Context propagation**: trace context (trace ID, span ID, trace flags) is serialized into HTTP headers (W3C Trace Context format: `traceparent: 00-{trace_id}-{span_id}-{flags}`) and propagated across service boundaries. Each service extracts the context, creates a child span, and propagates the updated context to downstream calls.
@@ -847,7 +902,7 @@ Cost: the branch ring buffer is continuously updated in hardware; enabling it ha
 
 LBR-based sampling sits at the "zero-cost walk" endpoint of the spectrum. It is complementary to frame pointers and SFrame — a production system can prefer LBR when branches fit, fall back to FP/SFrame when they don't.
 
-Source: https://lwn.net/Articles/619180/ . See `TRACERS.md §5.2` for the underlying LBR mechanism.
+Source: https://lwn.net/Articles/619180/. See §5.2 for the underlying LBR mechanism.
 
 ### 13.7. Go's Unconditional Frame-Pointer Discipline
 
@@ -921,7 +976,7 @@ GPU workloads cross a boundary that none of the prior mechanisms handle cleanly:
 
 **NVTX** (NVIDIA Tools Extension) is a lightweight API for in-application tracing annotations — `nvtxRangePush("frame")` / `nvtxRangePop()` to mark scoped ranges, `nvtxMarkA("checkpoint")` for instant events. When no profiler is attached, the library is a no-op stub (zero overhead). When Nsight Systems or Nsight Compute is attached, the ranges and markers appear as named spans on the timeline.
 
-The "registered string handles" optimization is worth naming: `NVTX3_FUNC_RANGE` pre-interns range names so the hot-path call is a pointer push rather than a `strcmp` in the profiler. This is the same "cheap guard, expensive payload" discipline as DTrace USDT (§1.5) applied to GPU-workload annotations, and the direct analogue of Tracy's scoped zones (§4.1) and OpenTelemetry spans (§12.3) for the GPU domain.
+The "registered string handles" optimization is worth naming: `NVTX3_FUNC_RANGE` pre-interns range names so the hot-path call is a pointer push rather than a `strcmp` in the profiler — the cheap-guard / expensive-payload pattern (§1.5) applied to GPU-workload annotations, and the direct analogue of Tracy's scoped zones (§4.1) and OpenTelemetry spans (§12.3) for the GPU domain.
 
 Sources: https://nvidia.github.io/NVTX/ and https://github.com/NVIDIA/NVTX
 
@@ -933,11 +988,13 @@ The load-bearing detail for GPU tracing is that CUPTI's `CUpti_ActivityKernel` r
 
 **Nsight Systems** (NVIDIA's system profiler) composes NVTX + CUPTI + OS-level perf-like sampling into a single timeline, adding GPU metric sampling (SM occupancy, tensor-core activity, PCIe/NVLink throughput) as separate tracks. It is the production end-state of the "universal timeline" pattern §11.2 describes for general tracing, specialized for GPU workloads.
 
-Sources: https://docs.nvidia.com/cupti/ and https://developer.nvidia.com/nsight-systems and https://docs.nvidia.com/nsight-systems/UserGuide/
+The cross-vendor convergence point is **Perfetto's `GpuRenderStageEvent` proto**, which models GPU work as per-hardware-queue timelines (graphics, compute, DMA, video-encode), each carrying submission IDs that correlate back to the CPU-side `vkQueueSubmit` / `glFlush` / `cuLaunchKernel` call. The "one thing at a time per queue" constraint is enforced by the representation — true GPU parallelism surfaces as additional queues, not overlapping events on one queue. Android Graphics Profiler, Google's GPU tracing for ANGLE, AMD's rocprof (§15.3), and increasingly Nsight Systems all emit Perfetto-compatible output: GPU tracing's analogue of pprof's lingua-franca role for profiles.
+
+Sources: https://docs.nvidia.com/cupti/ and https://developer.nvidia.com/nsight-systems and https://docs.nvidia.com/nsight-systems/UserGuide/ and https://github.com/google/perfetto/blob/main/protos/perfetto/trace/gpu/gpu_render_stage_event.proto
 
 ### 15.3. ROCm rocTracer / rocprofiler — AMD Equivalent
 
-AMD's ROCm stack mirrors NVIDIA's three-layer model: **rocTracer** for runtime-API callback tracing, **ROC-TX** for NVTX-equivalent application annotations, and **rocprof** / **ROCProfiler-SDK** for counter and hardware-trace collection. The legacy stack (rocTracer + rocprof v1/v2) is being superseded by **ROCprofiler-SDK / rocprofv3** with an EoS for the legacy tools scheduled for around 2026-Q2.
+AMD's ROCm stack mirrors NVIDIA's three-layer model: **rocTracer** for runtime-API callback tracing, **ROC-TX** for NVTX-equivalent application annotations, and **rocprof** / **ROCProfiler-SDK** for counter and hardware-trace collection. The legacy stack (rocTracer + rocprof v1/v2) is being superseded by **ROCprofiler-SDK / rocprofv3**. Scheduled for 2026-Q2: end-of-support for the legacy rocTracer + rocprof v1/v2 tools.
 
 The distinctive detail is the output format: `rocprof` emits **Chrome-tracing-compatible JSON**, so AMD GPU traces can be loaded directly into Perfetto (§11.2) or the Chrome DevTools tracing viewer without adapter code. This is a deliberate interoperability choice — AMD did not invent a new format, it adopted the one the existing tracing-viewer ecosystem already understood.
 
@@ -945,11 +1002,7 @@ Sources: https://rocm.docs.amd.com/projects/roctracer/en/latest/ and https://roc
 
 ### 15.4. Perfetto GPU Render-Stage Events
 
-**Perfetto** (§11.2) supports GPU traces natively via a `GpuRenderStageEvent` proto that models GPU work as per-hardware-queue timelines. Each hardware queue (graphics, compute, DMA, video-encode) gets its own track; events on each track carry submission IDs that correlate back to the CPU-side `vkQueueSubmit` / `glFlush` / `cuLaunchKernel` call that caused them.
-
-The structural constraint "one thing at a time per queue" is enforced by the representation — true GPU parallelism surfaces as *additional* queues rather than overlapping events on one queue. This is a cross-vendor model: Android Graphics Profiler, Google's own GPU tracing for ANGLE, and increasingly Nsight Systems and AMD's rocprof all emit Perfetto-compatible output. Perfetto's GPU support is closing the same gap for GPU tracing that pprof closed for profiles: one interchange format, many consumers.
-
-Source: https://github.com/google/perfetto/blob/main/protos/perfetto/trace/gpu/gpu_render_stage_event.proto
+Folded into §15.2 above (Perfetto's `GpuRenderStageEvent` is the cross-vendor GPU-trace interchange that Nsight Systems, AMD rocprof, and Android Graphics Profiler all converge on). Heading retained for cross-reference stability.
 
 ---
 
@@ -975,33 +1028,27 @@ The 2011 design paper (Eschweiler, Wagner, Geimer, Knüpfer, Nagel, Wolf — Par
 
 Scalasca's analysis engine **`scout`** is itself a parallel MPI program that reads each local OTF2 trace on the same rank that produced it, then does a distributed replay matching `MPI_Send`/`MPI_Recv` pairs and collective entry timestamps to classify "Late Sender", "Late Receiver", "Wait at Barrier", "Wait at N×N" patterns. It computes **delay cost** (the root-cause region upstream of the visible wait) and **critical path** — a fundamentally different analysis model from an APM waterfall, because the causality graph is over MPI messages, not HTTP spans.
 
-Sources: https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/docs/otf2-2.2/html/index.html and https://ebooks.iospress.nl/publication/26566 and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.6/docs/manual/scout.html
+The OTF2 ecosystem assumes a server-side viewer model: **Vampir** (TU Dresden ZIH) is the canonical OTF2 visualizer, and its distinctive choice is that **VampirServer runs as an MPI job alongside the trace files on the HPC filesystem** while the GUI is a thin client requesting aggregated time slices at the current zoom level. This is how Vampir displays traces that do not fit in the visualization host's RAM — the server lives where the data lives. Perfetto's implicit in-order forest (§11.1) is the same level-of-detail pattern, single-machine; Vampir scales it across the cluster that captured the trace.
 
-### 16.3. Vampir — Server-Side Rendering for Trillion-Event Traces
-
-**Vampir** (TU Dresden ZIH) is the canonical OTF2 visualizer. The distinctive rendering choice: **VampirServer runs as an MPI job alongside the trace files on the HPC filesystem**; the GUI is a thin client that requests aggregated time slices at the zoom level currently visible. This is how Vampir displays traces that do not fit in the visualization host's RAM — the server lives where the data lives, and the client renders whatever resolution fits on screen. Perfetto's implicit in-order forest (§11.1) is the same level-of-detail pattern, but single-machine; Vampir scales it across the cluster that captured the trace in the first place.
-
-Sources: https://vampir.eu/ and https://tu-dresden.de/zih/forschung/projekte/vampir
-
-### 16.4. TAU — Dyninst-Based Attach and Parallel Profiler Lineage
-
-**TAU (Tuning and Analysis Utilities)**, developed by the University of Oregon Performance Research Lab, predates Score-P and continues in parallel. Its distinctive contribution is **dyninst-based dynamic instrumentation** via `tau_exec` / `tau_run`: the profiler attaches to an already-running MPI executable without recompilation, patching in measurement probes live. TAU feeds into Score-P today but maintains its own tracing formats (SLOG2, TAU-trace) and its own ParaProf visualizer — useful when the target cannot be rebuilt against Score-P, or when a site has existing TAU tooling.
+The other long-running parallel-profiler lineage is **TAU (Tuning and Analysis Utilities)** from the University of Oregon Performance Research Lab. TAU predates Score-P and continues in parallel; its distinctive contribution is **dyninst-based dynamic instrumentation** via `tau_exec` / `tau_run`, attaching to a running MPI executable without recompilation and patching in measurement probes live. TAU feeds into Score-P today but maintains its own tracing formats (SLOG2, TAU-trace) and its own ParaProf visualizer — useful when the target cannot be rebuilt against Score-P, or when a site has existing TAU tooling.
 
 For a new language targeting HPC workloads, the practical implication is concrete: speak OTF2 and the `PMPI_*` profiling interface, not OTLP. TAU and Score-P cover the instrumentation side; Vampir and Scalasca cover analysis; OTF2 is the wire format that makes them interchangeable.
 
-Sources: https://www.cs.uoregon.edu/research/tau/docs/html-docs/latest/usersguide/usersguide.html and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.5/help/scalasca_patterns-2.5.html
+Sources: https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/docs/otf2-2.2/html/index.html and https://ebooks.iospress.nl/publication/26566 and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.6/docs/manual/scout.html and https://vampir.eu/ and https://tu-dresden.de/zih/forschung/projekte/vampir and https://www.cs.uoregon.edu/research/tau/docs/html-docs/latest/usersguide/usersguide.html and https://apps.fz-juelich.de/scalasca/releases/scalasca/2.5/help/scalasca_patterns-2.5.html
+
+### 16.3. Vampir — Server-Side Rendering for Trillion-Event Traces
+
+Folded into §16.2 above as part of the OTF2 viewer story; heading retained for cross-reference stability.
+
+### 16.4. TAU — Dyninst-Based Attach and Parallel Profiler Lineage
+
+Folded into §16.2 above; heading retained for cross-reference stability.
 
 ---
 
 ## 17. Summary by Mechanism Family
 
-This space is not one-dimensional. There are at least three orthogonal axes:
-
-- **Steady-state overhead** — what the program pays while "nothing interesting" is happening.
-- **Semantic richness** — whether the tool sees bytes and PCs, language objects and frames, or whole-system histories.
-- **Recoverability** — whether the tool can only observe live execution, can replay it, or can answer arbitrary post-hoc queries.
-
-A practical debugger or tracer usually chooses one mechanism family for control, another for data capture, and a third for presentation or diagnosis.
+The mechanism families below are organized by three orthogonal axes — steady-state overhead (cost when off), semantic richness (bytes/PCs vs language objects vs whole-system history), and recoverability (live observation vs replay vs arbitrary post-hoc queries). A practical tracer usually combines one family for control, another for data capture, and a third for presentation.
 
 ### 17.1. Direct Execution Interposition
 
@@ -1024,6 +1071,8 @@ These techniques change the code path itself: patch a site, swap in a trap, or r
 | Historical compile-time trace instructions | §4.2 | One NOP / trace site in versions using trace opcodes | Per-trace-point call | Per-line / function | Ruby YARV historical design; TracePoint abstraction |
 | In-place binary rewriting via instruction punning | §7.3 | Zero | Per-patched-site logic | Per-instruction | E9Patch |
 | PLT/GOT trampoline interception | §6.3 | Zero when unattached; requires recognizable dynamic-call stubs | Trap + arg decode per intercepted call | Per-library-symbol | ltrace; fragile under modern linking/hardening |
+| AST wrapper node insertion | §4.5 | Zero when wrappers are absent | Recompilation + event dispatch when active | Per-AST-node | GraalVM Truffle |
+| Language-level variable / execution trace | §4.4 | Zero when traces are absent | Per-access / callback | Per-variable / command | Tcl `trace` |
 
 ### 17.2. Cooperative Safepoints and Managed Handoff
 
@@ -1070,10 +1119,14 @@ The core idea is not "stop the program" but "emit structured events cheaply enou
 | Subsystem-embedded tracepoints for shared-memory IPC | §3.9 | Zero (NOP patched) | NOP→CALL tracepoint cost | Per-SQE / per-CQE | Linux io_uring tracepoints |
 | Database-engine query event bus | §3.10 | Zero when consumer off | Predicate eval + target write | Per-plan-node / per-statement | SQL Server XE, PG `auto_explain`, MySQL PS |
 | Language-runtime heap snapshots + telemetry | §3.11 | Zero until snapper enabled | Per-event memcpy + 0.1 s sampler | Per-opcode event, per-object in heap dump | MoarVM Telemetry + heap snapshots |
+| Long-horizon kernel/application metrics archive | §3.12 | Zero until pmcd polled | Per-metric collection + binary archive | Per-PMDA metric | Performance Co-Pilot (PCP) |
+| eBPF-backed syscall capture and security rule engine | §3.12 | Zero when ruleset empty | Per-syscall capture + rule eval | Per-syscall event | Sysdig + Falco |
 | Lock-free event queue | §4.1 | Very low idle cost | Per-span overhead | Per-annotated span | Tracy, Spall |
 | Match-spec filtered tracing | §4.3 | Minimal pattern/filter cost | Per-matching-call | Per-function-call | Erlang `dbg` |
 | Ultra-low-overhead language tracer | §4.6 | Very low active-path cost | Per-call / syscall event cost | Per-call / syscall | HUGLO |
 | Two-tier in-process browser sampler + typed markers | §4.7 | Zero when session off | Per-marker payload copy + periodic sampler | Per-marker + periodic sample | Mozilla Gecko Profiler |
+| Vendor microarchitecture-aware profiler with TMAM | §4.8 | Zero when session off | PMU sampling + per-microarch interpretation | Per-instruction TMAM category, memory-access source | Intel VTune, AMD μProf |
+| ETW-native runtime + kernel profiling | §4.9 | Zero when session off | ETW-stackwalk + CLR provider integration | Per-allocation, per-GC-event, per-context-switch | Microsoft PerfView, Windows Performance Analyzer |
 | Parallel producer/consumer trace ring buffer | §7.4 | QEMU / producer cost | Multi-core consumer cost | Every instruction / memory event | Cannoli |
 | Pre-aggregated trace tree | §11.1 | Zero until enabled; O(log N) append | Low-latency append + zoom aggregation | Per-event | implicit in-order forests |
 | Head-sampled distributed spans | §§12.1, 12.3 | Context propagation | Per-span overhead | Per-service call | Dapper, OpenTelemetry, Jaeger |
@@ -1094,24 +1147,16 @@ The "pay real overhead to gain deep visibility" designs: DBI, shadow state, and 
 | Race-tracking shadow clocks | §8.3 | N/A (always on) | 5–15× slowdown | Per-memory-access | ThreadSanitizer |
 | Definedness tracking via compiler instrumentation | §8.3 | N/A (always on) | ~3× slowdown | Per-memory-access | MemorySanitizer |
 | Targeted undefined-behavior guards | §8.3 | N/A (always on) | <5% slowdown | Per-operation | UBSan |
+| Virtual speedup (causal profiling) | §10.1 | Zero when not running Coz | ~17% mean overhead plus repeated perturbation runs | Per-line / progress point | Coz |
+| Coverage-guided fuzzing | §9.1 | Instrumentation cost | Thousands–millions of executions / sec | Per-edge / branch | AFL, libFuzzer |
 
 ### 17.6. Runtime-Semantic Hooks and Live Systems
 
-These mechanisms work above the raw instruction stream. They capture or reconstruct concepts the runtime already knows about: variables, frames, methods, and AST nodes.
-
-| Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
-|---|---|---|---|---|---|
-| AST wrapper node insertion | §4.5 | Zero when wrappers are absent | Recompilation + event dispatch when active | Per-AST-node | GraalVM Truffle |
-| Language-level variable / execution trace | §4.4 | Zero when traces are absent | Per-access / callback | Per-variable / command | Tcl `trace` |
+Folded into §17.1 (AST wrapper / variable traces are direct-execution-interposition mechanisms operating on the runtime's own AST or command-dispatch path). Heading retained for cross-reference stability.
 
 ### 17.7. Search and Perturbation
 
-These techniques do not primarily intercept execution; they search the space around a bug by repeated execution, coverage feedback, or timing perturbation.
-
-| Mechanism | Discussed in | Cost When Off | Cost When On | Granularity | Representative implementations |
-|---|---|---|---|---|---|
-| Virtual speedup (causal profiling) | §10.1 | Zero when not running Coz | ~17% mean overhead plus repeated perturbation runs | Per-line / progress point | Coz |
-| Coverage-guided fuzzing | §9.1 | Instrumentation cost | Thousands–millions of executions / sec | Per-edge / branch | AFL, libFuzzer |
+Folded into §17.5 (causal profiling and coverage-guided fuzzing share the heavyweight "pay real overhead to gain deep visibility / search coverage" trade-off). Heading retained for cross-reference stability.
 
 ### 17.8. Sampling Substrates and Stack Unwinding
 
@@ -1151,7 +1196,7 @@ Designs whose distinguishing property is operating at always-on scale, across fl
 | Multi-tenant profile store with trace correlation | §14.4 | Zero until session | ~1–5% CPU + profile-span tagging | Per-span profile jump | Grafana Pyroscope / Phlare, Datadog, GCP Profiler |
 | GPU annotation API | §15.1 | No-op stub when no tool attached | Pointer-push per range | Per-range / marker | NVTX, ROC-TX |
 | Cross-clock-domain GPU trace substrate | §15.2 | Zero until CUPTI session | Four-timestamp buffered record per kernel | Per-kernel-launch | CUPTI Activity API + Nsight Systems |
-| Per-hardware-queue GPU timeline | §15.4 | N/A | Per-submission correlation ID emission | Per-GPU-queue event | Perfetto `GpuRenderStageEvent` |
+| Per-hardware-queue GPU timeline | §15.2 | N/A | Per-submission correlation ID emission | Per-GPU-queue event | Perfetto `GpuRenderStageEvent` |
 
 ### 17.11. Parallel and HPC Tracing
 
@@ -1161,7 +1206,7 @@ Designs for inter-rank causality, trillions of events, and the `PMPI_*` / OpenMP
 |---|---|---|---|---|---|
 | Consortium-backbone parallel measurement layer | §16.1 | Zero when session off | MPI-wrapper + compiler-hook + OPARI2 overhead | Per-function / per-MPI-call / per-OMP-region | Score-P |
 | Per-rank lockless parallel trace format | §16.2 | N/A | Per-rank local writes; lazy ID translation; automated wait-state replay (`scout`) | Per-event + cross-rank message pairs | OTF2 + Scalasca |
-| Cluster-side trace visualization | §16.3 | N/A | MPI-job-scale rendering; thin-client aggregates | Per-rank × per-zoom-level | Vampir + VampirServer |
+| Cluster-side trace visualization | §16.2 | N/A | MPI-job-scale rendering; thin-client aggregates | Per-rank × per-zoom-level | Vampir + VampirServer |
 
 ---
 
@@ -1231,20 +1276,23 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 25. WWDC 2016 Session 721 — Unified Logging and Activity Tracing (PDF) — https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf
 26. Apple dev docs — Recording Performance Data (Instruments + signposts) — https://developer.apple.com/documentation/os/recording-performance-data
 27. WWDC 2018 Session 405 — Measuring Performance Using Logging — https://developer.apple.com/videos/play/wwdc2018/405/
-28. Swift Forums — Compile-time string interpolation for os_log — https://forums.swift.org/t/custom-string-interpolation-and-compile-time-interpretation-applied-to-logging/18799
-29. Jens Axboe — "Efficient IO with io_uring" — https://kernel.dk/io_uring.pdf
-30. Jens Axboe — "What's new with io_uring" (Kernel Recipes 2022) — https://kernel.dk/axboe-kr2022.pdf
-31. Linux io_uring tracepoint definitions — https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h
-32. LWN — "io_uring tracing support" — https://lwn.net/Articles/1063853/
-33. Cloudflare — "Missing Manuals: io_uring worker pool" — https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
-34. PostgreSQL auto_explain docs — https://www.postgresql.org/docs/current/auto-explain.html
-35. PostgreSQL pg_stat_statements docs — https://www.postgresql.org/docs/current/pgstatstatements.html
-36. SQL Server Extended Events engine — https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine
-37. SQL Server Extended Events targets — https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server
-38. MySQL Performance Schema — https://dev.mysql.com/doc/refman/en/performance-schema.html
-39. MoarVM Telemetry (Raku docs) — https://docs.raku.org/type/Telemetry
-40. MoarVM heapsnapshot.c — https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c
-41. moarperf web UI — https://github.com/timo/moarperf
+28. Jens Axboe — "Efficient IO with io_uring" — https://kernel.dk/io_uring.pdf
+29. Jens Axboe — "What's new with io_uring" (Kernel Recipes 2022) — https://kernel.dk/axboe-kr2022.pdf
+30. Linux io_uring tracepoint definitions — https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h
+31. LWN — "io_uring tracing support" — https://lwn.net/Articles/1063853/
+32. Cloudflare — "Missing Manuals: io_uring worker pool" — https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
+33. PostgreSQL auto_explain docs — https://www.postgresql.org/docs/current/auto-explain.html
+34. PostgreSQL pg_stat_statements docs — https://www.postgresql.org/docs/current/pgstatstatements.html
+35. SQL Server Extended Events engine — https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine
+36. SQL Server Extended Events targets — https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server
+37. MySQL Performance Schema — https://dev.mysql.com/doc/refman/en/performance-schema.html
+38. MoarVM Telemetry (Raku docs) — https://docs.raku.org/type/Telemetry
+39. MoarVM heapsnapshot.c — https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c
+40. moarperf web UI — https://github.com/timo/moarperf
+41. Performance Co-Pilot home — https://pcp.io/
+42. Sysdig vs strace technical comparison — https://sysdig.com/blog/sysdig-vs-strace/
+43. Falco home — https://falco.org/
+44. Falco repository — https://github.com/falcosecurity/falco
 
 ### Chapter 4 — Instrumentation Profilers
 
@@ -1264,6 +1312,12 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 14. Gecko Profiler code overview (Base + Gecko tiers) — https://firefox-source-docs.mozilla.org/tools/profiler/code-overview.html
 15. Firefox Profiler frontend — https://github.com/firefox-devtools/profiler
 16. profiler.firefox.com — https://profiler.firefox.com/
+17. Intel VTune Profiler — https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html
+18. AMD μProf — https://www.amd.com/en/developer/uprof.html
+19. Intel — Top-Down Microarchitecture Analysis Method (VTune Cookbook) — https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2024-0/top-down-microarchitecture-analysis-method.html
+20. PerfView repository (Microsoft) — https://github.com/microsoft/perfview
+21. Microsoft Learn — Windows Performance Analyzer — https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer
+22. Microsoft Learn — PerfView for .NET diagnostics — https://learn.microsoft.com/en-us/dotnet/core/diagnostics/perfview-tool
 
 ### Chapter 5 — Hardware Tracing
 

@@ -2,7 +2,28 @@
 
 Research on debugger implementations — user-facing bug-finding tools that pause, inspect, step, replay, or time-travel through program execution.
 
-This document covers breakpoint mechanisms from the debugger's side, record/replay and checkpointing, omniscient/time-travel tooling, live-visualization and in-engine overlays, debugger-as-service protocols and scripting APIs, retroactive and partial evaluation, DWARF correctness and build-ID symbol distribution, automated fault-isolation (delta debugging, slicing, spectrum-based localization, statistical debugging, cause-effect chains, symbolic execution, fuzzer-assisted triage, IR-level UB interpreters, interrogative and declarative debugging), async-stack reconstruction, concurrency-aware race and deadlock detectors, post-mortem / out-of-process debugging (core dumps, kdump, kernel debuggers, embedded probe stacks), and specification-level debugging (model-checker counterexamples, interactive theorem prover proof states). Runtime concurrency mechanisms themselves — schedulers, tasks, actors, channels, cancellation, STM, and I/O blocking boundaries — live in `CONCURRENCY.md`; this document discusses how debuggers expose, replay, query, or diagnose those mechanisms. Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`; the Miri/Stacked-Borrows angle is split between `DEBUGGERS.md §8.8` here and `MEMORY.md §§1.3, 8.11`. Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`. Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §11` for hot-reload from the module-system angle).
+This document covers:
+
+- Breakpoint mechanisms from the debugger's side.
+- Record/replay and checkpointing.
+- Omniscient/time-travel tooling.
+- Live visualization and in-engine overlays.
+- Debugger-as-service protocols and scripting APIs.
+- Retroactive and partial evaluation.
+- DWARF correctness and build-ID symbol distribution.
+- Automated fault isolation (delta debugging, slicing, spectrum-based localization, statistical debugging, cause-effect chains, symbolic execution, fuzzer-assisted triage, IR-level UB interpreters, interrogative and declarative debugging).
+- Async-stack reconstruction.
+- Concurrency-aware race and deadlock detectors.
+- Post-mortem / out-of-process debugging (core dumps, kdump, kernel debuggers, embedded probe stacks).
+- Specification-level debugging (model-checker counterexamples, interactive theorem prover proof states).
+
+Ownership boundaries with other documents:
+
+- Runtime concurrency mechanisms — schedulers, tasks, actors, channels, cancellation, STM, and I/O blocking boundaries — live in `CONCURRENCY.md`. This document discusses how debuggers expose, replay, query, or diagnose those mechanisms.
+- Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Sanitizer mechanism details (including ThreadSanitizer) are owned by `TRACERS.md §8`; this document covers only debugger-use.
+- Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`. The Miri/Stacked-Borrows aliasing model is canonical in `MEMORY.md §§1.3, 8.11`; `DEBUGGERS.md §8.8` covers Miri only as a debugger-side UB interpreter.
+- Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`. Compiler-emitted debug metadata encoding is in `COMPILERS.md §5`; OSR/deoptimization is in `COMPILERS.md §14.2`.
+- Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §11` for hot-reload from the module-system angle).
 
 ---
 
@@ -60,7 +81,7 @@ Source: https://fengweiz.github.io/paper/raven-dac22.pdf (DAC '22)
 
 ### 1.5. Page-Protection Watchpoints and Guard Pages
 
-Hardware debug registers are precise but tiny: on x86, usually four watched addresses, each limited to a small width. A scalable alternative is to use page permissions. Mark a page `PROT_NONE` with `mprotect()` or `PAGE_GUARD` / `VirtualProtect()` on Windows; when the target reads or writes that page, the CPU raises a page fault and the debugger decides whether the access is interesting.
+As discussed in §1.3, hardware DR registers are limited to four addresses; a scalable alternative is page permissions. Mark a page `PROT_NONE` with `mprotect()` or `PAGE_GUARD` / `VirtualProtect()` on Windows; when the target reads or writes that page, the CPU raises a page fault and the debugger decides whether the access is interesting.
 
 The trade-off is precision versus scale. Page watchpoints can cover kilobytes or megabytes and can be created in large numbers, but they trigger on every access to the protected page, not only the watched object. Debuggers and runtimes can reduce false positives by isolating selected objects onto their own pages, using guard pages around stacks or heap allocations, or combining page faults with single-step/reprotect logic.
 
@@ -82,7 +103,7 @@ Sources: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.
 
 Assertions and contracts are executable claims about program state: preconditions, postconditions, invariants, representation checks, and internal sanity checks. They are usually treated as testing or verification tools, but they are also debugger hooks. A contract violation is a semantically meaningful breakpoint: the program can stop exactly where an assumption first becomes false, with the violated predicate, source location, values, and call stack preserved.
 
-Eiffel made Design by Contract central to the language. Racket contracts enforce boundaries between components. Ada/SPARK contracts connect runtime checking and formal proof. Rust separates always-on `assert!` from debug-only `debug_assert!`. C++26 contract assertions add language-level `pre`, `post`, and `contract_assert` forms with different evaluation modes. Swift distinguishes `assert`, `precondition`, and unconditional traps.
+Eiffel made Design by Contract central to the language. Racket contracts enforce boundaries between components. Ada/SPARK contracts connect runtime checking and formal proof. Rust separates always-on `assert!` from debug-only `debug_assert!`. Status (C++26 working draft): contract assertions add language-level `pre`, `post`, and `contract_assert` forms with different evaluation modes. Swift distinguishes `assert`, `precondition`, and unconditional traps.
 
 The language-design lesson: **contracts should have debugger semantics**. A new language can define whether contract failures terminate, throw, invoke restarts, enter the debugger, continue in observe mode, log telemetry, or become catchable semantic breakpoints. This gives users a precise spectrum from zero-overhead release builds to invariant-rich debug builds.
 
@@ -113,7 +134,7 @@ Sources: https://rr-project.org/ and https://queue.acm.org/detail.cfm?id=3688088
 
 ### 2.2. Pernosco — Omniscient Debugging via Post-Hoc Analysis
 
-Robert O'Callahan (rr's creator) built Pernosco on top of rr recordings. Pernosco takes an rr trace, analyzes it using massive parallelism in the cloud, and builds a **searchable database of all program states at all points in time**. The result is an omniscient debugger that instantly answers:
+Status (as of 2026-04): commercial service. Robert O'Callahan (rr's creator) built Pernosco on top of rr recordings. Pernosco takes an rr trace, analyzes it using massive parallelism in the cloud, and builds a **searchable database of all program states at all points in time**. The result is an omniscient debugger that instantly answers:
 
 - "What is the value at this memory address at time T?"
 - "When was this value last modified?"
@@ -285,7 +306,7 @@ This is possible because Smalltalk's runtime is fully reflective — `thisContex
 
 The philosophical point: the debugger is the IDE. Rather than a cycle of edit → compile → run → crash → read error → edit, the Smalltalk workflow is: run → crash → the debugger opens → write the code right there → proceed. The boundary between "writing code" and "debugging code" dissolves entirely.
 
-No other mainstream language has achieved this level of integration, except Common Lisp (see below).
+Few mainstream languages have reached this level of integration; Common Lisp's condition/restart system (§3.5) is the closest sibling.
 
 Sources: https://pharo.org/ and https://stackoverflow.com/questions/54496857/how-does-pharo-starts-debugger-when-message-is-not-understanded
 
@@ -339,51 +360,42 @@ The most original of these is **GHCi's `:history` / `:back`**. Because Haskell i
 
 Python's `pdb` contribution is idiomatic ubiquity: `pdb.set_trace()` can be dropped anywhere, and in 3.14 the function gained a `backend` parameter to swap between `sys.settrace` (legacy) and PEP 669 `sys.monitoring` (shipped in 3.12) — the latter gives near-zero overhead when no tool is attached. PEP 768's Safe External Debugger Interface (accepted 2025) is the sibling mechanism on the attach side, covered in `TRACERS.md §2.2`. PuDB's angle is the TUI: a single-terminal split view with source, stack, breakpoints, and variables, plus post-mortem-on-crash and remote-over-socket modes, entirely keyboard-driven.
 
-The broader pattern: in a language with an interactive REPL, the debugger is not a separate tool but a set of REPL commands that share the interpreter's state. This is the less reflective cousin of Pharo's `doesNotUnderstand:` integration (§3.4) and Common Lisp's condition/restart system (§3.5) — the same philosophy at a lower ceiling.
-
 Sources: https://docs.python.org/3/library/pdb.html and https://documen.tician.de/pudb/index.html and https://simonmar.github.io/bib/papers/ghci-debug.pdf
 
 ### 3.9. Managed-Runtime Omniscient Debuggers — Chronon, TOD, IntelliTrace, RevDebug
 
-Bil Lewis's ODB (§3.1) defined the shape of omniscient debugging for Java but did not solve scale. Four production-grade successors share its architecture — **bytecode weaver + event stream + replay UI + queryable history** — and each makes a different engineering bet on where the overhead lands.
+Bil Lewis's ODB (§3.1) defined the shape of omniscient debugging for Java but did not solve scale. Four production-grade successors share its architecture — **bytecode weaver + event stream + replay UI + queryable history** — and each makes a different engineering bet on where the overhead lands: Chronon on the target JVM (commercial Eclipse/IntelliJ DVR; click any line of output to jump to its generating moment), TOD on a distributed event database (academic; 55k events/s single machine, 470k events/s on ten), IntelliTrace on snapshot size (Visual Studio Enterprise; `.iTrace` files captured by a stand-alone collector on production machines and opened later), and RevDebug on commercial scoping heuristics across .NET/Java/Python/JavaScript (observability platform with a time-travel front-end).
 
-**Chronon** (Prashant Deva, commercial) markets itself as "DVR for Java." A bytecode weaver logs every method call, variable assignment, and exception at runtime. The Eclipse and IntelliJ plugins let the developer **click any line of program output and jump to the moment in the recording where it was generated**; scrub backward, inspect any variable at any prior time, view the full history of changes to a field. Recording can be toggled on/off in a running JVM. The plugin is literally a time-traveling GUI wrapper over the recording file, which the developer queries like a database.
+| Product | Runtime | Where overhead lands | Distinct UX |
+|---|---|---|---|
+| Chronon | JVM | Target JVM (in-process weaver) | Click program output → jump to generating moment |
+| TOD | JVM | Distributed event database cluster | Linear scaling across machines; scoped trace capture |
+| IntelliTrace | CLR / .NET | Snapshot size in `.iTrace` files | Stand-alone production collector; "Activate Historical Debugging" |
+| RevDebug | .NET / Java / Python / JS | Commercial scoping heuristics | Inline value prompts; global search across entire recording |
 
-**TOD (Trace-Oriented Debugger)**, Guillaume Pothier and Éric Tanter at Université de Chile, is the academic answer to ODB's scalability problem: a **distributed event database** that scales roughly linearly across a cluster — sustained ingest of 55k events/s on one machine, 470k events/s on ten. The target JVM, event database, and debugger frontend run in separate processes; the weaver hooks the class-loading mechanism and caches weaved classes in the target JVM. **Scoped trace capture** (exclude the JDK, disable around tight loops) is essential to keep overhead usable.
+The pattern is mature enough that choosing among them is an engineering trade-off, not a research question.
 
-**Microsoft IntelliTrace** (Visual Studio Enterprise) is the .NET/CLR analogue. Records debugger events, exceptions, .NET Framework events, and optional full-process snapshots at every breakpoint/step in its "Events and Snapshots" mode — clicking a past event in the Diagnostic Tools window switches the debugger's *time context* to that event via "Activate Historical Debugging." Produces `.iTrace` files, which a **stand-alone collector** can capture on production machines without a full VS install; an engineer opens the file in VS Enterprise later.
-
-**RevDebug** (originally "Time Machine for .NET," renamed 2016) is the commercial "flight recorder for your code" for .NET/Java/Python/JavaScript. Value prompts show variable values inline in source during replay; global search spans the entire recording; session recording is explicitly marketed for **production** use alongside end-to-end tracing and topology discovery — an observability platform with a time-travel debugger front-end.
-
-All four make the same design bets ODB made: record through bytecode instrumentation, store as events, replay through a trace-as-database UI. They differ on **where the overhead lands** — Chronon on the target JVM, TOD on a database cluster, IntelliTrace on snapshot size, RevDebug on commercial-grade scoping heuristics — and on **where the product boundary sits**: IDE plugin (Chronon/IntelliTrace), research prototype (TOD), commercial observability platform (RevDebug). The pattern is mature enough that choosing among them is an engineering trade-off, not a research question.
+Status (as of 2026-04): Chronon, IntelliTrace, and RevDebug are commercial products; TOD is an academic system.
 
 Sources: https://wiki.jvmlangsummit.com/Chronon_-_Time_Travelling_Debugger and https://pleiad.cl/tod/ and https://learn.microsoft.com/en-us/visualstudio/debugger/intellitrace and https://revdebug.com/
 
 ### 3.10. Decorator-Based Omniscient Tracing — PySnooper, snoop, viztracer
 
-For languages with runtime tracing hooks (`sys.settrace` in Python, `TracePoint` in Ruby), omniscient-style debugging is often achievable with a **single decorator and no infrastructure**. The Python ecosystem has produced three tools in this category, each progressively richer.
+For languages with runtime tracing hooks (`sys.settrace` in Python, `TracePoint` in Ruby), omniscient-style debugging is achievable with a **single decorator and no infrastructure**: apply the decorator to a function, run, inspect the play-by-play log of every line executed and every variable assignment. No setup, no breakpoints, no database. The Python ecosystem ships three tools in this category, each adding something to the base shape:
 
-**PySnooper** (Ram Rachum, 2019) — "a poor man's debugger." Apply `@pysnooper.snoop()` to a function, and the decorator writes a play-by-play log of every line executed and every variable assignment to stderr or a file. No setup, no breakpoints, no database. `watch=('foo.bar', 'self.x[...]')` lifts arbitrary expressions into the log; `depth=N` traces into nested calls.
+- **PySnooper** (Ram Rachum, 2019): the base — `@pysnooper.snoop()` writes line-and-assignment logs to stderr or a file; `watch=` lifts arbitrary expressions; `depth=N` traces nested calls.
+- **snoop** (Alex Hall): adds `pp(expr)` icecream-like structured print (§6.3) and `pp.deep(lambda: expr)` which logs every intermediate subexpression in evaluation order — a lightweight version of Pernosco's reverse dataflow (§2.2) via AST rewriting.
+- **viztracer**: captures function entry/exit events via `sys.setprofile` plus a C extension, writes Perfetto-format JSON, opens in a Perfetto UI tab; handles threading, multiprocessing, asyncio, subprocess, and PyTorch natively, with `min_duration` and `log_sparse` filters for long runs.
 
-**snoop** (Alex Hall) extends PySnooper with several worthwhile additions. `pp(expr)` is icecream-like structured print (§6.3); `pp.deep(lambda: expr)` **logs every intermediate subexpression in the order the expression evaluated them** — a lightweight version of Pernosco's reverse dataflow (§2.2) implemented via AST rewriting. Uses Alex Hall's `executing` library to reliably locate source positions, same as icecream.
-
-**viztracer** captures function entry/exit events at Python level (via `sys.setprofile` plus a C extension for low overhead), writes them as Perfetto-format JSON, and opens the result in a Perfetto UI tab (`vizviewer result.json`). Handles threading, multiprocessing, asyncio, subprocess, and PyTorch natively. Filters reduce captured volume (`min_duration`, `log_sparse` mode) for long-running programs.
-
-The design lesson: **if the language runtime exposes per-line or per-function callback hooks, decorator-based omniscient tracing is a ~100-line library**. No modified VM, no recording infrastructure, no server. The cost is runtime overhead (10–100× depending on configuration), but the workflow is "add a decorator, run once, inspect output." For exploratory debugging of a specific function, this is the cheapest omniscient pattern available in any mainstream language.
+The design lesson: **if the language runtime exposes per-line or per-function callback hooks, decorator-based omniscient tracing is a ~100-line library**. The cost is 10–100× runtime overhead depending on configuration, but the workflow is "add a decorator, run once, inspect output" — the cheapest omniscient pattern available in any mainstream language for exploratory debugging of a specific function.
 
 Sources: https://github.com/alexmojaki/snoop and https://pypi.org/project/PySnooper/ and https://viztracer.readthedocs.io/en/latest/viztracer.html
 
 ### 3.11. Redux DevTools — Omniscient Over Application State
 
-Redux is a predictable state container for JavaScript where all state transitions happen through pure reducer functions on immutable actions. Redux DevTools exploits that discipline for **omniscient debugging over application state, not over execution**.
+Redux DevTools applies Elm's time-travel pattern (§3.3) to the JavaScript ecosystem: record every action dispatched to the store, replay actions from initial state to reach any historical point, skip/reorder/import/export sessions. Because reducers are pure functions on immutable actions, no process snapshot is needed.
 
-The mechanism is direct: record every **action** dispatched to the store. Because reducers are deterministic pure functions, the full state at any point in history can be re-derived by replaying actions from initial state — **no process snapshot needed, ever**. Click any action in the DevTools action list and the application state snaps to that point; the UI re-renders under the restored state. **Skip** an action (treat it as if it never dispatched) to test counterfactuals. **Reorder**, **import**, **export**, **persist** via URL hash (`?debug_session=reproducing_weird_bug` restores a named session across page loads).
-
-This is Elm's time-travel pattern (§3.3) at the scale of the mainstream JS ecosystem. It works for the same reason Elm's does: **if state transitions are pure functions of immutable inputs, replay is free.** The pattern is the engineering expression of a language-design constraint, not a debugger feature bolted onto an arbitrary runtime.
-
-Replay.io's Redux panel (§6.1) extends this further: because Replay records the *browser process*, not just the store, it can inspect non-serializable objects in any reducer after replaying to that dispatch. Pure Redux DevTools is limited to JSON-serializable state; Replay + Redux DevTools closes that gap by layering the omniscient execution recording underneath the action-replay view.
-
-The design lesson for new languages: **every design decision that makes state transitions pure or immutable drops an entire class of debugger infrastructure into the language for free**. Elm got time travel from `update : Msg -> Model -> Model`. Redux got it from JS by convention. A language enforcing the pattern gets it by construction, without any ODB-style trace recorder.
+The distinct contribution beyond §3.3 is the **Replay.io integration**: because Replay records the *browser process*, not just the store, it can inspect non-serializable objects in any reducer after replaying to that dispatch. Pure Redux DevTools is limited to JSON-serializable state; Replay + Redux DevTools closes that gap by layering the omniscient execution recording (§6.1) underneath the action-replay view.
 
 Source: https://github.com/reduxjs/redux-devtools
 
@@ -393,7 +405,7 @@ Live code replacement sits between debugging and compilation. The user edits cod
 
 Visual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk images, Flutter hot reload, Clojure REPL-driven development, and browser hot-module replacement all pick different points in the design space. The core problems are stable function identity, active-frame migration, closure layout changes, object shape changes, inlined-frame deoptimization, and coexistence of old and new code.
 
-This is the modern industry continuation of the Pharo (§3.4) and Common Lisp (§3.5) live-edit lineage: the difference is that managed runtimes (CLR, JVM, Dart VM) supply the deoptimization machinery the original reflective systems built into the language. The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Debuggers become dramatically more powerful if the runtime can deoptimize optimized frames back into an inspectable representation before applying a patch.
+This is the modern industry continuation of the Pharo (§3.4) and Common Lisp (§3.5) live-edit lineage: the difference is that managed runtimes (CLR, JVM, Dart VM) supply the deoptimization machinery the original reflective systems built into the language. The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Deoptimizing optimized frames back to an inspectable representation before applying a patch is what makes hot replacement debuggable; the OSR / deopt machinery itself is owned by `COMPILERS.md §14.2`.
 
 Sources: https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue, https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html, and https://docs.flutter.dev/tools/hot-reload
 
@@ -415,11 +427,7 @@ Source: https://whitebox.systems/
 
 ### 4.2. Bret Victor — Timeline Scrubber
 
-Bret Victor's "Inventing on Principle" talk (2012) proposed that execution isn't something you "step through" — it is a **timeline you scrub with a slider**. Every line of code has its execution history visualized alongside it. You drag a slider and see how values change over time.
-
-This requires recording all state, but for a simple interpreter it is tractable. The visualization shows not just "what is the current value" but "how did this value evolve over the lifetime of the program."
-
-The deeper claim: the step-by-step debugging model is a legacy of hardware limitations. With sufficient recording, the entire execution history is available simultaneously. The UI should present time as a spatial dimension, not a sequential process. No general-purpose programming environment has fully delivered the entire vision in production, but domain-specific and notebook-style systems have shipped important slices of it (§4.3).
+Bret Victor's "Inventing on Principle" talk (2012) proposed that execution is a timeline you scrub with a slider rather than something you step through, with each line's execution history visualized alongside the source. The vision drove later live-coding environments (§4.3), where the shipped slices of the idea are surveyed.
 
 Source: https://vimeo.com/36579366
 
@@ -569,7 +577,7 @@ Most mainstream reflection APIs — Java `Class.getMethods()`, Python `inspect`,
 The implementation: reflective capability is isolated into **mirror objects** that must be obtained explicitly, not through ambient `.getClass()`. Without a mirror in hand, a program has *no* reflective power. Newspeak (Bracha's language) has no static state and no globals; the top-level object receives a `platform` parameter as its sole connection to the outside world, and `platform` is the only way to obtain mirrors — a capability-security design.
 
 The consequence for debuggers is direct. A debugger is structurally a program holding mirrors on a target program. Mirror principles make this compose cleanly:
-- **Remote debugging** becomes natural: a mirror in the debugger process can stand for an object in the target process, because the mirror *is* the interface. JDWP/JDI (§5.5) already has this shape; the Bracha paper names why it's right.
+- **Remote debugging** maps a mirror in the debugger process to an object in the target process — JDWP/JDI (§5.5) is the lived example of this shape; the Bracha paper names why it's right.
 - **Sandboxing**: untrusted base-level code that cannot obtain mirrors cannot introspect itself — a capability-security property, not a runtime check.
 - **Language-neutral protocols**: mirror interfaces generalize across implementations because the base language's ontology is what's mirrored, not the implementation's object layout.
 
@@ -601,11 +609,11 @@ Sources: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html
 
 ## 6. Retroactive and Partial Evaluation
 
-The debugger does not have to exist at a separate moment from the program. Entries in this chapter collapse debugging *into* the edit/run cycle: Replay.io adds print statements retroactively *after* the bug occurred; Hazel evaluates programs with typed holes so every keystroke produces feedback; `dbg!` / `dbg/2` / icecream turn print debugging into a compiler-macro feature with zero attach-step. The axis is **when the diagnostic is introduced** — before execution, during editing, or after recording.
+The debugger does not have to exist at a separate moment from the program. Entries in this chapter collapse debugging *into* the edit/run cycle along the axis of **when the diagnostic is introduced** — before execution, during editing, or after recording. Replay.io adds print statements retroactively *after* the bug occurred (recorded execution becomes a query target); Hazel evaluates programs with typed holes so every keystroke produces feedback (the unfinished program is its own debugger surface); `dbg!` / `dbg/2` / icecream turn print debugging into a compiler-macro feature with zero attach-step (the diagnostic is part of the source). Each entry shifts the boundary between "writing code" and "debugging code" toward continuity.
 
 ### 6.1. Replay.io — Retroactive Console.log
 
-Replay.io is a time-travel debugger for web applications that records a browser session deterministically. The unique feature: after recording, you can **add console.log statements retroactively**. Click on a line of code, type an expression, press enter — and the logged values appear in the console as if the log statement had always been there.
+Status (as of 2026-04): commercial service. Replay.io is a time-travel debugger for web applications that records a browser session deterministically. The unique feature: after recording, you can **add console.log statements retroactively**. Click on a line of code, type an expression, press enter — and the logged values appear in the console as if the log statement had always been there.
 
 The implementation: Replay maintains a pool of forked browser processes at various points in the recording. When you add a retroactive print statement, Replay finds the nearest process fork, replays forward to each point where the line executes, evaluates the expression, and returns the results. Because the work is done in parallel across multiple forks, and no fork is more than ~100ms away from a checkpoint, results appear in "low logarithmic time."
 
@@ -629,7 +637,7 @@ Sources: https://hazel.org/ and https://arxiv.org/abs/1805.00155
 
 ### 6.3. Structured Print Debugging — Rust `dbg!`, Elixir `dbg/2`, icecream
 
-Print debugging is universal and universally apologetic. Rust's `dbg!()` macro (stabilized 2019), Elixir's `dbg/2` (2022), and Python's `icecream` (plus its 15+ community ports) turn it into a language-level feature worth using *in preference to* a traditional debugger for a large class of bugs.
+Print debugging is universal and universally apologetic. Rust's `dbg!()` macro (stabilized 2019), Elixir's `dbg/2` (2022), and Python's `icecream` (plus its 15+ community ports) turn it into a language-level feature that — for a large class of bugs — substitutes for traditional interactive debuggers, trading interactive stepping for zero-setup source-level traces.
 
 The design pattern is shared across all three implementations:
 1. **Expression-returning**: `dbg!(x + 1)` returns its argument, so it is insertable into any expression position without restructuring code — `let y = dbg!(f(x)) + 1;` works.
@@ -640,7 +648,7 @@ The design pattern is shared across all three implementations:
 
 The original contribution is *meta*: the debugger is the compiler macro itself. There is no attach step, no breakpoint lookup, no DWARF, no protocol. The cost is zero when the line is removed, and full-source-context when the line is present. This generalizes Chris Wellons's INT3;NOP pattern (§1.2) — compile the debugging directly into the code — but at language level rather than assembly level, and with the language's own formatter doing the work.
 
-For a new language, the implementation cost is small: a macro that captures `stringify!(expr)` and `file!()/line!()` alongside the evaluated value. The ergonomic payoff is large enough that the 15-port community ecosystem formed around Python's `ic()` within a few years.
+For a language designer, the implementation cost is small: a macro that captures `stringify!(expr)` and `file!()/line!()` alongside the evaluated value. The ergonomic payoff is large enough that the 15-port community ecosystem formed around Python's `ic()` within a few years.
 
 Sources: https://doc.rust-lang.org/std/macro.dbg.html and https://www.germanvelasco.com/blog/using-dbg-to-replace-io-inspect-and-pry-into-code and https://github.com/gruns/icecream
 
@@ -676,6 +684,8 @@ For JIT-compiled languages, the problem is worse: the JIT must emit debug inform
 
 The lesson: debug information is not optional metadata bolted on at the end. It is a cross-cutting concern that every compilation pass must maintain. Designing the IR with debug info propagation in mind (as LLVM does with `!dbg` metadata on every instruction) is essential.
 
+Source: https://llvm.org/docs/SourceLevelDebugging.html
+
 ### 7.3. Bytecode-to-Native Source Map — Apache Harmony / HotSpot
 
 JVMs maintain metadata that maps between bytecode offsets, source positions, and relevant native-code addresses. For debuggable or deoptimizable code, the JIT records enough information to map selected native PCs back to bytecode/source locations, handle safepoints, and reconstruct inlined frames. This allows a breakpoint requested at a bytecode offset to be implemented in native code where possible, and allows a native fault or sampled PC to be explained via native address → bytecode offset → line number table. The mapping is implementation-dependent and becomes approximate or many-to-many under optimization and inlining.
@@ -702,7 +712,9 @@ Sources: https://sourceware.org/elfutils/Debuginfod.html and https://sourceware.
 
 ## 8. Automated Fault Isolation
 
-Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), or aggregated value-histories (Daikon's dynamic invariants). The debugger becomes an automated search engine with a domain-specific query.
+Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), aggregated value-histories (Daikon's dynamic invariants), or whole-program SMT formulae over bounded executions (CBMC). The debugger becomes an automated search engine with a domain-specific query.
+
+A unifying design lesson runs through §§8.9–8.11: **make values, computations, and intent observable at semantic program points**. Whyline reifies the connection from outputs back to the code that produced them (provenance); Shapiro's algorithmic debugging reifies the computation tree so the user can answer yes/no on each subgoal's intended result (semantic intent); Daikon mines invariants over instrumented runs (population-statistics intent). Each technique requires the compiler/runtime to expose more than raw memory reads — function entries/exits, loop heads, algebraic constructors, effect boundaries, output provenance — and rewards languages that emit such events with debuggers users do not have to translate from machine state into mental model.
 
 ### 8.1. Delta Debugging — Minimizing Failure-Inducing Input
 
@@ -726,7 +738,7 @@ Mark Weiser introduced program slicing in 1981: given a variable at a program po
 
 The practical application: when a variable has a wrong value, the dynamic backward slice tells you exactly which statements contributed to that value. This is a mechanical version of what programmers do mentally — "where did this value come from?" — but computed automatically.
 
-Dynamic slicing is closely related to Pernosco's reverse dataflow tracking. The difference is granularity: program slicing operates on source statements, while Pernosco operates on individual memory writes and register transfers.
+Granularity is the distinguishing axis from reverse dataflow tracking (see §2.2): program slicing operates on source statements, while Pernosco operates on individual memory writes and register transfers.
 
 Sources: https://en.wikipedia.org/wiki/Program_slicing and http://www0.cs.ucl.ac.uk/staff/mharman/sf.html
 
@@ -770,7 +782,7 @@ Running this at several execution points produces a **cause-effect chain**: a se
 
 The only tool dependency is a debugger that can **read and write variables in arbitrary frames of a live process**. Zeller used GDB. The output is what programmers construct by hand when they "work backwards" from a crash, except mechanically derived and explicitly causal under an interventional definition — not "this variable correlates with failure" (Tarantula) but "changing this variable makes the failure go away."
 
-The connection to Pernosco (§2.2) is direct: Pernosco's reverse dataflow is a memory-level refinement of the same idea, operating on register transfers rather than source variables, and on a recorded trace rather than two live runs. Cause-effect chains are the *interventional* version; reverse dataflow is the *observational* version.
+Cause-effect chains are the *interventional* counterpart to Pernosco's *observational* reverse dataflow (§2.2).
 
 Sources: https://www.st.cs.uni-saarland.de/papers/fse2002/ and https://www.cs.umd.edu/~atif/zeller.pdf
 
@@ -808,7 +820,7 @@ Sources: https://afl-1.readthedocs.io/en/latest/fuzzing.html and https://chromiu
 
 Miri (Ralf Jung et al., 2017–) interprets Rust's MIR one operation at a time and, in doing so, detects **Undefined Behavior as it happens**, not as a statistical consequence of a downstream crash. It sits in §8 because its purpose is fault isolation: pinpoint the exact MIR statement and memory state where safety is violated.
 
-The architecture reuses the compiler's `rustc_const_eval::interpret` engine — the same one that evaluates `const fn` at compile time — and extends it via a `Machine` trait whose `MiriMachine` implementation adds threading, file I/O, optional FFI, and per-allocation metadata. Every MIR operation goes through UB checks: out-of-bounds (allocation bounds check), use-after-free (`AllocId` marked dead on deallocation), read of uninitialized memory (per-byte initialization bitmask in the `Allocation` struct), misaligned access (symbolic or int alignment mode), invalid value (`ValidityVisitor` — a `bool` must be 0 or 1, a `&T` must be non-null and aligned, a `char` must be a valid scalar), and **aliasing-model violations** under Stacked Borrows or Tree Borrows (Miri's experimental formal models of Rust's aliasing rules).
+The architecture reuses the compiler's `rustc_const_eval::interpret` engine — the same one that evaluates `const fn` at compile time — and extends it via a `Machine` trait whose `MiriMachine` implementation adds threading, file I/O, optional FFI, and per-allocation metadata. Every MIR operation goes through UB checks: out-of-bounds (allocation bounds check), use-after-free (`AllocId` marked dead on deallocation), read of uninitialized memory (per-byte initialization bitmask in the `Allocation` struct), misaligned access (symbolic or int alignment mode), invalid value (`ValidityVisitor` — a `bool` must be 0 or 1, a `&T` must be non-null and aligned, a `char` must be a valid scalar), and aliasing-model violations under Stacked Borrows or Tree Borrows (the latter experimental as of 2026-04). The Stacked Borrows / Tree Borrows model itself is owned by `MEMORY.md §1.3` (aliasing rules) and `MEMORY.md §8.11` (verification angle); this section covers only Miri's role as the runtime checker.
 
 The original contribution, in this survey's frame, is: **the debugger is an interpreter that speaks the compiler's own IR**. Compiler and debugger share an engine. This is possible because Rust's MIR is an explicit, well-typed IR designed for analysis; the const-evaluator exists regardless of Miri. Extending it to full program execution with instrumentation was an *engineering* step, not a *design* one. No other mainstream language has this property today — although Zig's comptime evaluator and Koka's algebraic-effects interpreter are in the same family.
 
@@ -826,7 +838,7 @@ Selecting a question (the Alice example: *"Why didn't Pac resize 0.5?"*) trigger
 
 Evaluation: comparing identical debugging scenarios, programmers using Whyline debugged 7.8× faster than without it; novices with Whyline outperformed experts without it; task-completion improved by 40%. The Java Whyline (2008) generalized the approach from Alice's tiny educational language to a mainstream ecosystem by recording execution traces with enough metadata to answer both kinds of questions retroactively on the trace.
 
-Philosophically this sits alongside Pernosco (§2.2): both use a recorded execution as a queryable database, but Whyline's contribution is the *interrogative UI* — users don't compose queries, they pick from an auto-generated list derived from what's currently on the output. The language-design lesson: if the compiler tracks enough provenance to connect output values back to the code that produced them, an interrogative debugger is a reasonable feature to ship — not a research aspiration.
+Philosophically this sits alongside Pernosco (§2.2): both use a recorded execution as a queryable database, but Whyline's contribution is the *interrogative UI* — users don't compose queries, they pick from an auto-generated list derived from what's currently on the output. (See chapter intro on the §§8.9–8.11 provenance/intent lesson.)
 
 Sources: https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf and https://faculty.washington.edu/ajko/papers/Ko2004Whyline.pdf
 
@@ -840,9 +852,7 @@ The original contribution is that **nondeterministic control flow needs a richer
 
 **Algorithmic debugging** (Ehud Shapiro, MIT PhD 1982, published as *Algorithmic Program Debugging*, MIT Press) is a different mechanism. Given a program that produced a **wrong answer**, Shapiro reifies the **computation tree** of that answer — each node is a subgoal call and its observed result — and **asks the user yes/no questions** about whether each subgoal's result is intended: *"Did `factorial(5)` return 120? Correct? Y/N."* The debugger bisects the tree based on the user's answers, converging on the smallest subtree where the result is wrong but all its children were correct — **isolating the buggy clause mechanically, without the user inspecting code.**
 
-This is **declarative debugging**: the user reasons about *intended semantics*, not operational behavior. The debugger infers the buggy code by triangulating between what the program did and what the user says should have happened. Extensions spread beyond Prolog: Naish's Mercury debugger, lazy functional-logic variants (Wadler-style), declarative diagnosers for constraint logic programming. For a language whose semantics the programmer understands better than its operational trace — which is most languages — declarative debugging complements every step-through technique in this document.
-
-The design lesson for a new language: **the question the debugger asks the user is a choice**. "Where should I step?" (traditional), "Why did X happen?" (Whyline §8.9), "Is this result correct?" (Shapiro). The last is the cheapest for the user — it requires zero code knowledge beyond semantic intent — and the most powerful when the language's evaluator can reify its own computation tree.
+This is **declarative debugging**: the user reasons about *intended semantics*, not operational behavior. The debugger infers the buggy code by triangulating between what the program did and what the user says should have happened. Extensions spread beyond Prolog: Naish's Mercury debugger, lazy functional-logic variants (Wadler-style), declarative diagnosers for constraint logic programming. The question the debugger asks the user is a design choice — "Where should I step?" (traditional), "Why did X happen?" (Whyline §8.9), "Is this result correct?" (Shapiro) — and the last is the cheapest for the user when the evaluator can reify its own computation tree.
 
 Sources: https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model and http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html
 
@@ -850,11 +860,31 @@ Sources: https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model and http:
 
 Dynamic invariant detectors observe executions and infer properties that appear to hold: `x <= y`, `len(buffer) == count`, `field != null`, "this collection is sorted", or "this function returns a value larger than its argument." Daikon (Ernst et al.) is the canonical system: it instruments programs, records values at program points, and emits likely invariants that could be written as assertions, contracts, or documentation.
 
-This is useful for fault isolation because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations. False positives are expected — the technique depends on test quality — but even false invariants reveal missing tests or underspecified behavior.
-
-The language-design lesson: **make values observable at semantic program points**. If the compiler can expose function entries/exits, loop heads, object fields, algebraic data constructors, and effect boundaries in a typed trace format, invariant mining becomes much more accurate than raw memory observation. Daikon is the population-statistics sibling to CBI (§8.4): both extract bug signal from many runs, with Daikon mining invariants and CBI mining failure-correlated predicates.
+This is useful for fault isolation because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations. False positives are expected — the technique depends on test quality — but even false invariants reveal missing tests or underspecified behavior. Daikon is the population-statistics sibling to CBI (§8.4): both extract bug signal from many runs, with Daikon mining invariants and CBI mining failure-correlated predicates. (See chapter intro on observable-program-points design lesson.)
 
 Sources: https://plse.cs.washington.edu/daikon/ and https://plse.cs.washington.edu/daikon/pubs/
+
+### 8.12. CBMC — Bounded Model Checking for Production C/C++/Rust
+
+Edmund Clarke's **CBMC** (C Bounded Model Checker, 2000+; CMU originally, now University of Oxford and Diffblue) is one of the most-deployed production verifiers for C and C++. CBMC translates a C program plus a set of assertions into a SAT/SMT formula whose unsatisfiability is equivalent to the assertions holding for **all executions up to a bounded loop unroll depth**. The verifier is **bounded**: it cannot prove correctness for unbounded loops in general, but it can prove that no assertion violation, no memory-safety violation, and no integer-overflow occurs within the chosen bound.
+
+The architectural distinction from KLEE (§8.6): KLEE *symbolically executes* a program, exploring path conditions and asking the solver whether each path is feasible; CBMC *encodes the entire program* (within bounds) as one large SMT formula and asks the solver whether any satisfying assignment violates an assertion. CBMC's encoding is more direct for verification (no path-explosion at the analysis level if the bound is reasonable); KLEE's exploration is better for test generation (each path produces a concrete reproducer). Both use SMT solvers underneath (Z3, MathSAT, CVC5, Bitwuzla), and the two are complementary tools rather than substitutes.
+
+Distinguishing features:
+
+- **Memory safety by default**: out-of-bounds, null-deref, double-free, use-after-free, integer overflow, and division-by-zero are checked automatically with `--memory-leak-check`, `--bounds-check`, `--pointer-check` flags.
+- **Concurrency support**: `--mm tso` and `--mm pso` model x86-TSO and PowerPC-style weak-memory orderings; thread interleavings are bounded by `--unwind` plus `--unwinding-assertions`. This is the most widely-used production verifier for concurrent C code's memory-model behaviour.
+- **Loop unwinding with proof obligations**: `--unwind 10 --unwinding-assertions` unrolls loops up to 10 iterations *and* generates an assertion that 10 iterations were sufficient (i.e., the loop terminates within 10 in all considered executions). If the unwinding-assertion fails, the bound was insufficient and the verification is incomplete; the user must increase the bound or prove the loop terminates by other means.
+- **C++ support via `goto-cc`**: Clarke, Kroening et al.'s `goto-cc` translates C/C++ source to GOTO programs (CBMC's IR), then CBMC analyses them.
+- **Counter-example traces**: when an assertion fails, CBMC emits a step-by-step trace including assignments, branch conditions, and function calls — directly debuggable, comparable to a normal debugger session.
+
+Production deployment is the largest in this verifier family. **AWS** uses CBMC extensively for verifying memory safety of C code: the **AWS Encryption SDK**, **FreeRTOS** kernel verification, **Amazon S3** server code, parts of **Amazon Linux**, and the Rust-to-C interop layer for AWS Lambda. **Diffblue** uses CBMC for Java test generation. **FAA-certified avionics** software routinely uses CBMC for memory-safety properties under DO-178C certification. **Kani** (model-checking for Rust) uses CBMC as its SMT-encoding backend, making CBMC the substrate for AWS-scale Rust formal verification.
+
+Distinct from Miri (§8.8): Miri interprets one execution; CBMC verifies all bounded executions. Distinct from Verus (`MEMORY.md §8.3`): Verus targets full functional correctness with linear-permission discipline; CBMC targets memory-safety + assertion-violation absence within loop bounds. Distinct from Kani: Kani is a Rust frontend over CBMC, so Kani inherits CBMC's bounded discipline.
+
+Status (as of 2026-04): CBMC is open-source under BSD license, actively maintained by University of Oxford and the Diffblue team. CBMC ~6.0+ ships with substantial Rust support via Kani, making it the substrate for Rust formal verification at AWS scale. Edmund Clarke received the 2007 Turing Award for the development of model checking, and CBMC is the most-deployed production embodiment of that work.
+
+Sources: https://www.cprover.org/cbmc/ and https://github.com/diffblue/cbmc and https://www.cprover.org/cprover-manual/cbmc/cbmc-tutorial/ and https://model-checking.github.io/kani/
 
 ---
 
@@ -872,7 +902,7 @@ The design lesson framing the rest of this chapter: **async debugging requires r
 
 ### 9.2. Go — `runtime/trace` + Delve Goroutine Awareness
 
-Go's runtime emits **scheduler events** — goroutine creation, blocking on channels/mutexes/syscalls, unblocking, GC pauses, system-monitor activity — into a per-thread ring buffer enabled by `runtime/trace.Start`. The result is a structured event stream that `go tool trace` visualizes as a per-goroutine timeline, with synchronization edges connecting senders to receivers across the goroutine graph. The mechanism is the same one TRACERS §3.5 covers from the always-on observability angle; for *debugging*, the same trace tells the operator which goroutine got stuck where.
+Go's runtime emits **scheduler events** — goroutine creation, blocking on channels/mutexes/syscalls, unblocking, GC pauses, system-monitor activity — into a per-thread ring buffer enabled by `runtime/trace.Start`. The result is a structured event stream that `go tool trace` visualizes as a per-goroutine timeline, with synchronization edges connecting senders to receivers across the goroutine graph. The mechanism is the same one `TRACERS.md §3.5` covers from the always-on observability angle; for *debugging*, the same trace tells the operator which goroutine got stuck where.
 
 **Delve** is the Go debugger's runtime-aware front-end. `goroutines` lists every live goroutine with its current state (running, runnable, waiting on chan/syscall/mutex/io), the user-level function it last entered, and the blocked-on resource. `goroutine N` switches the debugger context to goroutine N so subsequent `bt`, `frame`, `print` commands operate on its stack rather than the current OS thread's executor stack. This is the cleanest production realization of "the debugger natively understands the runtime's concurrency primitive" — Delve is built knowing about `g`, `m`, `p` structures and walks them directly.
 
@@ -916,15 +946,9 @@ Concurrency bugs evade step-through debugging. Data races disappear when the sch
 
 ### 10.1. ThreadSanitizer v2 — Hybrid Happens-Before + Lockset
 
-ThreadSanitizer (Serebryany, Iskhodzhanov, PACT 2009; v2 rewrite 2013) is a dynamic data-race detector shipped in Clang and GCC as `-fsanitize=thread`. Unlike v1 (Valgrind-based, slow), TSan v2 is **compiler-instrumented** — the compiler inserts shims around every memory access and synchronization primitive — making it ~20× faster than v1 and fast enough to run on full Chromium browser binaries, not just unit tests.
+ThreadSanitizer (Clang/GCC `-fsanitize=thread`) is the canonical dynamic data-race detector. From the debugger's side, the workflow is: build with `-fsanitize=thread`, run the failing test, and on a detected race the runtime prints both stack traces, both thread IDs, and the held-mutex list — a debugger-grade artifact suitable for triage without requiring a paused process. The Go race detector (`go build -race`) ships the same runtime with Go-specific happens-before rules for channels and `sync` primitives. A dynamic annotations API (`ANNOTATE_HAPPENS_BEFORE` / `_AFTER`) and per-issue suppression files let projects teach the detector about custom synchronization or mask known-benign reports.
 
-The algorithm is **hybrid: happens-before + lockset**. For every memory location, TSan maintains shadow memory recording the thread ID, clock, and synchronization context of recent accesses. On each access, it checks whether the accessing thread's vector clock establishes a happens-before relation to the previous accessor. If yes — no race. If no, and the locksets held by the two threads do not intersect — race reported, with both stack traces, both thread IDs, and the held-mutex list.
-
-The scope extends beyond pure races. TSan v2 detects **lock-order-inversion deadlocks** (cycles in a lock-graph it builds at runtime), **destruction of locked mutexes**, **use-after-free in concurrent code**, **async-signal-unsafe calls inside signal handlers**, **leaked threads**, and **races on vptr, file descriptors, and `pthread_barrier_t`**. It recognizes `std::atomic` and `__atomic_*` intrinsics, so lockless code is analyzed correctly. A **dynamic annotations API** (`ANNOTATE_HAPPENS_BEFORE` / `_AFTER` / `_IGNORE_WRITES_BEGIN`) lets user code teach TSan about custom synchronization not expressible in pthreads or standard atomics.
-
-The trade-offs: 5–15× slowdown and 5–10× memory overhead from shadow state (~1 shadow byte per program byte of memory touched), plus the fundamental limit that TSan only finds races *that actually occurred on an instrumented execution* — scheduler coverage still matters. Suppressions files (`race:`, `deadlock:`, `thread:`, `mutex:`, `signal:` prefixes) mask benign or unfixable races in third-party code.
-
-The design lineage: TSan descends from Helgrind (Valgrind) and inspires RacerD (Facebook, static). Go's built-in race detector (`go build -race`) is a TSan runtime with Go-specific happens-before rules for channels, `sync` primitives, and the scheduler. The language-design lesson: **if the runtime owns synchronization primitives** (Go's `go`, channels, mutex; a language's actor runtime; a language's effect system), happens-before tracking can be exhaustive with low overhead because every synchronization point is a known call site.
+The mechanism details (compiler-inserted shadow memory, hybrid happens-before + lockset algorithm, ~5–15× slowdown, lock-order-inversion and signal-handler-unsafety detection) are owned by `TRACERS.md §8`; the safety-model framing is owned by `MEMORY.md`. This section covers only the debugger-use surface — race reports as triage input — and the design lesson that if the runtime owns its synchronization primitives, the debugger sees an exhaustive happens-before lattice for free.
 
 Sources: https://research.google.com/pubs/archive/35604.pdf and https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs
 
@@ -952,7 +976,7 @@ Sources: https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/too
 
 ## 11. Post-Mortem and Out-of-Process Debugging
 
-Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint, a hardware-probe halt, or a curated crash artifact — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, the hardware substrate beneath embedded targets, the production pipelines that ship crash artifacts off failing machines, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (§2.7) is the non-crash sibling: checkpoint a *healthy* program for later inspection.
+Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint, a hardware-probe halt, or a curated crash artifact — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, the hardware substrate beneath embedded targets, the production pipelines that ship crash artifacts off failing machines, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (§2.7) is the non-crash sibling — checkpoint a *healthy* program for later inspection — and is contrasted with VS Snapshot (§2.3) in the record-and-replay chapter rather than repeated here.
 
 ### 11.1. Core Dumps — ELF Cores, `coredump_filter`, On-Demand Snapshots
 
@@ -974,9 +998,9 @@ The mechanism: at boot, `kexec -p` loads a small capture kernel into a reserved 
 
 The **`crash` utility** (Dave Anderson, Red Hat) is a **kernel-aware debugger** for the resulting vmcore. Unlike GDB, which understands ELF+DWARF but not kernel data structures, `crash` understands `task_struct`, slab allocators, zone allocators, the kernel log ring buffer, and per-CPU data. Commands include `bt` (cross-task backtrace), `ps` (process list from `task_struct`s), `kmem -s` (slab contents), `rd`/`wr` (raw memory read/write), `files` (open files per task), `log` (ring buffer extraction). It links against `vmlinux`'s debug info (or a separate `-debuginfo` package) and cross-references structures by offset.
 
-**`makedumpfile`** shrinks the vmcore before write — a full vmcore equals physical RAM, intolerable for a 256 GB server. `makedumpfile -c -d 31` compresses and excludes zero, free, cache, and user-space pages, typically reducing the dump to 1–10% of original size while preserving kernel state.
+**`makedumpfile`** shrinks the vmcore before write (full vmcore = physical RAM); `makedumpfile -c -d 31` compresses and excludes zero/free/cache/user pages, typically reducing the dump to 1–10% of original size.
 
-**`pstore`** is the embedded-system variant. No reserved memory for a capture kernel, so the kernel writes oops traces and console log to persistent storage — ACPI ERST, MTD flash, or `ramoops` backed by DRAM that survives a soft reboot — for retrieval after the next boot. Useful when the bug reboots the machine before kdump can run.
+**`pstore`** is the embedded variant: no reserved capture-kernel memory, so the kernel writes oops/console-log to persistent storage (ACPI ERST, MTD flash, `ramoops` over DRAM that survives a soft reboot) for retrieval after the next boot.
 
 Sources: https://www.kernel.org/doc/html/v5.19/admin-guide/kdump/kdump.html and https://kernel-internals.org/debugging/kdump/
 
@@ -1002,7 +1026,7 @@ Embedded debugging has constraints no desktop debugger faces: no OS, no filesyst
 
 **RTT — Real-Time Transfer.** Instead of pushing logs over UART, the target writes into a **ring buffer in its own SRAM**, structured with a well-known header pattern the probe can locate by scanning RAM. The debug probe, connected over SWD or JTAG, polls the buffer over the debug interface and drains it. No UART pins, no baud-rate trade-offs, multi-MB/s throughput on some configurations.
 
-**ITM / SWO.** ARM Cortex-M cores include an on-chip **Instrumentation Trace Macrocell** that emits events over a dedicated serial wire (SWO). `defmt-itm` routes defmt frames through ITM for even lower overhead than RTT — the core's tracing hardware does the I/O without CPU polling or DMA burn. Cortex-M tracing hardware covered in more depth in `TRACERS.md §5`.
+**ITM / SWO.** `defmt-itm` routes defmt frames through ARM Cortex-M's on-chip Instrumentation Trace Macrocell over a dedicated serial wire (SWO), letting the core's tracing hardware do the I/O without CPU polling or DMA burn. The ITM/ETM/SWO substrate itself is covered in `TRACERS.md §5`; the debugger-side workflow here is just "use it as the defmt transport."
 
 **probe-rs** is the host-side Rust rewrite of OpenOCD + gdbserver. It speaks SWD/JTAG natively, flashes firmware, attaches/runs targets, and integrates with defmt and RTT out of the box. `probe-rs run` is a cargo target runner, so `cargo run` on an MCU project works like running a native binary, with defmt logs streaming to the host terminal and panic backtraces decoded by `panic-probe`. A DAP adapter is built in, so VS Code debugs MCUs the same way it debugs desktop processes. `probe-rs serve` even exposes the probe over a network so a CI machine's board farm can be driven from a developer's laptop.
 
@@ -1075,6 +1099,7 @@ Rows grouped by chapter, in chapter order.
 
 | Technique | Cost When Off | Cost When On | Key Trade-off | Examples |
 |---|---|---|---|---|
+| **Chapter 1 — Breakpoint Mechanisms** | | | | |
 | INT3 breakpoint + displaced stepping | N/A (inserted per bp) | Trap + handler per hit | Universal; displaced step avoids remove-step-reinsert race | GDB (§1.1) |
 | Compiled conditional breakpoint (INT3;NOP) | Zero until condition true | Single trap when fired | Requires source-level edit, not runtime toggle | Chris Wellons pattern (§1.2) |
 | Hardware debug registers (DR0–DR3) | Zero on unwatched access | Trap (~3μs on Linux) | Max 4 watchpoints × 8 bytes | GDB, Jane Street perftrace (§1.3) |
@@ -1082,6 +1107,7 @@ Rows grouped by chapter, in chapter order.
 | Page-protection watchpoint | Page table permission bit | Page fault + filter + reprotect | Coarse page granularity; scales beyond DR registers | `mprotect`, `VirtualProtect(PAGE_GUARD)`, guard pages (§1.5) |
 | Event breakpoint / catchpoint | Runtime event taxonomy | Stop on matching event | Needs language/runtime event IDs, not just PCs | GDB catchpoints, JDWP exception breakpoints, DevTools pause-on-exception (§1.6) |
 | Contract violation as semantic breakpoint | Contract metadata/check mode | Predicate evaluation | Needs policy: ignore/observe/enforce/debug | Eiffel, Racket contracts, Rust `debug_assert!`, C++26 contracts (§1.7) |
+| **Chapter 2 — Record and Replay** | | | | |
 | Deterministic record + replay | N/A | ~20% recording overhead; replay re-executes from checkpoints | Single-threaded scheduling, CPU counter brittleness | rr, rr.soft (§2.1) |
 | Omniscient post-hoc query DB | N/A | Minutes to build, 10s of GB | Not live; post-hoc only | Pernosco (§2.2) |
 | Out-of-band production snapshot | N/A | Bounded snapshot collection overhead | Cannot step forward from snapshot; implementation/runtime-specific | VS Snapshot Debugger (§2.3) |
@@ -1094,6 +1120,7 @@ Rows grouped by chapter, in chapter order.
 | Intel PT ring-buffer + trigger snapshot | Hardware tracing on | 2–10% continuous; snapshot on demand | Intel + Linux only; last ~10 ms only | Magic Trace (§2.10) |
 | Fork-checkpoint reverse execution | None outside debugger | Periodic `fork()` checkpoints; memory proportional to CoW divergence; replay-to-target | Bytecode/Unix only (OCaml); predates rr by ~20y | `ocamldebug`, `ocamlearlybird` (§2.11) |
 | Trace-as-SQL database | Trace ingested into SQLite tables | Per-query SQL evaluation | Needs trace stored in relational form | Perfetto TraceProcessor + PerfettoSQL (§2.12) |
+| **Chapter 3 — Omniscient / Time-Travel Debugging** | | | | |
 | Record every assignment | O(writes) storage | Per-assignment write | Not for long-running workloads | ODB (Bil Lewis) (§3.1) |
 | Structural-sharing state history | O(delta × steps) | Persistent structure sharing | Post-mortem replay, not live | Toby Ho / JSON-R (§3.2) |
 | Immutable-state timeline slider | None unless history retained | Memory proportional to retained states/deltas; replay/render cost on scrub | Cheap with immutable state, but history retention is still bounded by policy | Elm (§3.3) |
@@ -1106,13 +1133,15 @@ Rows grouped by chapter, in chapter order.
 | Decorator-only omniscient trace | `sys.settrace` hook | 10–100× on traced code | One-function scope; no infrastructure | PySnooper, snoop, viztracer (§3.10) |
 | Action-log replay over pure state | Action history array | Action re-application on jump | Requires pure reducers + immutable state | Redux DevTools (cf. Elm §3.3) (§3.11) |
 | Hot code replacement | Versioned code metadata | Patch + deopt/frame policy | Active-frame migration is hard | Visual Studio Edit and Continue, JVM HotSwap, Erlang, Flutter (§3.12) |
+| **Chapter 4 — Live Visualization** | | | | |
 | Post-execution inline visualization | N/A | Full-run recording | No pause/step — post-run only | WhiteBox (§4.1) |
-| Timeline scrubber (aspirational) | Full state capture | Viable only at small scale | UX vision, not production | Bret Victor demo (§4.2) |
-| Live coding and reactive dataflow environments | Per-cell/static dependency metadata where available | Re-evaluation or watch updates on dependency/runtime change | Observable fits the DAG model; Light Table and Eve are related but different live-programming designs | Observable, Light Table, Eve (§4.3) |
+| Timeline scrubber (aspirational) | Full state capture | Viable only at small scale | → subsumed by Observable / Light Table / Eve, see §4.3 | Bret Victor demo (§4.2) |
+| Live coding and reactive dataflow environments | Per-cell/static dependency metadata | Re-evaluation or watch updates on dependency/runtime change | Static dependency view goes blind once side effects escape the reactive model | Observable, Light Table, Eve (§4.3) |
 | Dataflow arrows + cross-cell watch | Reactive dependency graph exists | Draw arrows per audit | Visual clutter on complex sheets | Excel Trace Precedents/Dependents + Watch Window, TraceModel (§4.3) |
 | In-game replicated debug overlay | Replication cost (already paid) | Per-frame draw on viewport | Debug category coupled to gameplay code | Unreal Gameplay Debugger + Visual Logger (§4.4) |
 | Capture-and-inspect GPU frame | On-demand capture | Full frame serialized to disk | Offline only; shader debug info must be preserved | RenderDoc, NSight, PIX — pixel history + shader debugger (§4.5) |
 | Live state-machine visualizer | Per-inspection WebSocket | Event-stream dispatch | Requires instrumented runtime | XState / Stately Inspector (§4.6) |
+| **Chapter 5 — Debugger-as-Service — Transport Protocols** | | | | |
 | Shared-memory debug protocol | Memory-mapped buffers | Near-zero IPC latency | Proprietary vs standardized | RemedyBG (§5.1) |
 | JSON message debug adapter protocol | Per-message JSON | Higher latency than native APIs | Lowest-common-denominator abstraction | DAP (VS Code, Neovim, Helix, Zed, …) (§5.2) |
 | Debugger scripting API | Python import | Per-value callback | Slower than native C++ formatters | GDB Python, LLDB formatters, gdb-dashboard, pwndbg (§5.3) |
@@ -1122,13 +1151,16 @@ Rows grouped by chapter, in chapter order.
 | Mirror-based reflection | Capability required | Mirror dispatch per meta-op | Language must be designed for it | Newspeak, Self; JDWP/JDI shares the shape (§5.7) |
 | Language-specific TCP debug protocol | Zero until client connects | Per-command dispatch, spesh-aware frame reconstruction | Protocol outlives the IDE if upstreamed | MoarVM remote debug (§5.8) |
 | Debug expression evaluation | Debug metadata + evaluator | Target calls may mutate/deadlock | Requires safe subset or explicit unsafe evaluation | GDB `print/call`, LLDB expressions, DevTools console, JDWP invoke (§5.9) |
+| **Chapter 6 — Retroactive and Partial Evaluation** | | | | |
 | Retroactive console.log | Deterministic recording/checkpoint infrastructure already paid | Replay/evaluate expression at hit points across checkpoints/forks | Requires upfront deterministic recording | Replay.io (§6.1) |
 | Typed holes + live eval | Language-level holes | Per-hole type check | Requires language co-design | Hazel (§6.2) |
 | Compile-time macro print | Zero when removed | One formatter call per hit | Source-level only; not toggleable at runtime | Rust `dbg!`, Elixir `dbg/2`, icecream (§6.3) |
+| **Chapter 7 — DWARF Debug Information and Optimized-Code Challenges** | | | | |
 | DWARF location expressions | Per-variable location list | O(PC range) lookup | Correctness bugs in optimized code | GCC, LLVM (§7.1) |
 | Cross-tier debug info mapping | Per-pass metadata | Propagation cost in every pass | Must be maintained by every compilation pass | LLVM `!dbg`, V8 TurboFan frame state (§7.2) |
 | Bytecode↔native source map | Per-bytecode entry | O(1) lookup | Only available where the mapping is emitted | JVM, HotSpot (§7.3) |
 | Build-ID-keyed HTTP symbol fetch | Build-ID in ELF | HTTP GET on first use | Network dependency; sanitizer support depends on external symbolizer/distribution configuration | debuginfod + `DEBUGINFOD_URLS` (§7.4) |
+| **Chapter 8 — Automated Fault Isolation** | | | | |
 | Delta debugging | Test oracle only | Multiple oracle runs; often near-linear/log-like on easy cases, worst-case O(n²) for `ddmin` | Needs fast pass/fail oracle | `git bisect`, `ddmin` (§8.1) |
 | Dynamic program slicing | Execution trace | Post-hoc slice computation | Per-input; needs instrumented run | Weiser-derived tools (§8.2) |
 | Spectrum-based fault localization | Coverage per test | Per-line scoring | Needs passing + failing tests with coverage | Tarantula, Ochiai, DStar (§8.3) |
@@ -1141,20 +1173,25 @@ Rows grouped by chapter, in chapter order.
 | 4-port tracing for nondeterministic control | Port-instrumentation hooks | Per-port trace callback | Requires Byrd-box-aware semantics | Prolog tracers (SWI, SICStus); generalizes to coroutines/effects (§8.10) |
 | Declarative / algorithmic debugging | Computation-tree reification | User answers O(log n) yes/no | Requires user to know intended semantics | Shapiro ADP; Mercury declarative debugger (§8.10) |
 | Dynamic invariant detection | Instrumented passing runs | Trace values + infer predicates | False positives depend on test quality | Daikon (§8.11) |
+| Bounded model checking | Whole-program SMT encoding to bound depth | All bounded executions verified at once | Unwind bounds must be sufficient; not full unbounded proof | CBMC + Kani (§8.12) |
+| **Chapter 9 — Async & Coroutine Debugging** | | | | |
 | Async stack problem framing | Conceptual: physical stack ≠ logical chain | None (taxonomy) | Reconstruction requires runtime cooperation | (§9.1) |
 | Scheduler-event runtime + debugger awareness | Per-goroutine event ring buffer | Native goroutine list/switch | Requires runtime designed for it | Go `runtime/trace`, Delve (§9.2) |
 | Coroutine-state metadata + structured-concurrency graph | Continuation captures per suspension | Compiler-emitted metadata read by IDE | Best when concurrency is structured | Kotlin coroutines + Parallel Stacks (§9.3) |
 | Stitched async stack traces | Per-await stack snapshot | Bounded record at each suspension | Memory tax at every async hop | V8 / Chrome DevTools (§9.4) |
 | Out-of-band task introspection | Per-task tracing instrumentation | Opt-in `console_subscriber` | Runtime-specific; per-runtime tooling | tokio-console (§9.5) |
+| **Chapter 10 — Concurrency-Aware Debuggers** | | | | |
 | Hybrid happens-before + lockset | Shadow memory ~1 byte per byte | ~5–15× slowdown | Only finds races that execute | ThreadSanitizer, Go race detector, Helgrind (§10.1) |
 | Systematic schedule exploration | Controlled test scheduler | Many explored interleavings | State-space explosion; needs runtime-owned sync | CHESS, Rust `loom`, FoundationDB simulation (§10.2) |
 | Deadlock/liveness wait graph | Runtime wait metadata | Graph update per wait/block | Requires all blocking primitives to be known | JVM thread dumps, Go goroutine dumps, lockdep, tokio-console (§10.3) |
+| **Chapter 11 — Post-Mortem and Out-of-Process Debugging** | | | | |
 | ELF core + `coredump_filter` | Bitmask + file I/O on crash | One kernel-write | Managed runtimes need runtime-aware dumper | Core dumps, `gcore`, `qSaveCore`, SOS, SA (§11.1) |
 | kexec capture kernel + vmcore | Reserved memory at boot | Full RAM snapshot on panic | Kernel-only; dump ≈ RAM (mitigated by `makedumpfile`) | kdump + `crash` + `makedumpfile` + `pstore` (§11.2) |
 | Dual-frontend kernel debugger | `CONFIG_KGDB` compiled in | Either deadlock-safe shell or GDB-remote full source | kdb sacrifices DWARF for robustness | KGDB + KDB shared debug core (§11.3) |
 | Deferred-format embedded logging | Format strings in `.debug` only | Binary frame + host decode | Requires probe + host-side ELF | defmt + probe-rs + RTT + ITM (§11.4) |
 | Hardware probe debugging | Debug port wired in silicon | Halt/resume over JTAG/SWD | Limited breakpoints; no OS services | OpenOCD, CoreSight, probe-rs (§11.5) |
 | Production minidump pipeline | Build IDs + unwind metadata | Crash artifact upload + symbolication | Privacy and symbol availability dominate usefulness | Breakpad, Crashpad, Windows minidumps, Sentry (§11.6) |
+| **Chapter 12 — Specification-Level Debugging** | | | | |
 | Counterexample-trace navigable debugger | Model-checker output | Per-state expression evaluation | Requires finite-state verification tool | TLA+ Toolbox Trace Explorer + TLA+ Debugger (§12.1) |
 | Proof-state viewer with diffs | ITP kernel state | Per-tactic diff + widget render | Only meaningful for proof-construction languages | Lean 4 InfoView, Coq goal view, Agda typed holes (§12.2) |
 
@@ -1281,9 +1318,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 1. DWARF Debugging Format Introduction — https://dwarfstd.org/doc/Debugging-using-DWARF-2012.pdf
 2. Debug Information Validation for Optimized Code (Li et al., PLDI 2020) — https://faculty.cc.gatech.edu/~qzhang414/papers/pldi20_yuanbo1.pdf
 3. Where Did My Variable Go? (Assaiante et al., 2022) — https://export.arxiv.org/pdf/2211.09568v1.pdf
-4. Apache Harmony: Breakpoints and Single Step in JIT Mode — https://harmony.apache.org/subcomponents/drlvm/breakpoints_and_ss.html
-5. Debuginfod (elfutils) — https://sourceware.org/elfutils/Debuginfod.html
-6. GDB Debuginfod Support — https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html
+4. LLVM: Source-Level Debugging with LLVM (`!dbg` metadata) — https://llvm.org/docs/SourceLevelDebugging.html
+5. Apache Harmony: Breakpoints and Single Step in JIT Mode — https://harmony.apache.org/subcomponents/drlvm/breakpoints_and_ss.html
+6. Debuginfod (elfutils) — https://sourceware.org/elfutils/Debuginfod.html
+7. GDB Debuginfod Support — https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html
 
 ### Chapter 8 — Automated Fault Isolation
 
@@ -1309,6 +1347,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 20. Shapiro: Algorithmic Program Debugging (archive of the debugger code) — http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html
 21. Daikon Dynamic Invariant Detector — https://plse.cs.washington.edu/daikon/
 22. Daikon Publications — https://plse.cs.washington.edu/daikon/pubs/
+23. CBMC — Bounded Model Checker for C/C++ — https://www.cprover.org/cbmc/
+24. CBMC repository (Diffblue) — https://github.com/diffblue/cbmc
+25. CBMC tutorial (CProver manual) — https://www.cprover.org/cprover-manual/cbmc/cbmc-tutorial/
+26. Kani — Rust verification via CBMC — https://model-checking.github.io/kani/
 
 ### Chapter 9 — Async & Coroutine Debugging
 

@@ -65,7 +65,7 @@ A *module* is usually a source-level or language-level unit of naming and visibi
 
 This distinction matters because versioning pressure lives at the package boundary, while visibility and code navigation usually live at the module boundary. Languages that fuse the two can feel simpler, but they often pay later in awkward resolution rules or namespace churn when distribution needs evolve.
 
-For a new language, this distinction matters early. If module identity and package identity are separated cleanly, source imports can remain stable while the package manager evolves independently. If they are fused, the package manager effectively becomes part of the language's naming semantics.
+This distinction matters early in language design. If module identity and package identity are separated cleanly, source imports can remain stable while the package manager evolves independently. If they are fused, the package manager effectively becomes part of the language's naming semantics.
 
 ### 1.6. Tooling and IDE surfaces
 
@@ -98,7 +98,7 @@ In a **declaration-based** design, the source explicitly states the module it de
 
 Most practical systems mix the two. Rust's `mod` declarations create logical modules, but the filesystem still constrains where out-of-line module bodies are found. Java package names are declared, but directory structure is expected to mirror them. The real design variable is therefore not binary "file-based or declared", but **how authoritative the filesystem is**.
 
-For a new language, this matters early. A fully file-based model buys simplicity and fast tooling bootstrapping. A declared model buys flexibility and future abstraction power. A hybrid model can work well, but only if the resolution rules stay deterministic.
+This decision matters early. A fully file-based model buys simplicity and fast tooling bootstrapping. A declared model buys flexibility and future abstraction power. A hybrid model can work well, but only if the resolution rules stay deterministic.
 
 ### 2.2. Flat vs hierarchical namespaces
 
@@ -217,7 +217,7 @@ A system with runtime module objects must answer:
 
 A system that keeps module boundaries mostly compile-time can avoid many of these questions, but may need separate mechanisms later for plugins or scripting.
 
-For a new language, this is another high-leverage choice: if modules are kept primarily static and non-executing, many later features become easier to specify cleanly. If dynamic loading is ever desired, it can be added as a separate mechanism instead of entangling every import with runtime behavior.
+This is another high-leverage choice: if modules are kept primarily static and non-executing, many later features become easier to specify cleanly. If dynamic loading is ever desired, it can be added as a separate mechanism instead of entangling every import with runtime behavior.
 
 ---
 
@@ -260,7 +260,7 @@ Rust is a strong example of a system where:
 
 are related but not collapsed into one mechanism. The downside is complexity. The upside is that tooling, encapsulation, and API shaping are all unusually powerful.
 
-Source: https://doc.rust-lang.org/reference/items/modules.html and https://doc.rust-lang.org/reference/visibility-and-privacy.html and https://doc.rust-lang.org/cargo/reference/manifest.html and https://doc.rust-lang.org/edition-guide/rust-2018/path-changes.html
+Sources: https://doc.rust-lang.org/reference/items/modules.html and https://doc.rust-lang.org/reference/visibility-and-privacy.html and https://doc.rust-lang.org/cargo/reference/manifest.html and https://doc.rust-lang.org/edition-guide/rust-2018/path-changes.html
 
 ### 3.2. Zig — `@import`, Namespaces as Values, and Low-Magic Resolution
 
@@ -287,7 +287,7 @@ Zig is an especially valuable reference for languages that prioritize:
 - explicit namespace usage,
 - and a module system that stays easy for tools to reason about.
 
-Source: https://ziglang.org/documentation/master/#import and https://ziglang.org/learn/build-system/ and https://ziglang.org/documentation/master/#Packages
+Sources: https://ziglang.org/documentation/master/#import and https://ziglang.org/learn/build-system/ and https://ziglang.org/documentation/master/#Packages
 
 ### 3.3. Go — Package DAGs, Capitalization Exports, and Cycle Prohibition
 
@@ -307,7 +307,7 @@ The Go modules layer adds another important design lesson: **package identity an
 
 Go is a particularly clear reference for a deliberately **DAG-enforcing, compiler/tooling-first** module model. It is especially relevant to languages that value fast builds, clean architecture boundaries, and deterministic tooling over flexible cyclic semantics.
 
-Source: https://go.dev/ref/spec#Packages and https://go.dev/ref/mod and https://research.swtch.com/vgo-import and https://go.dev/blog/package-names
+Sources: https://go.dev/ref/spec#Packages and https://go.dev/ref/mod and https://research.swtch.com/vgo-import and https://go.dev/blog/package-names
 
 ### 3.4. Odin — Package-Per-Directory Simplicity
 
@@ -321,11 +321,11 @@ This makes Odin useful in two ways.
 
 First, it is a reminder that a systems language does not need Rust's level of module-system richness to be usable. A package-per-directory model with predictable import rules may be sufficient if the language's goals emphasize readability, straightforward tooling, and a relatively opinionated project layout.
 
-Second, Odin is a good counterweight to Go. Both lean on directory/package organization, but Go turns that into a hard architecture rule with cycle prohibition and capitalization-driven exports. Odin's ecosystem suggests a somewhat softer, more convention-shaped style. That difference is useful when evaluating how strict a new language should be.
+Second, Odin is a good counterweight to Go. Both lean on directory/package organization, but Go turns that into a hard architecture rule with cycle prohibition and capitalization-driven exports. Odin's ecosystem suggests a softer, more convention-shaped style — useful for calibrating how strict the rules should be.
 
 At the same time, Odin's official documentation is less specification-like than Rust's, Go's, or Python's. For this document, that means Odin should be treated as a practical design point with lighter formal grounding, not as the primary reference for edge-case semantics.
 
-Source: https://odin-lang.org/docs/overview/#packages and https://odin-lang.org/docs/overview/#import-statements
+Sources: https://odin-lang.org/docs/overview/#packages and https://odin-lang.org/docs/overview/#import-statements
 
 ### 3.5. Design Lessons from the Static Family
 
@@ -345,7 +345,7 @@ But they also span a meaningful range inside that family:
 - **Go** maximizes compile-graph clarity and enforces architectural acyclicity.
 - **Odin** maximizes low-ceremony package organization.
 
-This is already enough to suggest that a new language should decide early whether it wants to sit closer to:
+This is already enough to suggest a language designer should decide early whether to sit closer to:
 - Rust's explicit API curation,
 - Zig's transparent namespace imports,
 - Go's hard DAG discipline,
@@ -386,7 +386,7 @@ Cyclic imports illustrate the cost. Since modules are created and cached before 
 
 Python is the strongest case against casually allowing import-time execution. The model is powerful, but it moves initialization order, loader behavior, and side effects into what would otherwise be a simple structural feature. That cost propagates into tooling, testing, and architecture.
 
-Source: https://docs.python.org/3/reference/import.html and https://peps.python.org/pep-0328/ and https://peps.python.org/pep-0420/ and https://docs.python.org/3/library/importlib.html
+Sources: https://docs.python.org/3/reference/import.html and https://peps.python.org/pep-0328/ and https://peps.python.org/pep-0420/ and https://docs.python.org/3/library/importlib.html
 
 ### 4.2. JavaScript ESM — Static Syntax, Live Bindings, and Runtime Evaluation
 
@@ -400,7 +400,7 @@ Node adds another layer: the same ESM semantics live inside a platform-specific 
 
 The design lesson is subtle. ESM shows that **static syntax does not automatically imply static semantics**. A language can have parse-time-known imports and still inherit complex runtime initialization, cycle, and environment-resolution behavior. A language that wants the analyzability benefits of static syntax may also need to reject or tightly limit ESM-style runtime loader semantics.
 
-Source: https://tc39.es/ecma262/#sec-modules and https://nodejs.org/api/esm.html and https://html.spec.whatwg.org/multipage/webappapis.html#module-system and https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
+Sources: https://tc39.es/ecma262/#sec-modules and https://nodejs.org/api/esm.html and https://html.spec.whatwg.org/multipage/webappapis.html#module-system and https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
 
 ### 4.3. Node CommonJS — `require`, Mutable Exports, and Loader-Centric Semantics
 
@@ -412,7 +412,7 @@ The export model is also different. CommonJS modules typically fill out a mutabl
 
 CommonJS matters for this document not because it should be imitated directly, but because it demonstrates what happens when the loader becomes the semantic center of modularity. The system becomes flexible and easy to extend locally, but the graph becomes less explicit and less compiler-friendly. ESM was, in part, a reaction to these limits.
 
-Source: https://nodejs.org/api/modules.html and https://nodejs.org/api/packages.html
+Sources: https://nodejs.org/api/modules.html and https://nodejs.org/api/packages.html
 
 ### 4.4. Ruby and Lua — Lightweight Runtime Loading Models
 
@@ -424,17 +424,17 @@ Lua traditionally treats modules as tables returned by executed files. This is i
 
 These systems are useful cautionary reference points for language design. They show that a language can survive with highly flexible runtime loading, but that such flexibility tends to weaken the compiler and toolchain's ability to reason about program structure in advance.
 
-Source: https://docs.ruby-lang.org/en/master/Kernel.html#method-i-require and https://www.lua.org/manual/5.4/manual.html#6.3 and https://www.lua.org/pil/8.html
+Sources: https://docs.ruby-lang.org/en/master/Kernel.html#method-i-require and https://www.lua.org/manual/5.4/manual.html#6.3 and https://www.lua.org/pil/8.html
 
 ### 4.5. Perl 5 — Symbol-Table Modules and `use` as Compile-Time `require + import`
 
-Perl 5 is the historical predecessor that Raku reacts against, and a useful contrast against the more elaborate runtime-import systems above. A Perl package is declared with `package Foo;` and creates a symbol table named `%Foo::`. Subroutines, variables, and other names live in that hash, with no language-level visibility distinction — `our $x` is package-scoped, `my $x` is lexically-scoped, but neither restricts cross-package access. Any code can read `$Foo::x` from anywhere.
+Perl 5 is the historical predecessor that Raku reacts against (forward-ref §9.9), and a useful contrast against the more elaborate runtime-import systems above. A Perl package is declared with `package Foo;` and creates a symbol table named `%Foo::`. Subroutines, variables, and other names live in that hash, with no language-level visibility distinction — `our $x` is package-scoped, `my $x` is lexically-scoped, but neither restricts cross-package access. Any code can read `$Foo::x` from anywhere.
 
 `use Module;` desugars exactly to `BEGIN { require Module; Module->import(LIST); }` — the `BEGIN` block forces compile-time execution. `require` is the lower primitive: it loads a `.pm` file by searching `@INC` (the module search path, populated from compiled-in defaults plus `PERL5LIB` and `-I` flags), then executes the file. `import` is just a method call that the convention `Exporter` module standardizes — `@EXPORT` names are imported by default, `@EXPORT_OK` are imported on request, `%EXPORT_TAGS` groups them by tag. None of this is enforced by the language; it's all convention layered on top of "modules are symbol tables" and "`use` calls `import`."
 
 The split between `use` (compile-time) and `require` (runtime) is the direct ancestor of Raku's `use`/`need`/`require` three-way split, and CPAN is the ecosystem Raku's fez/zef explicitly replaces. The contrast clarifies what Raku's ambitious identity model actually buys: Perl modules have *no* identity beyond filesystem path and package name, which is why CPAN suffered the supply-chain attacks that fez/zef was designed to close.
 
-Source: https://perldoc.perl.org/functions/use and https://perldoc.perl.org/functions/require and https://perldoc.perl.org/Exporter and https://perldoc.perl.org/perlmod
+Sources: https://perldoc.perl.org/functions/use and https://perldoc.perl.org/functions/require and https://perldoc.perl.org/Exporter and https://perldoc.perl.org/perlmod
 
 ### 4.6. Common Lisp — Packages as Symbol Namespaces, `defpackage`, and ASDF
 
@@ -459,7 +459,7 @@ Qualified syntax: `pkg::name` accesses an internal symbol (double-colon, by conv
 
 The lesson: **a sufficiently rich symbol-namespace operation set (use, import, shadowing-import, intern, export, shadow) eliminates the need for separate "import keyword variants"**. Languages like Python and Java have one `import` keyword and accumulate workarounds for partial imports, renames, and conflicts; Common Lisp expresses all those operations as orthogonal options on `defpackage`. The cost is conceptual surface area — `:shadow` vs `:shadowing-import-from` vs `:import-from` is a non-obvious distinction.
 
-Source: https://www.lispworks.com/documentation/HyperSpec/Body/m_defpkg.htm and https://www.lispworks.com/documentation/HyperSpec/Body/f_export.htm and https://lisp-docs.github.io/docs/tutorial/packages and https://asdf.common-lisp.dev/
+Sources: https://www.lispworks.com/documentation/HyperSpec/Body/m_defpkg.htm and https://www.lispworks.com/documentation/HyperSpec/Body/f_export.htm and https://lisp-docs.github.io/docs/tutorial/packages and https://asdf.common-lisp.dev/
 
 ### 4.7. Clojure — First-Class Dynamic Namespaces, `:require` vs `:import`
 
@@ -482,7 +482,7 @@ The interesting design choice is the **orthogonal `:require` vs `:import` split*
 
 The dynamic-mutability is genuinely used: REPL-driven development in Clojure relies on redefining Vars in a running namespace via `def`, with the new definition taking effect immediately for unqualified callers. This is the basis for Clojure's interactive workflow — much closer to Common Lisp's image-based development (covered in `DEBUGGERS.md §3.5`) than to Java's compile-and-restart model.
 
-Source: https://clojure.org/reference/namespaces and https://clojuredocs.org/clojure.core/ns and https://clojuredocs.org/clojure.core/require and https://clojure-doc.org/articles/language/namespaces/
+Sources: https://clojure.org/reference/namespaces and https://clojuredocs.org/clojure.core/ns and https://clojuredocs.org/clojure.core/require and https://clojure-doc.org/articles/language/namespaces/
 
 ### 4.8. Tcl — Orthogonal Namespaces and Packages
 
@@ -498,7 +498,7 @@ By convention, a package called `MyPkg` defines a namespace called `::MyPkg` and
 
 The lesson is that **modularity has two distinct concerns — naming and distribution — and they don't need to be coupled at the language level**. Most modern languages collapse them (Rust: package contains crates contains modules; Go: module contains packages). Tcl shows the alternative: keep them orthogonal, make the convention-of-correspondence explicit but not enforced. The cost is more concepts; the benefit is each mechanism stays simple and uncoupled.
 
-Source: https://www.tcl-lang.org/man/tcl8.6/TclCmd/package.htm and https://www.tcl-lang.org/man/tcl8.6/TclCmd/namespace.htm and https://wiki.tcl-lang.org/page/package+ifneeded
+Sources: https://www.tcl-lang.org/man/tcl8.6/TclCmd/package.htm and https://www.tcl-lang.org/man/tcl8.6/TclCmd/namespace.htm and https://wiki.tcl-lang.org/page/package+ifneeded
 
 ### 4.9. Design Lessons from the Runtime Family
 
@@ -523,7 +523,7 @@ Specific design lessons added by the symbol-table and Lisp-family entries:
 
 The advantage of the runtime family is flexibility. Plugin architectures, dynamic loading, reflective import patterns, and interactive workflows all become natural. The cost is that the language's module system now participates in execution semantics much more directly than in static systems. Compilers and IDEs can still do useful work, but they must either approximate loader behavior or re-implement parts of it.
 
-This family sharpens one of the central design questions for any new language. A runtime-import model also chooses:
+This family sharpens one of the central design questions for any language. A runtime-import model also chooses:
 - initialization-order semantics,
 - partially initialized cycle behavior,
 - a more difficult tooling story,
@@ -565,9 +565,9 @@ The cost is also real:
 - more ceremony for simple projects,
 - and more distance from the file-as-module simplicity of Go or Zig.
 
-OCaml is the strongest argument that module design can be a **semantic abstraction feature**, not merely an organizational feature. The key question is whether a new language wants any part of that power, or whether it wants to remain intentionally simpler. Full treatment of OCaml's value restriction and polymorphic-variant trade-offs lives in `TYPES.md §§6.8, 9`; OCaml 5's domains and effect-handler concurrency live in `CONCURRENCY.md §§5.5, 2.6`.
+OCaml is the strongest argument that module design can be a **semantic abstraction feature**, not merely an organizational feature. The key question is whether a language designer wants any part of that power, or wants to remain intentionally simpler. Full treatment of OCaml's value restriction and polymorphic-variant trade-offs lives in `TYPES.md §§6.8, 9`; OCaml 5's domains and effect-handler concurrency live in `CONCURRENCY.md §§5.5, 2.6`.
 
-Source: https://v2.ocaml.org/manual/moduleexamples.html and https://dev.realworldocaml.org/files-modules-and-programs.html and https://dev.realworldocaml.org/functors.html
+Sources: https://v2.ocaml.org/manual/moduleexamples.html and https://dev.realworldocaml.org/files-modules-and-programs.html and https://dev.realworldocaml.org/functors.html
 
 ### 5.2. Standard ML — Structures, Signatures, and the Classical Module Calculus
 
@@ -586,9 +586,9 @@ fully explicit. In other words, it presents the "module system" not as syntax ar
 
 This matters because many modern languages inherit only fragments of this tradition. Rust has strong visibility and package structure, but not higher-order modules. Haskell has modules and export lists, but not the same full functor-oriented module calculus. Racket has powerful module phases, but with a different emphasis. SML is the clean baseline for understanding what "modules as semantic abstraction" actually means before later languages compromise or specialize it.
 
-The trade-off, as always, is that expressive power increases conceptual weight. SML's module system is elegant, but it is not lightweight. That makes it useful as a design boundary even when a new language ultimately decides to stay far simpler.
+The trade-off, as always, is that expressive power increases conceptual weight. SML's module system is elegant, but it is not lightweight. That makes it useful as a design boundary even when an implementer ultimately stays far simpler.
 
-Source: https://smlfamily.github.io/sml97-defn.pdf and https://www.cs.cmu.edu/~rwh/isml/book.pdf and https://homepages.inf.ed.ac.uk/dts/fps/papers/MacQueen.pdf
+Sources: https://smlfamily.github.io/sml97-defn.pdf and https://www.cs.cmu.edu/~rwh/isml/book.pdf and https://homepages.inf.ed.ac.uk/dts/fps/papers/MacQueen.pdf
 
 ### 5.3. Haskell — Export Lists, Qualified Imports, and Package Layering
 
@@ -603,9 +603,9 @@ At the ecosystem level, Haskell also separates:
 
 more than some simpler systems do. Cabal/Stack package boundaries and module visibility rules are related, but not identical. This makes Haskell a useful design reference for ecosystems that want package-level and source-level identities layered without becoming the same mechanism.
 
-Compared with OCaml, Haskell's module system is less ambitious as a semantic abstraction calculus. Compared with Rust or Go, it is more declaration-oriented and explicit about export surfaces. That middle position is a useful reference for any new language that wants stronger source-level API control without adopting full ML-style higher-order modules. Full treatment of GHC's richer type-system story lives in `TYPES.md §6.7`; GHC's lightweight-thread, capability, spark, and STM runtime design lives in `CONCURRENCY.md §§2.6, 3.7, 9.6`.
+Compared with OCaml, Haskell's module system is less ambitious as a semantic abstraction calculus. Compared with Rust or Go, it is more declaration-oriented and explicit about export surfaces. That middle position is a useful reference for languages that want stronger source-level API control without adopting full ML-style higher-order modules. Full treatment of GHC's richer type-system story lives in `TYPES.md §6.7`; GHC's lightweight-thread, capability, spark, and STM runtime design lives in `CONCURRENCY.md §§2.6, 3.7, 9.6`.
 
-Source: https://www.haskell.org/onlinereport/haskell2010/haskellch5.html and https://cabal.readthedocs.io/en/stable/cabal-package.html and https://downloads.haskell.org/~ghc/latest/docs/users_guide/packages.html
+Sources: https://www.haskell.org/onlinereport/haskell2010/haskellch5.html and https://cabal.readthedocs.io/en/stable/cabal-package.html and https://downloads.haskell.org/~ghc/latest/docs/users_guide/packages.html
 
 ### 5.4. Racket — Modules, Phases, and `#lang`
 
@@ -623,7 +623,7 @@ This power comes with complexity:
 
 Racket is not primarily a candidate for direct imitation. It is a warning and an inspiration. If a language ever wants macros, DSLs, or language-as-library features at this level, then module phases must be designed deliberately. If that power is not wanted now, then Racket is evidence that it is often better deferred than approximated halfway.
 
-Source: https://docs.racket-lang.org/reference/Modules.html and https://docs.racket-lang.org/guide/module-paths.html and https://docs.racket-lang.org/guide/phases.html and https://docs.racket-lang.org/guide/hash-lang_reader.html
+Sources: https://docs.racket-lang.org/reference/Modules.html and https://docs.racket-lang.org/guide/module-paths.html and https://docs.racket-lang.org/guide/phases.html and https://docs.racket-lang.org/guide/hash-lang_reader.html
 
 ### 5.5. Ada — Packages, Specification/Body Split, Child Packages, Generic Packages
 
@@ -668,7 +668,7 @@ The `pragma Pure`, `pragma Preelaborate`, `pragma Elaborate_All` system controls
 
 The lesson: **Ada shows that the specification/body split, opaque types, child packages, and generic packages are individually usable design points that compose without any single one becoming the "module system."** Most modern language designers cherry-pick from this menu; Ada has them all and demonstrates they can coexist coherently.
 
-Source: http://www.ada-auth.org/standards/22rm/html/RM-7.html and http://www.ada-auth.org/standards/22rm/html/RM-10.html and http://www.ada-auth.org/standards/22rm/html/RM-12.html and https://learn.adacore.com/courses/intro-to-ada/chapters/modular_programming.html
+Sources: http://www.ada-auth.org/standards/22rm/html/RM-7.html and http://www.ada-auth.org/standards/22rm/html/RM-10.html and http://www.ada-auth.org/standards/22rm/html/RM-12.html and https://learn.adacore.com/courses/intro-to-ada/chapters/modular_programming.html
 
 ### 5.6. Modula-2 / Modula-3 / Oberon — The Wirth Lineage
 
@@ -712,7 +712,7 @@ This is the design Nim later adopted (§9.5). Oberon also introduced **`*` for r
 
 Across the three: Wirth's lineage shows that **opacity, hierarchy, and selective export are independent design dimensions** that can be combined or separated. Modern languages cherry-pick — Rust took selective export (`pub`), OCaml took the spec/body split (`.mli`/`.ml`), Nim took inline export markers — but rarely combine all three.
 
-Source: https://www.modula2.org/reference/ and https://www.cs.purdue.edu/homes/hosking/m3/reference/syntax.html and http://www.projectoberon.com/ and https://en.wikipedia.org/wiki/Oberon_(programming_language)
+Sources: https://www.modula2.org/reference/ and https://www.cs.purdue.edu/homes/hosking/m3/reference/syntax.html and http://www.projectoberon.com/ and https://en.wikipedia.org/wiki/Oberon_(programming_language)
 
 ### 5.7. Design Lessons from the Typed and Phase-Aware Family
 
@@ -763,41 +763,21 @@ This chapter therefore separates three concepts that many ecosystems blur togeth
 - **build-graph identity** — the units the compiler actually schedules and caches;
 - **distribution identity** — the units versioned, downloaded, published, and installed.
 
-Some systems align these cleanly. Some intentionally keep them separate. Some make them partially overlap, which often creates the most confusion. This chapter is decisive for new-language design because an elegant source-level module system can still become painful if package identity and resolution semantics are underspecified.
+Some systems align these cleanly. Some intentionally keep them separate. Some make them partially overlap, which often creates the most confusion. This chapter is decisive for language design because an elegant source-level module system can still become painful if package identity and resolution semantics are underspecified.
 
 ### 6.1. Rust — Packages, Crates, and Source-Level Modules as Distinct Layers
 
-Rust is one of the clearest modern examples of *not* collapsing all modularity concepts into one. Cargo's **package** is the build/share/publish unit. A package may contain one library crate and any number of binary crates. A **crate** is the compiler's primary compilation unit: the unit rooted at `lib.rs` or `main.rs` that produces one library or executable artifact. Inside a crate lives the **module tree**, shaped by `mod` declarations and file layout.
+Rust's package/crate/module layering is canonical at §3.1. The packaging-relevant point here is that Cargo adds a fourth layer in practice — **workspaces**, which group multiple packages that evolve together — and that crate/package resolution is delegated to Cargo manifest metadata, leaving source-level module syntax stable as packaging and workspace workflows evolve.
 
-This layering has several practical consequences:
+A workspace is a top-level grouping declared by a root `Cargo.toml` with a `[workspace]` table listing its `members`. Each member is a package (with its own `Cargo.toml` and one or more crates inside it), but the workspace as a whole shares one `Cargo.lock`, one `target/` directory, and (optionally) one set of shared `[workspace.dependencies]` resolved consistently across members. The workspace boundary therefore buys *coordinated dependency resolution and build artifacts* across packages that ship and version separately, while the package boundary continues to own *what gets published as a unit on crates.io*. Cross-member dependencies in a workspace can be path-based (resolved locally during development) without changing the published-package identity (resolved via registry when consumed externally).
 
-- A package can publish multiple related compilation units without pretending they are one namespace tree.
-- The compiler can reason about crates as artifact-sized units while still allowing fine-grained internal module structure.
-- Source-level module paths do not need to carry version numbers or package-manager metadata directly.
-
-Cargo adds a fourth layer in practice: **workspaces**, which group multiple packages that evolve together. This is not a module-system feature in the language sense, but it strongly shapes real Rust code organization. The important lesson is that Rust keeps these layers explicit enough that the ecosystem can talk about them precisely: package, workspace, crate, module.
-
-Rust's module resolution is therefore mostly static and local once the crate boundary is known, but crate/package resolution itself is delegated to Cargo manifest metadata. This separation is one reason Rust's source-level module syntax remains relatively stable even as packaging and workspace workflows evolve.
-
-Source: https://doc.rust-lang.org/cargo/reference/workspaces.html and https://doc.rust-lang.org/reference/crates-and-source-files.html and https://doc.rust-lang.org/cargo/reference/registries.html
+Sources: https://doc.rust-lang.org/cargo/reference/workspaces.html and https://doc.rust-lang.org/reference/crates-and-source-files.html and https://doc.rust-lang.org/cargo/reference/registries.html
 
 ### 6.2. Go — Modules as Distribution Units, Packages as Compilation Units
 
-Go's distinction between **modules** and **packages** is similarly important, but the mapping is tighter than Rust's. A Go **module** is a tree of source files rooted by a `go.mod` file and is the unit that is released, versioned, and downloaded. A **package** is typically a directory inside that tree and is the unit imported and compiled. Import paths are formed from:
+Go's package/module split is canonical at §3.3. The packaging-relevant point here is the identity-versioning interaction. **Semantic Import Versioning** requires major-version changes `v2+` to appear in the module path itself, so a breaking version change is reflected directly in source-level import names. The upside is reproducibility and clarity; the downside is that package-manager policy leaks into source identity more directly than in Rust. Go's package graph and distribution graph are closely aligned, and versioning policy is explicit at the source level.
 
-- the module path declared in `go.mod`, plus
-- the relative directory path to the package.
-
-This gives Go a very strong identity model. Import paths are not merely human-friendly names; they are also version-sensitive, distribution-relevant addresses. **Semantic Import Versioning** pushes this even further by requiring major-version changes `v2+` to appear in the module path itself. That means a breaking version change is reflected directly in source-level import names.
-
-The upside is reproducibility and clarity. The downside is that package-manager policy leaks into source identity more directly than in Rust. This is a deliberate trade-off: Go chooses strong alignment between source imports and release identity rather than trying to hide versioning behind a more abstract layer.
-
-Go is a particularly clear reference for a design where:
-- package graph and distribution graph are closely aligned,
-- import paths are semantically meaningful identities,
-- and versioning policy is explicit at the source level.
-
-Source: https://go.dev/ref/mod#go-mod-file and https://research.swtch.com/vgo-import and https://go.dev/ref/mod#minimal-version-selection
+Sources: https://go.dev/ref/mod#go-mod-file and https://research.swtch.com/vgo-import and https://go.dev/ref/mod#minimal-version-selection
 
 ### 6.3. Python — Import System and Packaging as Loosely Coupled Systems
 
@@ -812,7 +792,7 @@ This is one of the main reasons Python environments are powerful but notoriously
 
 Python is a valuable caution: **separating package management from imports can be good, but only if the identity boundary is still crisp enough for tools and users to reason about**. Otherwise, import behavior becomes too environment-shaped.
 
-Source: https://packaging.python.org/en/latest/specifications/ and https://peps.python.org/pep-0517/ and https://peps.python.org/pep-0621/
+Sources: https://packaging.python.org/en/latest/specifications/ and https://peps.python.org/pep-0517/ and https://peps.python.org/pep-0621/
 
 ### 6.4. Node and JavaScript — Package Metadata as Resolution Policy
 
@@ -828,7 +808,7 @@ The result is expressive and powerful, especially for dual ESM/CJS distribution,
 
 Node is the strongest warning about allowing package metadata to redefine source-level resolution semantics too aggressively. Such systems are flexible, but they make static reasoning and ecosystem simplicity harder.
 
-Source: https://nodejs.org/api/packages.html#exports and https://docs.npmjs.com/cli/v10/configuring-npm/package-json and https://nodejs.org/api/packages.html#conditional-exports
+Sources: https://nodejs.org/api/packages.html#exports and https://docs.npmjs.com/cli/v10/configuring-npm/package-json and https://nodejs.org/api/packages.html#conditional-exports
 
 ### 6.5. Zig and Odin — Package Roots, Build Context, and Tooling Simplicity
 
@@ -838,9 +818,9 @@ In **Zig**, package and module resolution are closely tied to the build configur
 
 In **Odin**, the language and ecosystem lean heavily on package-per-directory organization and named collections such as `base`, `core`, and `vendor`. This is much less elaborate than Cargo or npm, but also much less detached from source tree layout. The result is easy to understand and easy for tools to follow, at the cost of less abstraction between source organization and ecosystem packaging.
 
-These systems matter because they show that a new language does not need a maximal package manager model immediately. A language can begin with deterministic package roots and straightforward import resolution, then grow richer packaging later if the source-level identity model is kept clean.
+These systems matter because they show that a maximal package manager model is not needed immediately. A language can begin with deterministic package roots and straightforward import resolution, then grow richer packaging later if the source-level identity model is kept clean.
 
-Source: https://ziglang.org/learn/build-system/ and https://odin-lang.org/docs/overview/#packages
+Sources: https://ziglang.org/learn/build-system/ and https://odin-lang.org/docs/overview/#packages
 
 ### 6.6. Design Lessons from Packages, Identity, and Resolution
 
@@ -858,7 +838,11 @@ Node demonstrates a fourth, more volatile posture:
 
 - **metadata-shaped resolution** — package metadata actively participates in import semantics.
 
-A common path for a new language is:
+Deno (§6.7) demonstrates a fifth:
+
+- **URL-shaped identity with no central registry** — module identity *is* an HTTPS URL, content-addressed via lockfile, with no governance bottleneck and capability-sandboxed import authority.
+
+A defensible default path is:
 
 - keep **module identity** clear and source-level;
 - keep **package identity** explicit but not overly entangled with import syntax;
@@ -866,7 +850,25 @@ A common path for a new language is:
 - avoid making package metadata too loader-powerful too early;
 - and decide consciously whether version identity should ever leak into source import paths.
 
-This chapter therefore sharpens one of the main choices for any new language: whether to look more like Rust's layered separation, Go's path-aligned identity, Python's looser split, or Node's metadata-shaped resolution. The dominant pattern in modern systems-language design favors a layered Rust-style model, but the right answer depends on whether the ecosystem prioritizes reproducibility, conceptual simplicity, runtime flexibility, or distribution flexibility.
+This chapter therefore sharpens one of the main choices in this design space: whether to look more like Rust's layered separation, Go's path-aligned identity, Python's looser split, or Node's metadata-shaped resolution. The dominant pattern in modern systems-language design favors a layered Rust-style model, but the right answer depends on whether the ecosystem prioritizes reproducibility, conceptual simplicity, runtime flexibility, or distribution flexibility.
+
+### 6.7. Deno — URL-Based Module Identity and No Central Registry
+
+Ryan Dahl's **Deno** (2018+) takes a position no other entry in this chapter takes: **module identity is an HTTPS URL, and there is no central registry**. An import statement is `import { serve } from "https://deno.land/std@0.220.0/http/server.ts";` — the URL is the canonical name, the version is in the path, and there is no equivalent of crates.io, npm, PyPI, or Maven Central as a governance bottleneck. Modules are content-addressed via SHA-256 in a `deno.lock` file, downloaded on first use, and cached in a per-user directory under `$DENO_DIR`.
+
+The design choices that follow:
+
+- **No `node_modules` or virtual environment per project**: dependencies are content-addressed in a global cache, shared across projects. Builds are reproducible because the lock file pins the URL plus the content hash.
+- **Subresource integrity by default**: an import that resolves to bytes whose hash does not match the lock file is rejected at load. This defends against registry compromise and man-in-the-middle attacks without requiring users to opt in.
+- **Per-program capability sandbox**: a Deno program runs with no ambient authority by default — `--allow-net`, `--allow-read`, `--allow-write`, `--allow-env` are explicit grants. Combined with URL-shaped imports, this makes it possible to audit "what code runs, where it came from, and what authority it has" at deployment time. The capability angle complements `MEMORY.md §10` (object-capability discipline) at the runtime boundary.
+- **Bring-your-own-CDN identity**: deno.land/std is one CDN; jsr.io is another; private registries can be self-hosted by serving HTTPS responses with the right content negotiation. There is no governance bottleneck because identity is URL-shaped.
+- **Top-level `await` and ESM by default**: Deno follows ECMAScript module semantics (§4.2) directly, with no CommonJS distinction.
+
+Status (as of 2026-04): Deno 2.0+ added **jsr.io** (a curated registry serving canonical URLs while still URL-shaped) and improved npm-package interoperability via `npm:`-prefixed specifiers, partially closing the ecosystem gap with Node. Production users include Deno Deploy, Netlify Edge Functions, and several Node-replacement deployments. The two main current criticisms are the loss of central discovery (no equivalent of npm search) and ecosystem fragmentation between `deno.land/x`, `jsr.io`, and `npm:` resolution paths.
+
+The design lesson generalises: **content-addressed URLs as module identity** eliminate the registry-name-squatting and registry-availability problems §6.4 names for Node and §12.3 names for crates.io / PyPI, at the cost of giving up centralised discovery affordances and ecosystem-curation. Go's import-paths-as-URLs (§6.2) takes a similar position with a less radical lockfile model. A new language designer can adopt URL-shaped imports without committing to the full Deno model.
+
+Sources: https://docs.deno.com/runtime/fundamentals/modules/ and https://deno.com/blog/jsr_q4 and https://docs.deno.com/runtime/fundamentals/security/ and https://jsr.io/docs
 
 ---
 
@@ -903,11 +905,11 @@ The key elements:
 
 JPMS modules form an explicit dependency DAG validated at compile time, link time (`jlink`), and run time. A reads-graph is constructed at startup; reflective access into packages that are not `opens` raises `IllegalAccessError`. The platform itself (`java.base`, `java.sql`, `java.xml`, etc.) became modular, allowing custom runtime images via `jlink` that strip unused modules — useful for container images and embedded deployments.
 
-The cost was severe ecosystem disruption. JPMS adoption took years: Maven Central had to learn `Automatic-Module-Name` manifest entries for legacy JARs, build tools needed module-path support alongside the classpath, and many frameworks needed to add `opens` directives or migrate away from deep reflection. Even today, large parts of the Java ecosystem run on the classpath rather than the module path, treating JPMS as opt-in rather than the default.
+The cost was severe ecosystem disruption. JPMS adoption took years: Maven Central had to learn `Automatic-Module-Name` manifest entries for legacy JARs, build tools needed module-path support alongside the classpath, and many frameworks needed to add `opens` directives or migrate away from deep reflection. Status (as of 2026-04): large parts of the Java ecosystem still run on the classpath rather than the module path, treating JPMS as opt-in rather than the default.
 
-The design lesson is two-edged. JPMS proved that retrofitting a module system onto a 25-year-old runtime is *possible* and that it can deliver real benefits: strong encapsulation of platform internals (closing access to `sun.misc.Unsafe`-style backdoors), reliable reflection boundaries, custom runtime images, and explicit dependency graphs. But it also proved how expensive the retrofit is: every existing artifact had to either declare a module, accept being treated as an "automatic module" with weaker guarantees, or stay on the classpath. A new language is dramatically better off committing to a real module system from version 1 than discovering, twenty years later, that namespaces alone do not suffice.
+The design lesson is two-edged. JPMS proved that retrofitting a module system onto a 25-year-old runtime is *possible* and can deliver real benefits: strong encapsulation of platform internals (closing access to `sun.misc.Unsafe`-style backdoors), reliable reflection boundaries, custom runtime images, and explicit dependency graphs. But it also proved how expensive the retrofit is: every existing artifact had to either declare a module, accept being treated as an "automatic module" with weaker guarantees, or stay on the classpath. Committing to a real module system from version 1 is dramatically better than discovering twenty years later that namespaces alone do not suffice.
 
-Source: https://openjdk.org/projects/jigsaw/spec/ and https://openjdk.org/jeps/261 and https://www.oracle.com/corporate/features/understanding-java-9-modules.html and https://dev.java/learn/modules/
+Sources: https://openjdk.org/projects/jigsaw/spec/ and https://openjdk.org/jeps/261 and https://www.oracle.com/corporate/features/understanding-java-9-modules.html and https://dev.java/learn/modules/
 
 ### 7.2. C# / .NET — Namespaces, Assemblies, and `InternalsVisibleTo`
 
@@ -926,7 +928,7 @@ Compared with JPMS, .NET's modularity is structurally similar (assembly ≈ modu
 
 The design lesson is that CLR-style "the binary artifact is the encapsulation boundary, the source-level namespace is just naming" is workable for decades if the language never tries to enforce more. But it leaves visibility weaker than ML or Rust, leans heavily on tooling (NuGet, MSBuild) for dependency management, and provides no built-in mechanism for the platform to evolve its internal type layout safely without `TypeForwardedTo`-style retrofits.
 
-Source: https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/namespaces/ and https://learn.microsoft.com/en-us/dotnet/standard/assembly/ and https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.internalsvisibletoattribute and https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/internal
+Sources: https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/namespaces/ and https://learn.microsoft.com/en-us/dotnet/standard/assembly/ and https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.internalsvisibletoattribute and https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/internal
 
 ### 7.3. Scala — Packages, Top-Level Declarations, and Implicit Imports
 
@@ -938,7 +940,7 @@ Compilation-unit ordering matters less in Scala than in F# (covered later) but m
 
 At the artifact level, Scala compiles to JVM `.class` files and inherits JPMS / classpath behavior unchanged. Scala does not declare `module-info.java`-style metadata, and ScalaJS / Scala Native have their own artifact and packaging stories that mostly bypass JPMS. The Scala-specific module-system contribution is therefore at the *source level* — richer imports, top-level definitions, `given` import scoping, and `export` clauses — not at the artifact level.
 
-Source: https://docs.scala-lang.org/scala3/reference/changed-features/imports.html and https://docs.scala-lang.org/scala3/reference/other-new-features/export.html and https://docs.scala-lang.org/scala3/book/packaging-imports.html
+Sources: https://docs.scala-lang.org/scala3/reference/changed-features/imports.html and https://docs.scala-lang.org/scala3/reference/other-new-features/export.html and https://docs.scala-lang.org/scala3/book/packaging-imports.html
 
 ### 7.4. Kotlin — Packages, `internal` Visibility, and Multiplatform Modules
 
@@ -950,19 +952,19 @@ This is a useful design point. Kotlin gets `internal`-visibility encapsulation t
 
 **Kotlin Multiplatform** (formerly KMM) introduces a more elaborate module concept: a multiplatform module declares `commonMain` source plus per-target source sets (`jvmMain`, `iosMain`, `jsMain`, etc.). The module produces multiple artifacts simultaneously, with `expect`/`actual` declarations bridging platform-specific implementations. Here "module" means closer to "library that compiles to several platforms with shared and platform-specific code partitioned by source set." This is a build-tool-and-language hybrid: the language has `expect`/`actual`, the build tool decides which source sets contribute to which target.
 
-Source: https://kotlinlang.org/docs/visibility-modifiers.html and https://kotlinlang.org/docs/packages.html and https://kotlinlang.org/docs/multiplatform.html
+Sources: https://kotlinlang.org/docs/visibility-modifiers.html and https://kotlinlang.org/docs/packages.html and https://kotlinlang.org/docs/multiplatform.html
 
 ### 7.5. Design Lessons from JVM/CLR Module Layering
 
-The JVM and CLR ecosystems together demonstrate three durable patterns worth carrying forward to any new language design.
+The JVM and CLR ecosystems together demonstrate three durable patterns worth carrying forward to any module-system design.
 
-First, **namespace-only modularity is insufficient at scale, and retrofitting a module system later is expensive**. Java waited 22 years to ship JPMS; the disruption was significant, adoption is partial even today, and many parts of the ecosystem still treat the classpath as the operative reality. .NET never made the leap and continues to lean on assemblies plus convention. A new language should bake real module boundaries in from the first release, even if they are simple.
+First, **namespace-only modularity is insufficient at scale, and retrofitting a module system is expensive** (canonical retrofit story at §7.1). Bake real module boundaries in from the first release, even if simple.
 
-Second, **the binary artifact is a strong candidate for the encapsulation boundary**. Both ecosystems converged on "the published artifact (JAR / DLL / module) is what `internal` privacy respects." This sidesteps the problem of trying to enforce visibility at the source level when the same source can be compiled into many artifact configurations. The corollary: a friend mechanism (`InternalsVisibleTo`, `exports ... to`) is needed almost immediately, because test code typically lives in a sibling artifact and needs internal access.
+Second, **the binary artifact is a strong candidate for the encapsulation boundary**. Both ecosystems converged on "the published artifact (JAR / DLL / module) is what `internal` privacy respects," sidestepping source-level enforcement when the same source compiles into many artifact configurations. The corollary: a friend mechanism (`InternalsVisibleTo`, `exports ... to`) is needed almost immediately, because test code lives in a sibling artifact.
 
-Third, **reflection and metaprogramming break encapsulation unless the module system explicitly accommodates them**. JPMS's `opens` directive exists because Spring, Hibernate, and Jackson cannot work without deep reflective access. .NET's reflection has fewer enforced limits, but its analogues to `opens` show up indirectly through `[assembly: AllowPartiallyTrustedCallers]` and similar trust attributes. A language designing a module system from scratch should decide early whether reflection is permitted, restricted, or first-class — and if first-class, what mechanism (the equivalent of `opens`) explicitly authorizes it.
+Third, **reflection and metaprogramming break encapsulation unless the module system explicitly accommodates them**. JPMS's `opens` directive exists because Spring, Hibernate, and Jackson cannot work without deep reflective access; .NET's analogues are looser but present. A module system from scratch should decide early whether reflection is permitted, restricted, or first-class — and if first-class, what mechanism (the equivalent of `opens`) explicitly authorizes it.
 
-The fourth, less visible lesson is that **language-level modules and build-tool modules can be the same thing or different things, but the relationship must be clearly stated**. Kotlin is honest about it: the build tool defines the module. JPMS pretends the language defines the module, but in practice Maven and Gradle still own the dependency-resolution side. Pretending these are unrelated breeds confusion; making the relationship explicit is one of the cleaner design choices a new language can make.
+Fourth, **language-level modules and build-tool modules (§7.4)** can be the same or different things, but the relationship must be stated. Kotlin is honest about it: the build tool defines the module. JPMS pretends the language defines the module while Maven and Gradle still own dependency resolution. Making the relationship explicit is one of the cleaner design choices in this space.
 
 ---
 
@@ -987,7 +989,7 @@ The semantic consequence is that **C and C++ translation units have no module id
 
 This is why C and C++ build systems (Make, CMake, Bazel, Buck, Meson, Ninja) are so much more complex than build systems for languages with explicit modules: they must compute the include graph by re-running the preprocessor, track header timestamps for incremental rebuilds, and manage compilation-unit-level options (`-D`, `-I`, `-W`) that are not visible in the source.
 
-Source: https://en.cppreference.com/w/cpp/preprocessor/include and https://gcc.gnu.org/onlinedocs/cpp/ and https://github.com/include-what-you-use/include-what-you-use
+Sources: https://en.cppreference.com/w/cpp/preprocessor/include and https://gcc.gnu.org/onlinedocs/cpp/ and https://github.com/include-what-you-use/include-what-you-use
 
 ### 8.2. C++20 Modules — Named Modules, Module Interface Units, and BMI Caching
 
@@ -1017,23 +1019,23 @@ The performance and engineering benefits over `#include` are substantial:
 
 The migration story is the hard part. C++20 also defines **header units** (`import "foo.h";`), which let an existing header be imported as if it were a module, getting most of the parse-once benefit without rewriting the header. Header units are a transitional bridge: they let a project move incrementally from `#include` to `import` without big-bang rewrites. But header units also inherit some of the header model's weaknesses — they can leak macros (with restrictions) and they require the toolchain to determine what to do at the import-vs-include boundary.
 
-Tooling support has been the gating factor. GCC 14+, Clang 17+, and MSVC have varying levels of named-module support; build systems (CMake, Bazel) added module dependency scanning relatively late; cppcheck, clangd, and other analyzers needed specific module support. As of the mid-2020s, named modules are usable but not yet ubiquitous; the standard library import (`import std;`) is the most common entry point because it requires only consumer-side adoption.
+Tooling support has been the gating factor. GCC 14+, Clang 17+, and MSVC have varying levels of named-module support; build systems (CMake, Bazel) added module dependency scanning relatively late; cppcheck, clangd, and other analyzers needed specific module support. Status (as of 2026-04): named modules are usable but not yet ubiquitous; the standard library import (`import std;`) is the most common entry point because it requires only consumer-side adoption.
 
-The lessons are direct. First, **a module system can be retrofitted onto a 40-year-old textual language, but the migration takes a decade plus**. C++20 modules are real and good; they will not displace `#include` ecosystem-wide for many more years. Second, **the BMI is a per-compiler caching artifact, not a distribution format**. Trying to standardize a portable binary module format across compilers was attempted (the C++ Modules TS) and the committee converged on "don't standardize it" — every compiler caches differently, and that's fine because source distribution is the contract. Third, **macros and the preprocessor remain the dirtiest corner of the migration**. A new language that wants module-style benefits should avoid a textual macro layer entirely, or confine it (as Rust and C++20 modules do) so that macro effects do not cross module boundaries.
+The lessons are direct. First, **a module system can be retrofitted onto a 40-year-old textual language, but the migration takes a decade plus**. C++20 modules are real and good; they will not displace `#include` ecosystem-wide for many more years. Second, **the BMI is a per-compiler caching artifact, not a distribution format**. Trying to standardize a portable binary module format was attempted (C++ Modules TS) and the committee converged on "don't standardize it" — every compiler caches differently, and that's fine because source distribution is the contract. Third, **macros and the preprocessor remain the dirtiest corner of the migration**. A language designer wanting module-style benefits should avoid a textual macro layer entirely, or confine it (as Rust and C++20 modules do) so macro effects do not cross module boundaries.
 
-Source: https://en.cppreference.com/w/cpp/language/modules and https://isocpp.org/files/papers/P1103R3.pdf and https://learn.microsoft.com/en-us/cpp/cpp/modules-cpp and https://gcc.gnu.org/wiki/cxx-modules and https://clang.llvm.org/docs/StandardCPlusPlusModules.html
+Sources: https://en.cppreference.com/w/cpp/language/modules and https://isocpp.org/files/papers/P1103R3.pdf and https://learn.microsoft.com/en-us/cpp/cpp/modules-cpp and https://gcc.gnu.org/wiki/cxx-modules and https://clang.llvm.org/docs/StandardCPlusPlusModules.html
 
 ### 8.3. Design Lessons from the Header-to-Module Migration
 
-C++20 modules are the most expensive module-system retrofit in software history, and the design choices the committee made are worth studying for any new language.
+C++20 modules are the most expensive module-system retrofit in software history (alongside JPMS — the canonical retrofit story is at §7.1), and the design choices the committee made are worth studying.
 
 **Module identity is decoupled from filenames.** A module named `foo` lives in whatever file declares `export module foo;`. The build system maps module names to their interface units, but the source language treats the module name as authoritative. This is the opposite of Go, which makes the directory path part of the package import path. The C++20 design preserves the historical C++ freedom to organize files however the project wants, at the cost of requiring a module-name-to-file mapping somewhere (typically the build system).
 
 **The preprocessor is contained but not eliminated.** Inside a module, `#define` and `#include` still work, but their effects do not escape the module boundary unless explicitly exported. This is a pragmatic compromise: existing C++ code uses macros pervasively, and a module system that banned them outright would have been a non-starter. The compromise is to localize macro effects rather than remove them.
 
-**Source distribution remains the contract.** Despite the BMI, no portable binary module format exists. This avoids the ABI-stability nightmare that would have dominated standardization, but it also means every consumer compiles every dependency from source. A new language should consciously decide whether to follow this model (Rust does) or to ship binary artifacts as distribution units (Go effectively does, via build caches; .NET and JVM do explicitly).
+**Source distribution remains the contract.** Despite the BMI, no portable binary module format exists. This avoids the ABI-stability nightmare that would have dominated standardization, but it also means every consumer compiles every dependency from source. A language designer should consciously decide whether to follow this model (Rust does) or ship binary artifacts as distribution units (Go effectively does via build caches; .NET and JVM do explicitly).
 
-**Tooling lag is the rate-limiting factor.** Even with the language feature standardized, ecosystem adoption depends on build systems, IDEs, package managers, and analyzers. C++20 modules were specified in 2020 but were not practically usable until ~2024. A new language can sidestep this by shipping modules from version 1, but it must also be honest that the ecosystem won't materialize until the tools exist.
+**Tooling lag is the rate-limiting factor.** Even with the language feature standardized, ecosystem adoption depends on build systems, IDEs, package managers, and analyzers. C++20 modules were specified in 2020 but were not practically usable until ~2024. Shipping modules from version 1 sidesteps this, but the ecosystem won't materialize until the tools exist.
 
 The deepest lesson is conservative: **a language without modules at the start will accumulate a textual-include-style alternative whose inertia eventually exceeds the benefit of the formal module system**. The right time to introduce modules is before there is anything to migrate.
 
@@ -1047,13 +1049,13 @@ Beyond the core systems-language and scripting-language references, several prod
 
 Swift's module unit is the **module**, which corresponds operationally to a Swift framework, a static library, an Xcode target, or a Swift Package Manager (SPM) target. Imports are a single keyword: `import Foundation`, `import MyAppKit`. Within a module, all source files share a flat namespace; types can reference each other without import declarations. Across modules, imports are the only way to reference declarations.
 
-Swift's visibility lattice is deeper than Java's or Kotlin's: `open` (public + subclassable across modules), `public` (visible across modules, not subclassable across modules without `open`), `package` (visible within the same Swift package — added in Swift 5.9), `internal` (default; visible within the module), `fileprivate` (visible within the source file), `private` (visible within the enclosing declaration). The `package` level was the most recent and most consequential addition: previously, Swift had no way to share types between sibling modules in a multi-module package without making them `public`, polluting the published API surface.
+Swift's visibility lattice is deeper than Java's or Kotlin's: `open` (public + subclassable across modules), `public` (visible across modules, not subclassable across modules without `open`), `package` (visible within the same Swift package — added in Swift 5.9, 2023), `internal` (default; visible within the module), `fileprivate` (visible within the source file), `private` (visible within the enclosing declaration). Status (as of 2026-04): `package` is the most recent significant addition; previously, Swift had no way to share types between sibling modules in a multi-module package without making them `public`, polluting the published API surface.
 
 The most distinctive Swift contribution is **Library Evolution Mode**, the resilient-ABI compilation mode that lets a binary module evolve its internal layout without breaking already-compiled clients. With Library Evolution enabled, Swift emits per-module `.swiftinterface` text files (a stable serialized form of the module's public API) plus binary `.swiftmodule` files. Consumers compile against the interface, and the runtime resolves layouts dynamically. This is what allows Apple to ship a new iOS SDK and have apps built against an older SDK continue to run — the equivalent of .NET's `TypeForwardedTo` plus C++ ABI conventions, baked into the compiler at module granularity.
 
 Swift Package Manager (SPM) added the package-level distribution layer, with `Package.swift` describing dependencies, products, and target structure. SPM packages can declare both library products (consumed as modules) and executable products. Cross-module visibility within a package is the `package` access level; cross-package visibility requires `public`.
 
-Source: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol and https://github.com/swiftlang/swift-evolution/blob/main/proposals/0386-package-access-modifier.md and https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst and https://www.swift.org/documentation/package-manager/
+Sources: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol and https://github.com/swiftlang/swift-evolution/blob/main/proposals/0386-package-access-modifier.md and https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst and https://www.swift.org/documentation/package-manager/
 
 ### 9.2. Erlang and Elixir — Applications, OTP, and Code Loading
 
@@ -1065,7 +1067,7 @@ The runtime story is unusual: Erlang supports **hot module reload**, where a run
 
 **Elixir** sits on top of the Erlang VM and reuses the same module mechanics with a more hierarchical naming convention (`MyApp.Accounts.User`) and the `defmodule ... do ... end` syntax. The dot-separated module name is a convention layered on top of the flat BEAM module namespace — `MyApp.Accounts.User` compiles to a BEAM module named `Elixir.MyApp.Accounts.User`. Elixir's `import`, `alias`, `require`, and `use` keywords cover different access patterns: `alias` for shorter names, `import` for unqualified function access, `require` for compile-time macro availability, `use` for invoking a module's `__using__/1` macro at compile time. **Mix** is Elixir's build tool, which adds package and dependency management (with **Hex** as the registry) above the application layer.
 
-Source: https://www.erlang.org/doc/system/code_loading.html and https://www.erlang.org/doc/design_principles/applications.html and https://hexdocs.pm/elixir/Kernel.html#defmodule/2 and https://hexdocs.pm/mix/Mix.html
+Sources: https://www.erlang.org/doc/system/code_loading.html and https://www.erlang.org/doc/design_principles/applications.html and https://hexdocs.pm/elixir/Kernel.html#defmodule/2 and https://hexdocs.pm/mix/Mix.html
 
 ### 9.3. Julia — Module Objects, `using`/`import`, and Precompilation
 
@@ -1085,7 +1087,7 @@ Julia's package manager (`Pkg`) maintains environments: `Project.toml` lists dep
 
 The module-system-relevant lesson from Julia is that **`include`-style textual splicing can coexist with module declarations** if precompilation handles the resulting cost. Julia conventionally puts each module's contents into one file but uses `include` to assemble large modules from many files, treating files as a project-organization unit and modules as the namespace unit.
 
-Source: https://docs.julialang.org/en/v1/manual/modules/ and https://docs.julialang.org/en/v1/manual/code-loading/ and https://julialang.org/blog/2023/04/julia-1.9-highlights/
+Sources: https://docs.julialang.org/en/v1/manual/modules/ and https://docs.julialang.org/en/v1/manual/code-loading/ and https://julialang.org/blog/2023/04/julia-1.9-highlights/
 
 ### 9.4. Dart — Libraries, Parts, and Underscore Privacy
 
@@ -1097,7 +1099,7 @@ Dart supports `show` and `hide` clauses on imports (`import 'foo.dart' show Bar,
 
 The `part`/`part of` system is unusual. A `part` file is *not* its own library; it is a syntactic continuation of the parent library, sharing the parent's privacy and import scope. This is similar to C++ separate compilation units that share a translation context, but expressed at the source level. The part is mostly used for code generation: a build_runner-generated `*.g.dart` file is typically a `part of` the consuming library, letting it access private members for serialization, ORM, or freezing.
 
-Source: https://dart.dev/language/libraries and https://dart.dev/tools/pub/dependencies and https://dart.dev/language/built-in-types#part-and-part-of
+Sources: https://dart.dev/language/libraries and https://dart.dev/tools/pub/dependencies and https://dart.dev/language/built-in-types#part-and-part-of
 
 ### 9.5. Nim — File-as-Module with `*` Export Marker
 
@@ -1109,7 +1111,7 @@ Nim's package manager is **Nimble**, which uses `.nimble` files for package meta
 
 The design lesson is that **a tiny per-declaration export marker can replace export lists entirely** if the language is willing to make the marker mandatory at every public declaration. The trade-off is a small visual noise floor on every public symbol; the benefit is that the export decision is locally visible and reviewable.
 
-Source: https://nim-lang.org/docs/manual.html#modules and https://nimble.directory/ and https://nim-lang.org/docs/manual.html#modules-export-marker
+Sources: https://nim-lang.org/docs/manual.html#modules and https://nimble.directory/ and https://nim-lang.org/docs/manual.html#modules-export-marker
 
 ### 9.6. Elm — Strict Static Modules with No Cycles
 
@@ -1121,7 +1123,7 @@ Elm's package manager publishes to `package.elm-lang.org` and enforces **strict 
 
 The module-system-relevant lesson is that **forbidding cycles at the file level, not just the package level**, is feasible if the language is willing to enforce it. Elm's pure-functional design helps (no mutable singletons that benefit from cycle tolerance), but the discipline transfers to other static-functional designs.
 
-Source: https://elm-lang.org/docs/style-guide and https://package.elm-lang.org/help/design-guidelines and https://elm-lang.org/docs/syntax#modules
+Sources: https://elm-lang.org/docs/style-guide and https://package.elm-lang.org/help/design-guidelines and https://elm-lang.org/docs/syntax#modules
 
 ### 9.7. F# — File Order Matters and Compilation Units
 
@@ -1133,87 +1135,51 @@ F# also has `module Foo` and `namespace Foo` declarations. Modules are compilati
 
 The design lesson is that **strict file ordering eliminates entire classes of module-system complexity** at the price of project-file ergonomics. Most languages would never accept this trade-off, but for a language whose audience already accepts strict editor-driven workflows (F# users typically use Visual Studio or Rider, both of which display file order graphically), it works.
 
-Source: https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/modules and https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/namespaces and https://learn.microsoft.com/en-us/dotnet/fsharp/style-guide/component-design-guidelines
+Sources: https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/modules and https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/namespaces and https://learn.microsoft.com/en-us/dotnet/fsharp/style-guide/component-design-guidelines
 
-### 9.8. Crystal, Pony, and Zig's Build-System Module Story
+### 9.8. Crystal and Pony
 
-Three smaller-scope mentions worth grouping together.
+Two smaller-scope mentions worth grouping; Zig's full coverage lives at §3.2 and §6.5.
 
-**Crystal** uses `require "foo"` for textual inclusion-style imports, where `require` reads and evaluates the named file once (idempotent via a load-set). Modules are declared with `module Foo ... end` and form hierarchies (`Foo::Bar`). The combination is similar to Ruby's `require` plus Ruby's modules but with static type checking and AOT compilation. Shards is the package manager.
+**Crystal** uses `require "foo"` for textual inclusion-style imports, idempotent via a load-set. Modules are declared with `module Foo ... end` and form hierarchies (`Foo::Bar`). The combination is similar to Ruby's `require` plus Ruby's modules but with static type checking and AOT compilation. Shards is the package manager.
 
-**Pony** has a strict per-package-directory model (one directory = one package, every `.pony` file in the directory is part of that package) plus capability-based reference types (covered in `MEMORY.md §1.10`). The module system itself is straightforward; the distinctive work happens at the type-system level with reference capabilities being the unit of authority.
+**Pony** has a strict per-package-directory model (one directory = one package, every `.pony` file in the directory is part of that package) plus capability-based reference types (`MEMORY.md §1.10`). The module system itself is straightforward; the distinctive work happens at the type-system level with reference capabilities as the unit of authority.
 
-**Zig's package story** is worth re-examining as a build-system pattern rather than just a language feature. Since Zig 0.11 (August 2023), the `build.zig.zon` file declares package dependencies with content-hash identity. The Zig package manager fetches by URL plus hash, validates the content, and exposes packages as named modules in `build.zig`. This makes Zig's package management entirely build-graph-driven: there is no central registry, no semantic-versioning resolver, just URLs and hashes. The trade-off is reproducibility (any URL with the right hash works, any URL with the wrong hash fails) versus discovery (no central index of available packages).
-
-Source: https://crystal-lang.org/reference/syntax_and_semantics/requiring_files.html and https://tutorial.ponylang.io/packages/ and https://ziglang.org/download/0.11.0/release-notes.html#Package-Management
+Sources: https://crystal-lang.org/reference/syntax_and_semantics/requiring_files.html and https://tutorial.ponylang.io/packages/
 
 ### 9.9. Raku — `auth`/`ver`/`api` Identity, Repository Chain, and the fez/zef Ecosystem
 
-Raku has the most ambitious distribution-identity model in this survey. A distribution is identified by a four-tuple expressed inline in import statements: `Foo::Bar:ver<0.0.42>:auth<zef:lizmat>:api<2.0>:from<Perl5>`. The `auth` field names the publishing authority (typically `zef:user`); `ver` is the version; `api` marks API-compatibility level (incrementing it signals a breaking change without bumping `ver`); `from` is an interop tag (e.g. `Perl5` for modules accessed via `Inline::Perl5`). This is the only mainstream system where consumers can require *exactly one* among multiple distributions sharing a name but differing in `auth` — `use HTTP::Tiny:auth<zef:alice>` and `use HTTP::Tiny:auth<zef:bob>` resolve to distinct artifacts.
+Status (as of 2026-04): the fez/zef ecosystem is the current Raku module ecosystem, replacing CPAN and the older p6c.
 
-Three distinct keywords govern loading. `use` performs compile-time load + import (looking for `.rakumod` files). `need` performs compile-time load only, without importing names into the lexical scope — useful when you want a module's compunit available for fully-qualified reference but no name pollution. `require` performs runtime load + lexically-scoped import — symbols enter the local lexical scope, not the package scope. The distinction between *loading* (making a compunit available) and *importing* (making symbols visible) is sharper than in any other production language.
+Raku has the most ambitious distribution-identity model in this survey: a distribution is identified by a four-tuple expressed inline in import statements — `Foo::Bar:ver<0.0.42>:auth<zef:lizmat>:api<2.0>:from<Perl5>`. The `auth` field names the publishing authority (typically `zef:user`); `ver` is the version; `api` marks API-compatibility level; `from` is an interop tag. This is the only mainstream system where consumers can require *exactly one* among multiple distributions sharing a name but differing in `auth` — `use HTTP::Tiny:auth<zef:alice>` and `use HTTP::Tiny:auth<zef:bob>` resolve to distinct artifacts. (Compare Perl 5's package-identity-as-name-only model at §4.5, which Raku reacts against.)
 
-The resolution mechanism is the **`$*REPO` chain**: a linked list of `CompUnit::Repository` objects, each implementing a `need` method that may resolve the request or delegate to its successor. The standard chain is `core → vendor → site → home`. `CompUnit::Repository::FileSystem` is the development-mode repo (no version awareness, maps short names to file paths). `CompUnit::Repository::Installation` is the production repo (version-aware, auth-aware, content-addressed). Custom repos are ordinary Raku objects — significantly more flexible than Python's `sys.path` finder/loader machinery, because each repo can decide what to delegate, what to refuse, and what to virtualize.
+Three distinct keywords govern loading. `use` performs compile-time load + import. `need` performs compile-time load only, without importing names into the lexical scope. `require` performs runtime load + lexically-scoped import. The distinction between *loading* (making a compunit available) and *importing* (making symbols visible) is sharper than in any other production language.
 
-`META6.json` carries `provides`, `depends`, `build-depends`, `test-depends`, `tags`, `auth`, `ver`, `api`. The `provides` map is the crucial part: it declares an explicit mapping from `use`-target name to file path, decoupling filesystem layout from importable name. A distribution can put its source in `lib/foo.pm` and provide `Foo::Bar` to importers — the filename and the import name need not match. Only modules listed in `provides` are installable.
+The resolution mechanism is the **`$*REPO` chain**: a linked list of `CompUnit::Repository` objects (`core → vendor → site → home`), each implementing a `need` method that may resolve the request or delegate. `CompUnit::Repository::FileSystem` is the development-mode repo; `CompUnit::Repository::Installation` is the production repo (version-aware, auth-aware, content-addressed). Custom repos are ordinary Raku objects — more flexible than Python's `sys.path` finder/loader machinery. `META6.json` carries `provides`, `depends`, `auth`, `ver`, `api`; the `provides` map decouples filesystem layout from importable name (a distribution can put source in `lib/foo.pm` and provide `Foo::Bar`). The **fez/zef ecosystem** validates `auth` against the uploader's identity, rejects version `*` (poisoning attack), enforces one-upload-per-(dist, version), and serves a JSON master index — closing a class of supply-chain attacks viable on CPAN.
 
-The **fez/zef ecosystem** (current Raku module ecosystem, replacing CPAN and the older p6c) validates `auth` against the uploader's identity, rejects distributions with version `*` (a poisoning attack — `*` would supersede every other version), enforces one-upload-per-(dist, version), and serves a JSON master index from `360.zef.pm/index.json`. `fez upload` publishes; `zef install` consumes. The `auth` validation closes a class of supply-chain attacks that was viable on CPAN, where uploaders could put arbitrary `auth` values in their META.
+The design lesson: **if multiple distributions of the same name must coexist, identity has to be a tuple, not a string**. Raku makes the tuple visible in the import syntax itself, so a security-conscious importer can pin `auth` directly without external lockfiles. Full treatment of Raku's multi-dispatch and roles lives in `TYPES.md §6.6`; Raku's schedulers, promises, and `react`/`whenever` live in `CONCURRENCY.md §11.6`.
 
-The design lesson generalizes beyond Raku: **if the ecosystem allows multiple distributions of the same name to coexist, identity must be a tuple, not a string**. Raku's choice to make the tuple visible in the import syntax itself is unusual but principled — it means a security-conscious importer can pin `auth` directly without consulting external lockfiles. Full treatment of Raku's multi-dispatch, subsets, roles, and type-object design lives in `TYPES.md §6.6`; full treatment of Raku schedulers, promises, supplies, channels, `react`, `whenever`, and continuation-based `await` lives in `CONCURRENCY.md §11.6`.
-
-Source: https://docs.raku.org/language/modules and https://docs.raku.org/language/distributions/configuration-structure and https://docs.raku.org/language/compilation and https://github.com/ugexe/zef and https://deathbyperl6.com/fez-zef-a-raku-ecosystem-and-auth/
+Sources: https://docs.raku.org/language/modules and https://docs.raku.org/language/distributions/configuration-structure and https://docs.raku.org/language/compilation and https://github.com/ugexe/zef and https://deathbyperl6.com/fez-zef-a-raku-ecosystem-and-auth/
 
 ### 9.10. Forth — Wordlists, the Search-Order Stack, and `DEFINITIONS`
 
-Forth's module mechanism (the "Search-Order word set" of Forth-2012, optional but ubiquitous) is fundamentally unlike anything else in this survey. There is no `import` declaration, no module file format, no package manifest — just a stack of *wordlists* (named-word dictionaries) that the text interpreter searches in order.
+Forth's module mechanism (the "Search-Order word set" of Forth-2012) is fundamentally unlike anything else in the survey: there is no `import` declaration, no module file format, no package manifest — just a stack of *wordlists* (named-word dictionaries) that the text interpreter searches in order. Primitives include `WORDLIST` (create), `SET-ORDER`/`GET-ORDER` (read/write the search order), `ALSO` (duplicate the top), `PREVIOUS` (pop), `ONLY` (reset), `FORTH` (push the standard wordlist), and `DEFINITIONS` (make the top of the search order also the compilation wordlist).
 
-The primitives:
+The model is imperative: programmers manipulate the search-order stack within source files. To define editor commands without polluting the main namespace, push an editor wordlist via `ALSO`, define words, then pop with `PREVIOUS`. Lookup searches each wordlist newest-first; the search-order stack shadows top-down. Gforth adds a `voc1:voc2:word` qualified-syntax overlay via its recognizer system. The Gforth manual is candid about the trade-off: "trying to modularize programs in this way has disadvantages for debugging and reuse/factoring." The recurring concern is that "what does this name resolve to right now?" depends on dynamic search-order state.
 
-- `WORDLIST` creates a new empty wordlist and returns its identifier (a `wid`).
-- `SET-ORDER` ( widn ... wid1 n -- ) sets the search order to the listed wordlists, with `wid1` searched first.
-- `GET-ORDER` ( -- widn ... wid1 n ) reads the current search order.
-- `ALSO` duplicates the top of the search-order stack — adding a "scratchpad slot" to override below.
-- `PREVIOUS` removes the topmost wordlist from the search order.
-- `ONLY` resets to the implementation-defined minimum order (must include `FORTH-WORDLIST` and `SET-ORDER`).
-- `FORTH` pushes the standard `FORTH-WORDLIST` onto the search order.
-- `DEFINITIONS` makes the current top-of-search-order also be the *compilation* wordlist — newly defined words go into it.
+The lesson: **stack-of-tables is viable as a module primitive when source order and execution order are deliberately fused** (Forth's `:` definitions compile immediately into the top wordlist). It is poorly suited to languages with separate compilation, deferred linking, or static reasoning. Stack-effect type systems live in `TYPES.md §9.4`; Forth-family multitasking lives in `CONCURRENCY.md §7.5`.
 
-The model: programmers manipulate the search-order stack imperatively, often within a single source file. To define editor commands without polluting the main namespace, one creates an editor wordlist, pushes it via `ALSO`, defines words while it's at the top of the search order, then pops it with `PREVIOUS`. The result is a transient namespace that exists only within a lexical region of the source.
-
-The text interpreter searches each wordlist from newest definition to oldest — so a later definition shadows an earlier one of the same name *within* a wordlist, and an earlier wordlist on the search-order stack shadows a later one. This is essentially a manually-managed lexical-scope stack, with the programmer responsible for pushing and popping.
-
-Gforth and several modern Forths layer additional features. **Gforth** retains the older `vocabulary` word (a wordlist plus a defining word that pushes itself onto the search order when invoked) and integrates wordlists into its **recognizer** system, so that `voc1:voc2:word` qualified syntax works as a recognizer pattern: search the topmost recognizer for `voc1`, search inside `voc1` for `voc2`, look up `word` inside `voc2`. This is a path-syntax overlay on what's structurally a stack-of-tables.
-
-The Gforth manual is unusually candid about the trade-offs: "trying to modularize programs in this way has disadvantages for debugging and reuse/factoring that overcome the advantages in my experience." The critique echoes a recurring concern with stack-of-namespaces designs — that "what does this name resolve to right now?" depends on the current search-order state, which is harder to reason about than a static import list. Forth's defenders note that the same property allows transient editor/assembler namespaces with no per-file ceremony.
-
-The lesson: **stack-of-tables is a viable module-system primitive for languages where source order and execution order are deliberately fused** (Forth's `:` definitions are immediately compiled and added to the top wordlist). It is poorly suited to languages with separate compilation, deferred linking, or static reasoning about visibility. Full treatment of stack-effect type systems in the Forth/Factor family lives in `TYPES.md §9.4`; Forth-family multitasking, mailboxes, and CSP-style channels live in `CONCURRENCY.md §7.5`.
-
-Source: https://forth-standard.org/standard/search and https://gforth.org/manual/Word-Lists.html and https://gforth.org/manual/Wordlists-and-Search-Order-Tutorial.html and https://www.complang.tuwien.ac.at/forth/gforth/Docs-html-history/0.6.2/Why-use-word-lists-.html
+Sources: https://forth-standard.org/standard/search and https://gforth.org/manual/Word-Lists.html and https://gforth.org/manual/Wordlists-and-Search-Order-Tutorial.html and https://www.complang.tuwien.ac.at/forth/gforth/Docs-html-history/0.6.2/Why-use-word-lists-.html
 
 ### 9.11. Factor — Vocabularies, `USING:`, and Ambiguous-Use Errors
 
-Factor is the modern concatenative language that took Forth's wordlist-stack idea and replaced it with a declarative module system. A *vocabulary* is Factor's module unit: a directory containing one or more `.factor` files plus optional metadata. Vocabularies form a flat namespace identified by dotted names: `kernel`, `math.functions`, `sequences`, `io.files`.
+Factor is the modern concatenative language that replaced Forth's wordlist-stack with a declarative module system. A *vocabulary* is the module unit (a directory of `.factor` files in a flat namespace identified by dotted names: `kernel`, `math.functions`, `io.files`). Imports are declarative: `USE: vocab` and `USING: v1 v2 v3 ;` add to the search path; `IN: my.app` sets the current vocabulary; `QUALIFIED:`, `FROM: ... =>`, `EXCLUDE: ... =>`, and `RENAME: ... =>` cover the R6RS-style refinement vocabulary.
 
-The import syntax replaces Forth's stack manipulation with declarative directives:
+The distinctive mechanism is the **ambiguous-use-error**: if a name resolves to multiple imported vocabularies, the parser raises an error rather than silently picking one. Users disambiguate via `vocabulary:word` qualified syntax — the inverse of Forth's "first-found wins" search-order semantics. Vocabularies live under root directories (`core`, `basis`, `extra`, `work`); loading is via `require` or `reload`.
 
-- `USE: kernel` — add a single vocabulary to the search path, loading it if necessary.
-- `USING: kernel math sequences ;` — add multiple vocabularies (most common form).
-- `IN: my.app` — set the current vocabulary (where new definitions go).
-- `QUALIFIED: math.functions` — make `math.functions` accessible only via `math.functions:NAME` qualified syntax, no unqualified imports.
-- `FROM: math.functions => sin cos ;` — selective import of named words.
-- `EXCLUDE: kernel => 2drop 3drop ;` — import all except the listed words.
-- `RENAME: drop kernel => discard ;` — import a word under a different name.
-- `MAIN: my.app:run` — declare the entry point for an executable vocabulary.
+The contrast with Forth (§9.10) is sharp: Forth wordlists are runtime data the programmer mutates with imperative stack operations; Factor vocabularies are declarative compile-time entities resolved by the parser. Factor's optimizing compiler (`COMPILERS.md §32`) operates over fully-resolved vocabulary references, enabling whole-program type inference and inlining that the Forth wordlist model would obstruct.
 
-The distinctive Factor mechanism is the **ambiguous-use-error**. If a name resolves to multiple imported vocabularies, the parser raises an error rather than silently picking one. The user must disambiguate via `vocabulary:word` qualified syntax. This is the inverse of Forth's "first-found wins" search-order semantics — Factor refuses to guess. The trade-off is that adding a `USE:` can break existing code by introducing an ambiguity, but the failure mode is loud rather than silent.
-
-Vocabularies live under root directories (`vocab-roots`), conceptually the JVM classpath analog. Factor ships four roots: `core` (essential bootstrap vocabularies), `basis` (standard libraries), `extra` (community contributions), `work` (user code). Additional roots can be added via `add-vocab-root` or in `.factor-rc`. Loading is via `require` (load-once-and-cache) or `reload` (force reload from disk).
-
-The contrast with Forth is sharp. Forth's wordlists are runtime data structures the programmer manipulates with imperative stack operations; Factor's vocabularies are declarative compile-time entities resolved by the parser. Factor inherits Forth's word-as-named-definition unit and the textual stack-effect model, but builds a Rust-or-Haskell-style declarative module system around them. This is part of why Factor feels accessible to non-Forth programmers despite being concatenative.
-
-Factor's optimizing compiler (covered in `COMPILERS.md §32`) operates over fully-resolved vocabulary references, which is what makes whole-program type inference and inlining tractable across vocabulary boundaries — a property the Forth wordlist model would make significantly harder.
-
-Source: https://docs.factorcode.org/content/article-tour-vocabularies.html and https://docs.factorcode.org/content/article-vocabs.loader.html and https://docs.factorcode.org/content/article-vocabs.roots.html and https://docs.factorcode.org/content/word-USE__colon__%2Csyntax.html
+Sources: https://docs.factorcode.org/content/article-tour-vocabularies.html and https://docs.factorcode.org/content/article-vocabs.loader.html and https://docs.factorcode.org/content/article-vocabs.roots.html and https://docs.factorcode.org/content/word-USE__colon__%2Csyntax.html
 
 ### 9.12. D — `module foo.bar;`, Package Access, and `version()` Conditional Compilation
 
@@ -1237,29 +1203,19 @@ The **`export` modifier** is unusual: it distinguishes "visible to other modules
 
 The lesson: **a richer access-modifier lattice (private/package/protected/public/export) addresses real visibility distinctions** — particularly the binary-export boundary that languages like Java and C# handle implicitly via reflection visibility and that C/C++ handle out-of-band via `__declspec(dllexport)` / visibility attributes. D made it a first-class language concern.
 
-Source: https://dlang.org/spec/module.html and https://dlang.org/spec/attribute.html#visibility_attributes and https://dlang.org/spec/version.html and https://dub.pm/
+Sources: https://dlang.org/spec/module.html and https://dlang.org/spec/attribute.html#visibility_attributes and https://dlang.org/spec/version.html and https://dub.pm/
 
 ### 9.13. Lean 4 — `import`, `namespace`, `section`, `open`, `export`
 
-Lean 4 is a research-adjacent dependently-typed proof assistant and programming language with a mature, conventional module system — interesting because Lean's macro and elaboration system is heavily Racket-influenced (covered in `PARSERS.md §2.22`) yet the module language deliberately *did not* inherit Racket's phase tower.
+Lean 4's module surface is conventional: `import Foo.Bar` loads another file-shaped module, `namespace Foo ... end Foo` opens a hierarchical naming scope, `section ... end` provides a non-namespace scope for `variable` declarations, `open Foo` brings unqualified access, and `export Foo (a b c)` re-exports specific names. Imports are transitive. Modules are file-shaped (`Foo/Bar.lean` ↔ `Foo.Bar`). Lean deliberately *did not* inherit Racket's phase tower (§5.4) despite a Racket-influenced macro elaborator (`PARSERS.md §2.22`).
 
-The structure:
+The module-relevant design point is that **Lean modules participate in instance resolution**: an `instance : Add Nat where ...` declared in module `Foo` is only visible to clients that `import Foo`, so the import graph determines the visible instance set. Instance scoping is closer to Rust's coherence-by-orphan-rule than to Haskell's open-world assumption. Macro visibility follows the same pattern — a `macro_rules` declaration is visible where its namespace is `open`'d. Typeclass coherence semantics, the broader instance-resolution rules, and dispatch behavior are owned by `TYPES.md §6`; the module-system claim here is that imports are the scoping primitive, not type-system internals.
 
-- **`import Foo.Bar`** at the top of a file loads another module. Modules are file-shaped: `Foo/Bar.lean` is the source for `Foo.Bar`. Imports are transitive — `import Foo.Bar` transitively imports everything `Foo.Bar` imports.
-- **`namespace Foo ... end Foo`** opens a hierarchical naming scope. Declarations inside become `Foo.X`. Namespaces nest and can span multiple files.
-- **`section ... end`** is a non-namespace scope — useful for `variable` declarations that should affect a group of definitions without becoming part of the namespace.
-- **`open Foo`** brings unqualified access to names in `Foo` into the current scope. Like Haskell's `import Foo` (without `qualified`).
-- **`export Foo (a b c)`** re-exports specific names from `Foo` into the current namespace, making them accessible to clients via the current namespace name.
+Lake (`lakefile.lean` / `lakefile.toml`) is the package manager; Mathlib is the dominant single-package Lean ecosystem with hundreds of namespaces.
 
-The crucial design point: **Lean modules participate in instance resolution.** Instance declarations (`instance : Add Nat where ...`) are scoped: an instance declared in module `Foo` is only visible to clients that `import Foo`. This makes the module system part of typeclass resolution semantics, not just naming. A client can have one notion of `Add Nat` if it imports `Foo.Standard` and a different notion if it imports `Foo.Modular` — instance-set determined by the import graph, not by global registration.
+The lesson: **a conventional namespace-import module system can be made semantically load-bearing for instance and macro scoping without adopting Racket-style phase machinery** — a viable middle ground.
 
-This is closer to Rust's coherence-by-orphan-rule than to Haskell's open-world type-class assumption. Combined with Lean's macro hygiene, the module system also controls macro visibility — a `macro_rules` declaration is visible exactly where the namespace it's declared in is `open`'d.
-
-Lake is the package manager, with `lakefile.lean` (Lean source for the build configuration) or `lakefile.toml`. Mathlib (the community math library) is the largest Lean ecosystem and uses a single-package model with hundreds of namespaces.
-
-The lesson: **a conventional namespace-import module system can support sophisticated typeclass/instance/macro scoping without adopting Racket-style phase machinery.** Lean's choice to keep the module system simple while making it semantically load-bearing for instance resolution is a viable middle ground.
-
-Source: https://lean-lang.org/lean4/doc/setup.html and https://lean-lang.org/theorem_proving_in_lean4/interacting_with_lean.html and https://lean-lang.org/lean4/doc/whatsnew.html and https://leanprover-community.github.io/
+Sources: https://lean-lang.org/lean4/doc/setup.html and https://lean-lang.org/theorem_proving_in_lean4/interacting_with_lean.html and https://lean-lang.org/lean4/doc/whatsnew.html and https://leanprover-community.github.io/
 
 ### 9.14. R — NAMESPACE Files and Method Dispatch Interaction
 
@@ -1288,7 +1244,7 @@ The DESCRIPTION file is the manifest (`Package:`, `Version:`, `Depends:`, `Impor
 
 The lesson: **method-dispatch registration and name export are independent operations**, and a language with method dispatch has to decide whether they're coupled (Java: implicit method visibility tracks class visibility) or decoupled (R: explicit registration, separate from name export). The decoupling is more verbose but lets package authors expose dispatch behavior without exposing the implementing functions by name.
 
-Source: https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Package-namespaces and https://r-pkgs.org/namespace.html and https://cran.r-project.org/web/packages/policies.html
+Sources: https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Package-namespaces and https://r-pkgs.org/namespace.html and https://cran.r-project.org/web/packages/policies.html
 
 ### 9.15. Design Lessons from Additional Production Languages
 
@@ -1309,14 +1265,29 @@ The systems in this chapter add several specific lessons not covered by chapters
 - **Per-binary-export modifier** (D's `export`): distinguishing "visible across module boundaries within this binary" from "visible across linking boundaries between binaries" addresses the ELF/PE export-table concern at the language level rather than via build-system attributes.
 - **Module system as instance-resolution scope** (Lean 4): typeclass instances are scoped to module imports, so the import graph determines which dispatch tables are visible. Avoids Haskell's global instance assumption while keeping Rust's coherence stricter.
 - **Method registration decoupled from name export** (R NAMESPACE `S3method` vs `export`): when the language has method dispatch, registering a method for dispatch and exporting its name as a callable are independent operations, expressible separately.
+- **Compile-time-elaborated parametric IR shipped pre-instantiation** (Mojo §9.16): when the language has serialisable parametric IR, the module system can ship pre-elaboration code for cross-platform / cross-target specialisation, inverting Rust's monomorphisation-at-library-build-time model.
 
-A new language can pick from this menu without committing to any single ecosystem's full module system. Symbol-table-and-namespace lessons from Perl 5, Common Lisp, Clojure, and Tcl now live with the rest of the runtime-import family in §4.9; specification/body and Wirth-lineage lessons from Ada, Modula-2/3, and Oberon live with the typed family in §5.7.
+A language designer can pick from this menu without committing to any single ecosystem's full module system. Symbol-table-and-namespace lessons from Perl 5, Common Lisp, Clojure, and Tcl now live with the rest of the runtime-import family in §4.9; specification/body and Wirth-lineage lessons from Ada, Modula-2/3, and Oberon live with the typed family in §5.7.
+
+### 9.16. Mojo — File-as-Module over Three-Stage Compile-Time Elaboration
+
+Mojo's module-system *surface* is conventional Python-with-types (`from foo import bar`, file-as-module, dotted package paths), but the *underlying compilation pipeline* is the MLIR-based three-stage parser → interpreter → elaborator covered in `COMPILERS.md §6.6` (KGEN/POP) and `COMPILERS.md §12.10` (`@parameter`). The module-system-relevant consequence is that **modules participate in compile-time elaboration**: a parametric struct `List[T]` declared in module `collections` can be specialised at compile time at every call site, with the specialisation living in the importing module's compiled artifact rather than in `collections`.
+
+Distinct from Python (§4.1) inheritance: Mojo imports do not perform module-body execution in the Python sense. A Mojo module is a compile-time namespace of declarations; importing it makes the declarations available without running their initialisation code at import time. There is no `__init__.py` that runs on first import, and no module-object singleton with mutable state.
+
+Distinct from Rust (§3.1) crates: Mojo's parametric types (KGEN/POP) are **serialisable pre-instantiation**, so a Mojo library can ship parametric code that is specialised on the consumer's machine for the consumer's hardware target. This is the inverse of Rust's monomorphisation-at-library-build-time model: Rust generates concrete code at the library author's site for a fixed target tuple; Mojo defers specialisation to the consumer. The architectural benefit is **target-specific specialisation across the module boundary** — a generic SIMD kernel in a Mojo library can be specialised for AVX-512 on one consumer and Apple AMX on another from the same source artifact.
+
+Status (as of 2026-04): Mojo's module system is still evolving. The language was closed-source through 2024 with parts (the standard library, then the compiler core) becoming open-source over 2024–2026; a stable 1.0 module-system specification has not been published. The design point worth recording is the **compile-time-elaboration interaction**: a module system designed for a language with serialisable parametric IR has different identity-and-distribution properties than one designed for monomorphisation-at-link-time (Rust), runtime specialisation (Java erasure plus JIT), or whole-program reachability (Virgil §13.6 in `COMPILERS.md`).
+
+The lesson for language designers: **if the language has compile-time parametric IR, the module system can ship pre-elaboration code for cross-platform / cross-target specialisation** — a property only Mojo currently has at production scale, but one available to any language with similar IR architecture.
+
+Sources: https://docs.modular.com/mojo/manual/packages/ and https://docs.modular.com/mojo/manual/structs/ and https://docs.modular.com/mojo/manual/parameters/
 
 ---
 
 ## 10. Research and Advanced Module Calculi
 
-The languages in chapters 3–9 are all production systems that compromise expressive power for ecosystem viability. The research lineage in this chapter is the opposite: each entry pushes the module system in a particular formal direction, often producing systems that are conceptually beautiful but never widely deployed. They matter to a new-language designer not as templates to imitate, but as upper bounds on what a module system *could* be — and as cautions about which kinds of expressive power are not worth the cost.
+The languages in chapters 3–9 are all production systems that compromise expressive power for ecosystem viability. The research lineage in this chapter is the opposite: each entry pushes the module system in a particular formal direction, often producing systems that are conceptually beautiful but never widely deployed. They matter to a language designer not as templates to imitate, but as upper bounds on what a module system *could* be — and as cautions about which kinds of expressive power are not worth the cost.
 
 ### 10.1. Standard ML Module Calculus — The Classical Foundation
 
@@ -1331,7 +1302,7 @@ The technical depth that production languages have not absorbed is substantial:
 
 Production languages have absorbed signatures-and-modules but largely not the full machinery. OCaml is the closest to SML's expressivity (and adds first-class modules), but even OCaml's mainstream usage rarely exercises sharing constraints or opaque ascription deeply. The lesson is that module-calculus expressivity has a practical ceiling — the marginal user cost of each additional feature exceeds the marginal benefit at some point, and that point is reached fairly early.
 
-Source: https://smlfamily.github.io/sml97-defn.pdf and http://www.cs.cmu.edu/~rwh/smlbook/book.pdf and https://homepages.inf.ed.ac.uk/dts/fps/papers/MacQueen.pdf
+Sources: https://smlfamily.github.io/sml97-defn.pdf and http://www.cs.cmu.edu/~rwh/smlbook/book.pdf and https://homepages.inf.ed.ac.uk/dts/fps/papers/MacQueen.pdf
 
 ### 10.2. 1ML — Unifying Modules and Core
 
@@ -1339,9 +1310,9 @@ Andreas Rossberg's **1ML** (ICFP 2015, with subsequent refinements) is the most 
 
 The technical move that makes this work is treating signatures as a particular form of (large) type and modules as values of those types. Type abstraction is recovered through existential quantification, and applicative-vs-generative functor distinctions are recovered through choice of polymorphism mode (predicative vs impredicative). The result is a language whose module system is as expressive as full SML modules but expressed with no separate module syntax.
 
-1ML is not a production language. Its significance for a new-language designer is conceptual: it shows that the apparent need for "two languages" (core + module) is not fundamental, and that a sufficiently expressive single language can absorb the module system. Most production languages will not benefit from this — the two-language style is what makes ML modules approachable — but the existence proof matters because it bounds what is necessary.
+1ML is not a production language. Its significance is conceptual: it shows that the apparent need for "two languages" (core + module) is not fundamental, and that a sufficiently expressive single language can absorb the module system. Most production languages will not benefit from this — the two-language style is what makes ML modules approachable — but the existence proof matters because it bounds what is necessary.
 
-Source: https://people.mpi-sws.org/~rossberg/1ml/1ml.pdf and https://people.mpi-sws.org/~rossberg/
+Sources: https://people.mpi-sws.org/~rossberg/1ml/1ml.pdf and https://people.mpi-sws.org/~rossberg/
 
 ### 10.3. Modular Implicits — Type-Class-Style Inference for OCaml
 
@@ -1351,7 +1322,7 @@ This is conceptually significant because it shows that **type classes and module
 
 The proposal has not landed in mainline OCaml, partly because the elaboration semantics interact subtly with OCaml's existing type inference and module language. The design space remains open: OCaml's existing first-class modules cover some of the use cases, and the community has debated whether implicit modules add enough value to justify the language complexity.
 
-Source: https://arxiv.org/abs/1512.01895 and https://www.cl.cam.ac.uk/~jdy22/papers/modular-implicits.pdf and https://www.lpw25.net/
+Sources: https://arxiv.org/abs/1512.01895 and https://www.cl.cam.ac.uk/~jdy22/papers/modular-implicits.pdf and https://www.lpw25.net/
 
 ### 10.4. Backpack — Indefinite Modules and Mixin Linking for Haskell
 
@@ -1359,29 +1330,25 @@ Source: https://arxiv.org/abs/1512.01895 and https://www.cl.cam.ac.uk/~jdy22/pap
 
 The design pattern is straightforward: a library can expose a signature `Stream` and an indefinite implementation that depends on `Stream`-matching modules. Downstream consumers instantiate the library with their preferred concrete `Stream` implementation, and the result is a fully linked module. This is closer to ML functors than to type classes, but operating at the package layer rather than the module-language layer.
 
-Backpack landed in GHC 8.2 (2017) but has seen modest adoption. The mainstream Haskell answer to "abstraction over implementations" remains type classes, partly because Cabal's tooling integration with Backpack remained rough for years. The lesson is that **module-level mixin linking can be a powerful alternative to type classes**, but it competes with an entrenched mechanism and needs strong tooling to win adoption. A new language that has no entrenched type class system can choose mixin modules cleanly; one that already has type classes faces an uphill migration.
+Backpack landed in GHC 8.2 (2017) but has seen modest adoption. The mainstream Haskell answer to "abstraction over implementations" remains type classes, partly because Cabal's tooling integration with Backpack remained rough for years. The lesson: **module-level mixin linking can be a powerful alternative to type classes**, but it competes with an entrenched mechanism and needs strong tooling to win adoption. Greenfield designs without an entrenched type-class system can choose mixin modules cleanly; one that already has type classes faces an uphill migration.
 
-Source: https://plv.mpi-sws.org/backpack/backpack-popl.pdf and https://gitlab.haskell.org/ghc/ghc/-/wikis/backpack and https://wiki.haskell.org/Backpack
+Sources: https://plv.mpi-sws.org/backpack/backpack-popl.pdf and https://gitlab.haskell.org/ghc/ghc/-/wikis/backpack and https://wiki.haskell.org/Backpack
 
 ### 10.5. MixML and Recursive Mixin Modules
 
-Derek Dreyer's **MixML** (Dreyer-Rossberg, ICFP 2008) and the broader mixin-module tradition (Bracha-Cook 1990; Flatt-Felleisen 1998; Hirschowitz-Leroy 2002) explore module systems whose primary composition operator is *mixin merging* rather than functor application. A mixin module declares both required imports (slots to be filled) and provided exports; mixing two modules unifies their slots and exports, propagating type identities and recursively composing.
+Derek Dreyer's **MixML** (Dreyer-Rossberg, ICFP 2008) and the broader mixin-module tradition (Bracha-Cook 1990; Flatt-Felleisen 1998; Hirschowitz-Leroy 2002) explore module systems whose composition operator is *mixin merging* rather than functor application. A mixin module declares required imports (slots) and provided exports; mixing unifies slots and exports, propagating type identities and recursively composing. MixML's contribution is **type-safe recursion across module boundaries**: two modules can mutually depend through their interfaces if their composition resolves all slots — structurally similar to Backpack's indefinite modules but with composition rather than instantiation as the primitive.
 
-The key technical contribution of MixML is **type-safe recursion across module boundaries**. Two modules can mutually depend on each other through their interfaces if their mixin composition resolves all slots. This is structurally similar to Backpack's indefinite modules but with composition as the primitive operator rather than instantiation.
+Mixin modules have not landed in any major production language. Scala's traits are loosely inspired but operate at the value/class level. The lesson is that **recursive cross-module dependency is solvable with the right algebraic structure**, but production languages typically ban cycles instead — a simpler answer that vastly simplifies implementation.
 
-Mixin modules have not landed in any major production language. Scala's traits are loosely inspired by the same lineage but operate at the value/class level, not the module level. The lesson is that **recursive cross-module dependency is solvable with the right algebraic structure**, but production languages have generally chosen to ban cycles instead — a much simpler answer that loses some expressivity but vastly simplifies implementation and comprehension.
-
-Source: https://people.mpi-sws.org/~dreyer/papers/mixml/icfp08.pdf and https://www.mpi-sws.org/~dreyer/
+Sources: https://people.mpi-sws.org/~dreyer/papers/mixml/icfp08.pdf and https://www.mpi-sws.org/~dreyer/
 
 ### 10.6. Newspeak — Modules as Parameterized Top-Level Classes
 
-Gilad Bracha's **Newspeak** uses a fundamentally different module model from any other language in this survey. Newspeak has **no global namespace and no static state**. Top-level classes are parameterized over the modules they need: a top-level class declaration is effectively a module that takes its dependencies as constructor arguments. Instantiating the top-level class binds it to specific dependency implementations, and the resulting object *is* the module instance.
+Gilad Bracha's **Newspeak** has no global namespace and no static state. Top-level classes are parameterized over the modules they need: a top-level class is a module that takes its dependencies as constructor arguments, and instantiating the class produces a module instance. This is ocap modularity (canonical at `MEMORY.md §10`) lifted to the language's primary modularity mechanism. Modules cannot hold mutable global state, modules are parameterized over dependencies without DI framework, and module composition is object construction; multiple instances of "the same module" can coexist with different bindings, supporting test isolation, sandboxing, and live update naturally.
 
-This is ocap modularity (covered in `MEMORY.md §10`) lifted to the language's primary modularity mechanism. The consequences are radical: modules cannot hold mutable global state (there are no globals), modules can be parameterized over their dependencies without any ad-hoc dependency-injection framework, and module composition is just object construction. Multiple instances of "the same module" can coexist with different dependency bindings, supporting test isolation, sandboxing, and live-update patterns naturally.
+Newspeak is small and academic but has influenced E, Caja, SES (Hardened JavaScript), and the broader ocap tradition. The lesson: **fusing "module" and "object" produces a remarkably clean ocap story**, but it requires the language to commit to no-global-state from day one — essentially unretrofittable.
 
-Newspeak is small and academic, but its design has influenced E, Caja, SES (now Hardened JavaScript via TC39), and the broader ocap tradition. The lesson is that **fusing "module" and "object" in this way is internally consistent and produces a remarkably clean ocap story**, but it requires the language to commit to no-global-state from day one. Retrofitting it onto a language with existing globals or singleton modules is essentially impossible.
-
-Source: https://newspeaklanguage.org/ and https://bracha.org/newspeak.pdf and https://bracha.org/newspeak-modules.pdf
+Sources: https://newspeaklanguage.org/ and https://bracha.org/newspeak.pdf and https://bracha.org/newspeak-modules.pdf
 
 ### 10.7. Applicative vs Generative Functors
 
@@ -1394,9 +1361,9 @@ This matters when functors are used to implement abstract data types like sets o
 
 OCaml supports both: `module F (X : SIG) = struct ... end` is applicative when pure; `module F (X : SIG) : sig ... end = struct ... end` (with sealing) is generative. Programmers must understand the distinction to write correct abstract-type abstractions in OCaml.
 
-The design lesson is that **module application semantics is a language-design choice**, not just an implementation detail. A new language that introduces functors must decide whether default behavior is applicative (more usable, but rules out mutable state in functor bodies) or generative (more flexible, but every application produces a fresh type).
+The design lesson: **module application semantics is a language-design choice**, not just an implementation detail. Any language introducing functors must decide whether default behavior is applicative (more usable, but rules out mutable state in functor bodies) or generative (more flexible, but every application produces a fresh type).
 
-Source: https://v2.ocaml.org/manual/moduleexamples.html#s:applicative-functors and https://people.mpi-sws.org/~dreyer/papers/dreyer/thesis.pdf
+Sources: https://v2.ocaml.org/manual/moduleexamples.html#s:applicative-functors and https://people.mpi-sws.org/~dreyer/papers/dreyer/thesis.pdf
 
 ### 10.8. First-Class Modules
 
@@ -1411,7 +1378,7 @@ Here `(module Cmp)` is a first-class module value pattern. The argument is suppl
 
 First-class modules have been in OCaml since 3.12 (2010) and are the substrate behind several library patterns (e.g., the `(module Show)` argument idiom, certain monadic frameworks). They demonstrate that the gap between the module language and the core language can be bridged pragmatically without committing to 1ML's full unification.
 
-Source: https://v2.ocaml.org/manual/firstclassmodules.html and https://dev.realworldocaml.org/first-class-modules.html
+Sources: https://v2.ocaml.org/manual/firstclassmodules.html and https://dev.realworldocaml.org/first-class-modules.html
 
 ### 10.9. Scheme R6RS / R7RS Libraries — The Canonical Declarative Module Form
 
@@ -1440,54 +1407,23 @@ The R6RS/R7RS import refinements are the canonical reference for declarative mod
 
 A subtle technical point worth recording: the import-list itself is a *form*, not just a list of names. The `(library X)` wrapper is required only when one of the names in `X` would otherwise be parsed as `for`/`only`/`except`/`prefix`/`rename` — a self-referential escape hatch that disambiguates the small set of import-keyword names from arbitrary library-name identifiers. Most production languages skip this nicety and reserve their import-keywords globally.
 
-The lesson generalizes: **a small fixed set of import refinement operators (only/except/prefix/rename) covers virtually every selective-import pattern**, and a new language can adopt the R6RS/R7RS vocabulary without inventing a parallel set. The cost is minor: ~four import-form keywords to specify and document.
+The lesson generalizes: **a small fixed set of import refinement operators (only/except/prefix/rename) covers virtually every selective-import pattern**, and the R6RS/R7RS vocabulary can be adopted without inventing a parallel set. The cost is minor — ~four import-form keywords to specify and document.
 
-Source: https://www.r6rs.org/final/html/r6rs/r6rs-Z-H-10.html and https://small.r7rs.org/attachment/r7rs.pdf and https://standards.scheme.org/corrected-r7rs/r7rs-Z-H-7.html and https://standards.scheme.org/corrected-r7rs/r7rs-Z-H-12.html
+Sources: https://www.r6rs.org/final/html/r6rs/r6rs-Z-H-10.html and https://small.r7rs.org/attachment/r7rs.pdf and https://standards.scheme.org/corrected-r7rs/r7rs-Z-H-7.html and https://standards.scheme.org/corrected-r7rs/r7rs-Z-H-12.html
 
 ### 10.10. Agda and Idris 2 — Dependent-Type Modules and Records-as-Functors
 
-In dependently-typed languages, the boundary between modules and records dissolves: a module is a record, and a record can have fields that are themselves types or proofs that depend on earlier values. This makes ML-style functors a *special case* of ordinary record construction, with the parameter list being a telescope of dependent values rather than a fixed signature.
+In dependently-typed languages, the module/record boundary dissolves: a module is a record, and its fields can be types or proofs depending on earlier values. ML-style functors become a special case of ordinary record construction whose parameter list is a telescope of dependent values rather than a fixed signature.
 
-**Agda's parameterized modules** are the cleanest example:
+**Agda** declares parameterized modules with `module Stack (A : Set) where ...`, instantiated as `module IntStack = Stack Nat`. The structural difference from ML functors is that subsequent module parameters can reference earlier parameters as values, not just as types — a property requiring dependent-type machinery in the core language. Agda's other module operations (`open M`, `open M using (...)`, `hiding`, `renaming`, anonymous `module _ where ...`, `record`-as-module) follow the R6RS refinement vocabulary (§10.9). **Idris 2** inherits the same model and adds **interfaces** (records-of-functions resolved by search), structurally different from Lean 4's import-scoped registration (§9.13).
 
-```agda
-module Stack (A : Set) where
-  data Stack : Set where
-    empty : Stack
-    push  : A → Stack → Stack
+The module-structure claim: **once the language has dependent types, modules don't need to be a separate construct from records.** ML's three-stratum split (values, types, modules) collapses to one, but the property is fundamentally a typing-rule consequence; full treatment of dependent types lives in `TYPES.md §10`. A non-dependently-typed language inherits ML's stratified module language because its core language cannot express type-of-type fields.
 
-  pop : Stack → Maybe (A × Stack)
-  pop empty       = nothing
-  pop (push a s)  = just (a , s)
-```
-
-`module Stack (A : Set) where ...` declares a module parameterized by a type `A : Set`. Instantiation is by passing the parameter: `module IntStack = Stack Nat`. This is structurally identical to an ML functor, but the parameter list can include dependent types — a parameter's type can mention earlier parameters' values:
-
-```agda
-module Vector (A : Set) (n : Nat) where
-  -- n is in scope as a Nat value, not just a type parameter
-```
-
-ML functors can't express this — you can't have an ML functor `F` whose parameter type depends on a *value* parameter, because ML's value/type strata are separate. Agda's modules collapse the strata.
-
-Other Agda module features:
-
-- **`open M`** brings the contents of module `M` into the current scope; `open M public` re-exports them.
-- **Anonymous modules** for local namespace scopes: `module _ where ...` introduces names without naming the module.
-- **`open M using (foo)` / `hiding (bar)` / `renaming (foo to baz)`** — the same import refinements as R6RS Scheme (§10.9).
-- **`record` declarations are first-class modules.** A `record Point where field x : Nat; y : Nat` is both a record type and a module, with `Point.x` and `Point.y` as projection functions.
-
-**Idris 2** inherits a similar model and adds **interfaces** (Idris's name for typeclasses) which are themselves a module-like construct: an `interface Eq a where ...` declares a record-of-functions parameterized by `a`, and an `implementation Eq Nat where ...` constructs an instance of that record. Interface resolution is structural — finding an `Eq Nat` instance is finding a record with the right type. This is the dependent-type version of Haskell's typeclass resolution but structurally different from Lean 4's instance scoping (§9.13): Idris uses search-based resolution over the available implementations, Lean uses scoped registration via imports.
-
-The lesson for module-system design is sharp: **once the language has dependent types, modules don't need to be a separate construct from records**. ML's three-stratum split (values, types, modules) collapses to one (values, where types and modules are values of certain types). The cost is that the type system now has to handle records-with-types-and-proofs as ordinary terms, which is a substantial commitment. The benefit is conceptual unification — there's no separate "module language" because modules are just records.
-
-For a non-dependently-typed language, this isn't directly applicable, but the contrast clarifies what ML's stratified module language is *for*: it's an explicit second language because the core language can't express type-of-type fields. A new language that adopts dependent types early can skip the stratified module design entirely.
-
-Source: https://agda.readthedocs.io/en/latest/language/module-system.html and https://agda.readthedocs.io/en/latest/language/record-types.html and https://idris2.readthedocs.io/en/latest/tutorial/modules.html and https://idris2.readthedocs.io/en/latest/tutorial/interfaces.html
+Sources: https://agda.readthedocs.io/en/latest/language/module-system.html and https://agda.readthedocs.io/en/latest/language/record-types.html and https://idris2.readthedocs.io/en/latest/tutorial/modules.html and https://idris2.readthedocs.io/en/latest/tutorial/interfaces.html
 
 ### 10.11. Design Lessons from Research Module Calculi
 
-The research tradition produces several specific lessons for new-language design:
+The research tradition produces several specific lessons for module-system design:
 
 - **Module systems can be unified with the core language** (1ML), but production languages generally choose not to, because the two-language structure is more approachable.
 - **Implicit module elaboration is feasible** (modular implicits), and overlaps significantly with type classes; languages should choose one or the other, not both.
@@ -1495,10 +1431,30 @@ The research tradition produces several specific lessons for new-language design
 - **The applicative/generative functor distinction is a real semantic choice** (OCaml vs SML defaults), and any language with parameterized modules has to take a position.
 - **First-class modules are a useful pragmatic compromise** between the two-language ML style and full 1ML unification.
 - **Modules-as-objects-with-no-globals** (Newspeak) is the cleanest ocap module design but requires no-global-state from day one.
-- **Canonical declarative import refinements** (R6RS/R7RS Scheme): the four-operator vocabulary `only`/`except`/`prefix`/`rename` covers virtually every selective-import pattern, and a new language can adopt it without reinventing the wheel.
+- **Canonical declarative import refinements** (R6RS/R7RS Scheme): the four-operator vocabulary `only`/`except`/`prefix`/`rename` covers virtually every selective-import pattern, adoptable without reinventing the wheel.
 - **Dependent types collapse the module/record distinction** (Agda, Idris 2): once values and types live in one universe, ML's stratified module language becomes redundant — modules are just records with type-of-type fields. This only works if the language commits to dependent types from the start; it isn't retrofittable onto a stratified core.
 
-The deepest lesson is that **module-system expressivity has a steep diminishing-returns curve**. SML-level expressivity (signatures, functors, sharing constraints, opaque ascription) is the practical ceiling for production languages; everything beyond that is research-grade and rarely justifies its cost. A new language can do worse than aiming for "Rust + ML signatures" or "Go + functors" and stopping there — unless it commits to dependent types early, in which case the entire question dissolves into the core language.
+The deepest lesson is that **module-system expressivity has a steep diminishing-returns curve**. SML-level expressivity (signatures, functors, sharing constraints, opaque ascription) is the practical ceiling for production languages; everything beyond that is research-grade and rarely justifies its cost. A defensible target is "Rust + ML signatures" or "Go + functors" — unless dependent types are committed to early, in which case the entire question dissolves into the core language.
+
+A complementary lesson, separate from the expressivity curve, comes from Carbon (§10.12): **modules from day 1 with no migration debt** is a feasible alternative to retrofitting modules onto an established ecosystem (JPMS §7.1, C++20 §8.2). The Carbon design takes lessons from the C++20 retrofit — explicit `package`/`library` declarations, API/impl file split, per-API-element export markers, strict acyclic imports, build-system-managed module identity — and bakes them into version 1 instead of hoping the ecosystem will migrate.
+
+### 10.12. Carbon — Modules from Day 1 in a C++ Successor
+
+Google's **Carbon** (announced CppNow 2022, lead by Chandler Carruth) is an experimental C++ successor language with a module system designed against the lessons of the C++20 modules retrofit (§8.2) and the JPMS retrofit (§7.1). Unlike C++20, Carbon makes modules the primary unit from version 1; unlike JPMS, modules are language-level rather than artifact-level; unlike Rust, the module-and-package layering is co-designed with the build system from the start.
+
+Carbon's module design (still evolving; Carbon is pre-1.0, status as of 2026-04):
+
+- **Explicit `package` and `library` declarations**: every Carbon source file declares its package and library at the top via `package Foo library "Bar" api;` (or `impl` for implementation files). Imports are `import Foo library "Bar";` — the package name resolves through a dependency manifest, the library name resolves within the package.
+- **API/impl file split**: Carbon distinguishes API files (the public-interface files, similar to Ada's specification §5.5 or OCaml's `.mli` §5.1) from impl files (the implementation bodies). API files are the only thing visible to importers; impl files supply the bodies.
+- **Per-API-element export markers**: API files use the `api` modifier on declarations (similar to Nim §9.5's `*` marker but as an explicit keyword). The visibility decision is locally visible at every declaration.
+- **Strict acyclic imports**: cycles are forbidden between libraries within a package and between packages. The language statically rejects cyclic dependency graphs, following Go (§3.3) rather than Python (§4.1).
+- **Toolchain-managed module identity**: a `BUILD` file (similar to Bazel's) names libraries and their dependencies, mapping language-level imports to artifact-level builds. Carbon explicitly accepts that build-tool and language are co-designed (§7.4 Kotlin's lesson).
+
+The distinguishing claim is that **Carbon learns from the C++20 retrofit**: by making modules the *only* unit from day 1, Carbon avoids the migration overhead that left half of C++'s ecosystem still on `#include` in 2026. The cost is that Carbon has no existing ecosystem to consume — every dependency must be Carbon-native, with C++ interop via a dedicated FFI layer rather than `import` of C++ headers. The interop story is structurally distinct: Carbon defines a controlled interop surface for calling into and out of C++ libraries, but Carbon imports do not see C++ headers as modules.
+
+Status (as of 2026-04): Carbon is pre-1.0, not production-ready. The language is being developed in the open at `github.com/carbon-language/carbon-lang`; the explicit non-goal is "stable enough for production today." For module-system designers, Carbon is the cleanest current example of "modules from day 1, no migration debt" in a C-family successor language — even if Carbon itself never reaches production, its module-system design choices are an instructive data point on what can be done when the migration constraint is removed.
+
+Sources: https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/modules.md and https://github.com/carbon-language/carbon-lang and https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/code_and_name_organization/README.md
 
 ---
 
@@ -1514,7 +1470,7 @@ The mechanism is the substrate beneath higher-level dynamic-loading systems but 
 
 The `dlopen` model is the hot-reload primitive used by game engines (covered in `COMPILERS.md §23.5` from the runtime angle), database extensions (PostgreSQL `LOAD`, SQLite virtual tables), and traditional plugin architectures. The general pattern is: keep all mutable state in the host process, put only stateless logic in the reloadable shared object, and re-bind function pointers after each reload. The discipline is on the programmer; the language and OS provide only the loading mechanism.
 
-Source: https://man7.org/linux/man-pages/man3/dlopen.3.html and https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya
+Sources: https://man7.org/linux/man-pages/man3/dlopen.3.html and https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya
 
 ### 11.2. Java Class Loaders and OSGi
 
@@ -1526,13 +1482,11 @@ Custom class loaders enable rich dynamic-loading patterns: application servers (
 
 The lesson is that **dynamic module loading on a managed runtime requires the runtime to participate in module identity**. The JVM does this via class-loader-as-identity-component. The CLR does this via assembly load contexts (`AssemblyLoadContext`, .NET Core 3+). Languages without a managed runtime (C, Rust) cannot offer the same guarantees and rely on programmer discipline.
 
-Source: https://docs.oracle.com/javase/8/docs/technotes/guides/lang/cl-mt.html and https://www.osgi.org/resources/architecture/ and https://learn.microsoft.com/en-us/dotnet/core/dependency-loading/understanding-assemblyloadcontext
+Sources: https://docs.oracle.com/javase/8/docs/technotes/guides/lang/cl-mt.html and https://www.osgi.org/resources/architecture/ and https://learn.microsoft.com/en-us/dotnet/core/dependency-loading/understanding-assemblyloadcontext
 
 ### 11.3. Erlang Hot Module Reload
 
-Erlang's hot reload is covered above (§9.2) and from the runtime side in `COMPILERS.md §23.1`. The module-system-relevant point is that **the language commits to flat, named, individually loadable modules from the start**, which makes the runtime mechanism possible without any retrofitting. The two-version-active rule — old version persists for in-flight calls, new version becomes current for new calls — is implemented at the BEAM VM layer and works because module names are global-flat, not nested-hierarchical-with-cycles.
-
-A language that wants Erlang-style hot reload must commit early to: flat module identity, individually loadable artifacts, fully-qualified-call vs local-call distinction at the language level, and immutable per-process state (so reloading a module doesn't corrupt in-flight computations). All four are language-design choices, not runtime features added later.
+Erlang's flat-module + two-version-active hot reload is covered at §9.2 (canonical) and from the runtime side in `COMPILERS.md §23.1`. The point relevant here is the design preconditions: a language wanting Erlang-style hot reload must commit early to flat module identity, individually loadable artifacts, a fully-qualified-call vs local-call distinction, and immutable per-process state — all language-design choices, not runtime features added later.
 
 ### 11.4. Python `importlib.reload` and Plugin Patterns
 
@@ -1540,9 +1494,9 @@ Python supports module reloading via `importlib.reload(module)`, which re-execut
 
 For plugin architectures, the more common pattern is `importlib.import_module(name)` for dynamic discovery — typically driven by entry-point metadata (`entry_points` in `pyproject.toml`) that lets installed packages register plugins for a host application to discover. This is how Pytest discovers test runners, how Django finds installed apps, and how Sphinx loads extensions. The plugin model is a discovery mechanism layered on top of the standard import system, not a separate runtime mechanism.
 
-The lesson is that **Python's runtime-import model trivially supports plugin discovery but only weakly supports hot reload**. The "old objects still in memory" problem is fundamental to the import-time-execution semantics; eliminating it would require changing how Python references resolve, which would break the language. A new language that wants both runtime imports and clean hot reload should either restrict reloading to specific patterns (Julia's Revise.jl handles this for development workflows) or commit to the Erlang-style flat-module architecture from day one.
+The lesson is that **Python's runtime-import model trivially supports plugin discovery but only weakly supports hot reload**. The "old objects still in memory" problem is fundamental to import-time-execution semantics; eliminating it would require changing how Python references resolve. Designs that want both runtime imports and clean hot reload should either restrict reloading to specific patterns (Julia's Revise.jl handles this for development workflows) or commit to the Erlang-style flat-module architecture from day one.
 
-Source: https://docs.python.org/3/library/importlib.html#importlib.reload and https://packaging.python.org/en/latest/specifications/entry-points/
+Sources: https://docs.python.org/3/library/importlib.html#importlib.reload and https://packaging.python.org/en/latest/specifications/entry-points/
 
 ### 11.5. JavaScript Dynamic `import()` and Module Federation
 
@@ -1550,19 +1504,17 @@ ECMAScript modules support **dynamic import** via the `import()` expression, whi
 
 **Webpack's Module Federation** (introduced 2020) extends this further: a federated module can expose modules to other federated modules at runtime, across separately-deployed bundles. Two independently-built React applications can share component implementations, with the runtime resolving "import the `Header` component from the remote `app1` federation" against whichever version `app1` happens to be serving. This is the closest the JavaScript ecosystem comes to OSGi-style runtime module composition.
 
-The lesson is that **dynamic module loading composes with package-metadata-shaped resolution** (chapter 6.4): the same `package.json` `exports` map that determines static-import resolution also determines dynamic-import resolution, and the same loader configuration drives both. This is consistent but means the loader story has to be designed once for both static and dynamic paths.
+The lesson is that **dynamic module loading composes with package-metadata-shaped resolution** (§6.4): the same `package.json` `exports` map that determines static-import resolution also determines dynamic-import resolution, and the same loader configuration drives both. This is consistent but means the loader story has to be designed once for both static and dynamic paths.
 
-Source: https://html.spec.whatwg.org/multipage/webappapis.html#integration-with-the-javascript-module-system and https://webpack.js.org/concepts/module-federation/
+Sources: https://html.spec.whatwg.org/multipage/webappapis.html#integration-with-the-javascript-module-system and https://webpack.js.org/concepts/module-federation/
 
 ### 11.6. Hot Module Replacement in Bundlers (HMR)
 
-Webpack, Vite, esbuild, Parcel, and similar JavaScript bundlers support **Hot Module Replacement** during development: a code change rewrites only the affected modules, and the running browser receives the updated module record without a full reload. The mechanism layers on top of the bundler's dependency graph: the bundler tracks which modules depend on which, identifies the boundary of "modules that need to update," sends them to the browser over a WebSocket, and the runtime swaps them in.
+Webpack, Vite, esbuild, and Parcel support **Hot Module Replacement** during development. The module-identity-relevant property is that HMR requires modules to be addressable by stable identity in the dependency graph and to declare cooperation explicitly: the `import.meta.hot.accept(...)` boundary is the module asserting "I integrate the new version of myself." Without an accepting boundary the bundler walks up the dependency graph until it finds one, or falls back to a full reload. Accept-callback semantics, dependency-graph walking, and runtime patching mechanics live in `DEBUGGERS.md §3.12`.
 
-HMR works best when modules accept replacement explicitly via `import.meta.hot.accept(...)` callbacks — the module declares "I know how to integrate the new version of myself" and the bundler honors that boundary. Without `accept`, the bundler walks up the dependency graph until it finds an accepting boundary or falls back to a full reload.
+The module-system lesson is that **hot replacement requires explicit cooperation from modules being replaced** — the same constraint Erlang (§9.2) and Julia's Revise.jl encode at the language level. Robust hot reload requires exposing an analogue of `import.meta.hot.accept` as a module-system primitive from day one.
 
-The general lesson is that **hot replacement requires explicit cooperation from the modules being replaced**. The runtime cannot blindly swap in new code; the module must declare what state survives the swap, what state is reset, and how external references are repointed. This is true for HMR in JS, for `code:load_file` in Erlang, for `Revise.jl` in Julia, and for live-coding patterns in C/C++ via `dlopen`. A new language that wants robust hot reload should make the cooperation primitive (the analogue of `import.meta.hot.accept`) part of the module-system design from day one.
-
-Source: https://vitejs.dev/guide/features.html#hot-module-replacement and https://webpack.js.org/concepts/hot-module-replacement/ and https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules#hot_module_replacement
+Sources: https://vitejs.dev/guide/features.html#hot-module-replacement and https://webpack.js.org/concepts/hot-module-replacement/ and https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules#hot_module_replacement
 
 ---
 
@@ -1583,11 +1535,9 @@ The dominant lockfile families:
 - **`Manifest.toml`** (Julia) — records the resolved versions of all packages in an environment.
 - **`composer.lock`** (PHP), **`Gemfile.lock`** (Ruby), **`mix.lock`** (Elixir), etc.
 
-The cross-cutting design questions are: does the lockfile include content hashes (cargo, go.sum yes; older formats no)? Is it regenerated deterministically given the same manifest and registry state (cargo and pnpm yes; npm historically no)? Does the package manager validate the lockfile against the manifest on every build (most do)?
+The identity-relevant design question is whether the lockfile pins by version-string only or by content hash. The **content-hash approach** (Cargo, Go, Nix, pnpm) is increasingly the consensus: a lockfile entry pins not just a version number but the bytes of the dependency, so tampering or registry compromise is detectable. Go's checksum database goes further by maintaining a public log of every known module version's hash, defending against retroactive registry changes. Cache-key formation, manifest-vs-lockfile validation, and incremental invalidation mechanics are covered in `COMPILERS.md §18`.
 
-The **content-hash approach** (Cargo, Go, Nix, pnpm) is increasingly the consensus: a lockfile entry pins not just a version number but the bytes of the dependency, so tampering or registry compromise is detectable. Go's checksum database goes further by maintaining a public log of every known module version's hash, defending against retroactive registry changes.
-
-Source: https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html and https://go.dev/ref/mod#go-sum-files and https://docs.npmjs.com/cli/v10/configuring-npm/package-lock-json and https://pnpm.io/motivation
+Sources: https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html and https://go.dev/ref/mod#go-sum-files and https://docs.npmjs.com/cli/v10/configuring-npm/package-lock-json and https://pnpm.io/motivation
 
 ### 12.2. Workspaces and Monorepos
 
@@ -1602,7 +1552,7 @@ The general design tension is between **monorepo benefits** (atomic cross-packag
 
 The package-manager design lesson is that **workspace support must be a first-class feature, not a hack on top of the single-package model**. Cargo and pnpm got this right relatively early; npm and Yarn took years to converge on consistent semantics.
 
-Source: https://doc.rust-lang.org/cargo/reference/workspaces.html and https://go.dev/ref/mod#workspaces and https://docs.npmjs.com/cli/v10/using-npm/workspaces and https://pnpm.io/workspaces
+Sources: https://doc.rust-lang.org/cargo/reference/workspaces.html and https://go.dev/ref/mod#workspaces and https://docs.npmjs.com/cli/v10/using-npm/workspaces and https://pnpm.io/workspaces
 
 ### 12.3. Public Registries and Naming
 
@@ -1619,9 +1569,9 @@ Most modern languages ship with an official public registry hosting community pa
 
 The Go choice is unusual and instructive. By making module identity an arbitrary URL-shaped string, Go avoids registry-name-squatting entirely and aligns ecosystem identity with version-control identity. The cost is that there is no central place to discover packages or browse popularity; community-run tools like `pkg.go.dev` fill that gap.
 
-The **scoped vs flat namespace** decision is one of the most consequential choices for ecosystem health. Flat namespaces (crates.io, PyPI) have suffered from name-squatting, typo-squatting, and maintenance abandonment. Scoped namespaces (npm `@scope`, Maven `groupId`) defend against this but require organizations to claim and maintain their scopes. A new language designing a registry should commit to scoped names from the start; retrofitting is painful (npm's `@scope` introduction in 2014 left a long tail of unscoped legacy names).
+The **scoped vs flat namespace** decision is one of the most consequential choices for ecosystem health. Flat namespaces (crates.io, PyPI) have suffered from name-squatting, typo-squatting, and maintenance abandonment. Scoped namespaces (npm `@scope`, Maven `groupId`) defend against this but require organizations to claim and maintain their scopes. Any new registry should commit to scoped names from the start; retrofitting is painful (npm's `@scope` introduction in 2014 left a long tail of unscoped legacy names).
 
-Source: https://crates.io/policies and https://docs.npmjs.com/about-scopes and https://research.swtch.com/vgo-import and https://central.sonatype.org/publish/requirements/coordinates/
+Sources: https://crates.io/policies and https://docs.npmjs.com/about-scopes and https://research.swtch.com/vgo-import and https://central.sonatype.org/publish/requirements/coordinates/
 
 ### 12.4. Vendoring and Mirroring
 
@@ -1629,9 +1579,9 @@ Source: https://crates.io/policies and https://docs.npmjs.com/about-scopes and h
 
 **Mirroring** is the practice of running an internal copy of a public registry, often with content auditing or version pinning. Artifactory, Nexus, and self-hosted Verdaccio (npm), Sonatype Nexus (Maven, npm, PyPI), and Cloudsmith are commercial or open-source registry mirrors used by enterprises that cannot allow direct registry access from build infrastructure.
 
-The design lesson is that **registry availability is a build-graph concern**. A build that depends on an external registry being reachable can fail for reasons unrelated to the project's code. Vendoring eliminates this; mirroring centralizes the failure mode. A new language should at minimum support vendoring as a first-class workflow (copying dependencies into the project's own repo) so that hermetic builds are achievable.
+The design lesson is that **registry availability is a build-graph concern**. A build that depends on an external registry being reachable can fail for reasons unrelated to the project's code. Vendoring eliminates this; mirroring centralizes the failure mode. At minimum, support vendoring as a first-class workflow (copying dependencies into the project's own repo) so hermetic builds are achievable.
 
-Source: https://go.dev/ref/mod#vendoring and https://www.sonatype.com/products/sonatype-nexus-repository
+Sources: https://go.dev/ref/mod#vendoring and https://www.sonatype.com/products/sonatype-nexus-repository
 
 ### 12.5. Build-System Module Visibility — Bazel and Buck
 
@@ -1641,9 +1591,9 @@ This is structurally similar to JPMS's `exports ... to` qualified exports but at
 
 The interaction with language-level modules is subtle. In a Bazel monorepo using Java, a class can be `public` (Java visibility) but only depended on by specific Bazel targets (Bazel visibility). The build graph enforces architectural boundaries that Java's package-level visibility cannot. Google internally relies on this heavily.
 
-The lesson is that **at sufficient scale, build-system visibility becomes the dominant abstraction**, not language-level visibility. A new language designed for monorepo use should consider whether its module-system primitives compose cleanly with build-system visibility, or whether the two will fight. Most languages punt on this; Bazel's reach is substantial enough that punting is increasingly costly.
+The lesson is that **at sufficient scale, build-system visibility becomes the dominant abstraction**, not language-level visibility. Languages designed for monorepo use should consider whether their module-system primitives compose cleanly with build-system visibility, or whether the two will fight. Most languages punt on this; Bazel's reach is substantial enough that punting is increasingly costly.
 
-Source: https://bazel.build/concepts/visibility and https://buck2.build/docs/api/build/visibility/
+Sources: https://bazel.build/concepts/visibility and https://buck2.build/docs/api/build/visibility/
 
 ### 12.6. Functional Package Management — Nix Flakes and Guix
 
@@ -1684,9 +1634,9 @@ The design points worth carrying forward:
 
 Compared with Cargo, npm, or PyPI — which are *artifact distribution* systems with reproducibility added on — Nix and Guix are *build* systems with distribution as a side effect. The trade-off is acquisition cost (significant Nix learning curve, a separate package ecosystem to inhabit) for hermetic reproducibility that no lockfile-based system can match.
 
-For a new language designing its package manager, the question Nix and Guix raise is whether reproducibility is a *property of the lockfile* or a *property of the build*. Most modern systems pick the former; Nix shows the latter is achievable and structurally cleaner, at the cost of much higher complexity.
+For a package manager designer, the question Nix and Guix raise is whether reproducibility is a *property of the lockfile* or a *property of the build*. Most modern systems pick the former; Nix shows the latter is achievable and structurally cleaner, at the cost of much higher complexity.
 
-Source: https://nixos.wiki/wiki/Flakes and https://nix.dev/concepts/flakes.html and https://guix.gnu.org/manual/en/html_node/Defining-Packages.html and https://spack.readthedocs.io/en/latest/concretize.html
+Sources: https://nixos.wiki/wiki/Flakes and https://nix.dev/concepts/flakes.html and https://guix.gnu.org/manual/en/html_node/Defining-Packages.html and https://spack.readthedocs.io/en/latest/concretize.html
 
 ### 12.7. Design Lessons from Build Systems and Registries
 
@@ -1700,7 +1650,7 @@ The build-system-and-registry layer adds several specific lessons not visible at
 - **Build-system visibility is a layer above language visibility** and dominates at large scale. Compatibility with Bazel-style visibility is increasingly important for languages targeting enterprise monorepo use.
 - **Reproducibility can be a build-system property, not just a lockfile property** (Nix, Guix). Hermetic, content-addressed builds eliminate "works on my machine" by construction. The cost is a substantial language learning curve for the package manifest; the benefit is reproducibility that no retrofitted lockfile can guarantee.
 
-A new language can pick from this menu deliberately rather than discovering the choices through painful retrofits.
+A language designer can pick from this menu deliberately rather than discover the choices through painful retrofits.
 
 ---
 
@@ -1718,7 +1668,7 @@ Core Wasm modules are remarkably good at **language-agnostic deterministic execu
 
 The intermediate attempt that didn't ship is worth recording. **Module Linking** was a 2019–2021 W3C Wasm proposal to give core modules a typed-import linking story: a Wasm module could declare imports of *other Wasm modules* (not just functions), with type-checked module-as-module composition. The proposal got as far as Phase 2 in the Wasm CG process but was eventually superseded and folded into the Component Model. The reason the proposal didn't reach mainstream adoption is instructive: it tried to graft module composition onto the core Wasm type system, which only knew about scalar values and references. Composing modules required composing *interfaces*, and interfaces needed richer types (strings, records, variants, options, lists) than core Wasm provides. The Component Model resolved this by introducing WIT as a separate typed IDL above core Wasm rather than extending core Wasm's type system in place. Module Linking is the cautionary precedent: a typed module composition system needs a typed substrate, and adding the types to the substrate after the fact didn't work.
 
-Source: https://webassembly.github.io/spec/core/syntax/modules.html and https://webassembly.org/specs/
+Sources: https://webassembly.github.io/spec/core/syntax/modules.html and https://webassembly.org/specs/
 
 ### 13.2. The Component Model — WIT, Worlds, and Resource Types
 
@@ -1743,25 +1693,18 @@ The **resource type** is the most distinctive contribution. A resource is an opa
 
 ### 13.3. WASI Worlds and Capability-Scoped Modules
 
-**WASI** (WebAssembly System Interface), in its current Preview 2 form (launched January 2024) and the in-progress Preview 3, is built on the Component Model. WASI defines worlds for common use cases: `wasi:cli/command` (a command-line program), `wasi:http/proxy` (an HTTP request handler), `wasi:keyvalue/store` (a key-value store consumer). Each world declares the imports a component in that world receives — typically narrow capability handles for filesystem dirs, sockets, HTTP clients, clocks, random number generators, etc.
+**WASI** (Preview 2 launched January 2024; Preview 3 in progress) is built on the Component Model. WASI defines worlds for common use cases (`wasi:cli/command`, `wasi:http/proxy`, `wasi:keyvalue/store`), each declaring the narrow capability handles a component in that world receives — filesystem dirs, sockets, HTTP clients, clocks, RNGs, etc. The module-boundary point is that a world is a typed-binary IDL: capabilities cross the component boundary as resource handles, and a component's authority equals the handles it was granted at instantiation. Capability mechanics, attenuation/virtualization patterns, and the broader ocap argument live in `MEMORY.md §10`; here the relevant fact is that the Component Model preserves those properties at the binary module boundary because all external interaction goes through declared imports.
 
-The architectural commitment is **zero ambient authority**. A WASI component does not have access to the filesystem, network, or environment by default. The host explicitly grants capability handles at instantiation time: `--dir /data::readonly` grants a filesystem handle for `/data` with read-only permission; `--env API_KEY=...` makes that environment variable visible. A component that is not granted a filesystem capability simply has no way to read or write files — there is no "fall back to ambient access."
+The module-system-relevant lessons: **a binary-level module system can be designed from scratch with strong typed interfaces** if the ecosystem commits to a typed IDL (WIT plays for components what signatures play for ML modules), and **the canonical ABI matters** — marshalling typed data across the component boundary has real per-call overhead that the design must balance against richness.
 
-This is the most consequential modern deployment of object-capability principles in mainstream tooling, and it is achievable specifically because the Component Model lets capabilities be expressed as typed resource handles passed across the module boundary. Cloudflare Workers, Fastly Compute, and Fermyon Spin all run components in this style. The compositional benefits are substantial: a component implementing `wasi:filesystem` can be virtualized and intercepted by another component, attenuating or proxying its access — capabilities compose like reference attenuation in E (`MEMORY.md §10.4`).
-
-The module-system-relevant lessons are direct. First, **a binary-level module system can be designed from scratch with strong typed interfaces** if the language ecosystem commits to a typed IDL. WIT plays the role for Wasm components that signatures play for ML modules, but at the artifact boundary rather than the source-language boundary. Second, **explicit capability handles eliminate ambient authority cleanly** if the module system makes them the only way to obtain external resources. Third, **the canonical ABI matters**: the cost of marshalling typed data across the component boundary is real, and the design has to balance richness against per-call overhead.
-
-Source: https://github.com/WebAssembly/component-model and https://component-model.bytecodealliance.org/ and https://github.com/WebAssembly/WASI and https://github.com/WebAssembly/WASI/blob/main/Proposals.md
+Sources: https://github.com/WebAssembly/component-model and https://component-model.bytecodealliance.org/ and https://github.com/WebAssembly/WASI and https://github.com/WebAssembly/WASI/blob/main/Proposals.md
 
 ### 13.4. Design Lessons from Wasm Components
 
-The Component Model adds three lessons that are unusual in the broader module-system landscape:
+- **Capability-scoped modules are practical** (see `MEMORY.md §10` for ocap mechanics) — typed resource handles + zero-ambient-authority instantiation, with most cost in ecosystem commitment, not language complexity.
+- **Module composition is virtualization-friendly** — one component can wrap another by reimplementing its imports.
 
-- **The artifact boundary can be the typed module boundary.** Wasm components carry their full interface description in the binary itself, so any host can validate, link, and instantiate them without source. This is closer to what JPMS aspires to than what JPMS achieves, and is achievable specifically because Wasm has no preprocessor or macro system to disrupt it.
-- **Capability-scoped modules are practical.** The combination of typed resource handles plus zero-ambient-authority instantiation is more usable than expected — the cost is mostly ecosystem commitment to using capabilities consistently, not language complexity.
-- **Module composition can be virtualization-friendly.** Because all external interaction goes through declared imports, one component can wrap another by reimplementing its imports — a standard ocap pattern that the Component Model preserves at the binary boundary.
-
-For a new language targeting Wasm or any sandboxed-execution environment, the Component Model is the natural fit. For a general-purpose language, the design choices it embodies (typed module interfaces, capability-scoped imports, no ambient authority) are increasingly worth considering even outside the Wasm ecosystem.
+For a language targeting Wasm or any sandboxed environment, the Component Model is the natural fit; for general-purpose languages, the design choices (typed interfaces, capability-scoped imports, no ambient authority) are worth considering even outside the Wasm ecosystem.
 
 ---
 
@@ -1773,232 +1716,197 @@ The previous chapters now cover enough of the design space to support direct com
 
 | Language / system | Primary unit of modularity | Identity source | File-layout coupling | Package/distribution identity |
 |---|---|---|---|---|
-| Rust | Module tree inside a crate | `mod` declarations plus crate root | Medium | Separate package/crate layering |
-| Zig | Imported file / exposed package module | Build-exposed package name or file path | Medium-high | Build-context-defined; URL+hash via `build.zig.zon` |
-| Go | Package | Directory path under module path | High | Module in `go.mod`, package below it |
-| Odin | Package | Directory/package organization and collection roots | High | Lightweight collection/package model |
-| Python | Module / package object | Qualified import name resolved through import machinery | Medium-high | Separate packaging ecosystem |
-| JavaScript ESM | Module record | Specifier resolved by host environment | Medium | Strongly shaped by runtime/package metadata |
-| Node CommonJS | Loaded module object | Loader path / specifier resolution | Medium | Strongly shaped by package metadata |
-| OCaml | Compilation unit / module | File-backed compilation unit name | High | Libraries/packages layered above units |
-| Standard ML | Structure / functor / signature | Declaration-based | Low-medium | Implementation-specific ecosystem layer |
-| Haskell | Module | Declared module name plus package/build context | Medium | Package manager/build layer distinct |
-| Racket | Module | Module path + phase-relative binding context | Medium | Collections/packages layered above |
-| C / headers | Translation unit + header graph | Files and include paths | High | External build/package layer |
-| C++20 modules | Module interface unit | Declared module name + BMI/toolchain mapping | Medium | External build/package layer |
-| Java / JPMS | Package + module | Package declaration + `module-info.java` | Medium-high | Module artifact (JAR with module-info), Maven coords |
-| C# / .NET | Namespace + assembly | Namespace declaration + assembly identity | Low | Assembly (DLL) + NuGet coords |
-| Scala 3 | Package + top-level definition | Package declaration | Medium | JVM artifact + Maven coords |
-| Kotlin | Package + build-tool module | Package declaration + Gradle/Maven module | Medium | JVM artifact + Maven coords |
-| Swift | Module (framework / SPM target) | Build-tool target name | Low-medium | Framework / SPM package |
-| Erlang | Module (`-module(foo).`) | Flat module name | Medium (one module per file) | OTP application + Hex package |
-| Elixir | Module (`defmodule MyApp.Foo`) | Hierarchical-by-convention atom name | Medium | Mix project + Hex package |
-| Julia | Module + package | `module Foo`, possibly nested | Low (file-as-include) | Pkg environment + General registry |
-| Dart | Library | URI specifier (`package:foo/foo.dart`) | Medium-high | pub package |
-| Nim | File-as-module | Filename | High | Nimble package |
-| Elm | Module declaration | Module path matches file path | Strict (file path = module path) | elm-lang.org package |
-| F# | File + module/namespace | Project-file order + `module` declaration | Strict (project file authoritative) | NuGet package |
-| Raku | Distribution + compunit | `Name:ver<X>:auth<Y>:api<Z>` 4-tuple in import syntax | Low (filename via META6 `provides` map) | fez/zef ecosystem with auth-validated 4-tuple identity |
-| Perl 5 | Package (symbol table) | `package Foo;` declaration + filesystem path | Medium (path = `Foo/Bar.pm`) | CPAN distribution |
-| Common Lisp | Package (symbol namespace) | `defpackage` declaration | Low | ASDF system + Quicklisp |
-| Clojure | Namespace | `ns` macro declaration; runtime-mutable | Low-medium | deps.edn or Leiningen project + Clojars |
-| Tcl | Namespace + package (orthogonal) | `namespace eval` for naming, `package provide` for distribution | Low (auto-path discovery via `pkgIndex.tcl`) | Tcl package with versioned `pkgIndex.tcl` |
-| Forth | Wordlist | `WORDLIST` runtime token + search-order stack position | None (wordlists are runtime data) | Implementation-specific (no standard ecosystem) |
-| Factor | Vocabulary | Dotted-name vocabulary + directory path | High (vocabulary = directory) | Vocab roots: core/basis/extra/work |
-| Ada | Package | `package`/`package body` declaration; child packages form hierarchy | Medium (compilation-unit naming) | Build-system-defined (Alire ecosystem, GNAT project files) |
-| Modula-2 / Modula-3 | DEFINITION/IMPLEMENTATION module pair | Module name in `DEFINITION MODULE` / `IMPLEMENTATION MODULE` | Medium-high | Implementation-specific |
-| Oberon | Module with inline `*` export markers | `MODULE` declaration | High | Project-specific (Project Oberon) |
-| D | Module | `module foo.bar;` declaration | High (module name = filesystem path) | DUB package + code.dlang.org |
-| Lean 4 | Module + namespace | File path = module path; `namespace` declarations | High | Lake package + Mathlib + Reservoir |
-| R | Package | DESCRIPTION manifest + NAMESPACE file | Medium-high | CRAN registry with strict review |
-| Agda | Module (parameterized over dependent types) | `module M (...) where` declaration | Medium | Cabal/Stack ecosystem; agda-stdlib |
-| Idris 2 | Module + interface | `module M` declaration | Medium | pack package manager |
-| Wasm Component | Component artifact | WIT world declaration | None (binary artifact) | Distribution-format-independent |
+| Rust (§3.1) | Module tree inside a crate | `mod` declarations plus crate root | Medium | Separate package/crate layering |
+| Zig (§3.2) | Imported file / exposed package module | Build-exposed package name or file path | Medium-high | Build-context-defined; URL+hash via `build.zig.zon` |
+| Go (§3.3) | Package | Directory path under module path | High | Module in `go.mod`, package below it |
+| Odin (§3.4) | Package | Directory/package organization and collection roots | High | Lightweight collection/package model |
+| Python (§4.1) | Module / package object | Qualified import name resolved through import machinery | Medium-high | Separate packaging ecosystem |
+| JavaScript ESM (§4.2) | Module record | Specifier resolved by host environment | Medium | Strongly shaped by runtime/package metadata |
+| Node CommonJS (§4.3) | Loaded module object | Loader path / specifier resolution | Medium | Strongly shaped by package metadata |
+| OCaml (§5.1) | Compilation unit / module | File-backed compilation unit name | High | Libraries/packages layered above units |
+| Standard ML (§5.2) | Structure / functor / signature | Declaration-based | Low-medium | Implementation-specific ecosystem layer |
+| Haskell (§5.3) | Module | Declared module name plus package/build context | Medium | Package manager/build layer distinct |
+| Racket (§5.4) | Module | Module path + phase-relative binding context | Medium | Collections/packages layered above |
+| C / headers (§8.1) | Translation unit + header graph | Files and include paths | High | External build/package layer |
+| C++20 modules (§8.2) | Module interface unit | Declared module name + BMI/toolchain mapping | Medium | External build/package layer |
+| Java / JPMS (§7.1) | Package + module | Package declaration + `module-info.java` | Medium-high | Module artifact (JAR with module-info), Maven coords |
+| C# / .NET (§7.2) | Namespace + assembly | Namespace declaration + assembly identity | Low | Assembly (DLL) + NuGet coords |
+| Scala 3 (§7.3) | Package + top-level definition | Package declaration | Medium | JVM artifact + Maven coords |
+| Kotlin (§7.4) | Package + build-tool module | Package declaration + Gradle/Maven module | Medium | JVM artifact + Maven coords |
+| Swift (§9.1) | Module (framework / SPM target) | Build-tool target name | Low-medium | Framework / SPM package |
+| Erlang (§9.2) | Module (`-module(foo).`) | Flat module name | Medium (one module per file) | OTP application + Hex package |
+| Elixir (§9.2) | Module (`defmodule MyApp.Foo`) | Hierarchical-by-convention atom name | Medium | Mix project + Hex package |
+| Julia (§9.3) | Module + package | `module Foo`, possibly nested | Low (file-as-include) | Pkg environment + General registry |
+| Dart (§9.4) | Library | URI specifier (`package:foo/foo.dart`) | Medium-high | pub package |
+| Nim (§9.5) | File-as-module | Filename | High | Nimble package |
+| Elm (§9.6) | Module declaration | Module path matches file path | Strict (file path = module path) | elm-lang.org package |
+| F# (§9.7) | File + module/namespace | Project-file order + `module` declaration | Strict (project file authoritative) | NuGet package |
+| Raku (§9.9) | Distribution + compunit | `Name:ver<X>:auth<Y>:api<Z>` 4-tuple in import syntax | Low (filename via META6 `provides` map) | fez/zef ecosystem with auth-validated 4-tuple identity |
+| Perl 5 (§4.5) | Package (symbol table) | `package Foo;` declaration + filesystem path | Medium (path = `Foo/Bar.pm`) | CPAN distribution |
+| Common Lisp (§4.6) | Package (symbol namespace) | `defpackage` declaration | Low | ASDF system + Quicklisp |
+| Clojure (§4.7) | Namespace | `ns` macro declaration; runtime-mutable | Low-medium | deps.edn or Leiningen project + Clojars |
+| Tcl (§4.8) | Namespace + package (orthogonal) | `namespace eval` for naming, `package provide` for distribution | Low (auto-path discovery via `pkgIndex.tcl`) | Tcl package with versioned `pkgIndex.tcl` |
+| Forth (§9.10) | Wordlist | `WORDLIST` runtime token + search-order stack position | None (wordlists are runtime data) | Implementation-specific (no standard ecosystem) |
+| Factor (§9.11) | Vocabulary | Dotted-name vocabulary + directory path | High (vocabulary = directory) | Vocab roots: core/basis/extra/work |
+| Ada (§5.5) | Package | `package`/`package body` declaration; child packages form hierarchy | Medium (compilation-unit naming) | Build-system-defined (Alire ecosystem, GNAT project files) |
+| Modula-2 / Modula-3 (§5.6) | DEFINITION/IMPLEMENTATION module pair | Module name in `DEFINITION MODULE` / `IMPLEMENTATION MODULE` | Medium-high | Implementation-specific |
+| Oberon (§5.6) | Module with inline `*` export markers | `MODULE` declaration | High | Project-specific (Project Oberon) |
+| D (§9.12) | Module | `module foo.bar;` declaration | High (module name = filesystem path) | DUB package + code.dlang.org |
+| Lean 4 (§9.13) | Module + namespace | File path = module path; `namespace` declarations | High | Lake package + Mathlib + Reservoir |
+| R (§9.14) | Package | DESCRIPTION manifest + NAMESPACE file | Medium-high | CRAN registry with strict review |
+| Agda (§10.10) | Module (parameterized over dependent types) | `module M (...) where` declaration | Medium | Cabal/Stack ecosystem; agda-stdlib |
+| Idris 2 (§10.10) | Module + interface | `module M` declaration | Medium | pack package manager |
+| Wasm Component (§13.2) | Component artifact | WIT world declaration | None (binary artifact) | Distribution-format-independent |
+| Deno (§6.7) | Module URL + content hash | HTTPS URL with version path; lockfile pins SHA-256 | None (URL-shaped) | No central registry; URL identity = distribution identity |
+| Mojo (§9.16) | File-as-module | Filename + dotted package path | Medium-high | Compile-time-elaborated parametric IR shipped pre-instantiation |
+| Carbon (§10.12) | Library inside package | `package`/`library` declaration | Toolchain-managed | BUILD-file mapping; modules from day 1 |
 
 ### 14.2. Import semantics
 
 | Language / system | Static syntax? | Import-time execution? | Runtime module instance? | Cycles | Notes |
 |---|---|---|---|---|---|
-| Rust | Yes | No in the Python/loader sense | Not the primary model | Strongly discouraged / structurally acyclic in practice | Import is mainly name and visibility control |
-| Zig | Yes (`@import`) | No | Not the primary model | Static dependency style | Import yields a namespace-like value |
-| Go | Yes | Limited package init, but not arbitrary import-body model like Python | Some runtime init semantics | Forbidden | Compiler/tooling-first DAG design |
-| Odin | Yes | Minimal compared with scripting languages | Not the primary model | Simpler static package style | Package organization is the main story |
-| Python | Yes | Yes | Yes, cached module object | Allowed, with partial initialization hazards | Import system is core runtime machinery |
-| JavaScript ESM | Yes | Yes, via instantiation/evaluation | Yes | Allowed, with live-binding initialization semantics | Static syntax does not imply static semantics |
-| Node CommonJS | Function-style `require` | Yes | Yes, cached export object | Allowed, loader-shaped | Much weaker static analyzability |
-| OCaml | Yes | No runtime-import model in the scripting sense | Not primary | Generally structured through compilation units/interfaces | Module system is semantic and typed |
-| Standard ML | Yes | No runtime-import model in the scripting sense | Not primary | Structured through signatures/functors | Classical typed-module model |
-| Haskell | Yes | No scripting-style import execution | Not primary | More static/declarative than runtime systems | Export lists and qualification are central |
-| Racket | Yes | Yes, but phase-aware and expander-governed | Yes, with instantiation/visit distinction | Phase-mediated | Import semantics are part of macro semantics |
-| Java / JPMS | Yes | Static class load (no top-level body exec) | Class objects per loader | Forbidden across modules | Module reads-graph validated at compile/link/run |
-| C# / .NET | Yes | No top-level body in the Python sense | Assemblies as runtime objects | Allowed at namespace level | Reference assemblies tracked at build time |
-| Scala 3 | Yes | No scripting-style import execution | Not primary | Generally structural | Import scoping for `given` is explicit |
-| Swift | Yes | No body execution at import | Module objects exist at runtime | Allowed | Library evolution mode emits stable interface artifacts |
-| Erlang | Yes | No top-level body | Modules are runtime entities; reload-aware | Allowed (reload-friendly) | Two-version-active rule |
-| Julia | Yes | Yes (module body executes) | Yes, cached | Allowed | Precompilation caches reduce first-load cost |
-| Dart | Yes | Limited (top-level initializers run) | Library objects | Allowed | `deferred` imports for lazy loading |
-| Nim | Yes | Limited (compile-time `static:` blocks) | Not primary | Allowed | Single-character `*` export marker |
-| Elm | Yes | No (pure functional, no imperative top-level) | Not primary | **Forbidden at file level** | Strictest cycle prohibition in survey |
-| F# | Yes | No top-level body in Python sense | Not primary | Forbidden by file ordering | Project-file order is authoritative |
-| Raku | Yes | Limited (compile-time `use`/`need` vs runtime `require`) | Compunit objects | Allowed, repository-mediated | Three-way load/import split |
-| Perl 5 | Yes | Yes (`use` is `BEGIN { require + import }`) | Package symbol table | Allowed | `use` is compile-time, `require` is runtime |
-| Common Lisp | Yes | Yes (`defpackage` + `in-package` execute) | Yes — packages are first-class objects | Allowed (symbols can be forward-declared) | Symbol-table operations are runtime |
-| Clojure | Yes (`ns` macro) | Yes (namespace bodies execute on `:require`) | Yes — runtime-mutable namespaces | Allowed | `:as-alias` defers loading |
-| Tcl | Yes (`package require`) | Yes (registered scripts execute) | Packages tracked at runtime | Implementation-dependent | One version loaded per package name |
-| Forth | No (imperative stack ops) | Yes (every `:` definition mutates the dictionary at execution time) | Wordlists are runtime data | Possible via shadowing | No separate compile/load distinction |
-| Factor | Yes (`USING:`) | Vocabulary loading is compile-time | Vocabulary objects | Not the primary model | Ambiguous-use-error refuses to guess |
-| Ada | Yes (`with`/`use`) | Limited (package elaboration controlled by pragmas) | Not primary | Allowed; ordering controlled by `pragma Elaborate_All` | Specification/body split is foundational |
-| Modula-2 / Modula-3 | Yes (`FROM ... IMPORT`) | Module body executes once on first import | Module records exist at runtime | Allowed | DEFINITION/IMPLEMENTATION ancestor of `.mli`/`.ml` |
-| Oberon | Yes (`IMPORT`) | Module body executes on first import | Not primary | Allowed | Inline `*` export marker per declaration |
-| D | Yes (`import`) | Limited (`static this()` module ctors run at startup) | Not primary | Allowed | `version()` blocks for conditional compilation |
-| Lean 4 | Yes (`import`) | Module elaboration is compile-time | Not primary | Allowed (forced acyclic in practice) | Imports affect typeclass instance scope |
-| R | Yes (`library()`/`requireNamespace()`) | Yes (package onLoad hooks fire) | Yes — environments are first-class | Allowed | NAMESPACE file decouples export from S3/S4 dispatch |
-| Agda | Yes (`open`, `import`) | Module bodies elaborate lazily | Not primary | Disallowed (acyclic) | Parameters can be dependent types |
-| Idris 2 | Yes (`import`) | Module bodies elaborate at compile time | Not primary | Disallowed (acyclic) | Interfaces are records-of-functions |
-| Wasm Component | Yes (WIT) | No (component instantiation, not body exec) | Component instances per host | Generally not — explicit world | Capability handles passed at instantiation |
+| Rust (§3.1) | Yes | No in the Python/loader sense | Not the primary model | Strongly discouraged / structurally acyclic in practice | Import is mainly name and visibility control |
+| Zig (§3.2) | Yes (`@import`) | No | Not the primary model | Static dependency style | Import yields a namespace-like value |
+| Go (§3.3) | Yes | Limited package init, but not arbitrary import-body model like Python | Some runtime init semantics | Forbidden | Compiler/tooling-first DAG design |
+| Odin (§3.4) | Yes | Minimal compared with scripting languages | Not the primary model | Simpler static package style | Package organization is the main story |
+| Python (§4.1) | Yes | Yes | Yes, cached module object | Allowed, with partial initialization hazards | Import system is core runtime machinery |
+| JavaScript ESM (§4.2) | Yes | Yes, via instantiation/evaluation | Yes | Allowed, with live-binding initialization semantics | Static syntax does not imply static semantics |
+| Node CommonJS (§4.3) | Function-style `require` | Yes | Yes, cached export object | Allowed, loader-shaped | Much weaker static analyzability |
+| OCaml (§5.1) | Yes | No runtime-import model in the scripting sense | Not primary | Generally structured through compilation units/interfaces | Module system is semantic and typed |
+| Standard ML (§5.2) | Yes | No runtime-import model in the scripting sense | Not primary | Structured through signatures/functors | Classical typed-module model |
+| Haskell (§5.3) | Yes | No scripting-style import execution | Not primary | More static/declarative than runtime systems | Export lists and qualification are central |
+| Racket (§5.4) | Yes | Yes, but phase-aware and expander-governed | Yes, with instantiation/visit distinction | Phase-mediated | Import semantics are part of macro semantics |
+| Java / JPMS (§7.1) | Yes | Static class load (no top-level body exec) | Class objects per loader | Forbidden across modules | Module reads-graph validated at compile/link/run |
+| C# / .NET (§7.2) | Yes | No top-level body in the Python sense | Assemblies as runtime objects | Allowed at namespace level | Reference assemblies tracked at build time |
+| Scala 3 (§7.3) | Yes | No scripting-style import execution | Not primary | Generally structural | Import scoping for `given` is explicit |
+| Swift (§9.1) | Yes | No body execution at import | Module objects exist at runtime | Allowed | Library evolution mode emits stable interface artifacts |
+| Erlang (§9.2) | Yes | No top-level body | Modules are runtime entities; reload-aware | Allowed (reload-friendly) | Two-version-active rule |
+| Julia (§9.3) | Yes | Yes (module body executes) | Yes, cached | Allowed | Precompilation caches reduce first-load cost |
+| Dart (§9.4) | Yes | Limited (top-level initializers run) | Library objects | Allowed | `deferred` imports for lazy loading |
+| Nim (§9.5) | Yes | Limited (compile-time `static:` blocks) | Not primary | Allowed | Single-character `*` export marker |
+| Elm (§9.6) | Yes | No (pure functional, no imperative top-level) | Not primary | **Forbidden at file level** | Strictest cycle prohibition in survey |
+| F# (§9.7) | Yes | No top-level body in Python sense | Not primary | Forbidden by file ordering | Project-file order is authoritative |
+| Raku (§9.9) | Yes | Limited (compile-time `use`/`need` vs runtime `require`) | Compunit objects | Allowed, repository-mediated | Three-way load/import split |
+| Perl 5 (§4.5) | Yes | Yes (`use` is `BEGIN { require + import }`) | Package symbol table | Allowed | `use` is compile-time, `require` is runtime |
+| Common Lisp (§4.6) | Yes | Yes (`defpackage` + `in-package` execute) | Yes — packages are first-class objects | Allowed (symbols can be forward-declared) | Symbol-table operations are runtime |
+| Clojure (§4.7) | Yes (`ns` macro) | Yes (namespace bodies execute on `:require`) | Yes — runtime-mutable namespaces | Allowed | `:as-alias` defers loading |
+| Tcl (§4.8) | Yes (`package require`) | Yes (registered scripts execute) | Packages tracked at runtime | Implementation-dependent | One version loaded per package name |
+| Forth (§9.10) | No (imperative stack ops) | Yes (every `:` definition mutates the dictionary at execution time) | Wordlists are runtime data | Possible via shadowing | No separate compile/load distinction |
+| Factor (§9.11) | Yes (`USING:`) | Vocabulary loading is compile-time | Vocabulary objects | Not the primary model | Ambiguous-use-error refuses to guess |
+| Ada (§5.5) | Yes (`with`/`use`) | Limited (package elaboration controlled by pragmas) | Not primary | Allowed; ordering controlled by `pragma Elaborate_All` | Specification/body split is foundational |
+| Modula-2 / Modula-3 (§5.6) | Yes (`FROM ... IMPORT`) | Module body executes once on first import | Module records exist at runtime | Allowed | DEFINITION/IMPLEMENTATION ancestor of `.mli`/`.ml` |
+| Oberon (§5.6) | Yes (`IMPORT`) | Module body executes on first import | Not primary | Allowed | Inline `*` export marker per declaration |
+| D (§9.12) | Yes (`import`) | Limited (`static this()` module ctors run at startup) | Not primary | Allowed | `version()` blocks for conditional compilation |
+| Lean 4 (§9.13) | Yes (`import`) | Module elaboration is compile-time | Not primary | Allowed (forced acyclic in practice) | Imports affect typeclass instance scope |
+| R (§9.14) | Yes (`library()`/`requireNamespace()`) | Yes (package onLoad hooks fire) | Yes — environments are first-class | Allowed | NAMESPACE file decouples export from S3/S4 dispatch |
+| Agda (§10.10) | Yes (`open`, `import`) | Module bodies elaborate lazily | Not primary | Disallowed (acyclic) | Parameters can be dependent types |
+| Idris 2 (§10.10) | Yes (`import`) | Module bodies elaborate at compile time | Not primary | Disallowed (acyclic) | Interfaces are records-of-functions |
+| Wasm Component (§13.2) | Yes (WIT) | No (component instantiation, not body exec) | Component instances per host | Generally not — explicit world | Capability handles passed at instantiation |
+| Deno (§6.7) | Yes (ESM) | Yes (ESM evaluation) | Module records per host | Allowed (ESM live-binding) | URL-shaped imports, content-hashed lockfile |
+| Mojo (§9.16) | Yes (`from foo import bar`) | No (no module-body exec at import time) | Compile-time namespace | Disallowed in practice | Compile-time elaboration over imports |
+| Carbon (§10.12) | Yes (`import Foo library "Bar"`) | No (compile-time only) | Not primary | Forbidden across libraries / packages | API/impl file split with explicit `api` markers |
 
 ### 14.3. Visibility and export models
 
 | Language / system | Export model | Visibility granularity | Re-exports | Key trade-off |
 |---|---|---|---|---|
-| Rust | Explicit `pub` family | Fine-grained (`pub`, `pub(crate)`, `pub(super)`, `pub(in)`) | Strong | Powerful API shaping, more complexity |
-| Zig | `pub` declarations | Simple public/private | Moderate via namespace re-exposure | Low magic, less expressive visibility lattice |
-| Go | Capitalization convention | Package-private vs exported | Limited compared with Rust | Very simple, but naming-driven |
-| Odin | Package-oriented, lower ceremony | Simpler than Rust | Limited / ecosystem-convention shaped | Easy to read, fewer expressive controls |
-| Python | Mostly public-by-default with conventions | Convention-heavy | Trivial via rebinding/import patterns | Flexible, weak encapsulation |
-| JavaScript ESM | Explicit `export` | Module-level | Strong | Good static surface control, runtime complexity remains |
-| Node CommonJS | Mutable `module.exports` | Module object shaped by code | Trivial | Flexible but weakly structured |
-| OCaml | Public-by-default unless constrained by `.mli` | Interface-file-based | Possible | Strong abstraction with explicit interfaces |
-| Standard ML | Signature-controlled | Strong interface discipline | Possible | Abstraction power at high conceptual cost |
-| Haskell | Explicit export lists | Module-level | Moderate | Good source-level API curation |
-| Racket | `provide` forms | Module and phase aware | Strong | Powerful and precise, but phase complexity |
-| Java / JPMS | `exports`, `exports ... to` | Package-level via module-info | Indirectly via re-exports of imported packages | Friend-export (`exports ... to`) is rare elsewhere |
-| C# / .NET | `public`/`internal`/`protected` family + `InternalsVisibleTo` | Assembly-level boundary | Indirect via `TypeForwardedTo` | Friend assemblies are the canonical pattern |
-| Scala 3 | Modifier keywords + `export` clauses | Package + access modifiers | First-class `export` | Re-exports as a language feature |
-| Swift | `open`/`public`/`package`/`internal`/`fileprivate`/`private` | Six-level lattice | Strong | `package` level was a late addition |
-| Erlang | `-export([func/arity, ...])` | Per-function arity granularity | Limited | Function-arity-pair is the export atom |
-| Elixir | `def`/`defp` | Per-function | Limited | Macro-level `defmacro`/`defmacrop` distinction |
-| Julia | `export` lists | Module-level | Possible | Privacy is convention only |
-| Dart | Underscore-prefix privacy | Library-level (not file-level) | `export` directive | `_foo` is private to the library |
-| Nim | `*` export marker | Per-declaration | `export` keyword | Most concise export marking in survey |
-| Elm | `exposing (...)` list | Module-level | Possible | Type constructor exposing controls opaqueness |
-| F# | Access modifiers + `[<AutoOpen>]` | Module-level + namespace | Possible | `AutoOpen` for ambient helpers |
-| Raku | `is export` trait + tags | Per-declaration with optional tag groups | Possible via re-export | Multi-distribution coexistence by `:auth` |
-| Perl 5 | Convention (`@EXPORT`/`@EXPORT_OK` via Exporter module) | Per-symbol | Trivial via rebinding | No language-enforced visibility |
-| Common Lisp | `(:export ...)` in `defpackage` + `:shadow`/`:shadowing-import-from` | Per-symbol with explicit shadowing | Possible (re-import + re-export) | Six-relationship lattice — richest in survey |
-| Clojure | Convention (private Vars use `defn-`/`defprivate-`) | Per-Var, runtime-checkable | Trivial (Vars are first-class) | First-class namespace introspection |
-| Tcl | `namespace export` (advisory) | Namespace-level | Possible | Convention-driven, not language-enforced |
-| Forth | Per-wordlist visibility via search-order position | Per-wordlist | Manual (push wordlist to search order) | Stack-managed visibility |
-| Factor | All public within vocabulary | Vocabulary-level (no per-word privacy) | Strong via `EXCLUDE:` / `RENAME:` / `FROM:` | Ambiguous-use-error on conflict |
-| Ada | Specification declares public; `private` part for opacity | Per-package + child-package privileges | Possible via re-export | Private child packages for fine-grained scoping |
-| Modula-2 / Modula-3 | DEFINITION declares public surface | Module-level | Limited | Opaque types matched across the spec/body boundary |
-| Oberon | Inline `*` (read-only) and `-` (read-write) markers | Per-declaration | Possible | Single-character markers per public symbol |
-| D | `private`/`package`/`protected`/`public`/`export` | Five-level lattice | `public import` for re-export | `export` distinguishes binary-export visibility |
-| Lean 4 | Public-by-default; `private` for module-local | Module-level + section-level | Strong via `export` clause | Imports affect instance resolution scope |
-| R | NAMESPACE file `export()`/`exportPattern()` | Package-level | Possible (with care for S3/S4 dispatch) | Method registration decoupled from export |
-| Agda | Public-by-default; `private` block for module-local | Module-level | `open public` for re-export | Records and modules are unified |
-| Idris 2 | Access modifiers on declarations | Per-declaration | Possible | Interfaces add typeclass-style dispatch |
-| Wasm Component | WIT `interface` declarations | Component boundary | Worlds compose interfaces | Typed at the binary boundary |
+| Rust (§3.1) | Explicit `pub` family | Fine-grained (`pub`, `pub(crate)`, `pub(super)`, `pub(in)`) | Strong | Powerful API shaping, more complexity |
+| Zig (§3.2) | `pub` declarations | Simple public/private | Moderate via namespace re-exposure | Low magic, less expressive visibility lattice |
+| Go (§3.3) | Capitalization convention | Package-private vs exported | Limited compared with Rust | Very simple, but naming-driven |
+| Odin (§3.4) | Package-oriented, lower ceremony | Simpler than Rust | Limited / ecosystem-convention shaped | Easy to read, fewer expressive controls |
+| Python (§4.1) | Mostly public-by-default with conventions | Convention-heavy | Trivial via rebinding/import patterns | Flexible, weak encapsulation |
+| JavaScript ESM (§4.2) | Explicit `export` | Module-level | Strong | Good static surface control, runtime complexity remains |
+| Node CommonJS (§4.3) | Mutable `module.exports` | Module object shaped by code | Trivial | Flexible but weakly structured |
+| OCaml (§5.1) | Public-by-default unless constrained by `.mli` | Interface-file-based | Possible | Strong abstraction with explicit interfaces |
+| Standard ML (§5.2) | Signature-controlled | Strong interface discipline | Possible | Abstraction power at high conceptual cost |
+| Haskell (§5.3) | Explicit export lists | Module-level | Moderate | Good source-level API curation |
+| Racket (§5.4) | `provide` forms | Module and phase aware | Strong | Powerful and precise, but phase complexity |
+| Java / JPMS (§7.1) | `exports`, `exports ... to` | Package-level via module-info | Indirectly via re-exports of imported packages | Friend-export (`exports ... to`) is rare elsewhere |
+| C# / .NET (§7.2) | `public`/`internal`/`protected` family + `InternalsVisibleTo` | Assembly-level boundary | Indirect via `TypeForwardedTo` | Friend assemblies are the canonical pattern |
+| Scala 3 (§7.3) | Modifier keywords + `export` clauses | Package + access modifiers | First-class `export` | Re-exports as a language feature |
+| Swift (§9.1) | `open`/`public`/`package`/`internal`/`fileprivate`/`private` | Six-level lattice | Strong | `package` level was a late addition |
+| Erlang (§9.2) | `-export([func/arity, ...])` | Per-function arity granularity | Limited | Function-arity-pair is the export atom |
+| Elixir (§9.2) | `def`/`defp` | Per-function | Limited | Macro-level `defmacro`/`defmacrop` distinction |
+| Julia (§9.3) | `export` lists | Module-level | Possible | Privacy is convention only |
+| Dart (§9.4) | Underscore-prefix privacy | Library-level (not file-level) | `export` directive | `_foo` is private to the library |
+| Nim (§9.5) | `*` export marker | Per-declaration | `export` keyword | Most concise export marking in survey |
+| Elm (§9.6) | `exposing (...)` list | Module-level | Possible | Type constructor exposing controls opaqueness |
+| F# (§9.7) | Access modifiers + `[<AutoOpen>]` | Module-level + namespace | Possible | `AutoOpen` for ambient helpers |
+| Raku (§9.9) | `is export` trait + tags | Per-declaration with optional tag groups | Possible via re-export | Multi-distribution coexistence by `:auth` |
+| Perl 5 (§4.5) | Convention (`@EXPORT`/`@EXPORT_OK` via Exporter module) | Per-symbol | Trivial via rebinding | No language-enforced visibility |
+| Common Lisp (§4.6) | `(:export ...)` in `defpackage` + `:shadow`/`:shadowing-import-from` | Per-symbol with explicit shadowing | Possible (re-import + re-export) | Six-relationship lattice — richest in survey |
+| Clojure (§4.7) | Convention (private Vars use `defn-`/`defprivate-`) | Per-Var, runtime-checkable | Trivial (Vars are first-class) | First-class namespace introspection |
+| Tcl (§4.8) | `namespace export` (advisory) | Namespace-level | Possible | Convention-driven, not language-enforced |
+| Forth (§9.10) | Per-wordlist visibility via search-order position | Per-wordlist | Manual (push wordlist to search order) | Stack-managed visibility |
+| Factor (§9.11) | All public within vocabulary | Vocabulary-level (no per-word privacy) | Strong via `EXCLUDE:` / `RENAME:` / `FROM:` | Ambiguous-use-error on conflict |
+| Ada (§5.5) | Specification declares public; `private` part for opacity | Per-package + child-package privileges | Possible via re-export | Private child packages for fine-grained scoping |
+| Modula-2 / Modula-3 (§5.6) | DEFINITION declares public surface | Module-level | Limited | Opaque types matched across the spec/body boundary |
+| Oberon (§5.6) | Inline `*` (read-only) and `-` (read-write) markers | Per-declaration | Possible | Single-character markers per public symbol |
+| D (§9.12) | `private`/`package`/`protected`/`public`/`export` | Five-level lattice | `public import` for re-export | `export` distinguishes binary-export visibility |
+| Lean 4 (§9.13) | Public-by-default; `private` for module-local | Module-level + section-level | Strong via `export` clause | Imports affect instance resolution scope |
+| R (§9.14) | NAMESPACE file `export()`/`exportPattern()` | Package-level | Possible (with care for S3/S4 dispatch) | Method registration decoupled from export |
+| Agda (§10.10) | Public-by-default; `private` block for module-local | Module-level | `open public` for re-export | Records and modules are unified |
+| Idris 2 (§10.10) | Access modifiers on declarations | Per-declaration | Possible | Interfaces add typeclass-style dispatch |
+| Wasm Component (§13.2) | WIT `interface` declarations | Component boundary | Worlds compose interfaces | Typed at the binary boundary |
+| Deno (§6.7) | Explicit `export` (ESM) | Module-level | First-class re-exports | URL identity bundles distribution + visibility |
+| Mojo (§9.16) | Convention plus `fn`/`struct` modifiers | Module-level | Possible | Imports do not run module bodies |
+| Carbon (§10.12) | Explicit `api` modifier per declaration | Per-declaration in API file | Possible via re-export | API/impl file split enforces interface-first design |
 
 ### 14.4. Typed and phase-aware abstraction power
 
 | Language / system | Typed module interfaces? | Parameterized modules? | Phase-aware imports? | Distinctive strength |
 |---|---|---|---|---|
-| Rust | Not in the ML sense | No higher-order module system | Limited via proc-macro separation, not phase tower | Strong visibility and crate layering |
-| Zig | No | No | No | Extremely explicit static imports |
-| Go | No | No | No | Compiler-friendly package DAG |
-| Python | No | No | No | Runtime flexibility, loader extensibility |
-| JavaScript ESM | No | No | No | Live bindings with static syntax |
-| OCaml | Yes (signatures) | Yes (functors) | No phase tower like Racket | Production typed module calculus |
-| Standard ML | Yes | Yes | No | Classical module calculus |
-| Haskell | Weaker than ML signatures/functors | Not in the same sense | No | Export/qualification discipline without full higher-order modules |
-| Racket | Module contracts and language tooling, not ML signatures | Not the same abstraction style | Yes | Modules as macro- and language-phase boundaries |
-| 1ML (research) | Yes (signatures = types) | Yes, as ordinary functions | No phase tower | Unifies module language with core language |
-| Backpack (Haskell) | Yes (mixin-style holes) | Indefinite-module instantiation | No | Mixin linking at the package layer |
-| MixML (research) | Yes (mixin signatures) | Yes (mixin merging) | No | Type-safe recursive cross-module dependency |
-| Newspeak | Yes (top-level class declarations) | Yes (top-level class is a parameterized module) | No | Modules as parameterized objects, no globals |
-| R6RS Scheme libraries | No types (untyped) | No (declarative imports only) | Yes (R6RS phasing via `for` annotations) | Canonical `only`/`except`/`prefix`/`rename` import refinements |
-| R7RS Scheme `define-library` | No types (untyped) | No | No (R7RS dropped phasing) | Pragmatic simplification of R6RS plus `cond-expand` |
-| Ada generic packages | Yes (specification = signature) | Yes (generic instantiation) | No | Production typed module system since 1980 |
-| Modula-2 / Modula-3 | Yes (DEFINITION = signature) | Modula-3 generic interfaces | No | Direct ancestor of OCaml `.mli`/`.ml` |
-| Agda | Yes (record types as module signatures) | Yes (with dependent type parameters) | No | Modules collapse into records under dependent types |
-| Idris 2 | Yes (interface declarations) | Yes (parametric over types and values) | No | Interfaces dispatch via search resolution |
-| Wasm Component | Yes (WIT worlds) | Worlds compose imports/exports | No | Typed module interfaces at the binary boundary |
+| Rust (§3.1) | Not in the ML sense | No higher-order module system | Limited via proc-macro separation, not phase tower | Strong visibility and crate layering |
+| Zig (§3.2) | No | No | No | Extremely explicit static imports |
+| Go (§3.3) | No | No | No | Compiler-friendly package DAG |
+| Python (§4.1) | No | No | No | Runtime flexibility, loader extensibility |
+| JavaScript ESM (§4.2) | No | No | No | Live bindings with static syntax |
+| OCaml (§5.1) | Yes (signatures) | Yes (functors) | No phase tower like Racket | Production typed module calculus |
+| Standard ML (§5.2) | Yes | Yes | No | Classical module calculus |
+| Haskell (§5.3) | Weaker than ML signatures/functors | Not in the same sense | No | Export/qualification discipline without full higher-order modules |
+| Racket (§5.4) | Module contracts and language tooling, not ML signatures | Not the same abstraction style | Yes | Modules as macro- and language-phase boundaries |
+| 1ML (research) (§10.2) | Yes (signatures = types) | Yes, as ordinary functions | No phase tower | Unifies module language with core language |
+| Backpack (Haskell) (§10.4) | Yes (mixin-style holes) | Indefinite-module instantiation | No | Mixin linking at the package layer |
+| MixML (research) (§10.5) | Yes (mixin signatures) | Yes (mixin merging) | No | Type-safe recursive cross-module dependency |
+| Newspeak (§10.6) | Yes (top-level class declarations) | Yes (top-level class is a parameterized module) | No | Modules as parameterized objects, no globals |
+| R6RS Scheme libraries (§10.9) | No types (untyped) | No (declarative imports only) | Yes (R6RS phasing via `for` annotations) | Canonical `only`/`except`/`prefix`/`rename` import refinements |
+| R7RS Scheme `define-library` (§10.9) | No types (untyped) | No | No (R7RS dropped phasing) | Pragmatic simplification of R6RS plus `cond-expand` |
+| Ada generic packages (§5.5, §10.1) | Yes (specification = signature) | Yes (generic instantiation) | No | Production typed module system since 1980 |
+| Modula-2 / Modula-3 (§5.6) | Yes (DEFINITION = signature) | Modula-3 generic interfaces | No | Direct ancestor of OCaml `.mli`/`.ml` |
+| Agda (§10.10) | Yes (record types as module signatures) | Yes (with dependent type parameters) | No | Modules collapse into records under dependent types |
+| Idris 2 (§10.10) | Yes (interface declarations) | Yes (parametric over types and values) | No | Interfaces dispatch via search resolution |
+| Wasm Component (§13.2) | Yes (WIT worlds) | Worlds compose imports/exports | No | Typed module interfaces at the binary boundary |
 
 ### 14.5. Packaging, identity, and resolution
 
-| Language / system | Package manager/module system relationship | Resolution style | Versioning leaks into source imports? | Main consequence |
-|---|---|---|---|---|
-| Rust | Layered but explicit | Cargo resolves packages, compiler resolves crates/modules | Usually no at module path level | Clean conceptual separation |
-| Go | Closely aligned | Module path + directory path | Yes, via semantic import versioning | Very strong reproducibility and path identity |
-| Python | Loosely coupled | Runtime import machinery + environment search path | Usually not directly | Flexible, but environment-sensitive |
-| Node / ESM | Strongly metadata-shaped | Specifier resolution through host + `package.json` | Sometimes effectively yes through exports/entrypoint policy | Flexible, but complex and loader-sensitive |
-| Zig | Build-context shaped | Build graph exposes package names and roots | Not usually in source syntax itself | Deterministic, but tied closely to build configuration |
-| Odin | Simpler collection/package roots | Source tree and collection roots | No strong source-level version encoding | Easy to understand, less abstract |
-| OCaml / Haskell | Build-tool/ecosystem-layered | Source names + compiler/build context | Usually not in ordinary source imports | Good abstraction, more tooling/build convention load |
-| Racket | Collection/package layered | Module paths + collections + phases | Not the main model | Excellent extensibility, more conceptual machinery |
-| Java + Maven | Layered (Maven coords distinct from JPMS module name) | Maven resolves coords, JPMS resolves module reads | Sometimes via classifier conventions | JPMS adoption is partial; classpath is still common |
-| .NET + NuGet | Layered (NuGet package distinct from assembly identity) | NuGet resolves packages, runtime loads assemblies | Sometimes via package version | Package and assembly identities can drift |
-| Swift + SPM | Layered (SPM package distinct from module) | SPM resolves packages, compiler loads modules | Not in source imports | Library Evolution mode separates source from binary |
-| Erlang/Elixir + Hex | Layered (Hex package distinct from OTP application) | Hex resolves packages, BEAM loads modules | Not in source | Application is the deployment unit |
-| Julia + Pkg + General | Layered | Pkg resolves environments, runtime loads modules | Not in source | `Manifest.toml` lockfile is the resolution truth |
-| Dart + pub | Aligned (pub package = library distribution) | pub resolves packages, compiler loads libraries | Not in source | `pubspec.yaml` is the manifest |
-| Nim + Nimble | Aligned | Nimble resolves packages, compiler loads modules | Not in source | Conventional naming, no enforced scoping |
-| Elm + elm-lang | Aligned with strict semver enforcement | elm-lang.org resolves packages | Not in source | Tool-enforced semver compliance |
-| Raku + fez/zef | Layered with auth-validated 4-tuple identity | `$*REPO` chain of CompUnit::Repository objects | Yes — `:auth`/`:ver`/`:api` appear in source `use` statements | Auth-validated supply-chain prevents poisoning |
-| Perl 5 + CPAN | Loosely coupled (CPAN is convention-shaped) | `@INC` search path | Not in source | Foundational; many design issues Raku reacts against |
-| Common Lisp + ASDF + Quicklisp | Layered (packages are language-level, ASDF systems are ecosystem-level) | ASDF system definitions resolve packages | Not in source | Two-layer split allows packages and systems to be many-to-many |
-| Clojure + deps.edn / Leiningen | Layered (namespaces are language, deps are tool) | tools.deps or Leiningen resolves Maven coords | Not in source | Java ecosystem inherited via Maven |
-| Tcl + pkgIndex.tcl | Aligned but orthogonal to namespaces | `package require` searches auto-path | Version range may be requested in source | Two-layer namespace/package model |
-| Forth | Implementation-defined (no standard ecosystem) | Implementation-specific load mechanism | No | No standardized package manager |
-| Factor + vocab roots | Aligned (vocabulary = directory tree) | Resolved against vocab-roots | Not in source | Single ecosystem, ambiguous-use enforced |
-| Ada + Alire | Layered (project files distinct from packages) | GNAT project resolves source paths | Not in source | Spec/body split is foundational |
-| Modula-2 / Modula-3 | Implementation-specific | DEFINITION/IMPLEMENTATION pair on disk | Not in source | Foundational; little active ecosystem |
-| Oberon | Implementation-specific | Module name = source filename | Not in source | Project Oberon is the canonical reference system |
-| D + DUB | Aligned (package = directory tree) | DUB resolves package coords | Not in source | dub.json/dub.sdl manifest |
-| Lean 4 + Lake + Reservoir | Layered | Lake resolves; lakefile.lean configuration | Not in source | Mathlib is the dominant package |
-| R + CRAN | Aligned (package = directory; DESCRIPTION manifest) | `library()` searches `.libPaths()` | Not in source | Strict pre-publication review |
-| Agda + agda-stdlib | Cabal/Stack-layered | Cabal or stack resolves; `.agda-lib` files | Not in source | Small ecosystem, math-focused |
-| Idris 2 + pack | Layered | `pack` resolves; `pack.toml` | Not in source | Modeled on Cargo |
-| Nix flakes / Guix | Build-as-pure-function | Content-addressed resolution against `flake.lock` | Not in source | Hermetic reproducibility by language construction |
-| Wasm Components | Distribution-format-independent | Host loads components by name | Not in source | Identity is the WIT world declaration |
+Subsumed by the identity column of §14.1 and the prose treatment in §6 (Packages, Identity, Resolution) and §12 (Build Systems, Workspaces, Lockfiles, Registries). Refer to §14.1 for module identity sources at a glance, §6.1–§6.6 for the per-language packaging postures, and §12.1–§12.7 for lockfiles, workspaces, registries, and build-system layering.
 
 ### 14.6. Tooling friendliness
 
 | Language / system | Static graph quality | Resolution determinism | Incremental-friendly? | Main tooling pain |
 |---|---|---|---|---|
-| Rust | High | High | High | Re-export-heavy APIs can complicate surface tracking |
-| Zig | High | High | High | Build-context coupling must stay explicit |
-| Go | Very high | High | Very high | Architectural rigidity from no-cycle rule |
-| Odin | High | High | High in principle | Less formal specification than Rust/Go |
-| Python | Lower | Medium | Harder | Import-time execution and environment-shaped resolution |
-| JavaScript ESM | Medium-high | Medium | Moderate | Runtime host resolution and cyclic initialization semantics |
-| Node CommonJS | Lower | Medium | Harder | Dynamic `require` patterns and mutable exports |
-| OCaml | High | High | High | More conceptual complexity for users |
-| Haskell | High | High | High | Package/build layering can be nontrivial |
-| Racket | Medium | Medium-high | Depends on phase/tooling support | Phase complexity |
-| Java / JPMS | High | High | High | JPMS adoption gap; classpath fallback fragments tooling |
-| C# / .NET | High | High | High | Reflection-heavy frameworks weaken encapsulation guarantees |
-| Swift | High | High | High | Library Evolution mode requires explicit annotations |
-| Erlang | High | High | High (per-module reload) | Flat namespace scales via convention |
-| Julia | Medium-high | High | High with precompilation | First-load latency before pkgimage cache |
-| Elm | Very high | Very high | Very high | Strict file-cycle ban can frustrate prototyping |
-| F# | Very high | Very high | Very high | Project-file ordering ergonomics |
-| Wasm Component | High (typed binary) | High | High | Tooling for WIT is still maturing |
+| Rust (§3.1) | High | High | High | Re-export-heavy APIs can complicate surface tracking |
+| Zig (§3.2) | High | High | High | Build-context coupling must stay explicit |
+| Go (§3.3) | Very high | High | Very high | Architectural rigidity from no-cycle rule |
+| Odin (§3.4) | High | High | High in principle | Less formal specification than Rust/Go |
+| Python (§4.1) | Lower | Medium | Harder | Import-time execution and environment-shaped resolution |
+| JavaScript ESM (§4.2) | Medium-high | Medium | Moderate | Runtime host resolution and cyclic initialization semantics |
+| Node CommonJS (§4.3) | Lower | Medium | Harder | Dynamic `require` patterns and mutable exports |
+| OCaml (§5.1) | High | High | High | More conceptual complexity for users |
+| Haskell (§5.3) | High | High | High | Package/build layering can be nontrivial |
+| Racket (§5.4) | Medium | Medium-high | Depends on phase/tooling support | Phase complexity |
+| Java / JPMS (§7.1) | High | High | High | JPMS adoption gap; classpath fallback fragments tooling |
+| C# / .NET (§7.2) | High | High | High | Reflection-heavy frameworks weaken encapsulation guarantees |
+| Swift (§9.1) | High | High | High | Library Evolution mode requires explicit annotations |
+| Erlang (§9.2) | High | High | High (per-module reload) | Flat namespace scales via convention |
+| Julia (§9.3) | Medium-high | High | High with precompilation | First-load latency before pkgimage cache |
+| Elm (§9.6) | Very high | Very high | Very high | Strict file-cycle ban can frustrate prototyping |
+| F# (§9.7) | Very high | Very high | Very high | Project-file ordering ergonomics |
+| Wasm Component (§13.2) | High (typed binary) | High | High | Tooling for WIT is still maturing |
 
 ### 14.7. Visibility and scoping comparison
 
-| Mechanism | Granularity | Languages | Notes |
-|---|---|---|---|
-| Default-private with explicit `pub`/`export` | Per-declaration | Rust, Zig, Racket, ESM, JPMS (`exports`) | Most defensive default |
-| Capitalization-driven exports | Per-identifier | Go | No keyword cost; depends on naming discipline |
-| Single-character export marker | Per-declaration | Nim (`*`) | Most concise default-private design |
-| Underscore-prefix privacy | Per-identifier | Dart, Python (convention), Julia (convention) | Lightweight; Dart enforces it |
-| Public-by-default | Per-declaration | Python, OCaml without `.mli`, default Java packages | Convenient but accumulates accidental API |
-| Interface-file restriction | Per-module | OCaml `.mli`, Haskell export list | Strong API discipline |
-| Friend mechanism | Cross-module specific | C# `InternalsVisibleTo`, Java `exports ... to`, C++ `friend` | Test-code access without public exposure |
-| Build-tool module visibility | Per-target | Kotlin `internal`, Bazel `visibility`, Buck `visibility` | Build graph is the boundary |
-| Six-level lattice | Per-declaration | Swift (`open`/`public`/`package`/`internal`/`fileprivate`/`private`) | Richest production lattice |
+Merged into §14.3 (Visibility and export models), which covers the same ground with per-language granularity. The distilled mechanism categories — default-private with explicit markers, capitalization-driven, underscore-prefix, interface-file restriction, friend mechanisms, build-tool visibility, multi-level lattices — are recoverable from the §14.3 rows by the "Export model" and "Visibility granularity" columns.
 
 ### 14.8. Cycle policy
 
@@ -2013,94 +1921,43 @@ The previous chapters now cover enough of the design space to support direct com
 
 ### 14.9. Design option matrix
 
-| Design option | Benefit | Cost | Languages | Typical fit |
-|---|---|---|---|---|
-| File-as-module | Very simple mental model | Less flexible logical organization | Python, Zig-ish workflows, OCaml compilation units | Common in simpler or file-centric systems |
-| Directory-as-package | Easy project organization | Filesystem becomes highly authoritative | Go, Odin | Common in systems emphasizing layout clarity |
-| Declared module unit | Flexible logical structure | More resolution machinery | Rust, Java, OCaml, C++20 modules | Common in systems emphasizing explicit logical structure |
-| Static imports only | Clean compiler/tooling graph | Less dynamic flexibility | Rust, Zig, Go, Odin | Common in compiler/tooling-oriented systems |
-| Import-time execution | Flexible plugins/init patterns | Harder cycles, tooling, reproducibility | Python, JS, Ruby | Common in dynamic/runtime-oriented systems |
-| Explicit exports | Clear APIs, good encapsulation | Slightly more verbosity | Rust, Zig, ESM, Racket | Common in systems emphasizing API discipline |
-| Public-by-default | Fast early coding | Accidental API sprawl | Python, OCaml without `.mli` | Common in convenience-oriented or convention-heavy systems |
-| Hard cycle prohibition | Simpler graph and init semantics | More architectural pressure on users | Go | Common where a strict dependency DAG is a design goal |
-| Phase-aware imports | Future macro power | Much higher conceptual complexity | Racket | Common only in macro- or language-extension-oriented systems |
-| Typed module interfaces | Strong abstraction boundaries | Major language complexity increase | OCaml, SML | Common in typed module-calculus traditions |
-| Package identity separate from module identity | Cleaner ecosystem evolution | More concepts to explain | Rust, partly Haskell/OCaml | Common in layered package/module ecosystems |
-| Package metadata shapes resolution | Flexible publishing/runtime interop | Harder static reasoning | Node | Common in loader- and package-metadata-shaped ecosystems |
-| Resilient ABI / library evolution | Binary compatibility across versions | Compiler/runtime complexity | Swift, .NET (`TypeForwardedTo`) | Common where binary distribution dominates |
-| Hot module reload at runtime | Live-coding and uptime | Requires module-identity + state-survival discipline | Erlang, Elixir, OSGi, JS HMR | Common in long-running or interactive systems |
-| Capability-scoped imports | Sandboxing and ocap composition | Requires zero-ambient-authority commitment | Wasm Components, Newspeak | Common in security- and isolation-oriented designs |
-| Workspace / monorepo support | Atomic multi-package edits | More tooling required | Cargo, Go, pnpm, Bazel | Increasingly table stakes for serious ecosystems |
-| Content-hash lockfiles | Reproducible builds | More plumbing | Cargo, Go, pnpm, Nix | Modern standard |
-| Hermetic build-as-pure-function | Reproducibility by construction | Steep learning curve; separate ecosystem | Nix flakes, Guix, Spack | Strongest reproducibility model in the survey |
-| Specification/body file split | Interface-first design, opaque types | Two files per module | Ada, Modula-2, OCaml `.mli`/`.ml` | Foundational; ML/OCaml are the modern descendants |
-| Dependent-type modules / records-as-functors | Module language unifies with core | Requires dependent types from day one | Agda, Idris 2 | Eliminates the stratified module language entirely |
+Subsumed by §15 (open-design questions) and §16 (closing synthesis). See those sections for the recurring decision points and the cross-cutting reading of the design space.
 
 ---
 
 ## 15. Open Design Questions
 
-The questions below are the recurring decision points any new language faces when designing a module system. They are not ranked: each represents a real trade-off, and the right answer depends on the language's broader goals.
+These are the recurring decision points a module-system designer faces. Each summarizes a trade-off explored at length earlier; the canonical chapters do the work.
 
-### 15.1. Is a module a file, a directory, or a declared unit?
-
-A file-based design (Python, Zig source files, OCaml compilation units, Nim, F#) is simple and tooling-friendly: the filesystem is authoritative. A directory-based design (Go, Odin) makes filesystem layout the package boundary, which scales project organization at the cost of locking in a specific tree shape. A declaration-based design (Rust, Java, OCaml's `module ... struct`, C++20 named modules) decouples logical structure from layout but requires more resolution machinery. Hybrids are possible (Rust's `mod` declarations plus filesystem search) but only if the resolution rules stay deterministic.
-
-### 15.2. Are imports static dependency edges, or runtime events?
-
-Forbidding import-time execution (the static-graph family of chapter 3) yields a clean compile graph, easier tooling, simpler initialization, and trivial cycle policy. Allowing import-time execution (chapter 4) buys flexibility and plugin-style extension at the cost of complicated cycle semantics, environment-sensitive behavior, and weaker static analyzability. This is one of the highest-leverage decisions in the design space; it is also one of the hardest to reverse.
-
-### 15.3. Are exports explicit, public-by-default, or convention-driven?
-
-Explicit exports (Rust `pub`, Java `public`, JPMS `exports`, ESM `export`, Nim `*`) align well with refactoring and API stability. Public-by-default (Python, OCaml without `.mli`) is convenient at small scale but accumulates accidental API. Convention-driven (Go capitalization, Dart underscore-prefix) sits between the two — lightweight but dependent on naming discipline. The richer the visibility lattice (Swift's six levels, Rust's `pub(crate)`/`pub(super)`/`pub(in)`), the more precisely large codebases can encode intent at the cost of more concepts to learn.
-
-### 15.4. Are cycles forbidden, tolerated, or structured?
-
-Hard prohibition (Go at the package level, Elm at the file level, F# via project ordering) yields the cleanest compilation, initialization, and tooling story but pushes architectural pressure onto users. Tolerance with partial initialization (Python, JS ESM live bindings, CommonJS) gives flexibility at the price of evaluation-order surprises. Structured mediation through signatures and functors (OCaml, SML, Backpack) trades language complexity for a principled answer. The choice signals whether the module system is meant to *enforce* architecture or merely *describe* it.
-
-### 15.5. Are package identity and module identity the same?
-
-Coupling them tightly (Go's module path + directory path, Elm's package = module-namespace) yields strong reproducibility and clear ecosystem identity at the cost of versioning policy leaking into source. Keeping them separate (Rust's package vs crate vs module, Haskell's module vs Cabal package) preserves stable source-level naming as the package layer evolves but requires explaining more layers. Loose coupling (Python's import system vs packaging) is the most flexible but the most environment-shaped. The choice usually shapes whether reproducible builds, package managers, and registry naming are easy or hard later.
-
-### 15.6. Does package metadata participate in resolution?
-
-If `package.json`-style metadata redefines what a source-level specifier means (Node `exports` maps, conditional exports), the language gains expressive distribution flexibility but loses static reasoning. If metadata is purely installation information (Cargo, Go modules), tooling has a simpler job. Most new languages benefit from leaving metadata-shaped resolution out, at least initially.
-
-### 15.7. Are runtime modules first-class objects, or only compile-time abstractions?
-
-Runtime module objects (Python, Erlang, Julia, OSGi-style JVM) enable hot reload, plugin discovery, dynamic introspection, and reflection-heavy frameworks. Compile-time-only modules (Rust, Zig, Go in practice) keep the compiler simple and the runtime cheap but require separate mechanisms for plugin-style extension. The decision is closely linked to whether import-time execution is permitted (§15.2).
-
-### 15.8. Should phase-aware macro/module separation be designed in?
-
-If a language eventually wants Racket- or Rust-style compile-time metaprogramming, the module system needs a story for which bindings exist at which phase. This can be designed in from day one (Racket's phase tower) or deferred — but a module system designed without thinking about phases can lock out future macro power. A new language can keep the initial module system simple while leaving room for a later phase refinement, but only if the early choices do not prematurely fuse phases.
-
-### 15.9. How are dynamic loading and hot reload supported?
-
-If hot reload is a goal (live-coding, long-running services, plugin architectures), the module system has to commit early to flat or hierarchical-but-stable identity, individually loadable artifacts, and a story for state survival across reload. Erlang's flat-module two-version-active design, OSGi's class-loader hierarchy, and JS HMR's `import.meta.hot.accept` all illustrate that this requires language-level cooperation, not just runtime tooling. Languages that ignore this until late tend to retrofit awkwardly.
-
-### 15.10. Is the artifact boundary the module boundary?
-
-Some languages make the published binary artifact the encapsulation unit (Java module/JAR, .NET assembly, Swift framework, Wasm component). Others keep modules as source-level abstractions and let artifacts be a separate concern (Rust crate vs package, Go package vs module). Tying modules to artifacts simplifies reasoning about distribution and binary compatibility but couples module design to packaging decisions. The Wasm Component Model is the most modern realization of artifact-as-module-boundary; it works because the typed interface description is part of the artifact.
-
-### 15.11. How is reflection accommodated?
-
-Frameworks that depend on deep reflection (DI containers, ORMs, serializers) break encapsulation unless the module system explicitly authorizes them. JPMS's `opens` directive, .NET's looser reflection rules, and Wasm's resource handles each take a different position. A new language should decide whether reflection is permitted (Java pre-9), restricted (JPMS post-9), or first-class (Smalltalk, Newspeak); the decision shapes both the module system and the framework ecosystem that grows on top.
+- **§15.1. Is a module a file, a directory, or a declared unit?** File-based, directory-based, declared-based, or hybrid; the right answer depends on how authoritative the filesystem should be (see §2.1, §14.1).
+- **§15.2. Are imports static dependency edges, or runtime events?** Forbidding import-time execution buys static graphs, simple cycles, and easy tooling; allowing it buys plugin extension at high cost (see §2.3, §3, §4, §14.2).
+- **§15.3. Are exports explicit, public-by-default, or convention-driven?** Explicit exports support refactoring; public-by-default is convenient but accumulates accidental API; convention-driven sits between (see §2.4, §14.3).
+- **§15.4. Are cycles forbidden, tolerated, or structured?** Hard prohibition, partial-init tolerance, or structured mediation through signatures/functors — see §2.5, §3.3, §14.8 for the taxonomy.
+- **§15.5. Are package identity and module identity the same?** Tight coupling vs separation vs loose coupling; see §2.6, §6.1–§6.6, and the identity column of §14.1.
+- **§15.6. Does package metadata participate in resolution?** Loader-shaped resolution (Node) vs purely installation metadata (Cargo, Go); see §6.4 and §6.6 for the prose treatment, and §14.1 for the identity column.
+- **§15.7. Are runtime modules first-class objects, or only compile-time abstractions?** Runtime module objects enable hot reload and reflection; compile-time-only modules keep the runtime cheap (see §2.8, §14.2).
+- **§15.8. Should phase-aware macro/module separation be designed in?** Designing phases in from day one (Racket §5.4) or deferring while avoiding phase-fusing early choices.
+- **§15.9. How are dynamic loading and hot reload supported?** Flat-module two-version-active (§9.2), class-loader hierarchies (§11.2), or accept-callback HMR (§11.6) — all require early language-level cooperation.
+- **§15.10. Is the artifact boundary the module boundary?** Java module/JAR, .NET assembly, Swift framework, Wasm component all make the artifact the encapsulation unit (see §13).
+- **§15.11. How is reflection accommodated?** Permitted, restricted, or first-class — JPMS `opens`, .NET reflection, Wasm resource handles each take a different position (see §7.5, §13.3).
 
 ---
 
 ## 16. Closing Synthesis
 
-The design space splits into roughly five broad concerns:
+The design space splits into static graph systems (chapter 3), runtime import systems (chapter 4), typed or phase-aware abstraction systems (chapters 5, 10), package and resolution models (chapters 6, 12), and runtime/dynamic/capability-scoped modules (chapters 11, 13).
 
-1. **Static compile-time graph systems** prioritize deterministic dependency graphs, separate compilation, tooling, and explicit boundaries (chapter 3).
-2. **Runtime import systems** treat imports as program execution and module initialization events, prioritizing flexibility over static analyzability (chapter 4).
-3. **Typed or phase-aware abstraction systems** use modules as semantic abstraction layers, not just namespace or packaging mechanisms (chapter 5, chapter 10).
-4. **Package, identity, and resolution models** determine how source-level names connect to distribution artifacts, versioning, and toolchain behavior (chapter 6, chapter 12).
-5. **Runtime, dynamic, and capability-scoped modules** govern how modules are loaded, swapped, and isolated at execution time (chapter 11, chapter 13).
+Across these families, a small set of decisions does most of the load-bearing work, and the rest of the design surface tends to follow from them. The first is **whether imports are static dependency edges or runtime events** (§2.3, §15.2). Refusing import-time execution by default is the single most consequential lever: it sharply simplifies the compile graph, the cycle story, the tooling story, and the initialization-order story all at once. Allowing it buys plugin-style extension and dynamic metaprogramming surfaces, but every later decision (cycles, hot reload, IDE indexing, reproducibility) becomes harder. Python, ESM, and CommonJS show how much complexity propagates from this one choice.
 
-A baseline chosen early in a language's design often leans toward the first family for source-level semantics — static imports, explicit exports, no cycles, deterministic resolution — and toward Rust-style layered package/module identity for the second. The runtime, dynamic-loading, and capability-scoped concerns can be deferred to later versions as long as the initial design does not foreclose them: flat module identity preserves the option of hot reload, typed interfaces preserve the option of capability scoping, and explicit visibility preserves the option of artifact-boundary encapsulation.
+The second is **where the artifact boundary sits relative to the typed module boundary** (§13, §15.10). Rust's source-level distribution, Java's JAR-as-module, .NET's assembly, Swift's framework with Library Evolution, and the Wasm Component Model with WIT all answer this differently. When the artifact boundary is also the typed interface boundary, capability scoping (§13.3, `MEMORY.md §10`) and resilient ABI evolution (§9.1) become natural; when artifacts are merely byproducts of source builds, both have to be reinvented in tooling.
 
-The strongest cross-cutting lesson from this survey is that **module-system retrofits are uniformly painful**. JPMS took 22 years; C++20 modules are still rolling out a decade after specification work began; Python's import system has accumulated decades of `__path__` and namespace-package patches; Node spent years reconciling CommonJS with ESM. The new-language opportunity is to commit to a module system from version 1 — even a simple one — that sets up the right invariants (static graph, explicit exports, deterministic resolution, layered package identity) so that later additions are extensions rather than rewrites.
+The third is **the lockfile and content-hash convergence** (§12.1). Modern ecosystems are converging on content-addressed lockfiles whether the underlying registry is centralized (Cargo, Hex), URL-shaped (Go), or hermetic (Nix, Guix). A new package manager that ships without one will be retrofitting it within a few years; the only real choice is whether reproducibility lives at the lockfile layer or all the way down in the build derivation.
+
+The fourth is **how reflective and ocap concerns shape the rest** (§7.5, §13.3, §15.11). A module system that decides early whether reflection is permitted, restricted, or first-class — and whether ambient authority crosses module boundaries — gets capability-scoped modules and disciplined frameworks for free. A system that defers the question accumulates `opens`-style escape hatches (JPMS), `InternalsVisibleTo` patches (.NET), and reflection-permission frameworks that the original module design did not anticipate.
+
+A defensible baseline leans toward the static-graph family for source-level semantics and Rust-style layered package/module identity for the packaging concern; runtime, dynamic-loading, and capability-scoped properties can be added later if early choices do not foreclose them (flat identity preserves hot reload; typed interfaces preserve capability scoping; explicit visibility preserves artifact-boundary encapsulation).
+
+The strongest cross-cutting lesson is that module-system retrofits are uniformly painful (JPMS, C++20, Python's import patches, the CJS/ESM reconciliation). Committing to a module system from version 1 — even a simple one — with the right invariants (static graph, explicit exports, deterministic resolution, layered package identity) makes later additions extensions rather than rewrites.
 
 ---
 
@@ -2188,6 +2045,10 @@ References are grouped by the chapter that first cites them. Within each chapter
 8. Node.js Packages — Subpath exports — https://nodejs.org/api/packages.html#exports
 9. npm `package.json` reference — https://docs.npmjs.com/cli/v10/configuring-npm/package-json
 10. Node.js Conditional exports — https://nodejs.org/api/packages.html#conditional-exports
+11. Deno modules documentation — https://docs.deno.com/runtime/fundamentals/modules/
+12. JSR — JavaScript Registry — https://jsr.io/docs
+13. Deno security and permissions — https://docs.deno.com/runtime/fundamentals/security/
+14. Deno blog — JSR Q4 update — https://deno.com/blog/jsr_q4
 
 ### Chapter 7 — JVM and .NET Module Systems
 
@@ -2244,31 +2105,33 @@ References are grouped by the chapter that first cites them. Within each chapter
 23. F# — Component design guidelines — https://learn.microsoft.com/en-us/dotnet/fsharp/style-guide/component-design-guidelines
 24. Crystal — Requiring files — https://crystal-lang.org/reference/syntax_and_semantics/requiring_files.html
 25. Pony — Packages — https://tutorial.ponylang.io/packages/
-26. Zig 0.11 release notes — Package management — https://ziglang.org/download/0.11.0/release-notes.html#Package-Management
-27. Raku — Modules — https://docs.raku.org/language/modules
-28. Raku — Distributions: configuration and structure — https://docs.raku.org/language/distributions/configuration-structure
-29. Raku — Compilation and module loading — https://docs.raku.org/language/compilation
-30. zef package installer — https://github.com/ugexe/zef
-31. fez/zef ecosystem and auth — https://deathbyperl6.com/fez-zef-a-raku-ecosystem-and-auth/
-32. Forth-2012 — Search-Order word set — https://forth-standard.org/standard/search
-33. Gforth manual — Word Lists — https://gforth.org/manual/Word-Lists.html
-34. Gforth manual — Wordlists and Search Order Tutorial — https://gforth.org/manual/Wordlists-and-Search-Order-Tutorial.html
-35. Gforth manual — Why use word lists? — https://www.complang.tuwien.ac.at/forth/gforth/Docs-html-history/0.6.2/Why-use-word-lists-.html
-36. Factor — Vocabularies tour — https://docs.factorcode.org/content/article-tour-vocabularies.html
-37. Factor — Vocabulary loader — https://docs.factorcode.org/content/article-vocabs.loader.html
-38. Factor — Vocabulary roots — https://docs.factorcode.org/content/article-vocabs.roots.html
-39. Factor — `USE:` syntax — https://docs.factorcode.org/content/word-USE__colon__%2Csyntax.html
-40. D Language — Modules specification — https://dlang.org/spec/module.html
-41. D Language — Visibility attributes — https://dlang.org/spec/attribute.html#visibility_attributes
-42. D Language — Conditional compilation (`version`) — https://dlang.org/spec/version.html
-43. DUB package manager — https://dub.pm/
-44. Lean 4 — Setting up Lean — https://lean-lang.org/lean4/doc/setup.html
-45. Theorem Proving in Lean 4 — Interacting with Lean — https://lean-lang.org/theorem_proving_in_lean4/interacting_with_lean.html
-46. Lean 4 — What's new — https://lean-lang.org/lean4/doc/whatsnew.html
-47. Lean Community / Mathlib — https://leanprover-community.github.io/
-48. R — Writing R Extensions: Package namespaces — https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Package-namespaces
-49. R Packages (Wickham & Bryan) — Namespace chapter — https://r-pkgs.org/namespace.html
-50. CRAN Repository Policy — https://cran.r-project.org/web/packages/policies.html
+26. Raku — Modules — https://docs.raku.org/language/modules
+27. Raku — Distributions: configuration and structure — https://docs.raku.org/language/distributions/configuration-structure
+28. Raku — Compilation and module loading — https://docs.raku.org/language/compilation
+29. zef package installer — https://github.com/ugexe/zef
+30. fez/zef ecosystem and auth — https://deathbyperl6.com/fez-zef-a-raku-ecosystem-and-auth/
+31. Forth-2012 — Search-Order word set — https://forth-standard.org/standard/search
+32. Gforth manual — Word Lists — https://gforth.org/manual/Word-Lists.html
+33. Gforth manual — Wordlists and Search Order Tutorial — https://gforth.org/manual/Wordlists-and-Search-Order-Tutorial.html
+34. Gforth manual — Why use word lists? — https://www.complang.tuwien.ac.at/forth/gforth/Docs-html-history/0.6.2/Why-use-word-lists-.html
+35. Factor — Vocabularies tour — https://docs.factorcode.org/content/article-tour-vocabularies.html
+36. Factor — Vocabulary loader — https://docs.factorcode.org/content/article-vocabs.loader.html
+37. Factor — Vocabulary roots — https://docs.factorcode.org/content/article-vocabs.roots.html
+38. Factor — `USE:` syntax — https://docs.factorcode.org/content/word-USE__colon__%2Csyntax.html
+39. D Language — Modules specification — https://dlang.org/spec/module.html
+40. D Language — Visibility attributes — https://dlang.org/spec/attribute.html#visibility_attributes
+41. D Language — Conditional compilation (`version`) — https://dlang.org/spec/version.html
+42. DUB package manager — https://dub.pm/
+43. Lean 4 — Setting up Lean — https://lean-lang.org/lean4/doc/setup.html
+44. Theorem Proving in Lean 4 — Interacting with Lean — https://lean-lang.org/theorem_proving_in_lean4/interacting_with_lean.html
+45. Lean 4 — What's new — https://lean-lang.org/lean4/doc/whatsnew.html
+46. Lean Community / Mathlib — https://leanprover-community.github.io/
+47. R — Writing R Extensions: Package namespaces — https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Package-namespaces
+48. R Packages (Wickham & Bryan) — Namespace chapter — https://r-pkgs.org/namespace.html
+49. CRAN Repository Policy — https://cran.r-project.org/web/packages/policies.html
+50. Mojo packages manual — https://docs.modular.com/mojo/manual/packages/
+51. Mojo structs manual — https://docs.modular.com/mojo/manual/structs/
+52. Mojo parameters / parametric types — https://docs.modular.com/mojo/manual/parameters/
 
 ### Chapter 10 — Research and Advanced Module Calculi
 
@@ -2300,6 +2163,9 @@ References are grouped by the chapter that first cites them. Within each chapter
 26. Agda — Record types — https://agda.readthedocs.io/en/latest/language/record-types.html
 27. Idris 2 — Modules and namespaces — https://idris2.readthedocs.io/en/latest/tutorial/modules.html
 28. Idris 2 — Interfaces — https://idris2.readthedocs.io/en/latest/tutorial/interfaces.html
+29. Carbon module design — https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/modules.md
+30. Carbon language repository — https://github.com/carbon-language/carbon-lang
+31. Carbon — code and name organization — https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/code_and_name_organization/README.md
 
 ### Chapter 11 — Dynamic Loading, Plugins, and Hot Module Replacement
 

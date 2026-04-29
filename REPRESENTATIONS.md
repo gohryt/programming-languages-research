@@ -14,51 +14,65 @@ This chapter names the recurring axes along which representations differ. None o
 
 ### 1.1. Tree vs Graph
 
-A program can be represented as a tree (one parent per node, no shared substructures) or as a graph (multiple parents allowed, sharing or cycles possible). Trees are easier to traverse, serialize, and reason about structurally — every traversal terminates, and every node has a unique path from the root. Graphs allow shared subexpressions (hash consing), cyclic dependency representations (def-use chains in SSA), and richer structural identities, at the cost of needing visitor logic that handles repeated visits.
+A tree allows one parent per node and no sharing; a graph allows multiple parents, hash-consed sharing, or cyclic def-use edges. Trees are easier to traverse, serialize, and reason about structurally; graphs admit shared subexpressions and richer structural identity at the cost of visitor logic that handles repeated visits.
 
-The classical pipeline trees-then-graphs reflects this: parsers emit trees (ASTs are usually trees), and middle-end IRs convert to graphs (SSA def-use chains, sea-of-nodes, e-graphs). Some representations sit in the middle: rowan's red-green trees (§2.2) are trees in the green layer but allow structural sharing of identical subtrees as a storage policy.
+The classical trees-then-graphs pipeline reflects this: parsers emit trees, middle-end IRs convert to graphs (SSA def-use, sea-of-nodes, e-graphs). Some forms sit between — rowan's red-green trees (§2.2) are trees that share identical subtrees as a storage policy.
 
 ### 1.2. Mutable vs Immutable
 
-A mutable representation is updated in place by transformation passes; an immutable one is rebuilt as a new value each time it changes. Mutable IRs (LLVM IR, GCC GIMPLE, V8 TurboFan) optimize for in-pass throughput — passes can rewrite instructions, replace operands, and fold subgraphs without allocating new nodes. Immutable IRs (Roslyn green nodes, Lean 4 persistent arrays, Salsa memoized values) optimize for incrementality, equality-by-identity, and concurrent access — the same value can be shared across compilation queries without locking.
+Mutable IRs are rewritten in place by passes (LLVM IR, GCC GIMPLE, V8 TurboFan) and optimize for in-pass throughput. Immutable IRs are rebuilt as new values (Roslyn green nodes, Lean 4 persistent arrays, Salsa memoized values) and optimize for incrementality, equality-by-identity, and concurrent sharing without locking.
 
-The trade-off is real: mutable IRs are faster for throughput-oriented batch compilation; immutable IRs are nearly mandatory for query-based incremental compilers (`COMPILERS.md §18`) and content-addressed systems (§12 here).
+The trade-off: mutable IRs are faster for throughput-oriented batch compilation; immutable IRs are nearly mandatory for query-based incremental compilers (`COMPILERS.md §18`) and content-addressed systems (§12 here).
 
 ### 1.3. Pointer-Rich vs Flat-Arena
 
-A pointer-rich representation links nodes by heap pointers — every parent holds child pointers, every traversal dereferences. A flat-arena representation stores nodes in contiguous arrays and links by indices into those arrays; child references become `u32` offsets, not 64-bit pointers. Flat-arena designs (Cuik postfix, Zig token-indexed, struct-of-arrays AST in `PARSERS.md §3.3`) halve memory footprint, improve cache locality, and make serialization trivial — at the cost of traversal indirection through an arena base pointer and the need for explicit lifetime management of the arena.
+Pointer-rich IRs link nodes by 64-bit heap pointers; flat-arena IRs store nodes contiguously and link by 32-bit offsets into the arena. Flat layouts (Cuik postfix, Zig token-indexed, struct-of-arrays ASTs in `PARSERS.md §3.3`) halve edge cost, improve cache locality, and make serialization trivial, at the cost of arena lifetime management.
 
-The choice is most consequential for ASTs, where node counts run into millions on large codebases. SSA IRs are pointer-rich more often because the optimizer needs to reroute references frequently; an arena layout would force more rewrite work.
+The choice matters most for ASTs (millions of nodes on large codebases). SSA IRs tend to stay pointer-rich because optimizers reroute references frequently and an arena would force more rewrite work.
 
 ### 1.4. Typed vs Untyped
 
-A typed representation carries enough information for the type of every value/operand to be checked or inferred. LLVM IR is typed (every value has an `i32`, `i64`, `<4 x float>`, etc.); WebAssembly is typed; JVM bytecode is typed at instruction granularity. An untyped representation leaves type information to side metadata or doesn't track it — Forth's data stack is untyped, raw assembly is untyped, dynamic-language bytecodes are partly typed (CPython tracks reference cells but not the underlying values).
+Typed representations carry enough information to check the type of every operand. LLVM IR, WebAssembly, and JVM bytecode are typed at instruction granularity. Untyped forms (Forth's data stack, raw assembly, partially-typed dynamic bytecodes) push verification cost onto consumers.
 
-Typed representations enable verification (Wasm validation, JVM bytecode verification), aggressive optimization (LLVM's type-based alias analysis), and better tooling. Untyped representations are simpler and more flexible but push verification and analysis cost onto consumers.
+Typed IRs enable verification (Wasm validation, JVM verifier), aggressive alias analysis, and better tooling; untyped forms are simpler and more flexible.
 
 ### 1.5. Single-Level vs Multi-Level
 
-A single-level representation has one IR — LLVM IR (mostly), Cranelift CLIF, LuaJIT IR. A multi-level representation is a *cascade* of progressively-lowered IRs, each tuned to a phase: Rust's HIR → THIR → MIR → LLVM IR (§10.3), GHC's Core → STG → Cmm (§10.4), Mojo's KGEN parametric layer → POP dialect → LLVM dialect (§5.4). MLIR (§10.1) industrialized this pattern with first-class dialects that can coexist in one module and lower progressively.
+A single-level IR has one form (LLVM IR, Cranelift CLIF, LuaJIT IR). A multi-level cascade chains progressively-lowered IRs, each tuned to a phase, as in Rust's HIR → THIR → MIR → LLVM IR (§10.3), GHC's Core → STG → Cmm (§10.4), or as in Mojo (KGEN parametric layer → POP dialect → LLVM dialect, §5.4). MLIR (§10.1) generalizes the pattern.
 
-The trade-off is engineering simplicity vs per-phase optimality. A single-level IR has one set of passes, one set of analyses, one printer. A multi-level cascade lets each level be tuned to what its consumers need (HIR for type inference, THIR for pattern-match exhaustiveness, MIR for borrow checking) at the cost of translation layers between them.
+Trade-off: engineering simplicity vs per-phase optimality. A cascade tunes each level (HIR for inference, THIR for exhaustiveness, MIR for borrow checking) at the cost of translation layers.
 
 ### 1.6. Source-Faithful vs Lowered
 
-A source-faithful representation preserves features visible in the source: comments, whitespace, original control structures (`if`/`while`/`for` rather than CFG jumps), parenthesization, original variable names. A lowered representation discards these for analysis convenience: scopes flatten into linear blocks, structured control becomes branches, names become numeric identifiers.
+Source-faithful representations preserve comments, whitespace, structured control, and original names. Lowered forms flatten scopes into blocks, replace structured control with branches, and rename to numeric IDs.
 
-The dichotomy is design-meaningful because some tools require fidelity. Source-to-source transformers (refactoring tools, formatters, deobfuscators) must round-trip back to readable source — Roslyn (§2.1), rowan (§2.2), SwiftSyntax (§2.3), and Google JSIR (§5.10) all preserve enough information for this. Optimizers can discard fidelity for analysis power. Hybrid designs (Hermes HIR, Mojo KGEN, JSIR's `jshir` dialect) preserve some structure for specific phases while still admitting lowering.
+Fidelity matters whenever a tool round-trips back to source: refactoring, formatting, deobfuscation. Roslyn (§2.1), rowan (§2.2), SwiftSyntax (§2.3), and Google JSIR (§5.10) all preserve enough for this. Hybrid designs (Hermes HIR, Mojo KGEN, JSIR's `jshir`) keep structure for specific phases while still admitting lowering.
 
 ### 1.7. Persistent vs Ephemeral
 
-A persistent representation lives across compilation sessions: stored on disk, content-addressed, queryable later. Unison's hashed AST (§12.1) is the extreme case — code identity is the hash, not a name. Salsa's memoized values (§12.2) persist across queries within a single rust-analyzer session. Lean 4's persistent arrays (§12.3) survive across elaborator invocations. An ephemeral representation lives only during one compilation pass — most LLVM IR uses are like this.
+A persistent representation lives across compilation sessions: stored on disk, content-addressed, or queryable later (Unison's hashed AST §12.1, Salsa's memoized values §12.2, Lean 4's persistent arrays §12.3). Ephemeral IRs live only during one pass.
 
-Persistence enables incremental compilation, distributed builds, content-addressed sharing, and reproducibility. The cost is that every IR change must be considered as a schema migration; persistent IRs cannot be reorganized as freely as in-memory ones.
+Persistence enables incremental compilation, distributed builds, and reproducibility; the cost is that every IR change becomes a schema migration.
+
+### 1.8. Axis-to-Chapter Mini-Index
+
+| Axis | Most relevant chapters |
+|---|---|
+| Tree vs Graph | §2 (lossless trees), §6 (SSA), §8 (e-graphs) |
+| Mutable vs Immutable | §2 (red-green), §12 (persistent IRs) |
+| Pointer-Rich vs Flat-Arena | §3 (AST layouts), §15 (target-adjacent) |
+| Typed vs Untyped | §6 (typed SSA), §9 (typed bytecode), §11 (effect/region-typed) |
+| Single-Level vs Multi-Level | §5, §10 (cascades), §15 (target-adjacent split) |
+| Source-Faithful vs Lowered | §2 (CSTs), §4 (high-level IRs) |
+| Persistent vs Ephemeral | §12 (persistent), §15.5 (DEX install-time AOT) |
 
 ---
 
 ## 2. Concrete Syntax Trees and Lossless Representations
 
 A concrete syntax tree (CST) preserves every token, every comment, every piece of trivia from the source. Lossless trees take this further: byte-exact round-tripping is a guarantee, not a hope. The chapter's distinguishing axis is *what mechanism enforces the lossless property*: structural sharing of immutable green nodes (Roslyn, rowan), full-fidelity byte-level retention (SwiftSyntax), or schema-derived APIs that make trivia a first-class field on every node (ASDL, ungrammar). All entries serve tooling — refactoring, formatting, IDE navigation, code generation — where fidelity to the original source is mandatory and any lossy detail is a bug.
+
+A recurring theme is *the schema as the ground truth*: when the tree shape lives in one specification (ASDL §2.7, ungrammar §3.7), every consumer (visitors, accessors, serializers) is generated from it rather than reinvented per consumer.
 
 ### 2.1. Roslyn Red-Green Trees (C#)
 
@@ -80,7 +94,7 @@ Sources: https://github.com/rust-analyzer/rowan and https://rust-analyzer.github
 
 Apple's SwiftSyntax is the official syntax library for Swift, modelled on Roslyn red-green but with explicit *byte-exact round-trip* as a first-party API guarantee. Every comment, every space, every token is preserved through the tree and re-serializable to the exact original bytes. This is stronger than rowan's default — rowan preserves trivia but byte-exactness depends on the printer.
 
-The reason for the stronger guarantee: SwiftSyntax is the boundary for Swift macros (SE-0382, SE-0389, Swift 5.9+). A user-written macro receives a SwiftSyntax tree and returns one; compile then continues with the rewritten tree. If round-trip were lossy, every macro expansion would silently mangle source. The cost is that every macro plugin compiles a non-trivial SwiftSyntax dependency into its binary, which has been a recurring source of macro build-time complaints in Xcode.
+The reason for the stronger guarantee: SwiftSyntax is the boundary for Swift macros (SE-0382, SE-0389, Swift 5.9+). A user-written macro receives a SwiftSyntax tree and returns one; compile then continues with the rewritten tree. If round-trip were lossy, every macro expansion would silently mangle source. The cost is that every macro plugin compiles a non-trivial SwiftSyntax dependency into its binary, which inflates per-plugin build cost.
 
 Sources: https://github.com/swiftlang/swift-syntax and https://github.com/swiftlang/swift-evolution/blob/main/proposals/0389-attached-macros.md
 
@@ -110,9 +124,7 @@ Source: https://www.oilshell.org/blog/2017/02/11.html
 
 ### 2.7. ASDL — Abstract Syntax Description Language
 
-ASDL (Wang, Appel, Korn, Serra; 1997) is a language for describing tree-shaped data with sums, products, and optional fields. From one ASDL file, generators emit typed Python, C, C++, ML, or Java accessors. CPython's `Python.asdl` defines the canonical Python AST shape; Oil/OSH derived its lossless tree from ASDL; SML/NJ used it internally; CompCert uses an ASDL-like spec for its IR languages.
-
-The contribution that earns it a place here is *the schema as the ground truth*. Without a schema, every consumer of an AST has to reinvent its node taxonomy and carry its drift over time. With ASDL, the tree shape is one file — visitors, traversals, and serializers are generated from it. This is the same design philosophy as ungrammar (§3.7), but two decades older.
+ASDL (Wang, Appel, Korn, Serra; 1997) is a language for describing tree-shaped data with sums, products, and optional fields. From one ASDL file, generators emit typed Python, C, C++, ML, or Java accessors. CPython's `Python.asdl` defines the canonical Python AST shape; Oil/OSH derived its lossless tree from ASDL; SML/NJ used it internally; CompCert uses an ASDL-like spec for its IR languages. ASDL predates ungrammar (§3.7) by two decades and occupies the same design slot.
 
 Sources: https://www.cs.princeton.edu/research/techreps/TR-554-97 and https://docs.python.org/3/library/ast.html
 
@@ -180,7 +192,7 @@ Source: https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.ht
 
 ### 3.8. RakuAST — Class-Based AST as Compiler Frontend
 
-Rakudo's RakuAST replaces the QAST-based front-end with an AST whose nodes are Raku classes under the `RakuAST::` package: `RakuAST::StatementList`, `RakuAST::Call::Name`, etc. `.AST` parses to objects, `.DEPARSE` round-trips back to source, and `IMPL-TO-QAST` lowers to the runtime IR.
+Rakudo's RakuAST replaces the QAST-based front-end with an AST whose nodes are Raku classes under the `RakuAST::` package: `RakuAST::StatementList`, `RakuAST::Call::Name`, etc. (QAST = the older Q Abstract Syntax Tree, the runtime IR shared between NQP — "Not Quite Perl," the bootstrap subset that implements Rakudo — and Raku.) `.AST` parses to objects, `.DEPARSE` round-trips back to source, and `IMPL-TO-QAST` lowers to QAST for execution.
 
 The radical move: AST nodes are *first-class language objects*. User macros construct, traverse, and rewrite syntax with the same tools used to manipulate any other Raku object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) become available for runtime debuggers and packaging. Cross-references: `PARSERS.md §6.3` (Rakudo grammars), `COMPILERS.md §6.8` (RakuAST → QAST lowering), `COMPILERS.md §14.5` (MoarVM new-disp), and `TYPES.md §6.6` for the surrounding type-object / role / subset world that makes this representation unusually natural in Raku. The cost: every AST traversal goes through full language object dispatch, with measurable allocation pressure during compilation.
 
@@ -226,9 +238,9 @@ Source: https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/s
 
 ### 4.5. Hermes HIR (Hermes IR)
 
-Meta's Hermes JavaScript engine has its own multi-level IR: a high-level IR (HIR) that retains JS semantics (closures, scopes, hoisting), and a lower-level Hermes Bytecode (HBC, §9.11) that the engine actually executes. HIR is SSA-form; HBC is a register-based bytecode tuned for fast load on resource-constrained devices (React Native targets).
+Meta's Hermes JavaScript engine lowers JS to a high-level IR (HIR) before emitting Hermes Bytecode (HBC, §9.11). HIR is SSA-form with JS-aware operations that retain enough source semantics — closures, lexical scopes, hoisting, `arguments` materialization, `try`/`catch` regions — for the optimizer to reason about them before they are flattened into register-based bytecode. The optimizer runs eager type narrowing, dead-code elimination, scope flattening, and stack-promotion of captured variables on HIR; only afterwards does lowering to HBC's register form happen.
 
-HIR's distinctive design choice: it's optimized for *ahead-of-time* compilation, unlike V8's IRs which are JIT-oriented. Hermes precompiles JS to HBC at app build time and ships only HBC to devices, eliminating parse and compile cost at startup. The HIR layer lets Hermes apply JS-aware optimizations (eager type narrowing, dead-code elimination) before lowering to bytecode.
+Two HIR-level details worth recording. First, HIR carries enough scope information to decide *which captured variables can become stack slots* rather than living on a heap-allocated `Environment`; this is the Hermes-specific equivalent of escape analysis on closures. Second, HIR is what makes `Function.prototype.toString` and similar JS reflective features survivable across optimization: the bytecode emitter consults HIR-level annotations to recover source-faithful behaviour for the few APIs that demand it. The shipping-model framing — HIR runs at app build time, not on device, and only HBC is shipped — is in §9.11.
 
 Source: https://github.com/facebook/hermes/tree/main/lib/Optimizer
 
@@ -236,7 +248,7 @@ Source: https://github.com/facebook/hermes/tree/main/lib/Optimizer
 
 In the GraalVM Truffle framework, the language implementer writes an *AST interpreter* — but the AST is also the IR. Partial evaluation specializes the AST against observed types and values, producing an effectively-compiled version of the same tree. There is no separate IR phase; the AST nodes carry inline caches, profiling, and specialization metadata that make them executable both interpretively and (after Graal partial evaluation) as native code.
 
-This is the Futamura projection (§COMPILERS.md §1.3) made concrete: the partial evaluator (Graal) plus the interpreter (the AST + node specializations) is the compiler. Truffle's contribution is showing that the same data structure can be both the source-faithful AST and the optimization substrate, eliminating a translation layer.
+This is the Futamura projection (`COMPILERS.md §1.3`) made concrete: the partial evaluator (Graal) plus the interpreter (the AST + node specializations) is the compiler. Truffle's contribution is showing that the same data structure can be both the source-faithful AST and the optimization substrate, eliminating a translation layer.
 
 Source: https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/
 
@@ -258,7 +270,7 @@ Mid-level IRs are where most analysis and optimization happens: name-resolved, t
 
 rustc's MIR is the borrow checker's native IR. CFG of basic blocks; statements are simple three-address operations; terminators are explicit (`Goto`, `SwitchInt`, `Drop`, `Call`, `Return`). Every variable has explicit drop semantics, every borrow has a region, every reference carries the lifetime that reaches it. Pattern matching is fully desugared to chains of comparisons.
 
-MIR was introduced in 2016 specifically because borrow checking on the AST had become unmaintainable — non-lexical lifetimes (NLL) and later Polonius (`MEMORY.md §1.2`) require a flow-sensitive representation. MIR's CFG gave the borrow checker a clean substrate, and const-eval, drop elaboration, exhaustiveness checking, and miri (`DEBUGGERS.md §8.8`) all became cleaner on MIR than they were on the AST. Lowering to LLVM IR happens after MIR-level passes complete.
+MIR was introduced in 2016 to give borrow checking a flow-sensitive substrate. The successor checkers — non-lexical lifetimes (NLL) and Polonius (the next-generation borrow checker, formulated in Datalog; full treatment in `MEMORY.md §1.2`) — both rely on MIR's CFG shape, as do const-eval, drop elaboration, exhaustiveness checking, and miri (Rust's interpreter for unsafe-code soundness checking; see `DEBUGGERS.md §8.8`). Lowering to LLVM IR happens after MIR-level passes complete.
 
 Sources: https://rustc-dev-guide.rust-lang.org/mir/index.html and https://blog.rust-lang.org/2016/04/19/MIR.html
 
@@ -294,35 +306,38 @@ The two architectural details: BIR is *cached as a linking artifact* — each pa
 
 Source: https://medium.com/ballerina-techblog/peering-into-the-ballerina-intermediate-representation-8e97361a070e
 
+### 5.6–5.9. Speculative JS/PHP JIT IRs
+
+§§5.6–5.9 describe four mid-tier optimizing JIT IRs sharing a common shape: SSA with JS/PHP-aware ops, speculative type guards, and explicit deoptimization metadata at every speculative point. They differ in operand encoding, the size of the speculation vocabulary, and what each carries to support tier transitions. Tier orchestration (when each tier is invoked, how OSR transitions are scheduled, when to recompile) belongs in `COMPILERS.md §14` (`§14.2` for OSR/deopt mechanics specifically); this chapter records the data model only.
+
+| IR | Operand encoding | SSA shape | Deopt-metadata layout | Defining ops |
+|---|---|---|---|---|
+| IonMonkey MIR/LIR (§5.6) | Pointer-rich nodes | Two-IR: high-level MIR + lower LIR | Snapshot per side-exit, with operand mapping back to bytecode locals | `MAdd`, `MGuardShape`, `MCall` |
+| V8 Maglev (§5.7) | Dense indexed | Single-level SSA, fewer node kinds than TurboFan | Per-operation deopt info inline | speculative ops bail to Sparkplug |
+| JSC DFG (§5.8) | SSA values + explicit dataflow edges | Mid-tier between Baseline and FTL/B3 | Explicit OSR exit nodes carrying register state | Speculative type guards |
+| HHVM HHIR (§5.9) | Region-scoped SSA | Generated from a region (connected hot subgraph) of HHBC, not whole functions | Side-exit metadata pointing back to HHBC offsets | PHP/Hack dynamic-dispatch ops |
+
 ### 5.6. SpiderMonkey IonMonkey MIR / LIR
 
-SpiderMonkey's IonMonkey (Firefox's optimizing JS JIT) uses two IR levels: a **MIR** (Mid-level IR, unrelated to Rust's MIR or LLVM's MIR) which is SSA-form with high-level JS-aware operations (`MAdd`, `MGuardShape`, `MCall`), and a lower **LIR** (Low-level IR) used for register allocation and machine-code emission.
-
-MIR's role is the JS-specific optimizer — type specialization, range analysis, allocation sinking, redundant guard elimination. The handover to LIR happens after IonMonkey decides instructions are stable; LIR is closer to the target ISA but still abstracted enough to support multiple architectures. The two-IR design predates V8's Turboshaft (§6.5) and addresses the same problem: separating high-level transformation from target-specific scheduling.
+SpiderMonkey's IonMonkey uses two IR levels: a **MIR** (Mid-level IR, unrelated to Rust's MIR or LLVM's MIR) of SSA-form with JS-aware operations (`MAdd`, `MGuardShape`, `MCall`), and a lower **LIR** (Low-level IR) for register allocation and machine-code emission. MIR carries deopt snapshots at every guard so a failed speculation can resume into baseline code. The two-IR split predates V8's Turboshaft (§6.5) and addresses the same separation between high-level transformation and target-specific scheduling. Tier orchestration: see `COMPILERS.md §14` (and `§14.2` for OSR/deopt details).
 
 Source: https://wiki.mozilla.org/IonMonkey
 
 ### 5.7. V8 Maglev IR
 
-V8's Maglev is a mid-tier optimizing JIT inserted between Sparkplug (baseline) and TurboFan (full optimizer). Its IR is SSA-form but designed for *speed of compilation*, not depth of optimization — Maglev's selling point is that it produces good-enough code in a fraction of TurboFan's compile time, hitting steady-state performance early.
-
-Maglev's IR carries explicit deopt metadata at every speculative operation, so when an assumption fails the runtime can bail out to Sparkplug code. The IR is intentionally less expressive than TurboFan's sea-of-nodes (§6.4) — fewer node kinds, fewer optimizations, simpler CFG. The trade-off favours JIT-compile-time over peak throughput, which fits the "warm path" workload where Maglev typically runs.
+Maglev's IR is single-level SSA with dense indexed operands, fewer node kinds than TurboFan's sea-of-nodes (§6.4), and explicit deopt info inline at each speculative op. The data model is intentionally less expressive than TurboFan; the trade-off favours compile speed over peak quality. Failed speculations bail to Sparkplug rather than to the interpreter, which is why Maglev's deopt metadata records *baseline-frame* state rather than full bytecode-pointer state — the deopt layout is co-designed with the tier directly below it. The single-level shape (no separate LIR) and the linear node table both reflect the same priority: keep the IR small enough that compile time fits between a function getting hot and the user noticing latency. Maglev's place in V8's tier pipeline (between Sparkplug and TurboFan/Turboshaft) lives in `COMPILERS.md §14` (`§14.2` covers the OSR/deopt mechanics that the inline deopt info ultimately feeds).
 
 Source: https://v8.dev/blog/maglev
 
 ### 5.8. JavaScriptCore DFG (Data Flow Graph)
 
-JavaScriptCore's DFG is a mid-tier optimizing JIT IR, named for its data-flow-graph structure (SSA + explicit dataflow edges). DFG uses *speculative type guards* aggressively: every operation checks observed types and deoptimizes to baseline interpretation if assumptions fail. The IR carries explicit OSR exit points so the runtime can transition cleanly between optimization tiers.
-
-DFG sits between LLInt (interpreter), Baseline (template JIT), DFG (mid-tier optimizer), and FTL (Faster Than Light, the top-tier B3 SSA optimizer). The four-tier design is deliberate: each tier compiles fast enough to take over from the one below before the upper tier becomes a startup-latency bottleneck.
+DFG is SSA with explicit dataflow edges and aggressive speculative type guards. Each guard records an *OSR exit* (On-Stack Replacement: the mechanism that transitions execution between tiers without unwinding) carrying enough register and stack state to resume in the lower tier. JSC's four tiers — LLInt (interpreter), Baseline (template JIT), DFG (mid-tier), FTL (Faster Than Light, the top tier built on B3, JSC's lower-level SSA optimizer) — are covered orchestration-wise in `COMPILERS.md §14`, with the OSR-exit mechanism itself in `§14.2`.
 
 Source: https://webkit.org/blog/3362/introducing-the-webkit-ftl-jit/
 
 ### 5.9. HHVM HHIR (HipHop Intermediate Representation)
 
-HHVM's HHIR is the IR for Hack and PHP. SSA-form, with HHVM-specific operations modelling dynamic dispatch, magic methods, weak typing, and reference semantics. HHIR is the substrate for HHVM's optimizing JIT (Tier 2+); the lower bytecode (HHBC, §9.10) is what the interpreter and baseline JIT consume.
-
-The distinctive feature: HHIR is generated from a *region* (a connected subgraph of the bytecode) rather than from whole functions. Region-based JIT compilation, popularized by Hauswirth and Pemberton's earlier work, lets the JIT focus optimization effort on the specific control-flow paths that are actually hot, sidestepping the cost of optimizing entire functions where most basic blocks are cold.
+HHIR is region-scoped SSA: it's generated from a *region* (a connected subgraph of HHBC, HHVM's bytecode, §9.10) rather than from whole functions. Side-exit metadata maps back to HHBC offsets so failed speculations resume in the interpreter or baseline JIT. PHP/Hack dynamic dispatch, magic methods, weak typing, and reference semantics ride as HHIR-specific ops. Region-JIT orchestration: see `COMPILERS.md §14` (and `§14.2` for the deopt/side-exit transitions HHIR's metadata feeds).
 
 Source: https://github.com/facebook/hhvm/tree/master/hphp/runtime/vm/jit
 
@@ -330,7 +345,7 @@ Source: https://github.com/facebook/hhvm/tree/master/hphp/runtime/vm/jit
 
 Google's JSIR is an MLIR-based JavaScript IR designed for *source-to-source* analysis: deobfuscation, taint analysis, and decompilation of Hermes bytecode back to readable JS. The dual-dialect design (`jsir` for SSA values, `jshir` for high-level structured control flow as MLIR regions) is what distinguishes it from optimizer-oriented JS IRs (Maglev, DFG, IonMonkey MIR).
 
-Specifically: `jshir` represents `if`/`while`/`for`/`logical_expression` as MLIR regions rather than CFG jumps, so the original control-flow structure is preserved. L-value vs r-value separation is explicit (`identifier_ref` vs `identifier`). Round-trip back to the Babel AST is claimed at 99.9%+ success, achieved via post-order traversal mapping that recursively reconstructs AST nesting from use-def chains. JSIR underpins Google's CASCADE LLM-powered deobfuscator (arXiv:2507.17691).
+Specifically: `jshir` represents `if`/`while`/`for`/`logical_expression` as MLIR regions rather than CFG jumps, so the original control-flow structure is preserved. L-value vs r-value separation is explicit (`identifier_ref` vs `identifier`). Status (as of 2025-07): round-trip back to the Babel AST is reported at 99.9%+ success, achieved via post-order traversal mapping that recursively reconstructs AST nesting from use-def chains. JSIR underpins Google's CASCADE LLM-powered deobfuscator (arXiv:2507.17691).
 
 The lesson generalizes: an IR designed for *security analysis* — taint propagation, dataflow tracking, source recovery — has different fidelity requirements than an IR designed for codegen. JSIR shows MLIR's region machinery accommodating both: structured control as regions for source fidelity, SSA values for dataflow.
 
@@ -364,13 +379,13 @@ HotSpot's C2 (server-tier JIT) uses Cliff Click's Sea-of-Nodes IR: a graph where
 
 The cost is that the IR is harder to print, debug, and reason about than linear SSA, and global scheduling on every pass adds compile-time overhead. HotSpot accepts these costs because peak code quality matters more for long-running server workloads. The same IR style appears in V8 TurboFan (§6.4) and Graal — all server-tier JITs that prioritize peak throughput.
 
-Sources: Click (1995) "From Quads to Graphs" and https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html
+Source: https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html (Click's 1995 "From Quads to Graphs" paper is in the chapter 6 References.)
 
 ### 6.4. V8 TurboFan
 
-TurboFan is V8's classical optimizing JIT, also Sea-of-Nodes. Layered atop the base SoN, TurboFan adds *type system specialization* (Number vs String vs JSObject), inline caches feedback (call sites embedded with observed types), and deoptimization metadata (every speculative operation knows how to bail to Ignition bytecode if assumptions fail).
+TurboFan is V8's classical optimizing JIT, also Sea-of-Nodes. Layered atop the base SoN, TurboFan adds *type system specialization* (Number vs String vs JSObject), inline-cache feedback (call sites embedded with observed types), and deoptimization metadata (every speculative operation knows how to bail to Ignition bytecode if assumptions fail).
 
-For a decade TurboFan was V8's only optimizer; it was replaced (or supplemented) by Turboshaft (§6.5) starting in 2022. The reason for replacement: TurboFan's SoN graph made compilation slow, and JS workloads often need many short-lived optimizations rather than deep peak quality. The trade-off illustrates that Sea-of-Nodes is analytically elegant but operationally expensive at JIT scale.
+Status (as of 2026-04): TurboFan is being progressively replaced by Turboshaft (§6.5), an effort the V8 team began in 2022 and that has migrated most pipelines through 2024–2026. The motivation — SoN compile-time cost on JS workloads — illustrates that Sea-of-Nodes is analytically elegant but operationally expensive at JIT scale. Tier orchestration: see `COMPILERS.md §14` (and `§14.2` for OSR/deopt mechanics).
 
 Source: https://v8.dev/blog/launching-ignition-and-turbofan
 
@@ -378,7 +393,7 @@ Source: https://v8.dev/blog/launching-ignition-and-turbofan
 
 Turboshaft is V8's replacement for TurboFan's Sea-of-Nodes IR. Where TurboFan stored operations in a graph with implicit ordering, Turboshaft keeps operations in *straight-line basic blocks* with dense indexed operand references — closer to LLVM IR than to SoN. Operations live in a flat buffer with fixed-size slots; operands are 32-bit indices rather than pointers.
 
-The motivation was concrete: SoN compile time was 30–40% of total V8 JIT time on the affected pipelines, debugging was hard because program order was implicit, and cache locality suffered from pointer-chasing. Turboshaft's linear shape eliminates global scheduling per pass and gives pass authors predictable iteration behaviour. The team reported 30–40% compile-time reduction with parity-or-better code quality.
+Status (as of 2026-04): the V8 team reports a 30–40% compile-time reduction relative to TurboFan with parity-or-better code quality on the migrated pipelines, with debugging easier because program order is explicit and cache locality improved by removing pointer-chasing. Turboshaft's linear shape eliminates global scheduling per pass and gives pass authors predictable iteration behaviour.
 
 Source: https://v8.dev/blog/turboshaft
 
@@ -476,9 +491,9 @@ Source: https://github.com/egraphs-good/egglog
 
 ### 8.3. Cranelift e-Graph Mid-End
 
-Cranelift adopted egg-based e-graphs for its mid-end optimizer in 2022, replacing its previous peephole-rewriter. The rewriter's rules — strength reduction, algebraic identities, GVN — express as ISLE (`COMPILERS.md §13.2`) patterns over the e-graph. The acyclic-egraph (aegraph) variant Cranelift uses is a restricted form of e-graph that disallows cycles, making extraction easier.
+Cranelift's mid-end is built around the *aegraph* (acyclic e-graph): a restricted form of e-graph that disallows cycles, making extraction tractable. Rewrite rules — strength reduction, algebraic identities, GVN — express as ISLE patterns matching against the aegraph. Optimization-pipeline framing belongs in `COMPILERS.md §1.4`; here the data-structure point is that the aegraph trades some expressiveness for predictable extraction, and that every rewrite preserves the original alongside the new form (so memory cost grows with rewrite depth).
 
-As of 2025, this is the largest production deployment of e-graphs. Trade-offs: e-graphs use more memory than mutable IRs (every rewrite preserves the original alongside the new form), and extraction has to choose among equivalent programs. Cranelift's choice of acyclic e-graphs accepts some expressiveness loss for predictable extraction.
+Status (as of 2026-04): widely cited as the largest production deployment of e-graphs.
 
 Source: https://github.com/bytecodealliance/rfcs/blob/main/accepted/cranelift-egraph.md
 
@@ -506,9 +521,9 @@ Source: https://docs.oracle.com/javase/specs/jvms/se21/html/
 
 ### 9.2. CIL (.NET Common Intermediate Language)
 
-CIL is .NET's bytecode, also stack-based, also typed. ECMA-335 standardizes the format. CIL adds features JVM bytecode lacks: explicit value types (structs that don't allocate on the heap), generics (preserved through CIL rather than erased), unsafe pointer types, and tail-call instructions. The runtime (CoreCLR) JIT-compiles CIL to native via RyuJIT.
+CIL is .NET's bytecode, sharing JVM's (§9.1) stack-based, typed, verifiable shape (ECMA-335). The deltas worth recording are what CIL adds beyond JVM: explicit value types (structs that don't heap-allocate), reified generics (preserved through CIL rather than erased), unsafe pointer types, and tail-call instructions. The runtime (CoreCLR) JIT-compiles CIL via RyuJIT.
 
-CIL's design philosophy: "the runtime is a target, not a translator." Source languages (C#, F#, VB.NET, IronPython, IronRuby) compile to CIL with as little semantic loss as possible — generic information, attribute metadata, and debug symbols all flow through. The runtime's job is to JIT these features efficiently, not to lower them.
+The design philosophy is "the runtime is a target, not a translator": source languages (C#, F#, VB.NET, IronPython, IronRuby) compile to CIL with as little semantic loss as possible, and the runtime JITs the features rather than the front-end lowering them away.
 
 Source: https://ecma-international.org/publications-and-standards/standards/ecma-335/
 
@@ -546,9 +561,9 @@ Source: https://peps.python.org/pep-0659/
 
 ### 9.7. MoarVM MAST and MoarVM Bytecode
 
-MoarVM (Raku's VM) has two bytecode levels. **MAST** (MoarVM Abstract Syntax Tree) is the high-level abstract bytecode that NQP and Raku compile to. **MoarVM bytecode** (often called MBC) is the lower-level executable form — register-based, with operations modeling Raku's rich semantics (multi-dispatch, multiple integers, parameter handling, container types).
+MoarVM (Raku's VM) has two bytecode levels. **MAST** (MoarVM Abstract Syntax Tree) is the high-level abstract bytecode that NQP and Raku compile to. **MoarVM bytecode** (often called MBC) is the lower-level executable form — register-based, with operations modeling Raku's rich semantics (multi-dispatch, multiple integer kinds, parameter handling, container types).
 
-The two-level design lets MAST be the stable target for Raku's compiler while MBC is free to evolve. MoarVM's spesh and new-disp subsystems (`COMPILERS.md §14.4`, `§14.5`) operate on MBC, specializing it for observed types. The lego JIT (`§13.5`) and expression JIT (`§9.1`) consume MBC and emit native code.
+The two-level design lets MAST be the stable compile target while MBC evolves. The RakuAST → QAST → MAST → MBC compile chain is covered from the AST angle in §3.8; spesh and new-disp specialization live in `COMPILERS.md §14.4`, `§14.5`.
 
 Source: https://github.com/MoarVM/MoarVM/blob/master/docs/bytecode.markdown
 
@@ -570,17 +585,17 @@ Source: https://docs.kernel.org/bpf/
 
 ### 9.10. HHBC (HHVM Bytecode)
 
-HHVM's HHBC (HipHop Bytecode) is the bytecode for Hack and PHP. Register-based (or rather, partially register- and stack-based — HHBC has both), with operations modeling PHP's dynamic dispatch, weak typing, magic methods, and reference semantics. HHBC is what HHVM's interpreter (LLInt) and baseline JIT execute; HHIR (§5.9) is the higher-level IR for the optimizing JIT.
+HHVM's HHBC (HipHop Bytecode) is the bytecode for Hack and PHP. It's hybrid register/stack — some operands ride a small operand stack, some name registers — with PHP-specific ops for dynamic dispatch, weak typing, magic methods, and reference semantics. HHBC is what the interpreter (LLInt) and baseline JIT execute; HHIR (§5.9) is the higher-level IR for the optimizing JIT.
 
-HHBC's notable feature: the bytecode encodes type observations (which call sites observed which types) inline, so the JIT can speculate based on the bytecode itself. This lets the JIT be invoked in a "warm" state — it doesn't need to re-collect type observations because the bytecode already contains them.
+The notable feature is that HHBC encodes *type observations* inline (which call sites saw which types). The JIT can speculate from the bytecode without re-collecting observations, letting it start "warm."
 
 Source: https://github.com/facebook/hhvm/blob/master/hphp/doc/bytecode.specification
 
 ### 9.11. Hermes HBC
 
-Hermes Bytecode is the executable form of Meta's Hermes JavaScript engine (used in React Native). HBC is generated *ahead of time* on developer machines, not at runtime — the React Native build process compiles JS to HBC and ships only HBC to devices. This is unusual for JS engines (V8 ships parse+compile to runtime); Hermes' AOT model is what enables fast app startup on resource-constrained mobile devices.
+Hermes Bytecode is the executable form of Meta's Hermes JavaScript engine (used in React Native). HBC is register-based and compact like the other entries in this chapter; what makes it distinctive is the *shipping model*. Hermes precompiles JS to HBC at app build time and ships only HBC to devices, not source — unusual among JS engines. There is no JIT; HBC is interpreted.
 
-HBC is register-based, compact, and designed for fast load and execution rather than for repeated JIT optimization (Hermes is interpreter-only by default; there's no JIT). The trade-off: Hermes JS code runs 5–10× slower than V8 once warm, but starts 30–50% faster cold — the right trade for a mobile bundler. Cross-reference: §4.5 covers Hermes HIR (the higher level Hermes lowers from before HBC).
+The trade-off: Hermes JS code runs 5–10× slower than V8 once warm, but starts 30–50% faster cold — the right trade for a mobile bundler. Status (as of 2026-04): figures match the public Hermes design notes; Hermes remains JIT-less, while V8/JSC continue to add tiers, so the steady-state gap is unlikely to close. Cross-references: §4.5 (Hermes HIR, the higher level Hermes lowers from before HBC); `COMPILERS.md §14` for tier orchestration in JS engines generally (Hermes's no-JIT choice is the limit case of that tier-design space).
 
 Source: https://github.com/facebook/hermes/blob/main/doc/Design.md
 
@@ -646,17 +661,15 @@ Source: https://elsman.com/mlkit/
 
 ### 11.2. Koka — Effect Type System in IR
 
-Koka's IR threads effect types through every binding (§7.5). The representation: every function arrow is `a -> <effects> b`; every let-binding's type carries the effects of the bound expression. The optimizer uses effects to decide what's safe to reorder (`<>` pure expressions can be moved freely; effectful expressions cannot cross effect boundaries).
-
-Effect types as IR annotations make Koka's optimizer simpler than a heuristic equivalent: no separate purity analysis is needed because the types are the analysis. The cost is that the IR is more complex than untyped or simply-typed alternatives, and effect inference adds compile-time overhead.
+Representation layout: Koka's arrow type carries an effect row, `a -> <effects> b`, and every let-binding's type records the effects of its right-hand side. The optimizer reads this row to decide reorderings (`<>` pure expressions move freely; effectful ones cannot cross effect boundaries). See §7.5 for the surrounding direct-style ANF context. The effect-system semantics — row polymorphism, handler typing, evidence passing — live in `TYPES.md` (effect systems chapter).
 
 Source: https://www.microsoft.com/en-us/research/publication/algebraic-effects-handlers-go-mainstream/
 
 ### 11.3. Linear Haskell — Multiplicity-Annotated IR
 
-GHC's Linear Haskell (`-XLinearTypes`, GHC 9.0+) puts multiplicities on the function arrow: `a %1 -> b` is a linear function (must consume its argument exactly once); `a %m -> b` is multiplicity-polymorphic. The IR (an extended Core) carries these multiplicities through every binding.
+Representation layout: GHC's Linear Haskell puts multiplicities on the function arrow — `a %1 -> b` is linear (consume exactly once), `a %m -> b` is multiplicity-polymorphic. The IR is an extended Core that carries multiplicities on every binding alongside its existing type and kind machinery.
 
-The implementation cost in GHC was small (~1,150 lines) because the multiplicities ride on top of Core's existing type machinery. The contribution: linear types, which had been kept out of mainstream functional languages for thirty years, became a Core extension rather than a separate language. Cross-reference: `MEMORY.md §1.11` covers Linear Haskell from the resource-discipline angle.
+Status (as of GHC 9.0+, available since 2021-02): the GHC implementation cost was small (~1,150 lines, per the paper) because multiplicities ride on top of Core's existing type infrastructure. Type-system semantics: see `TYPES.md`. Resource-discipline framing: `MEMORY.md §1.11`.
 
 Source: https://arxiv.org/abs/1710.09756
 
@@ -670,9 +683,9 @@ Source: https://granule-project.github.io/
 
 ### 11.5. Idris 2 — Quantitative Type Theory IR
 
-Idris 2's IR uses Quantitative Type Theory (QTT, McBride 2016): every binder has a multiplicity 0 / 1 / ω, where 0 = erased at runtime, 1 = used exactly once, ω = unrestricted. This unifies linearity *and* erasure: types are 0-quantity (no runtime cost), runtime values are 1 or ω, and the compiler eliminates 0-quantity values during compilation.
+Representation layout: every binder carries a multiplicity from {0, 1, ω}. 0-quantity values are erased before runtime; 1-quantity values must be used exactly once; ω-quantity values are unrestricted. Both type-level data and erased proof witnesses ride as 0; runtime values are 1 or ω.
 
-QTT's contribution to the IR landscape: a single multiplicity dimension subsumes both Granule's grades and traditional erasure markers. The IR is simpler than carrying both as separate annotations, while expressing the same things. Cross-reference: `MEMORY.md §1.12` covers Idris 2 from the language-design angle.
+The IR-design contribution is that one multiplicity dimension subsumes both Granule's grades (§11.4) and traditional erasure markers, keeping the IR simpler than carrying them as separate annotations. Type-theory background (QTT, McBride 2016): see `TYPES.md`. Memory/resource framing: `MEMORY.md §1.12`.
 
 Source: https://idris2.readthedocs.io/
 
@@ -691,6 +704,22 @@ RustBelt's λRust (Jung et al., POPL 2018) is a formal IR for Rust subset, defin
 This is the IR-as-formal-artifact extreme: λRust is not compiled and run; it's defined and reasoned about. Yet it counts as a language representation because it captures what Rust *means* mathematically, and every other Rust-related verifier (Verus, Prusti, Creusot, Aeneas, RefinedRust) builds atop or adjacent to it. Cross-reference: `MEMORY.md §8.1` covers RustBelt from the formal-soundness angle.
 
 Source: https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf
+
+### 11.8. Verification Intermediate Languages — Boogie, Viper, WhyML, F\* / Low\*
+
+§§11.6–11.7 cover verification-typed IRs (Verus, RustBelt). The complementary representation family is the **verification intermediate language** (VIL): an IR designed not to be compiled but to be discharged by a theorem prover. The same architectural principle as MLIR (§10.1) — multiple frontend languages share one mid-level substrate — but applied to verification rather than codegen. Each entry below is the lingua franca of an entire verifier ecosystem.
+
+**Boogie** (Microsoft Research, K. Rustan M. Leino, 2007+) is the workhorse VIL: an imperative language with first-class procedures, modifies clauses, pre/post-conditions, axioms, and assertions, designed to be the target of higher-level verifiers. **Spec#** compiles to Boogie; **VCC** (verifying C compiler) compiles to Boogie; **Dafny** (`TYPES.md §7.5`) compiles to Boogie; **Chalice** compiles to Boogie; **Move Prover** (Diem/Aptos blockchain verification) compiles to Boogie. Each frontend translates its surface language into Boogie's imperative-with-assertions IR and lets Boogie's verification condition generator + Z3 (or other SMT solvers) discharge the proof obligations. The IR-design lesson: a small imperative VIL with built-in modifies clauses scales to verifying tens of thousands of lines of source code per frontend.
+
+**Viper / Silver** (ETH Zurich, Schwerhoff, Müller et al., 2015+) is the **separation-logic equivalent**: an imperative VIL where assertions are separation-logic predicates with explicit ownership transfer (`acc(x.f, write)` is "the program holds write-permission to field f of x"). **Prusti** (`MEMORY.md §8.4`) compiles Rust to Viper; **Nagini** compiles annotated Python to Viper; **VerCors** compiles Java/PVL to Viper; **Gobra** compiles Go to Viper. The frontends share Viper's permission-based reasoning rather than reinventing it per language. Distinct from Boogie: Viper has separation logic primitives in the core language, where Boogie axiomatises them via per-frontend encodings.
+
+**WhyML** (Why3, INRIA — Filliâtre, Marché, Paskevich, 2010+) is the **functional VIL**: a purely-functional ML-like language with refinement types and ghost code, used by **Frama-C** (C verification via the C-to-WhyML compiler), **SPARK** (Ada verification), and **Creusot** (`MEMORY.md §8.5` — Rust verification via prophetic borrows). WhyML's distinctive choice is **multi-prover backend dispatch**: a single Why3 verification condition is offered to Z3, CVC4/CVC5, Alt-Ergo, Vampire, and Coq simultaneously, with the user choosing which prover to pursue per goal. This makes Why3 robust to per-prover regressions and lets users combine SMT speed with interactive-prover precision on hard goals.
+
+**F\* Low\* / KaRaMeL pipeline** (Project Everest) is the systems-verification VIL family (covered from the verification-result side in `MEMORY.md §8.9`). F\* is the surface language with effects and refinement; **Low\*** (ICFP 2017) is the C-extractable subset with a stack/heap memory model; **KaRaMeL** (formerly KreMLin) extracts Low\* programs to readable C. The IR-design lesson is that **a verification-focused IL paired with a code-extractable subset gives both proof and production binary from one source** — HACL\*, EverCrypt, EverParse, and the Linux kernel WireGuard implementation all ship via this pipeline.
+
+The architectural lesson generalising these four: **separating the verification IL from the surface language is the right scaling move**. Each surface language compiles to one of these VILs, the VILs themselves are stable enough to maintain over decades, and prover advancements (Z3, CVC5) propagate to all frontends simultaneously. Compare MLIR's dialect framework (§10.1): the shape is the same — one framework hosting multiple frontend translations into a small set of mid-level substrates — applied to verification rather than compilation.
+
+Sources: https://github.com/boogie-org/boogie and https://www.pm.inf.ethz.ch/research/viper.html and https://why3.lri.fr/ and https://github.com/FStarLang/karamel and https://www.cs.cmu.edu/~aldrich/courses/17-355-19sp/notes/notes-Boogie.pdf
 
 ---
 
@@ -726,7 +755,7 @@ Source: https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h
 
 ## 13. Domain-Specific / Non-Traditional IRs
 
-Some representations are not general-purpose IRs but encode a specific domain — instruction selection, scheduling, syntactic analysis, security verification, image-processing pipelines. The chapter's distinguishing axis is *what kind of computation the representation describes*: a rewrite system (ISLE, Datalog, SmPL, Stratego), a separation of concerns (Halide algorithm/schedule), a syntax schema (ungrammar, ASDL), a specification (TLA+), or a hardware model (ISLA). All earn their place because they show that "language representation" extends well beyond compiler IRs.
+Some representations are not general-purpose IRs but encode a specific domain — instruction selection, scheduling, syntactic analysis, security verification, image-processing pipelines, neural-network compilation. The unifying axis across this chapter is that each entry is a *non-traditional artifact that plays an IR-like role in its domain*: it's the structure that downstream tools consume, query, and rewrite, even when it isn't a CFG of typed instructions. The sub-axis is *what kind of computation the representation describes*: a rewrite system (ISLE, Datalog, SmPL, Stratego), a separation of concerns (Halide algorithm/schedule), a syntax schema (ungrammar, ASDL), a formal specification (TLA+), a hardware model (ISLA), a non-traditional encoding (Bril JSON), or a tensor-graph compilation IR (TVM Relay/TIR, PyTorch FX, StableHLO). The reason for grouping them together is that each shows "representation" extending well beyond compiler IRs.
 
 ### 13.1. ISLE — Cranelift Instruction-Selection DSL
 
@@ -738,11 +767,7 @@ Source: https://github.com/bytecodealliance/wasmtime/blob/main/cranelift/codegen
 
 ### 13.2. ungrammar — CST Schema as Representation
 
-ungrammar (covered in §3.7 above) is also worth naming as a domain-specific representation: it represents a *syntax schema* in a form that generators can consume. The schema is the code; visitors, tree types, and accessors are emitted from it. This is the "schema as ground truth" pattern at the syntactic level.
-
-The contribution is the same as ASDL's: separating tree-shape design from parser implementation. ungrammar is more recent and more closely tied to rowan/rust-analyzer; ASDL is older and more language-agnostic. Both occupy the same design slot.
-
-Source: https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html
+See §3.7. ungrammar is listed in this chapter as a domain-specific representation because the schema *is* the IR — visitors, tree types, and accessors are generated from one file. ASDL (§2.7) is the older, more language-agnostic variant.
 
 ### 13.3. Datalog as Program Representation — Soufflé
 
@@ -762,7 +787,7 @@ Source: https://coccinelle.gitlabpages.inria.fr/website/
 
 ### 13.5. TLA+ Specifications as IRs
 
-TLA+ specifications are not IRs in the compilation sense — TLA+ is a specification language for concurrent and distributed systems, not a programming language. But the specifications themselves are representations: state machines with explicit invariants, expressed in mathematical logic, queryable by the TLC model checker.
+TLA+ is a *specification language*, not an IR proper — it describes concurrent and distributed system semantics for human and tool reasoning, not for compilation. It is included here because the specifications themselves are representations: state machines with explicit invariants, expressed in mathematical logic, queryable by the TLC model checker.
 
 The connection to IRs: TLC produces a finite-state model from the spec, and its outputs (state graphs, counterexample traces) are themselves representations the user navigates. TLA+ Toolbox's Trace Explorer (`DEBUGGERS.md §12.1`) treats counterexamples as interactive debuggable artifacts. The lesson: a specification language can play an IR-like role for verification tools.
 
@@ -794,9 +819,23 @@ Source: https://github.com/rems-project/isla
 
 ### 13.9. Bril — JSON-Encoded IR
 
-Bril (introduced in §6.8) deserves a second mention here for its distinctive *encoding choice*: JSON. Most IRs have a textual or binary form; Bril's wire format is JSON. Tools, optimizers, and analyzers can be written in any language that can parse JSON — Python, JavaScript, Rust, OCaml, Haskell. The didactic point is that an IR's representation can itself be a non-traditional choice that lowers the barrier to participation.
+See §6.8 for the full treatment. Bril is listed in this chapter because the *wire format itself is the IR* (JSON, parseable from any language) — a non-traditional encoding choice that fits this chapter's "domain-specific / non-traditional" framing.
 
-Source: https://capra.cs.cornell.edu/bril/
+### 13.10. AI Compiler IR Family — TVM Relay/TIR, PyTorch FX, StableHLO
+
+The AI compiler ecosystem has evolved a representation family largely separate from the LLVM/MLIR mainstream, optimised for tensor-shape inference, operator fusion, autotuning, and cross-hardware deployment. Three IRs anchor the space.
+
+**Apache TVM Relay/TIR** (Chen, Moreau, Jiang et al. — OSDI 2018) is the most-deployed open-source DL compiler IR. The two-level design splits responsibilities. **Relay** is a high-level functional IR with first-class tensors, ADTs, gradient operators, and shape polymorphism: a Relay program looks like a typed lambda calculus where every value is a tensor or a tensor-producing function. **TIR (Tensor IR)** is the low-level loop-and-buffer IR with explicit memory hierarchies, suitable for hardware-target codegen via `Schedule` transformations. The architectural lesson is **schedule-as-IR-transformation** (echoing Halide §13.7): a TIR program plus a schedule produces target-specific code, and the schedule space can be searched (AutoTVM, MetaSchedule, Ansor) for performance. TVM's Relay→TIR lowering is the canonical example of "two-level IR with separation of algorithm and schedule" applied to whole neural networks rather than single kernels.
+
+**PyTorch FX** (Reed, James, Fei, et al., 2021; PyTorch 1.8+) is the graph-based PyTorch IR for `torch.compile`. FX captures the forward computation as a `torch.fx.GraphModule`, a Python-level symbolic trace of the model, with each tensor op as a node. The distinguishing property is that **FX traces user Python code** (via dynamic-trace plus symbolic-shape inference) rather than requiring users to write in a constrained DSL. This is the same trade-off as JAX's `jit` (also trace-based) versus TVM/XLA's structured IR — FX prioritises ease of adoption over expressivity. FX is the substrate for **TorchInductor** (the `torch.compile` backend), for FX-based quantisation, partitioning, and pipeline-parallelism transformations, and for `torch.export` (the graph-export-to-stable-format path). The limitation is that traced graphs are *specialised to the input shapes seen at trace time*; recompilation triggers when shapes change beyond marked dynamic dims.
+
+**StableHLO** (Google, OpenXLA, 2023+) is the portable successor to XLA's HLO (`COMPILERS.md §15.5`). The design goal is a **versioned, MLIR-defined operator set** that frontend frameworks (JAX, PyTorch via `torch.export`, TensorFlow, ONNX) can target as a stable interchange format, decoupling them from XLA backend evolution. StableHLO is to AI compilers what SPIR-V (`COMPILERS.md §15.4`) is to GPU compilers: a portable IR that lets frontend and backend evolve independently. The op set is small (~150 ops), each with a precise spec covering shape inference, broadcasting semantics, and numerical behaviour. Status (as of 2026-04): StableHLO is the OpenXLA-blessed exchange format, with `torch.export` to StableHLO emerging as the canonical PyTorch-to-XLA path; JAX produces StableHLO directly via `jax.export`.
+
+The design lesson generalises beyond AI: **a domain with rapid hardware evolution and many frontend frameworks needs a stable mid-level IR with versioned operator semantics**, separating frontend concerns (autodiff, dynamic shapes, model authorship) from backend concerns (codegen, scheduling, kernel fusion, hardware targeting). The split mirrors LLVM IR's role for general-purpose compilation but is specialised for tensor-graph workloads and shaped by the AI hardware diversity (NVIDIA / AMD / Apple / Google TPU / AWS Trainium / Cerebras / Groq) that no single backend can serve well.
+
+Cross-references: Triton (`COMPILERS.md §15.1`) is the kernel-level companion to TVM Relay/TIR — Triton is to GPU kernels what TIR is to whole-network compilation. Mojo's KGEN/POP (§5.4) is the parametric-IR alternative for the same workload class. MLIR (§10.1) underlies StableHLO and parts of TVM. Halide (§13.7) is the algorithm/schedule separation idea TVM TIR inherits.
+
+Sources: https://tvm.apache.org/docs/arch/relay_intro.html and https://pytorch.org/docs/stable/fx.html and https://openxla.org/stablehlo and https://arxiv.org/abs/1802.04799
 
 ---
 
@@ -804,27 +843,31 @@ Source: https://capra.cs.cornell.edu/bril/
 
 Forth's representation tradition is unlike anything in the compiler-IR mainstream. Programs are sequences of dictionary-entry references; "compilation" is concatenating addresses; "interpretation" is dispatching through them. The chapter's distinguishing axis is *how dispatch works*: indirect through an instruction-pointer table (DTC), through one extra indirection (ITC), or via subroutine calls (STC). The endpoint is colorForth and arrayForth, where the source representation IS the parsed program — no translation pass exists. Cross-reference: `COMPILERS.md §33` covers Forth implementations from the compiler angle; `TYPES.md §9.4` covers stack-effect type systems in the Forth/Factor family; `CONCURRENCY.md §7.5` covers Forth-family multitasking and channels. Here the focus is the direct-representation tradition.
 
+### 14.1–14.3. Threaded Code Dispatch (DTC, ITC, STC)
+
+The three classical Forth dispatch styles (DTC, ITC, STC) share a representation idea — a compiled word is a sequence of references to other words — and differ in *what each reference resolves to* and *who runs the dispatch*. Brad Rodriguez's "Moving Forth Part 1" is the canonical reference for all three.
+
+| Variant | What's stored per slot | Dispatch | Trade-off |
+|---|---|---|---|
+| Direct Threaded Code (§14.1) | Address of a machine-code routine | Inner loop: fetch → jump; each primitive ends with `NEXT` | Simplest, smallest representation; modern fallback in GForth/VFX when advanced techniques don't apply |
+| Indirect Threaded Code (§14.2) | Address of a code-field word, which itself points to machine code | One extra indirection in the inner loop | Lets user-defined words and primitives share a uniform dispatch shape; this is what makes `DOES>` (`COMPILERS.md §12.9`) transparent — `CREATE` allocates dictionary space and `DOES> @` installs a code field that fetches from that space |
+| Subroutine Threaded Code (§14.3) | A native `CALL` instruction | CPU's call/return machinery (no inner loop, no `NEXT`) | Larger code size (a `CALL` is 5 bytes on x86-64 vs an 8-byte address slot, but pays once per invocation); on modern branch predictors, STC's call/return pattern outperforms ITC/DTC. Used heavily by SwiftForth, VFX Forth, Mecrisp, zeptoforth (`COMPILERS.md §33.3`) |
+
 ### 14.1. Direct Threaded Code (DTC)
 
-In direct threaded code, a compiled Forth word is a sequence of *addresses of machine code routines*. The interpreter inner loop is "fetch next address, jump to it, the routine ends with NEXT which fetches the next address." Each primitive is implemented as machine code; the threaded code is just an array of pointers.
-
-DTC is the simplest Forth dispatch and the historical default. Modern Forths (GForth, VFX) use DTC for rapid prototyping and fall back to it when advanced techniques don't apply. The representation is exquisitely compact — a Forth program is literally a list of addresses, with no per-instruction overhead beyond the address itself.
+See the table above. DTC is the historical default and the simplest of the three: the threaded code is literally an array of machine-code addresses, with no per-instruction overhead beyond the address itself.
 
 Source: https://www.bradrodriguez.com/papers/moving1.htm
 
 ### 14.2. Indirect Threaded Code (ITC)
 
-Indirect threaded code adds one indirection: compiled words are sequences of addresses pointing to *code-field words* that themselves point to machine code. This level lets Forth treat user-defined words and primitives uniformly — both have a code field, and the code field is what the inner loop dispatches on.
-
-ITC enables `DOES>`, the operator that lets a user-defined word install custom behavior for words it creates (`COMPILERS.md §12.9`). A constant defined as `42 CONSTANT ANSWER` works because `CREATE` allocates dictionary space, and `DOES> @` installs a code field that fetches from that space. ITC's extra indirection is what makes this transparent.
+See the table above. ITC's extra indirection is what makes `DOES>` work uniformly: every word has a code field that the inner loop dispatches on, so primitives and user-defined words look identical to the dispatcher.
 
 Source: https://www.bradrodriguez.com/papers/moving1.htm
 
 ### 14.3. Subroutine Threaded Code (STC)
 
-In subroutine threaded code, a compiled word is a sequence of `CALL` instructions — actual machine-code call instructions, not data pointers. The CPU's call/return machinery does the dispatch; no inner loop, no NEXT routine. SwiftForth and VFX Forth use STC heavily; Mecrisp and zeptoforth do too.
-
-STC removes the dispatch overhead at the cost of larger code size (a `CALL` is 5 bytes on x86-64; a threaded-code address is 8 bytes — actually larger, but one execute removes a dispatch). On modern CPUs with deep branch predictors, STC's predictable call/return pattern is faster than ITC/DTC's data-driven dispatch. Cross-reference: `COMPILERS.md §33.3` covers SwiftForth.
+See the table above. STC replaces the threaded-code/`NEXT` model with native `CALL`/`RET`, letting the CPU's branch predictor do the work. SwiftForth: `COMPILERS.md §33.3`.
 
 Source: https://www.bradrodriguez.com/papers/moving1.htm
 
@@ -884,25 +927,17 @@ Source: https://github.com/bytecodealliance/wasmtime/tree/main/cranelift/codegen
 
 ### 15.4. WebAssembly as Target IR
 
-Wasm (§9.8) is target-adjacent in the sense that it's the executable form many compilers target. Rust, C/C++ (Emscripten), Go (TinyGo, GOARCH=wasm), AssemblyScript, Zig — all emit Wasm. The Wasm module is what runs.
-
-The implication: Wasm's design constraints (structured control, type validation, bounded memory) propagate back to source-language compilers. A Rust function compiled to Wasm cannot use arbitrary `goto`, cannot read uninitialized memory, cannot exceed Wasm's type system. The IR-to-target transition forces source-language designs to fit Wasm's shape.
-
-Source: https://webassembly.github.io/spec/core/
+See §9.8 for the bytecode itself. As a *target*, Wasm's design constraints — structured control flow, type validation, bounded linear memory — propagate back into source-language compilers (Rust, C/C++ via Emscripten, Go via TinyGo, AssemblyScript, Zig): a function compiled to Wasm cannot use arbitrary `goto`, read uninitialized memory, or escape Wasm's type system.
 
 ### 15.5. DEX as Target Form
 
-Android's DEX (§9.3) is target-adjacent for the Java/Kotlin compiler pipeline: javac/kotlinc emit JVM `.class` files, then the `d8` (or `dx`) tool translates them to DEX. ART then consumes DEX. The two-step (Java bytecode → DEX) reflects DEX's later arrival; modern Android tooling can emit DEX more directly.
-
-DEX as a *target* (not as an intermediate form) is what gives Android its install-time-AOT model: ART compiles DEX to native at install or first-run, caching the result in `/data/dalvik-cache`. The DEX-to-native compilation is fast (~seconds per app) because DEX is already register-based and analysis-friendly.
-
-Source: https://source.android.com/docs/core/runtime/dex-format
+See §9.3 for the bytecode itself. As a *target*, DEX is what underpins Android's install-time-AOT model: javac/kotlinc emit JVM `.class` files, `d8` (or older `dx`) translates them to DEX, and ART compiles DEX to native at install or first-run, caching the result in `/data/dalvik-cache`.
 
 ### 15.6. ELF / Mach-O / COFF as Program Representation
 
 Object file formats — ELF (Linux/BSD), Mach-O (macOS/iOS), COFF/PE (Windows) — are themselves program representations. Sections for text, data, BSS, debug info, symbol tables, relocations; metadata for build IDs, linker hints, code signing. The file is what the operating system loads and executes.
 
-For language designers, the object file format constrains what compilers can express. Stack-unwind tables (DWARF `.eh_frame`, SFrame, ORC), debug info (`.debug_*`), build IDs, symbol exports — all live in section conventions defined by the format. A new language emitting native code must speak ELF/Mach-O/COFF or rely on a backend (LLVM, Cranelift, GCC) that does.
+For language designers, the object file format constrains what compilers can express. Stack-unwind tables (DWARF `.eh_frame`, SFrame, ORC), debug info (`.debug_*`), build IDs, symbol exports — all live in section conventions defined by the format. A compiler emitting native code must speak ELF/Mach-O/COFF or rely on a backend (LLVM, Cranelift, GCC) that does.
 
 Sources: https://refspecs.linuxfoundation.org/elf/elf.pdf and https://github.com/aidansteele/osx-abi-macho-file-format-reference
 
@@ -1033,6 +1068,7 @@ Rows grouped by chapter, in chapter order. Each row's Examples column ends with 
 | Quantitative type theory | 0/1/ω multiplicity | Linearity + erasure unified | Idris 2 (§11.5) |
 | Three-mode IR (spec/proof/exec) | Erased ghost code in IR | Verification artifacts at zero runtime cost | Verus (§11.6) |
 | Mechanized λRust | Coq-defined IR with operational semantics | Soundness theorem substrate | RustBelt (§11.7) |
+| Verification intermediate language | Imperative or functional IL targeting SMT/proof assistants | Multiple frontends share one verification substrate | Boogie, Viper, WhyML, F\* Low\* (§11.8) |
 
 ### 16.11. Persistent and content-addressed IRs
 
@@ -1055,6 +1091,7 @@ Rows grouped by chapter, in chapter order. Each row's Examples column ends with 
 | Algorithm/schedule split | Image processing | Auto-tunable schedule space | Halide (§13.7) |
 | Sail ISA spec as IR | Hardware verification | Symbolic execution of ISA semantics | ISLA / CHERI (§13.8) |
 | JSON-encoded IR | Pedagogy | Minimal tooling barrier | Bril (§13.9) |
+| AI compiler IR family | Tensor-graph compilation | Two-level relay/TIR or trace-based or MLIR-versioned | TVM Relay/TIR, PyTorch FX, StableHLO (§13.10) |
 
 ### 16.13. Forth-style direct representations
 
@@ -1137,12 +1174,13 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 
 1. LLVM Language Reference Manual — https://llvm.org/docs/LangRef.html
 2. Cranelift source tree — https://github.com/bytecodealliance/wasmtime/tree/main/cranelift
-3. Sea of Nodes — Click "From Quads to Graphs" (Oracle archive) — https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html
-4. V8 — Launching Ignition and TurboFan — https://v8.dev/blog/launching-ignition-and-turbofan
-5. V8 Turboshaft blog — https://v8.dev/blog/turboshaft
-6. LuaJIT compiler design specification (freelists archive) — https://www.freelists.org/post/luajit/Compiler-Design-Specification
-7. GHC Cmm wiki — https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/cmm-type
-8. Bril (Cornell CS 6120) — https://capra.cs.cornell.edu/bril/
+3. Sea of Nodes (Oracle architect article on HotSpot C2) — https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html
+4. Click, Cliff (1995) "From Quads to Graphs" — original Sea-of-Nodes paper (PLDI 1995); not freely hosted online, cited by name.
+5. V8 — Launching Ignition and TurboFan — https://v8.dev/blog/launching-ignition-and-turbofan
+6. V8 Turboshaft blog — https://v8.dev/blog/turboshaft
+7. LuaJIT compiler design specification (freelists archive) — https://www.freelists.org/post/luajit/Compiler-Design-Specification
+8. GHC Cmm wiki — https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/cmm-type
+9. Bril (Cornell CS 6120) — https://capra.cs.cornell.edu/bril/
 
 ### Chapter 7 — CPS, ANF, and Functional IRs
 
@@ -1189,6 +1227,11 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 4. Idris 2 documentation — https://idris2.readthedocs.io/
 5. Verus repository — https://github.com/verus-lang/verus
 6. RustBelt POPL 2018 — https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf
+7. Boogie verifier project — https://github.com/boogie-org/boogie
+8. Viper / Silver project (ETH Zurich) — https://www.pm.inf.ethz.ch/research/viper.html
+9. Why3 home — https://why3.lri.fr/
+10. KaRaMeL (F\* extraction to C) — https://github.com/FStarLang/karamel
+11. Aldrich — Lecture notes on Boogie (CMU 17-355) — https://www.cs.cmu.edu/~aldrich/courses/17-355-19sp/notes/notes-Boogie.pdf
 
 ### Chapter 12 — Persistent and Content-Addressed IRs
 
@@ -1205,6 +1248,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 5. Spoofax language workbench — https://www.spoofax.dev/
 6. Halide — https://halide-lang.org/
 7. ISLA / Sail (CHERI) — https://github.com/rems-project/isla
+8. Apache TVM Relay introduction — https://tvm.apache.org/docs/arch/relay_intro.html
+9. PyTorch FX documentation — https://pytorch.org/docs/stable/fx.html
+10. StableHLO project (OpenXLA) — https://openxla.org/stablehlo
+11. Chen et al. — "TVM: An Automated End-to-End Optimizing Compiler for Deep Learning" (OSDI 2018) — https://arxiv.org/abs/1802.04799
 
 ### Chapter 14 — Forth-Style Direct Representations
 
