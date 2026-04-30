@@ -2,7 +2,7 @@
 
 This document collects the *ecosystem-level* layer that sits above source-language module systems: how packages are identified, resolved, distributed, versioned, locked, registered, and built. The companion document `MODULES.md` covers language-level module mechanisms — imports, visibility, naming, encapsulation, cycles, and dynamic loading — and treats the *source-level* concerns of how modules work as code artifacts. This file owns the *distribution* concerns of how packages cross machines, ecosystems, and time.
 
-The split exists because in production languages, source-level modularity and distribution-level packaging are usually distinct mechanisms even when they appear unified at first glance. Rust separates package, crate, and module identity. Go separates module path from package path. Python keeps import system and packaging ecosystem deliberately decoupled. Conflating the two in design leads to import behaviour that is too environment-sensitive for tools and package identity that is too weak for reproducibility — the worst of both worlds. Splitting them in this corpus reflects that production-language reality.
+The split exists because in production languages, source-level modularity and distribution-level packaging are usually distinct mechanisms even when they appear unified at first glance. Rust separates package, crate, and module identity. Go separates module path from package path. Python keeps import system and packaging ecosystem deliberately decoupled. Conflating the two in design tends to make import behaviour too environment-sensitive for tools and package identity too weak for reproducibility. Splitting them in this corpus reflects that production-language reality.
 
 Cross-references: language-level module concerns (imports, visibility, cycle policy, dynamic loading) live in `MODULES.md`. Compile-time graph invalidation and incremental compilation live in `COMPILERS.md §18`. Memory-safety and ownership concerns at the package boundary live in `MEMORY.md §10` (capability-based modularity).
 
@@ -20,7 +20,7 @@ Packaging adds several concerns that pure module systems do not address:
 - **Identity** — what makes two artifacts "the same" across machines and time. Path, registry name, content hash, signed manifest, or some combination.
 - **Resolution** — given a constraint set ("I need at least X version 2.x"), pick a concrete dependency tree. Greedy, SAT-based, MVS (Go's Minimal Version Selection), constraint-solver-based.
 - **Distribution** — how artifacts physically reach consumers. Central registry, decentralised URL, content-addressed CDN, vendored repository.
-- **Reproducibility** — given identical inputs, do all consumers get bit-identical builds? Lockfiles plus content hashes are the table-stakes mechanism.
+- **Reproducibility** — given identical inputs, do all consumers get bit-identical builds? Lockfiles plus content hashes are the baseline mechanism.
 - **Build orchestration** — how a package's source becomes its compiled artifact. Cargo, Maven, npm scripts, Bazel, Nix derivations.
 - **Workspace and monorepo support** — multiple packages developed together, shared lockfile, cross-package path references.
 
@@ -51,7 +51,7 @@ A module system manages source-level imports and visibility. A package manager h
 
 A language that does not consciously separate these roles often ends up with the worst of both worlds: imports that are too environment-sensitive for tooling and package identity that is too weak for reproducibility.
 
-This axis matters early in language design. If module identity and package identity are separated cleanly, source imports can remain stable while the package manager evolves independently. If they are fused, the package manager effectively becomes part of the language's naming semantics.
+This axis matters early in language design. If module identity and package identity are separated cleanly, source imports can remain stable while the package manager evolves independently. If they are fused, package-manager policy effectively becomes part of the language's naming semantics.
 
 ---
 

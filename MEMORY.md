@@ -2,27 +2,13 @@
 
 Research on compile-time and runtime memory disciplines — ownership and borrowing, region inference, reference-counting compilation, modern C++ safety initiatives, hardware tagging and capabilities, tracing GC architectures, allocators, formal verification of memory safety, concurrent reclamation, and capability-based authority.
 
-This document is the canonical owner for memory-model and memory-safety research. It spans both compile-time analyses and runtime systems: ownership and borrowing, regions, reference-counting compilation, tracing GC, allocators, hardware mechanisms, verified memory safety, concurrent reclamation, and capability-based authority. `COMPILERS.md §16` keeps only the compiler-pass view of selected techniques — where IR must expose ownership, regions, RC operations, or runtime checks so optimization can remove or lower them. Runtime execution coordination — schedulers, tasks, actors, channels, cancellation, STM, and I/O blocking boundaries — lives in `CONCURRENCY.md`; this file discusses those mechanisms only where they determine memory ownership, heap shape, reclamation, or data-race safety. Sanitizers as observability tools live in `TRACERS.md §8`; see `DEBUGGERS.md §8.8` for the operational aliasing model behind Miri, and see `MEMORY.md §8.11` for the formal-model side. Capability-based modularity at the binary boundary (Wasm Components, WASI worlds) is covered here from the authority angle and in `MODULES.md §11` from the module-system angle. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
+This document is the canonical owner for memory-model and memory-safety research. It spans both compile-time analyses and runtime systems: ownership and borrowing, regions, reference-counting compilation, tracing GC, allocators, hardware mechanisms, verified memory safety, concurrent reclamation, and capability-based authority. `COMPILERS.md §16` keeps only the compiler-pass view of selected techniques. Runtime execution coordination lives in `CONCURRENCY.md`; this file discusses those mechanisms only where they determine memory ownership, heap shape, reclamation, or data-race safety. Sanitizers as observability tools live in `TRACERS.md §8`. Capability-based modularity at the binary boundary is covered here from the authority angle and in `MODULES.md §11` from the module-system angle. The unifying axis across the chapters is *where the safety argument is paid for*: in source annotations, in the type system, in compile-time analysis, in runtime checks, in hardware tags, in formal proofs, or in the language's authority discipline.
 
 ---
 
 ## 1. Ownership and Borrowing — Compile-Time Aliasing Discipline
 
-Ownership systems make memory safety a static type-system property by enforcing aliasing rules at compile time. The distinguishing axis across entries is *what discipline replaces ambient mutable aliasing*:
-
-- **Rust** — "shared XOR mutable" with explicit lifetimes;
-- **Hylo** — no first-class references at all, via mutable value semantics;
-- **Mojo** — argument conventions with ASAP destruction;
-- **Swift** — exclusivity law layered on ARC;
-- **Austral** — pure linearity;
-- **Pony** — six-capability lattice;
-- **Linear Haskell** — multiplicity-polymorphic arrows;
-- **Idris 2 / Granule / Clean** — multiplicity, graded modal, and uniqueness systems.
-- **OxCaml** — modal types (locality / uniqueness / affinity) layered on OCaml's GC;
-- **Inko** — single ownership + Erlang-style processes;
-- **Move (Aptos/Sui)** — resource-types-with-abilities (the type-system perspective is canonical at `TYPES.md §12.5`); from a memory-discipline angle, Move's resources are the largest production deployment of linearity-as-asset-protection in any language, with a mandatory bytecode verifier enforcing the discipline at the trust boundary.
-
-Each picks a different point on the annotation-burden / inference-power / expressiveness triangle.
+Ownership systems make memory safety a static type-system property by enforcing aliasing rules at compile time. The distinguishing axis across entries is *what discipline replaces ambient mutable aliasing*: Rust's shared-versus-mutable borrowing, Hylo's mutable value semantics, Swift's exclusivity over ARC, Pony's reference capabilities, OxCaml's modal types over a GC'd language, Inko's single ownership plus processes, and Move's resource types. Each picks a different point on the annotation-burden / inference-power / expressiveness triangle.
 
 ### 1.1. Rust — Non-Lexical Lifetimes (NLL)
 
@@ -200,9 +186,9 @@ Sources: https://verdagon.dev/blog/regions-prototype and https://verdagon.dev/bl
 
 ### 2.7. ASAP — As-Static-As-Possible
 
-Raphaël Proust's **ASAP** (Cambridge PhD 2017) is fully automatic, *no annotations*, no GC: dataflow analyses (usage + aliasing) emit per-program-point deallocation instructions at compile time, falling back to bounded runtime scans only when static info is insufficient. Subsumes both linear types and Tofte–Talpin regions: given a linear/region-correct program, ASAP emits equivalent free instructions. Where static analysis can't decide, it inserts specialised scan-and-deallocate code (bounded, unlike a tracing GC).
+Raphaël Proust's **ASAP** (Cambridge PhD 2017) is fully automatic, with no annotations and no GC: dataflow analyses (usage + aliasing) emit per-program-point deallocation instructions at compile time, falling back to bounded runtime scans only when static info is insufficient. Subsumes both linear types and Tofte–Talpin regions: given a linear/region-correct program, ASAP emits equivalent free instructions. Where static analysis can't decide, it inserts specialised scan-and-deallocate code (bounded, unlike a tracing GC).
 
-Followed up by Nathan Corbyn's Cambridge Part II (2020) with an LLVM backend and benchmarks vs. Boehm GC. The most aggressive "no-annotation, no-GC" point in the design space.
+Followed up by Nathan Corbyn's Cambridge Part II (2020) with an LLVM backend and benchmarks vs. Boehm GC. It is the most aggressive no-annotation, no-GC point in the design space.
 
 Sources: https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-908.pdf and https://nathancorbyn.com/nc513.pdf
 
@@ -219,6 +205,16 @@ Not a region *language* feature but a *runtime* layout technique. Shahriyar, Bla
 Region granularity is independent of language-level region semantics — purely a layout/locality optimization. The lesson is that the same word means two different things in this chapter and chapter 6: programmer-visible regions vs. allocator-internal regions.
 
 Sources: https://www.steveblackburn.org/pubs/papers/rcix-oopsla-2013.pdf and http://arxiv.org/pdf/2210.17175v1
+
+### 2.10. Spegion — Implicit and Non-Lexical Regions with Sized Allocations
+
+Hughes, Vollmer, and Batty's **Spegion** (ECOOP 2025) revisits region-based memory management with three modern constraints: region lifetimes should be **implicit**, should be **non-lexical**, and should support **sized allocations** rather than assuming uniform heap cells. Classic Tofte–Talpin regions (§2.2) infer region structure but tie deallocation to lexical region scopes; this makes some natural allocation patterns impossible or forces data to remain live longer than necessary. Spegion loosens that shape by allowing region lifetimes to follow control-flow use rather than block nesting.
+
+The non-lexical aspect is the main bridge to Rust-style NLL (`MEMORY.md §1.1`): a region can become dead at the last use rather than at the end of the syntactic scope that introduced it. The sized-allocation aspect makes the calculus more implementation-facing than many classic region calculi, because real allocators care about object size classes, block reuse, and layout decisions.
+
+The lesson is that **region systems are not limited to lexical stack-shaped lifetimes**. A language can keep the bulk-free and no-tracing benefits of regions while moving toward flow-sensitive lifetimes familiar from modern borrow checking. Status (as of 2026-04): research-grade, but directly relevant to languages searching for a middle point between GC, ownership, and arena allocation.
+
+Sources: https://arxiv.org/abs/2506.02182 and https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.15
 
 ---
 
@@ -246,7 +242,7 @@ Sources: https://www.microsoft.com/en-us/research/wp-content/uploads/2023/07/flr
 
 ### 3.3. Lobster — Lifetime-Analysis Borrow-Check-Lite
 
-Wouter van Oortmerssen's **Lobster** is a statically-typed Python-ish language using flow-sensitive lifetime analysis to elide ~95% of RC ops at compile time, with a custom bump-style allocator for the rest. Lifetime analysis as a borrow checker lite: tracks ownership through flow-sensitive type inference and specialization, removing inc/dec on locally-scoped references entirely. Inline structs (zero-overhead values) plus race-less GIL-less multithreading via a distributed memory model — RC objects don't cross thread boundaries.
+Wouter van Oortmerssen's **Lobster** is a statically-typed Python-ish language using flow-sensitive lifetime analysis to elide ~95% of RC ops at compile time, with a custom bump-style allocator for the rest. Its lifetime analysis plays a borrow-checker-like role: it tracks ownership through flow-sensitive type inference and specialization, removing inc/dec on locally-scoped references entirely. Inline structs (zero-overhead values) plus race-free, GIL-free multithreading via a distributed memory model mean RC objects do not cross thread boundaries.
 
 Cycles are banned in practice; if leaked, reported at exit with a human-readable diagnostic. Cost is claimed within an order of magnitude of C, far above Python/Lua. The "leak report at exit" is a clever pragmatic move: the cycle problem is pushed back to the programmer, but with tooling support rather than silent leaks.
 
@@ -282,7 +278,7 @@ The C++ language-safety debate of 2024–2026 appears to have shifted toward **P
 
 ### 4.1. The Profiles vs Safe C++ Resolution (June 2025)
 
-Status (as of 2026-04): in June 2025 Sean Baxter publicly described Profiles as having won the committee argument and indicated Safe C++ (P3390) was no longer being continued. SG23 voted to prioritize Profiles over Safe C++. Profiles themselves also failed to forward to CWG for C++26 at Hagenberg (February 2025); the committee instead created a non-normative language safety white paper targeting compiler implementations behind flags before C++29.
+Status (as of 2026-04): in June 2025 Sean Baxter publicly described Profiles as having prevailed in the committee discussion and indicated Safe C++ (P3390) was no longer being continued. SG23 voted to prioritize Profiles over Safe C++. Profiles themselves also failed to forward to CWG for C++26 at Hagenberg (February 2025); the committee instead created a non-normative language-safety white paper targeting compiler implementations behind flags before C++29.
 
 The technical fault lines: the Profiles camp argues annotations should be exceptional and that most existing C++ can be made safer by recompilation plus restrictions plus library hardening, with viral `safe`/lifetime annotations rejected as unacceptable disruption. The Safe C++ camp argues that without language-level aliasing/exclusivity information, sound lifetime safety is impossible and Profiles risk replicating existing static analyzers without verifiable guarantees.
 
@@ -663,6 +659,26 @@ The architectural contribution is the **decoupling of runtime services from lang
 Status (as of 2026-04): actively maintained at github.com/eclipse-omr/omr; production via OpenJ9. The lesson: **a language designer building a new managed runtime should evaluate OMR + JitBuilder before writing GC and JIT from scratch**, much as a frontend designer evaluates LLVM before writing a backend. The cost is OMR's specific APIs and assumptions; the benefit is decades of production-tested GC and JIT engineering.
 
 Sources: https://github.com/eclipse-omr/omr and https://eclipse.dev/omr/starter/whatisomr.html and https://projects.eclipse.org/projects/technology.omr
+
+### 6.22. CRGC — Fault-Recovering Actor Garbage Collection in Pekko
+
+Plyukhin, Agha, and Montesi's **CRGC** (PLDI 2025) studies garbage collection in actor systems where failures and recovery are part of the programming model. Actor runtimes complicate ordinary GC because reachability is not only a heap graph question: actors own mailboxes, in-flight messages, supervision relationships, and failure/restart state. A collector must preserve the actor semantics even when faults occur during or around collection.
+
+CRGC's design point is **fault-recovering actor GC** in Apache Pekko, the Apache fork of Akka. The important language-runtime lesson is that actor heaps and actor references should be treated as semantic runtime objects, not merely ordinary heap nodes. Collection, failure recovery, and message delivery must agree on a consistent notion of actor liveness.
+
+This belongs at the boundary between memory management and concurrency: `CONCURRENCY.md §6` owns actors and supervision; this section owns the collection/reclamation consequences. The general design lesson is that **runtime memory management should match the unit of failure and isolation**. Actor-local heaps, per-actor snapshots, and mailbox-aware reachability can make actor runtimes more predictable than a single global object graph.
+
+Sources: https://pldi25.sigplan.org/details/pldi-2025-papers/39/CRGC-Fault-Recovering-Actor-Garbage-Collection-in-Pekko and https://dl.acm.org/doi/10.1145/3729288
+
+### 6.23. Memory Tiering in a Python Virtual Machine
+
+Li et al.'s **Memory Tiering in Python Virtual Machine** (VMIL 2025) explores adapting a CPython-like runtime to heterogeneous memory. Memory tiering moves data among memory classes with different latency, bandwidth, capacity, or persistence characteristics — for example DRAM plus slower large-capacity memory — based on runtime hotness and object behaviour.
+
+The VM-level problem differs from OS-only page migration. A language runtime knows object types, allocation sites, container layouts, reference relationships, and interpreter hot paths; using that semantic information can guide placement better than page-level recency alone. In a Python VM, the challenge is especially visible because object overhead is high, pointer chasing is common, and container objects create rich graph structure.
+
+The design lesson: **future memory managers may need placement policy, not just reclamation policy**. Heap design can expose hot/cold object classification, allocation-site metadata, and profiling hooks so runtimes can target heterogeneous memory without rewriting user programs. This is adjacent to allocators (§7), GC layout (§6), and tracing/profiling (`TRACERS.md §14`) because tiering decisions require runtime telemetry.
+
+Sources: https://people.cs.vt.edu/~butta/docs/vmil25_mtp.pdf and https://conf.researchr.org/details/icfp-splash-2025/vmil-2025/7/Memory-Tiering-in-Python-Virtual-Machine
 
 ---
 

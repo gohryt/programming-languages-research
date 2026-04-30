@@ -1,6 +1,6 @@
 # Debuggers
 
-Research on debugger implementations — user-facing bug-finding tools that pause, inspect, step, replay, or time-travel through program execution.
+Research on debugger implementations — tools that pause, inspect, step, replay, or time-travel through program execution.
 
 This document covers:
 
@@ -19,11 +19,11 @@ This document covers:
 
 Ownership boundaries with other documents:
 
-- Runtime concurrency mechanisms — schedulers, tasks, actors, channels, cancellation, STM, and I/O blocking boundaries — live in `CONCURRENCY.md`. This document discusses how debuggers expose, replay, query, or diagnose those mechanisms.
-- Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Sanitizer mechanism details (including ThreadSanitizer) are owned by `TRACERS.md §8`; this document covers only debugger-use.
-- Memory-safety mechanisms (sanitizers, hardware tagging, aliasing models, ownership disciplines) live in `MEMORY.md`. The Miri/Stacked-Borrows aliasing model is canonical in `MEMORY.md §§1.3, 8.11`; `DEBUGGERS.md §8.8` covers Miri only as a debugger-side UB interpreter.
+- Runtime concurrency mechanisms live in `CONCURRENCY.md`; this document discusses how debuggers expose, replay, query, or diagnose them.
+- Production-style observability, profiling, and always-on instrumentation live in `TRACERS.md`. Sanitizer mechanism details (including ThreadSanitizer) are owned by `TRACERS.md §8`; this document covers only debugger use.
+- Memory-safety mechanisms live in `MEMORY.md`. The Miri/Stacked-Borrows aliasing model is canonical in `MEMORY.md §§1.3, 8.11`; `DEBUGGERS.md §8.8` covers Miri only as a debugger-side UB interpreter.
 - Parser and compiler implementation details are in `PARSERS.md` and `COMPILERS.md`. Compiler-emitted debug metadata encoding is in `COMPILERS.md §5`; OSR/deoptimization is in `COMPILERS.md §14.2`.
-- Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §10` for hot-reload from the module-system angle).
+- Module systems, dynamic loading, and hot module replacement at the language-level boundary live in `MODULES.md` (see especially `MODULES.md §10`).
 
 ---
 

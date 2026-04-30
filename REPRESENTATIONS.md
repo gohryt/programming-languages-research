@@ -2,7 +2,7 @@
 
 Research on the data structures and encodings used to represent programs internally — concrete syntax trees, abstract syntax trees, source-adjacent IRs, mid-level IRs, SSA forms, CPS/ANF, e-graphs, bytecode, multi-level IR architectures, effect-/region-/capability-annotated IRs, persistent and content-addressed IRs, domain-specific representations, Forth-style direct representations, and target-adjacent IRs.
 
-This document is the canonical catalogue for program representations. It treats each representation as an artifact in its own right: the design pressures behind its data layout, what it makes cheap, what it makes expensive, and where it sits in a language pipeline. `PARSERS.md §3` keeps only the parse-time view of parser output, and `COMPILERS.md §6` keeps only the compiler-pass view of IR consumers. This file owns the broader representation survey: lossless trees as tooling substrates, AST layouts, source-adjacent IRs, mid-level IRs, SSA forms, bytecode families, e-graphs, content-addressed code, effect-/region-/capability-annotated forms, Forth-style direct representations, and target-adjacent artifacts. The unifying axis across chapters is *what the representation is for*: source fidelity, optimization, portability, abstraction layering, security analysis, or storage identity.
+This document is the canonical catalogue for program representations. It treats each representation as an artifact in its own right: the design pressures behind its data layout, what it makes cheap, what it makes expensive, and where it sits in a language pipeline. `PARSERS.md §3` keeps only the parse-time view of parser output, and `COMPILERS.md §6` keeps only the compiler-pass view of IR consumers. The unifying axis across chapters is *what the representation is for*: source fidelity, optimization, portability, abstraction layering, security analysis, or storage identity.
 
 When other research documents mention a representation, they should usually keep a short, consumer-specific capsule and point here for the full data-structure treatment.
 
@@ -10,7 +10,7 @@ When other research documents mention a representation, they should usually keep
 
 ## 1. Scope and Design Axes
 
-This chapter names the recurring axes along which representations differ. None of these axes is binary in practice — almost every real representation makes a different trade-off on each — but separating them clarifies what each later entry is optimizing for. The axes are not ordered by importance; they are ordered by how visible the trade-off becomes at the source level.
+This chapter names the recurring axes along which representations differ. None of these axes is binary in practice, but separating them clarifies what each later entry is optimizing for.
 
 ### 1.1. Tree vs Graph
 
@@ -38,7 +38,7 @@ Typed IRs enable verification (Wasm validation, JVM verifier), aggressive alias 
 
 ### 1.5. Single-Level vs Multi-Level
 
-A single-level IR has one form (LLVM IR, Cranelift CLIF, LuaJIT IR). A multi-level cascade chains progressively-lowered IRs, each tuned to a phase, as in Rust's HIR → THIR → MIR → LLVM IR (§10.3), GHC's Core → STG → Cmm (§10.4), or as in Mojo (KGEN parametric layer → POP dialect → LLVM dialect, §5.4). MLIR (§10.1) generalizes the pattern.
+A single-level IR has one form (LLVM IR, Cranelift CLIF, LuaJIT IR). A multi-level cascade chains progressively-lowered IRs, each tuned to a phase, as in Rust's HIR → THIR → MIR → LLVM IR (§10.2), GHC's Core → STG → Cmm (§10.3), or as in Mojo (KGEN parametric layer → POP dialect → LLVM dialect, §5.4). MLIR (§10.1) generalizes the pattern.
 
 Trade-off: engineering simplicity vs per-phase optimality. A cascade tunes each level (HIR for inference, THIR for exhaustiveness, MIR for borrow checking) at the cost of translation layers.
 
@@ -78,13 +78,13 @@ A recurring theme is *the schema as the ground truth*: when the tree shape lives
 
 C# and VB.NET's compiler API uses a two-layer tree: immutable, position-free **green nodes** that store kind + width + child references, and ephemeral **red nodes** that wrap green nodes with absolute text positions and parent pointers computed lazily on demand. Editing produces a new green tree that shares unchanged subtrees with the old one — an O(edit-size) update rather than O(file-size). The red tree is rebuilt on each navigation but cheap because it caches over the underlying green structure.
 
-The original contribution is treating *width-only* nodes as the storage representation. Most position-aware ASTs store absolute offsets per node, paying for them on every edit. Roslyn pays for absolute positions only when the user navigates, and even then only for the path actually visited. This is why Roslyn supports massive solutions (~1M-line solutions in Visual Studio) with sub-second incremental responses.
+The original contribution is treating *width-only* nodes as the storage representation. Most position-aware ASTs store absolute offsets per node, paying for them on every edit. Roslyn pays for absolute positions only when the user navigates, and only for the path actually visited.
 
 Sources: https://ericlippert.com/2012/06/08/red-green-trees/ and https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax
 
 ### 2.2. rust-analyzer rowan
 
-rowan is the Rust port of Roslyn's red-green design, used by rust-analyzer and a growing number of language servers (Lelwel, Typst's parser, several research projects). Same green/red split, same incremental properties. Distinctive additions: green nodes are interned by hash, so identical subtrees across a workspace share storage; rowan's `SyntaxNode` is a thin handle (~16 bytes) rather than a full red-tree allocation; and trivia (comments, whitespace) is attached to tokens rather than synthesized as separate nodes, simplifying the API.
+rowan is the Rust port of Roslyn's red-green design, used by rust-analyzer and a growing number of language servers (Lelwel, Typst's parser, several research projects). The red/green split is the same as Roslyn's; the distinctive additions are green-node interning by hash, thin `SyntaxNode` handles (~16 bytes), and attaching trivia to tokens rather than synthesizing separate trivia nodes.
 
 rowan is also content-agnostic: the language-specific node kind enum is supplied by the consumer. The same library powers Rust, Typst, Lelwel-generated grammars, and several DSL projects. This separation of concrete-syntax-tree mechanics from language-specific node types is what makes rowan a reusable lossless-tree library rather than a Rust-specific component.
 
@@ -739,6 +739,16 @@ The architectural lesson generalising these four: **separating the verification 
 
 Sources: https://github.com/boogie-org/boogie and https://www.pm.inf.ethz.ch/research/viper.html and https://why3.lri.fr/ and https://github.com/FStarLang/karamel and https://www.cs.cmu.edu/~aldrich/courses/17-355-19sp/notes/notes-Boogie.pdf
 
+### 11.9. First-Class Verification Dialects for MLIR
+
+Fehr, Fan, Pompougnac, Regehr, and Grosser's **First-Class Verification Dialects for MLIR** (PLDI 2025) brings verification artifacts into MLIR as dialects rather than translating out to a separate one-off verifier format too early. The premise is that compiler transformations and verification obligations should coexist in the same multi-level infrastructure: operations, regions, types, attributes, and rewrite passes can carry both executable semantics and proof-relevant facts.
+
+This is a different point from Boogie/Viper/WhyML (§11.8). Traditional VILs are stable targets consumed by external provers. Verification dialects instead let compiler passes lower, transform, and preserve proof obligations alongside ordinary IR, using MLIR's dialect-conversion machinery. The advantage is locality: a transformation can rewrite code and the corresponding verification representation in one framework. The risk is framework weight and dialect-design complexity.
+
+The design lesson: **verification can be a first-class multi-level IR concern**, not only a post-lowering export step. Languages that already use MLIR can encode refinements, memory models, permissions, or proof obligations in dialects and delay commitment to a specific external prover until later in the pipeline.
+
+Sources: https://pldi25.sigplan.org/details/pldi-2025-papers/60/First-Class-Verification-Dialects-for-MLIR and https://users.cs.utah.edu/~regehr/papers/pldi25.pdf
+
 ---
 
 ## 12. Persistent and Content-Addressed IRs
@@ -835,11 +845,19 @@ Sail/ISLA's contribution to representations: an ISA can be a representation, que
 
 Source: https://github.com/rems-project/isla
 
-### 13.9. Bril — JSON-Encoded IR
+### 13.9. Pydrofoil — Sail ISA Specifications as Compilable Simulator IR
+
+**Pydrofoil** (ECOOP 2025) treats Sail ISA specifications as a source representation for generating fast instruction-set simulators. Sail already acts as a formal ISA IR for symbolic execution and verification (§13.8); Pydrofoil adds the compiler-engineering path: specialise the Sail semantics into an executable simulator with substantially less interpretive overhead than directly executing the model.
+
+The representation lesson is that a formal specification can be more than documentation or proof input. If it is executable and typed enough, it can become the canonical representation from which emulators, tests, and analysis tools are generated. Cross-reference: `COMPILERS.md §15.8` covers Pydrofoil from the compilation-pipeline angle.
+
+Sources: https://arxiv.org/abs/2503.04389 and https://github.com/pydrofoil/pydrofoil
+
+### 13.10. Bril — JSON-Encoded IR
 
 See §6.8 for the full treatment. Bril is listed in this chapter because the *wire format itself is the IR* (JSON, parseable from any language) — a non-traditional encoding choice that fits this chapter's "domain-specific / non-traditional" framing.
 
-### 13.10. AI Compiler IR Family — TVM Relay/TIR, PyTorch FX, StableHLO, IREE
+### 13.11. AI Compiler IR Family — TVM Relay/TIR, PyTorch FX, StableHLO, IREE
 
 The AI compiler ecosystem has evolved a representation family largely separate from the LLVM/MLIR mainstream, optimised for tensor-shape inference, operator fusion, autotuning, and cross-hardware deployment. Four IRs anchor the space.
 
@@ -864,7 +882,7 @@ Cross-references: Triton (`COMPILERS.md §15.1`) is the kernel-level companion t
 
 Sources: https://tvm.apache.org/docs/arch/relay_intro.html and https://pytorch.org/docs/stable/fx.html and https://openxla.org/stablehlo and https://arxiv.org/abs/1802.04799 and https://iree.dev/ and https://github.com/iree-org/iree
 
-### 13.11. Bend / HVM2 — Interaction Combinator Graphs as Program Representation
+### 13.12. Bend / HVM2 — Interaction Combinator Graphs as Program Representation
 
 Bend / HVM2 (concurrency angle in `CONCURRENCY.md §3.11`) presents a representation that has no analogue elsewhere in this chapter: a program is a graph of **interaction combinators** (Lafont 1997) — small first-order rewrite rules over typed nodes connected by directed ports. There is no SSA, no CPS, no ANF, no CFG; the data structure is a *net*, and "execution" is repeated rewriting of *active pairs* (two nodes whose principal ports are connected) via interaction rules until no active pairs remain.
 
@@ -878,7 +896,7 @@ The lesson generalises: **a representation whose evaluation rule is locally conf
 
 Sources: https://github.com/HigherOrderCO/HVM2 and https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf and https://github.com/HigherOrderCO/Bend
 
-### 13.12. ZK-Language IRs — Cairo CASM, Noir ACIR, Aiken UPLC
+### 13.13. ZK-Language IRs — Cairo CASM, Noir ACIR, Aiken UPLC
 
 Zero-knowledge programming languages compile to representations designed for **proof generation**, not for CPU execution. The constraint surface is unusual: the target is not an instruction set with registers and memory but an *arithmetic circuit* — a graph of additions, multiplications, and lookup operations over a finite field — that a SNARK or STARK prover can encode as a polynomial identity. The compiler IR has to bridge ordinary high-level source (control flow, arrays, recursion) to this constraint-graph target.
 
@@ -892,7 +910,7 @@ The design lesson cuts across blockchain/ZK design: **the IR target shapes the l
 
 Sources: https://www.starknet.io/cairo-book/ch201-architecture.html and https://www.cairo-lang.org/about-cairo/ and https://noir-lang.org/ and https://github.com/noir-lang/noir and https://aiken-lang.org/ and https://arxiv.org/pdf/2601.09372
 
-### 13.13. Yul — Solidity's Compiler-Internal Mid-Level IR
+### 13.14. Yul — Solidity's Compiler-Internal Mid-Level IR
 
 **Yul** is the mid-level IR used by the **Solidity** compiler since the IR-based pipeline became the default in Solidity 0.8.13 (2022). Solidity source compiles to Yul (a small typed assembly-like language with named variables, `for`/`if`/`switch`, and direct EVM opcode access), Yul is optimised by the YulOptimizer (constant folding, common-subexpression elimination, dead-code elimination, structural simplification), and the optimised Yul is then translated to EVM bytecode. The Solidity compiler also exposes Yul as a *first-class language*: developers can write inline-assembly Yul blocks within Solidity, or write whole contracts in pure Yul for fine-grained gas optimisation.
 
@@ -1156,11 +1174,12 @@ Rows grouped by chapter, in chapter order. Each row's Examples column ends with 
 | Term + strategy IR | Whole-language workbench | Rewrite-driven compilation | Stratego / Spoofax (§13.6) |
 | Algorithm/schedule split | Image processing | Auto-tunable schedule space | Halide (§13.7) |
 | Sail ISA spec as IR | Hardware verification | Symbolic execution of ISA semantics | ISLA / CHERI (§13.8) |
-| JSON-encoded IR | Pedagogy | Minimal tooling barrier | Bril (§13.9) |
-| AI compiler IR family | Tensor-graph compilation | Two-level relay/TIR or trace-based or MLIR-versioned, or fused scheduling+execution | TVM Relay/TIR, PyTorch FX, StableHLO, IREE (§13.10) |
-| Interaction-combinator graph | Higher-order functional + parallel evaluation | Disjoint reductions parallel by construction | Bend / HVM2 (§13.11) |
-| ZK-language IRs | Arithmetic-circuit / proof-friendly ISA | Constraint graphs vs custom ZK ISA | Cairo CASM, Noir ACIR, Aiken UPLC (§13.12) |
-| Compiler-internal mid-level IR exposed as language | Solidity → Yul → EVM | Bridges high-level OO and low-level bytecode | Yul (§13.13) |
+| Sail spec as simulator-generation IR | ISA simulation | One spec feeds verification and fast simulators | Pydrofoil (§13.9) |
+| JSON-encoded IR | Pedagogy | Minimal tooling barrier | Bril (§13.10) |
+| AI compiler IR family | Tensor-graph compilation | Two-level relay/TIR or trace-based or MLIR-versioned, or fused scheduling+execution | TVM Relay/TIR, PyTorch FX, StableHLO, IREE (§13.11) |
+| Interaction-combinator graph | Higher-order functional + parallel evaluation | Disjoint reductions parallel by construction | Bend / HVM2 (§13.12) |
+| ZK-language IRs | Arithmetic-circuit / proof-friendly ISA | Constraint graphs vs custom ZK ISA | Cairo CASM, Noir ACIR, Aiken UPLC (§13.13) |
+| Compiler-internal mid-level IR exposed as language | Solidity → Yul → EVM | Bridges high-level OO and low-level bytecode | Yul (§13.14) |
 
 ### 16.13. Forth-style direct representations
 
@@ -1312,6 +1331,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 9. Why3 home — https://why3.lri.fr/
 10. KaRaMeL (F\* extraction to C) — https://github.com/FStarLang/karamel
 11. Aldrich — Lecture notes on Boogie (CMU 17-355) — https://www.cs.cmu.edu/~aldrich/courses/17-355-19sp/notes/notes-Boogie.pdf
+12. First-Class Verification Dialects for MLIR (PLDI 2025) — https://pldi25.sigplan.org/details/pldi-2025-papers/60/First-Class-Verification-Dialects-for-MLIR
+13. Fehr et al. — First-Class Verification Dialects for MLIR — https://users.cs.utah.edu/~regehr/papers/pldi25.pdf
 
 ### Chapter 12 — Persistent and Content-Addressed IRs
 
@@ -1328,7 +1349,9 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 5. Spoofax language workbench — https://www.spoofax.dev/
 6. Halide — https://halide-lang.org/
 7. ISLA / Sail (CHERI) — https://github.com/rems-project/isla
-8. Apache TVM Relay introduction — https://tvm.apache.org/docs/arch/relay_intro.html
+8. Pydrofoil: accelerating Sail-based instruction set simulators — https://arxiv.org/abs/2503.04389
+8a. Pydrofoil repository — https://github.com/pydrofoil/pydrofoil
+9. Apache TVM Relay introduction — https://tvm.apache.org/docs/arch/relay_intro.html
 9. PyTorch FX documentation — https://pytorch.org/docs/stable/fx.html
 10. StableHLO project (OpenXLA) — https://openxla.org/stablehlo
 11. Chen et al. — "TVM: An Automated End-to-End Optimizing Compiler for Deep Learning" (OSDI 2018) — https://arxiv.org/abs/1802.04799

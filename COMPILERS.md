@@ -2,19 +2,19 @@
 
 Research on compilation techniques, intermediate representations, code generation, and runtime-compilation integration (JITs, regex, query engines, hot code swap).
 
-This document covers everything downstream of parsing: lowering, IR use, optimization, codegen, runtime object models, and compiler-emitted debug metadata. It treats representations from the compiler-pass perspective — what each form enables or constrains — while the broader CST/AST/HIR/MIR/SSA/bytecode catalogue lives in `REPRESENTATIONS.md`. Compile-time memory analyses (region inference, reference counting as a compilation strategy) are in scope; runtime garbage collection, allocator implementations, language-level allocator API models, and the broader memory-safety discipline space (ownership, regions, RC, capabilities, verified safety, concurrent reclamation, hardware tagging) live in `MEMORY.md`. Runtime scheduling, async/await execution, actors, channels, cancellation, STM, and blocking/I/O coordination live in `CONCURRENCY.md`; this file keeps only lowering, continuation, ABI, and optimization consequences. Exception-handling runtime mechanics are also out of scope. Parser-side concerns (source position strategies, AST layouts, error recovery, parser architectures) are in `PARSERS.md`. User-facing debugger UX is in `DEBUGGERS.md`; runtime observability / tracing is in `TRACERS.md`. Module systems, import semantics, package identity, build-graph formation, and dynamic module loading at the source level live in `MODULES.md`; this document focuses on what compilers do *below* that boundary.
+This document covers lowering, optimization, code generation, runtime object models, and compiler-emitted debug metadata. It treats representations from the compiler-pass perspective — what each form enables or constrains — while the broader representation catalogue lives in `REPRESENTATIONS.md`. Compile-time memory analyses such as region inference and reference counting as a compilation strategy are in scope; broader memory-safety disciplines and runtime memory management live in `MEMORY.md`. Runtime scheduling and concurrency semantics live in `CONCURRENCY.md`; user-facing debugger workflows live in `DEBUGGERS.md`; observability pipelines live in `TRACERS.md`. Parser-side concerns are in `PARSERS.md`, and source-level module/package boundaries are in `MODULES.md` and `PACKAGING.md`.
 
 ---
 
 ## 1. Compilation Techniques
 
-Strategies for translating source programs into executable form, spanning whole-program AOT, tiered JIT, partial-evaluation-derived compilers, and interpreter-specialization tricks that blur the interpreter/compiler line. The distinguishing axis across the entries below is *how much work is deferred and to when* — stencils paid for at build time and cheap to splice at runtime, tiers that promote hot code from interpreter to optimizing JIT, partial evaluators that derive compilers from interpreters, or quickened opcodes that specialize in place without ever generating machine code. Each entry picks a different point on the compile-time / peak-performance / engineering-cost triangle.
+Strategies for translating source programs into executable form, spanning whole-program AOT, tiered JIT, partial-evaluation-derived compilers, and interpreter-specialization tricks that blur the interpreter/compiler line. The distinguishing axis is *how much work is deferred and to when*. Each entry picks a different point on the compile-time / peak-performance / engineering-cost triangle.
 
 ### 1.1. Copy-and-Patch — Stencil-Based Code Generation
 
-Haoran Xu and Fredrik Kjolstad (Stanford, 2021) introduced copy-and-patch compilation: instead of emitting machine code instruction by instruction, the compiler pre-compiles a library of "stencils" — code snippets for each bytecode operation with "holes" for operands. Code generation becomes: copy the stencil, patch the holes with concrete values. Done.
+Haoran Xu and Fredrik Kjolstad (Stanford, 2021) introduced copy-and-patch compilation: instead of emitting machine code instruction by instruction, the compiler pre-compiles a library of "stencils" — code snippets for each bytecode operation with "holes" for operands. Code generation becomes copying the stencil and patching the holes with concrete values.
 
-The results are striking: compilation is 4–6x faster than the fastest existing baseline compilers (like Liftoff in V8), while producing code of comparable quality. The compilation time is dominated by `memcpy` — there's almost no per-instruction decision-making.
+Empirically, compilation is 4–6x faster than the fastest existing baseline compilers (like Liftoff in V8), while producing code of comparable quality. The compilation time is dominated by `memcpy` — there is almost no per-instruction decision-making.
 
 The technique has historical roots: QEMU's original "dyngen" backend by Fabrice Bellard used a similar approach in 2003, compiling C stencils and extracting relocations. Copy-and-patch modernizes this by using LLVM as the stencil compiler, enabling better stencil quality and automatic relocation extraction.
 
@@ -32,7 +32,7 @@ Modern VMs typically have two or three execution tiers:
 
 V8 (JavaScript): Ignition (interpreter) → Sparkplug (baseline) → Maglev (mid-tier optimizing) → TurboFan (optimizing). SpiderMonkey (JavaScript): interpreter → baseline → IonMonkey. JVM HotSpot: interpreter → C1 (baseline) → C2 (optimizing).
 
-**The interactive-language sweet spot (Jamie Brandon).** For interactive languages, the combined compile-time + run-time matters more than either alone. A program that compiles in 0.1s and runs in 1s is better than one that compiles in 0s and runs in 2s (interpreter) or compiles in 10s and runs in 0.5s (LLVM -O3). Brandon notes that the OCaml native-code compiler is about half the size of its interpreter, and yet performs one to two orders of magnitude better. This suggests the "naive compiler" sweet spot — fast compilation, reasonable execution, good tooling — is underexplored compared to both interpreters and optimizing compilers. Tiered execution (interpreted glue code + compiled hot paths) may be the practical answer for interactive languages. The debugging story for tiered systems remains unsolved (see `DEBUGGERS.md §7` on cross-tier DWARF mapping).
+**The interactive-language sweet spot (Jamie Brandon).** For interactive languages, the combined compile-time + run-time matters more than either alone. A program that compiles in 0.1s and runs in 1s is better than one that compiles in 0s and runs in 2s (interpreter) or compiles in 10s and runs in 0.5s (LLVM -O3). Brandon notes that the OCaml native-code compiler is about half the size of its interpreter, and yet performs one to two orders of magnitude better. This suggests the "naive compiler" sweet spot — fast compilation, reasonable execution, good tooling — is underexplored compared with both interpreters and optimizing compilers. Tiered execution (interpreted glue code + compiled hot paths) may be the practical answer for interactive languages. Debugging across tiers remains a difficult problem; see `DEBUGGERS.md §7.2` on cross-tier source and variable mapping.
 
 Source: https://www.scattered-thoughts.net/writing/implementing-interactive-languages/
 
@@ -84,7 +84,7 @@ Source: Brandhorst-Satzkorn, "Lambda Sets" (Roc design notes); see also Reynolds
 
 In bytecode interpreters, dispatch overhead (reading the next opcode and branching to its implementation) is a major bottleneck. Direct threaded code replaces opcodes with arrays of pointers directly to the machine code implementing each operation.
 
-To further reduce dispatch overhead, systems like GForth use "Dynamic Superinstructions." Instead of executing individual primitives (e.g., `dup`, `*`), the VM dynamically identifies common sequences of bytecodes and compiles them into a single "superinstruction" on the fly, copying the machine code routines into a contiguous block. This eliminates the dispatch boundaries between those instructions and allows the CPU to execute them as a single block of native code. It bridges the gap between a pure interpreter and a JIT compiler by performing ultra-lightweight native code stitching at runtime.
+To further reduce dispatch overhead, systems like GForth use "Dynamic Superinstructions." Instead of executing individual primitives (e.g., `dup`, `*`), the VM dynamically identifies common sequences of bytecodes and compiles them into a single "superinstruction" on the fly, copying the machine code routines into a contiguous block. This eliminates the dispatch boundaries between those instructions and allows the CPU to execute them as a single block of native code. The result sits between a pure interpreter and a JIT compiler: ultra-lightweight native code stitching at runtime.
 
 Ertl's EuroForth 2023/2024 papers ("The Performance Effects of Virtual-Machine Instruction Pointer Updates," published as ECOOP 2024) quantify how IP-update dependency chains dominate critical paths on modern out-of-order cores; the paper introduces `l` (loop), `c`/`ci` (combined+immediate), and `b` (branch) instruction-combining optimizations that reduce these chains for up to 2× speedups on dispatch-bound benchmarks.
 
@@ -122,7 +122,7 @@ The mainline CPython JIT (§1.1) is one of several Python-acceleration efforts. 
 
 **Pyjion** (Microsoft, 2016–2021) is the third historical production JIT effort, using the .NET CLR's RyuJIT as the codegen backend for CPython bytecode. It demonstrated that a host JIT can be reused for a guest language but shipped as research and was archived in 2022.
 
-The lesson for Python performance: **mainline CPython has converged on a copy-and-patch JIT (§1.1) plus the adaptive interpreter (§1.9), but the production-deployment-history of Cinder shows that aggressive method-JITs with type-specialization plus inlining give larger wins (~30–50% on Instagram workloads) than either approach alone**. The trade-off is engineering complexity: Cinder-class JITs are large codebases (~100K lines of C/C++) maintained by full-time teams.
+The deployment lesson is that copy-and-patch baselines (§1.1), adaptive interpreters (§1.9), and method-level JITs occupy distinct points in the same design space. Cinder-class JITs buy larger wins, but at much higher engineering cost.
 
 Sources: https://github.com/facebookincubator/cinderx and https://github.com/facebookincubator/cinder and https://engineering.fb.com/2022/05/02/open-source/cinder-jits-instagram/ and https://github.com/pyston/pyston and https://blog.pyston.org/
 
@@ -170,7 +170,7 @@ Sources: https://numba.pydata.org/ and https://github.com/numba/llvmlite and htt
 
 ## 2. Memory Management in Compilers
 
-Compilers allocate enormous numbers of small objects — AST nodes, IR instructions, types, symbols — with highly predictable lifetimes. The entries in this chapter differ on *which regularity they exploit*: per-phase lifetime for arena bump allocation, structural equality for interning and hash consing, per-field access patterns for struct-of-arrays layout, or alignment guarantees for stealing pointer bits as free tag storage. Each is a targeted optimization that pays off because compiler workloads are not general-purpose allocation workloads.
+Compilers allocate enormous numbers of small objects — AST nodes, IR instructions, types, symbols — with highly predictable lifetimes. The entries in this chapter differ on *which regularity they exploit*: per-phase lifetime, structural equality, per-field access patterns, or alignment guarantees. Each is a targeted optimization that pays off because compiler workloads are not general-purpose allocation workloads.
 
 ### 2.1. Arena Allocation — Bump Allocators
 
@@ -294,7 +294,7 @@ The encoding achieves remarkable density: for typical C/C++ programs, the line t
 
 The design principle: exploit the regularity of compiler output. Consecutive machine instructions usually correspond to consecutive or nearby source lines. Delta encoding captures this regularity.
 
-> The *location expression* side of DWARF — describing where variables live under optimization — is a debugger correctness concern covered in `DEBUGGERS.md §7`.
+> The *location expression* side of DWARF — describing where variables live under optimization — is a debugger correctness concern covered in `DEBUGGERS.md §7.1`.
 
 Source: https://dwarfstd.org/
 
@@ -365,21 +365,19 @@ Sources: https://github.com/bytecodealliance/wasmtime/tree/main/cranelift and ht
 
 ### 6.6. Mojo KGEN and POP Dialect — Parametric MLIR
 
-Status (as of 2026-04): Mojo's KGEN/POP design is included here for one compiler-pipeline reason: unresolved parameterization can be represented as IR instead of as syntax or macro state. KGEN keeps parametric code serializable before elaboration; POP operations carry symbolic parameter values until a later elaborator substitutes concrete sizes, types, and target information.
-
-That makes compile-time metaprogramming part of lowering rather than a separate AST macro system. For a new language, the design question is whether generic/comptime code should remain distributable and cacheable before instantiation. `REPRESENTATIONS.md §5.4` covers KGEN/POP as a representation; §12.10 covers it from the metaprogramming angle.
+Status (as of 2026-04): Mojo's KGEN/POP matters here for one compiler-pipeline reason: unresolved parameterization can survive as IR until a later elaboration stage. That makes compile-time metaprogramming part of lowering rather than a separate AST macro system, and it keeps generic/comptime code distributable and cacheable before instantiation. `REPRESENTATIONS.md §5.4` covers the parametric-IR data model; §12.10 covers the metaprogramming angle.
 
 Sources: https://llvm.org/devmtg/2025-10/slides/technical_talks/lattner_zhu.pdf and https://github.com/modular/modular/blob/main/mojo/stdlib/docs/internal/pop_dialect.md
 
 ### 6.7. Ballerina BIR — Single IR, Dual Backends, Cached for Incrementality
 
-The compiler-pass implication is that a shared mid-level artifact with per-target lowering is cleaner than duplicating the pipeline once a language needs multiple serious backends — but only if the IR avoids assumptions from any one backend. Ballerina BIR also doubles as the package-level cache for incremental builds. The representation details and how BIR is serialized live in `REPRESENTATIONS.md §5.5`.
+The compiler-pass implication is that a shared mid-level artifact with per-target lowering is cleaner than duplicating the pipeline once a language needs multiple serious backends — but only if the IR avoids assumptions from any one backend. BIR also serves as the package-level cache for incremental builds. The structural details and serialization format live in `REPRESENTATIONS.md §5.5`.
 
 Sources: https://medium.com/ballerina-techblog/peering-into-the-ballerina-intermediate-representation-8e97361a070e and http://dl.lib.uom.lk/handle/123/16182
 
 ### 6.8. RakuAST — Class-Based AST as Compiler-Extensibility Substrate
 
-The compiler-facing lesson is that a user-visible AST can sit above an older lowering target instead of replacing it: Rakudo parses to RakuAST objects, then lowers through `IMPL-TO-QAST` (a method that emits QAST — the older Rakudo/NQP compiler-tree IR) into the existing pipeline. This is a metaprogramming and extension-point decision rather than an optimizer-IR decision; the cost is that every compiler traversal pays object dispatch, heap allocation, and GC pressure. Full representation details live in `REPRESENTATIONS.md §3.8`.
+The compiler-facing lesson is that a user-visible AST can sit above an older lowering target instead of replacing it: Rakudo parses to RakuAST objects, then lowers through `IMPL-TO-QAST` into the existing pipeline. This is a metaprogramming and extension-point decision rather than an optimizer-IR decision; the cost is object dispatch, allocation, and GC pressure during compilation. Full representation details live in `REPRESENTATIONS.md §3.8`.
 
 Sources: https://docs.raku.org/type/RakuAST and https://news.perlfoundation.org/post/grant-rakuast-2020-12 and https://github.com/lizmat/articles/blob/main/review-of-2025.md
 
@@ -979,7 +977,7 @@ Generated classes are cached in-memory by their generation key (in-process re-us
 
 The most-deployed Codegen application is **ActiveJ Serializer** — the framework's schema-free serializer that generates per-type binary codec classes at first use, recovering hand-written-codec performance from runtime-introspected Java classes. ActiveJ claims it as the fastest JVM serializer; whether it is *the* fastest is contested, but the design pattern (one generated codec class per serialized type, cached forever, JIT-warm before use) is the same one Kryo, FlatBuffers, and Cap'n Proto Java each implement at varying levels of automation. Codegen is what makes "generate one codec class per type" cheap to implement.
 
-Distinct from the §13 lightweight backends (QBE, Cranelift, TPDE, DynASM, MoarVM lego, Virgil): those generate native machine code; Codegen generates JVM bytecode. Distinct from MetaOCaml/Terra staged programming (§12.3, §12.4): those provide compile-time staging with type-safe quotations; Codegen is runtime, with type inference but without staged-code typing — the bytecode is verifier-checked at class-define time. Distinct from Template Haskell (§12.5): TH is compile-time AST-rewriting, Codegen is runtime bytecode emission. The right comparison point is **JitBuilder** (Eclipse OMR's `MEMORY.md §6.21` codegen library) — both target managed-runtime bytecode generation with productivity-oriented APIs; Codegen is JVM-only, JitBuilder is multi-language.
+Distinct from the §13 lightweight backends (QBE, Cranelift, TPDE, DynASM, MoarVM lego, Virgil): those generate native machine code; Codegen generates JVM bytecode. Distinct from MetaOCaml/Terra staged programming (§12.3, §12.4): those provide compile-time staging with type-safe quotations; Codegen is runtime, with type inference but without staged-code typing — the bytecode is verifier-checked at class-define time. Distinct from Template Haskell (§12.5): TH is compile-time AST-rewriting, Codegen is runtime bytecode emission. The right comparison point is **JitBuilder**, the JIT-building library shipped as part of Eclipse OMR (see `MEMORY.md §6.21`) — both target managed-runtime bytecode generation with productivity-oriented APIs; Codegen is JVM-only, JitBuilder is multi-language.
 
 Sister technique inside ActiveJ: **Specializer (§17.4)** uses ASM directly (not Codegen) to rewrite existing class instances rather than generate new classes from scratch. The two libraries target adjacent but distinct use cases — Codegen for "I have an AST/schema and want a class implementing it"; Specializer for "I have a class instance and want a specialised static class encoding its values."
 
@@ -1012,6 +1010,16 @@ Wasmtime (Bytecode Alliance) is the Wasm runtime cited throughout this document,
 The trade-off axis across the three: **compilation strategy diversity (Wasmer)**, **LLVM-only pure performance (WAVM)**, **embedded-target footprint (WAMR)**. Wasmtime + Cranelift sits in the middle as the production default. Combined with §22 (BPF/eBPF JIT) and §24 (Wasm streaming compile), this rounds out the Wasm-runtime landscape: Wasmtime for general-purpose deployment, Wasmer for backend choice, WAVM for compute-heavy workloads, WAMR for embedded.
 
 Sources: https://wasmer.io/ and https://github.com/wasmerio/wasmer and https://github.com/WAVM/WAVM and https://github.com/bytecodealliance/wasm-micro-runtime
+
+### 13.13. ASTro — AST-Based Reusable Optimization Framework
+
+Koichi Sasada's **ASTro** (VMIL 2025) is a reusable framework for building optimized AST-traversal interpreters via partial evaluation. The motivation is a common VM engineering failure mode: the language semantics are written once in an interpreter, then partially duplicated in a compiler, optimizer, and runtime helpers. ASTro keeps the AST interpreter as the semantic source of truth and generates optimized execution machinery from it, reducing duplication between the interpreter and partial evaluator.
+
+The design point is adjacent to Truffle/Graal (§1.3) and RPython (§14.7), but narrower and more reusable for AST interpreters: define the AST node semantics, let the framework derive optimized variants and traversal structure, and avoid rewriting language semantics into a second IR-specific optimizer. This is especially relevant for small dynamic languages, DSLs, and research VMs where maintaining separate interpreter and compiler semantics is the largest correctness risk.
+
+Status (as of 2026-04): workshop/research prototype. The lesson generalises: **AST interpreters can be made a reusable optimization substrate**, not merely a slow reference implementation, if the AST traversal and specialization hooks are designed as framework APIs.
+
+Sources: https://dl.acm.org/doi/10.1145/3759548.3763371 and https://www.atdot.net/~ko1/activities/2025_astro_VMIL2025.pdf
 
 ---
 
@@ -1092,6 +1100,33 @@ The spesh-interaction is the load-bearing point: continuation capture across an 
 
 Sources: https://github.com/rakudo/rakudo/blob/nom/src/core/ThreadPoolScheduler.pm and https://github.com/MoarVM/MoarVM/blob/master/src/core/threads.c and https://docs.raku.org/language/concurrency.html
 
+### 14.7. Multi-Tier JIT Generation from Meta-Tracing Interpreters — 2SOM / RPython
+
+Izawa, Masuhara, and Bolz-Tereick's **2SOM** (ECOOP 2025) adds a lightweight tier to an RPython meta-tracing VM without implementing a new traditional JIT backend. The method treats interpreter definitions not only as language semantics but also as compilation-strategy specifications. Two interpreter variants drive the same meta-tracing infrastructure: a tier-1 interpreter that generates subroutine-threaded code for quick warm-up, and a tier-2 interpreter that triggers RPython's ordinary tracing JIT for hot loops.
+
+The practical machinery is the interesting part:
+
+- **Embedded profiling** in the tier-1 code counts back edges and raises a tier-transition event when a threshold is reached.
+- **Interpreter switching** transfers the current frame from the lightweight interpreter into the heavyweight tracing interpreter, letting existing `jit_merge_point` machinery enter optimized code.
+- **Shallow tracing** avoids corrupting interpreter state when threaded-code generation traces both sides of a branch: handler calls are recorded without executing side-effecting handler bodies during tracing.
+- **Direct calls with inline caching** turn dynamic method dispatch in threaded code into guarded direct `call_assembler` paths when receiver types match cached observations.
+
+The reported result on synthesized SOM workloads is about **15% faster warm-up** than tracing-JIT-only execution, with about **5% peak-performance loss**. The limitation is equally important: the approach cannot add a tier requiring a fundamentally different low-level backend, register allocator, or instruction scheduler, because it reuses the meta-tracing compiler's existing trace pipeline.
+
+The design lesson: **meta-compiler frameworks can recover a tiered-VM shape by varying interpreter definitions**, not only by building multiple independent compilers. This is most attractive for language implementations that already have a high-quality interpreter and want a baseline native tier without duplicating semantics.
+
+Source: https://arxiv.org/html/2504.17460v1
+
+### 14.8. Reusing Highly Optimized IR in Dynamic Compilation
+
+Pečimúth, Leopoldseder, and Tůma's **Reusing Highly Optimized IR in Dynamic Compilation** (ECOOP 2025) studies dynamic compilation systems that avoid throwing away expensive optimization work when runtime conditions change. The general pattern is to preserve optimized IR fragments and adapt or reconnect them across recompilation events, instead of returning all the way to bytecode or an unoptimized IR whenever profiling data, assumptions, or bytecode operands change.
+
+This sits between tiered compilation (§1.2), deoptimization (§14.2), and IR caching (§18): the unit being cached is not only generated machine code, but an already-optimized compiler representation that can be reused as input to later dynamic compilation. The benefit is lower compile latency for hot paths that change incrementally; the risk is correctness complexity around invalidated assumptions, deopt metadata, and IR versioning.
+
+The design lesson: **dynamic compilers should treat optimized IR as a reusable artifact**, not just an ephemeral by-product of one compilation event, when hot code evolves under stable structure.
+
+Sources: https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.25 and https://labs.oracle.com/pls/apex/f?p=94065:10:983652587227:11670
+
 ---
 
 ## 15. Domain-Specific & AI-Oriented Compilation
@@ -1160,7 +1195,7 @@ The takeaway for language design: GPU compilation is fundamentally a multi-stage
 
 ### 15.6. Bend / HVM2 — Interaction-Combinator Runtime to GPU
 
-The HVM2 runtime (concurrency angle in `CONCURRENCY.md §3.11`, representation angle in `REPRESENTATIONS.md §13.11`) compiles **Bend** source code to an interaction-combinator graph, then to either a C runtime or a CUDA runtime. The CUDA backend's compilation pipeline is unusual: rather than emitting per-program PTX (the NVRTC §15.3 pattern) or per-kernel SPIR-V (§15.4), HVM2 ships a **fixed CUDA evaluator** that interprets the graph at runtime, distributing active-pair rewrites across warp lanes. The "compiler" therefore becomes a *graph-builder for the GPU evaluator*, not a code generator in the traditional sense.
+The HVM2 runtime (concurrency angle in `CONCURRENCY.md §3.11`, representation angle in `REPRESENTATIONS.md §13.12`) compiles **Bend** source code to an interaction-combinator graph, then to either a C runtime or a CUDA runtime. The CUDA backend's compilation pipeline is unusual: rather than emitting per-program PTX (the NVRTC §15.3 pattern) or per-kernel SPIR-V (§15.4), HVM2 ships a **fixed CUDA evaluator** that interprets the graph at runtime, distributing active-pair rewrites across warp lanes. The "compiler" therefore becomes a *graph-builder for the GPU evaluator*, not a code generator in the traditional sense.
 
 The architectural lesson is distinct from every other entry in this chapter: where Triton (§15.1, §15.5), NVRTC (§15.3), Mojo (§6.6), and TornadoVM (next subsection) all generate target-specific kernel code, HVM2 generates target-neutral graph data and lets a fixed runtime evaluate it. This pays a constant-factor performance cost vs hand-tuned kernels, but eliminates the per-program codegen step entirely — a Bend program runs on any HVM2-supported device without backend-specific compilation. Status (as of 2026-04): the CUDA backend is research-grade; production deployment requires either accepting the constant-factor cost or generating specialised kernels for hot subgraphs (a hybrid approach not yet in the public roadmap).
 
@@ -1181,6 +1216,16 @@ The lesson for language designers: **a managed-runtime language can add GPU comp
 Sources: https://openjdk.org/projects/babylon/ and https://www.tornadovm.org/ and https://tornadovm.readthedocs.io/en/latest/introduction.html and https://www.infoq.com/news/2025/12/tornadovm-20-gpu-llm/ and https://jjfumero.github.io/posts/2025/02/07/babylon-and-tornadovm
 
 Sources: https://docs.mesa3d.org/nir/ and https://www.tensorflow.org/xla
+
+### 15.8. Pydrofoil — Compiling Sail ISA Specifications into Fast Simulators
+
+**Pydrofoil** (ECOOP 2025) is a multi-stage compiler that generates fast instruction-set simulators from **Sail** processor ISA specifications. Sail specifications are already used as executable formal models for RISC-V, ARM, CHERI, and related architectures; Pydrofoil turns those specifications into higher-performance simulators rather than forcing implementers to choose between a trusted but slow formal model and a separately written fast emulator.
+
+The pipeline is significant because the source artifact is a semantics specification, not an implementation-oriented language. Pydrofoil specialises and compiles the Sail model, removing interpretive overhead while preserving the connection to the authoritative ISA description. That makes it a useful case study in **specification-as-compiler-input**: the same semantic artifact can feed verification tools, test generation, and executable simulators.
+
+The design lesson generalises beyond ISA simulators: when a language or platform already has an executable formal semantics, a staged compiler can sometimes generate practical runtime artifacts from the semantics directly, avoiding semantic drift between spec, interpreter, and tests.
+
+Sources: https://arxiv.org/abs/2503.04389 and https://github.com/pydrofoil/pydrofoil
 
 ---
 
@@ -1341,6 +1386,16 @@ The lesson is that **a language compiler can layer two incremental mechanisms �
 
 Sources: https://www.typescriptlang.org/docs/handbook/project-references.html and https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-0.html and https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-4.html
 
+### 18.5. Incremental Computing by Differential Execution
+
+Kumar, Pacak, and Erdweg's **Incremental Computing by Differential Execution** (ECOOP 2025) studies automatic incrementalization by executing *differences* when inputs change. Rather than recomputing a function from scratch or relying only on memoized subcalls, differential execution supplies rules for how an execution should be updated given an input delta.
+
+The compiler/tooling relevance is the granularity: the changed artifact is not necessarily a file, module, or query key, but a structured value with an edit. Differential execution can exploit the shape of the edit — insertion, deletion, replacement, field update — and propagate only the semantic consequences. This connects to language-server incrementality, live programming, build systems, and long-lived reactive computations where the program repeatedly answers nearly-identical questions.
+
+The design lesson: **incrementality can be expressed as a semantics of change**, not only as cache invalidation. Query systems (§18.1) ask “which cached results are stale?”; differential execution asks “what is the output delta induced by this input delta?”
+
+Sources: https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.20 and https://www.pl.informatik.uni-mainz.de/files/2025/04/autoinc-diff-exec.pdf
+
 ---
 
 ## 19. Type-System Outputs and Compiler Consequences
@@ -1363,7 +1418,7 @@ Sources: https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymor
 
 ### 19.3. Effect Handler Lowering
 
-Algebraic effects and typed capabilities are type-system topics (see `TYPES.md §15` for effect-system semantics), but their implementation is a compiler/runtime topic. Efficient effect-handler implementations avoid naive full continuation capture when possible. Koka-style generalized evidence passing threads handler evidence through calls; OCaml 5 exposes effect handlers through runtime-supported continuations and stack switching (see `CONCURRENCY.md §13` for the runtime continuation/stack-switching machinery).
+Algebraic effects and typed capabilities are type-system topics (see `TYPES.md §11` for effect-system semantics), but their implementation is a compiler/runtime topic. Efficient effect-handler implementations avoid naive full continuation capture when possible. Koka-style generalized evidence passing threads handler evidence through calls; OCaml 5 exposes effect handlers through runtime-supported continuations and stack switching (see `CONCURRENCY.md §5.5` for the runtime continuation/stack-switching machinery).
 
 Compiler consequence: the chosen effect representation affects call ABI, tail calls, stack maps, async lowering, optimization barriers, and interaction with memory management. If effects are statically typed, the compiler can often erase or specialize effect evidence; if effects are dynamically handled, the runtime must carry enough state to find handlers and resume continuations.
 
@@ -1557,7 +1612,7 @@ The same verifier-first design that BPF (§22.1) deploys at the OS kernel bounda
 
 Like BPF, Move's verifier accepts *only* programs it can prove safe; rejected modules cannot run at all. Unlike BPF, the safety property being enforced is not "doesn't crash the kernel" but "doesn't violate the linear-resource invariants the asset model depends on." The two are structurally similar: a small, mandatory static analysis at the trust boundary substitutes for runtime checks throughout the program.
 
-The lesson generalises: **a verifier-restricted bytecode is the natural compilation target for any language whose programs run in untrusted contexts**. BPF deploys this for kernel modules; Move deploys it for blockchain smart contracts; WASI/Component Model (`MODULES.md §11`) deploys it for sandboxed Wasm. For language designers building compilers that target sandbox-class execution environments (WebAssembly with capability discipline, embedded scripting languages with restricted authority, plug-in systems for other applications), the verifier-restricted bytecode pattern is the structurally cleanest answer.
+The lesson generalises: **a verifier-restricted bytecode is the natural compilation target for any language whose programs run in untrusted contexts**. BPF deploys this for kernel modules; Move deploys it for blockchain smart contracts; WASI/Component Model (`MODULES.md §11.2`) deploys it for sandboxed Wasm. For language designers building compilers that target sandbox-class execution environments (WebAssembly with capability discipline, embedded scripting languages with restricted authority, plug-in systems for other applications), the verifier-restricted bytecode pattern is the structurally cleanest answer.
 
 Sources: https://aptos.dev/network/blockchain/move and https://move-language.github.io/move/ and https://hackenproof.com/blog/for-hackers/move-smart-contract-security-guide-part-1
 
@@ -1593,7 +1648,7 @@ Source: https://timholy.github.io/Revise.jl/stable/
 
 Common Lisp treats the live image as the primary development environment: every function, class, method, and variable can be redefined at runtime. `(defun foo () ...)` evaluated interactively replaces the existing `foo`; future calls see the new definition. Method dispatch tables (CLOS) propagate changes automatically; global variable rebinding takes effect immediately.
 
-The SLIME / SLY IDE environments build on this to provide "compile-defun" and "compile-file" commands that update the running image incrementally. Combined with the condition system (`DEBUGGERS.md §3.5`), the workflow is: run code → hit an error → the debugger pops up → edit the offending function → restart the frame → continue.
+The SLIME / SLY IDE environments build on this to provide "compile-defun" and "compile-file" commands that update the running image incrementally. Combined with the condition/restart system (`DEBUGGERS.md §3.5`), the workflow is: run code → hit an error → the debugger pops up → edit the offending function → restart the frame → continue.
 
 This development style — sometimes called "image-based" or "residential" — is philosophically distinct from edit-compile-run. The whole system is always live; code changes are made *to* the running system rather than to a file that will later be recompiled. Smalltalk pushed this idea further (`DEBUGGERS.md §3.4`), but Common Lisp established the compiled, static-type-free version that most modern interactive languages inherit.
 
@@ -2207,6 +2262,7 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Multi-backend Wasm runtime | SinglePass / Cranelift / LLVM swappable backends | Pick compile-vs-quality per workload | Triple maintenance burden | Wasmer (§13.12) |
 | LLVM-only Wasm runtime | All Wasm via full LLVM pipeline | Peak performance for compute-heavy workloads | Seconds of compile-per-module | WAVM (§13.12) |
 | Embedded Wasm runtime | C, kilobyte-budget, multi-mode execution | Wasmtime-class semantics on MCU-class hardware | Per-mode build configuration | WAMR (§13.12) |
+| AST interpreter as reusable optimisation substrate | AST semantics + partial-evaluator framework | Avoids semantic duplication between interpreter and compiler | Framework-driven optimisation shape | ASTro (§13.13) |
 | Trace-based JIT | Trace recording | Auto-inlining, cross-function opt | Trace explosion on branchy code | LuaJIT, PyPy (§14.1) |
 | OSR / Deoptimization | Stack frame mapping | Tier switch mid-execution | Complex frame reconstruction | V8, HotSpot, SpiderMonkey (§14.2) |
 | Basic Block Versioning | Per-block specialized variants | Type specialization without tracing | Code duplication | Ruby YJIT (§14.3) |
@@ -2215,6 +2271,8 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Uninlining on guard failure | Inliner records resume-init | Reconstructs pre-inlining stack | Per-inline metadata cost | MoarVM spesh (§14.4) |
 | Dispatcher programs (guards+delegate+resume) | Recorded dispatch bytecode | One mechanism for all dispatch kinds | Requires NQP-style dispatcher substrate | MoarVM new-disp (§14.5) |
 | Continuation-safe await lowering | First-class continuations + resumption metadata | Non-blocking wait composes with specialization | Requires VM continuation primitive | MoarVM ThreadPoolAwaiter (§14.6; `CONCURRENCY.md`) |
+| Tiered JIT from interpreter variants | Multiple interpreter definitions + shared meta-tracer | Adds warm-up tier without a second full backend | Cannot change low-level backend architecture | 2SOM / RPython (§14.7) |
+| Reusable optimized IR in dynamic compilation | Cache/preserve optimized IR across recompiles | Reduces repeated optimization work | Assumption invalidation and IR-versioning complexity | Oracle Labs dynamic compilation (§14.8) |
 | Polyhedral compilation | Parametric polyhedra | Optimal loop tiling/fusion | Restricted to affine loops | Halide, Tiramisu, Triton (§15.1) |
 | Enzyme AD | LLVM IR differentiation | Language-agnostic, GPU support | Requires LLVM integration | Julia, C/C++, Rust (§15.2) |
 | NVRTC runtime PTX compile | CUDA source → PTX → SASS | Dynamic kernel specialization | Two-stage compile | PyTorch, JAX, XLA (§15.3) |
@@ -2222,6 +2280,7 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Mesa NIR / XLA / Triton | Multi-stage GPU pipelines | Specialized backends per stage | Ecosystem fragmentation | Mesa, TensorFlow, OpenAI (§15.5) |
 | Interaction-net runtime to GPU | Fixed CUDA evaluator interpreting graphs | No per-program codegen step | Constant-factor cost vs hand-tuned kernels | Bend / HVM2 (§15.6) |
 | Java to GPU via code reflection | Code models lowered to OpenCL/PTX at runtime | No separate kernel language | OpenJDK feature still maturing | Project Babylon + TornadoVM (§15.7) |
+| Executable semantics to fast simulator | Sail spec + staging/specialization | One authoritative ISA spec feeds practical simulator | Spec language constrains optimisation shape | Pydrofoil (§15.8) |
 | Perceus ref counting | Linear resource calculus | Garbage-free, in-place reuse | No cycles without extension | Koka (§16.1) |
 | Region-based memory | Region inference | Bulk deallocation, no GC pauses | Less control than ownership | MLKit, Cyclone (§16.2) |
 | Generational references | 48-bit gen per alloc + per-ref | 2–10% cost, no GC/RC/borrow checker | Runtime check on every deref | Vale (§16.3) |
@@ -2450,24 +2509,26 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 8. Steel Bank Common Lisp — https://www.sbcl.org/
 9. SBCL manual (SourceForge) — https://sbcl.sourceforge.net/manual/
 10. SBCL manual (canonical) — https://sbcl.org/manual/index.html
-11. Siskind — "Stalin: a Statically-Typing-Inferring Whole-Program Optimizing Compiler for Scheme" (APLAS 2003 invited) — https://engineering.purdue.edu/~qobi/papers/aplas2003.pdf
-12. Stalin source mirror — https://github.com/barak/stalin
-13. Siskind — "Flow-Directed Lightweight Closure Conversion" (1997 tech report) — https://www.iro.umontreal.ca/~feeley/papers/SiskindEC97.pdf
-14. MLton home — http://mlton.org/
-15. Cejtin, Jagannathan, Weeks — "Flow-Directed Closure Conversion for Typed Languages" (POPL 2000) — https://www.cs.purdue.edu/homes/suresh/papers/popl00-camera-ready.pdf
-16. MLton repository — https://github.com/MLton/mlton
-17. Fluet, Weeks — "Contification Using Dominators" — https://www.cs.purdue.edu/homes/suresh/papers/contification.pdf
-18. ActiveJ Codegen — https://activej.io/codegen
-19. ActiveJ Codegen examples — https://activej.io/codegen/examples
-20. activej-codegen on Maven Central — https://central.sonatype.com/artifact/io.activej/activej-codegen
-21. LuaJIT DynASM — https://luajit.org/dynasm.html
-22. QuickJS (Bellard) — https://bellard.org/quickjs/
-23. QuickJS-NG — https://github.com/quickjs-ng/quickjs
-24. QuickJS specification — https://bellard.org/quickjs/quickjs.html
-25. Wasmer — https://wasmer.io/
-26. Wasmer repository — https://github.com/wasmerio/wasmer
-27. WAVM — https://github.com/WAVM/WAVM
-28. WebAssembly Micro Runtime (WAMR) — https://github.com/bytecodealliance/wasm-micro-runtime
+11. ASTro: An AST-Based Reusable Optimization Framework — https://dl.acm.org/doi/10.1145/3759548.3763371
+12. ASTro VMIL 2025 paper PDF — https://www.atdot.net/~ko1/activities/2025_astro_VMIL2025.pdf
+13. Siskind — "Stalin: a Statically-Typing-Inferring Whole-Program Optimizing Compiler for Scheme" (APLAS 2003 invited) — https://engineering.purdue.edu/~qobi/papers/aplas2003.pdf
+14. Stalin source mirror — https://github.com/barak/stalin
+15. Siskind — "Flow-Directed Lightweight Closure Conversion" (1997 tech report) — https://www.iro.umontreal.ca/~feeley/papers/SiskindEC97.pdf
+16. MLton home — http://mlton.org/
+17. Cejtin, Jagannathan, Weeks — "Flow-Directed Closure Conversion for Typed Languages" (POPL 2000) — https://www.cs.purdue.edu/homes/suresh/papers/popl00-camera-ready.pdf
+18. MLton repository — https://github.com/MLton/mlton
+19. Fluet, Weeks — "Contification Using Dominators" — https://www.cs.purdue.edu/homes/suresh/papers/contification.pdf
+20. ActiveJ Codegen — https://activej.io/codegen
+21. ActiveJ Codegen examples — https://activej.io/codegen/examples
+22. activej-codegen on Maven Central — https://central.sonatype.com/artifact/io.activej/activej-codegen
+23. LuaJIT DynASM — https://luajit.org/dynasm.html
+24. QuickJS (Bellard) — https://bellard.org/quickjs/
+25. QuickJS-NG — https://github.com/quickjs-ng/quickjs
+26. QuickJS specification — https://bellard.org/quickjs/quickjs.html
+27. Wasmer — https://wasmer.io/
+28. Wasmer repository — https://github.com/wasmerio/wasmer
+29. WAVM — https://github.com/WAVM/WAVM
+30. WebAssembly Micro Runtime (WAMR) — https://github.com/bytecodealliance/wasm-micro-runtime
 
 ### Chapter 14 — Trace-Based JIT & Speculative Optimization
 
@@ -2485,6 +2546,9 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 12. Rakudo ThreadPoolScheduler — https://github.com/rakudo/rakudo/blob/nom/src/core/ThreadPoolScheduler.pm
 13. MoarVM threads.c — https://github.com/MoarVM/MoarVM/blob/master/src/core/threads.c
 14. Raku concurrency docs — https://docs.raku.org/language/concurrency.html
+15. A Lightweight Method for Generating Multi-Tier JIT Compilation Virtual Machine in a Meta-Tracing Compiler Framework — https://arxiv.org/html/2504.17460v1
+16. Reusing Highly Optimized IR in Dynamic Compilation — https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.25
+17. Oracle Labs publication page — Reusing Highly Optimized IR in Dynamic Compilation — https://labs.oracle.com/pls/apex/f?p=94065:10:983652587227:11670
 
 ### Chapter 15 — Domain-Specific & AI-Oriented Compilation
 
@@ -2505,6 +2569,8 @@ Background: arena allocation, struct-of-arrays layout, and qualifier-bit packing
 15. TornadoVM introduction — https://tornadovm.readthedocs.io/en/latest/introduction.html
 16. InfoQ — TornadoVM 2.0 GPU LLM — https://www.infoq.com/news/2025/12/tornadovm-20-gpu-llm/
 17. Babylon vs TornadoVM (Fumero) — https://jjfumero.github.io/posts/2025/02/07/babylon-and-tornadovm
+18. Pydrofoil: accelerating Sail-based instruction set simulators — https://arxiv.org/abs/2503.04389
+19. Pydrofoil repository — https://github.com/pydrofoil/pydrofoil
 
 ### Chapter 16 — Advanced Memory Management
 

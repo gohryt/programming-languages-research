@@ -2,19 +2,19 @@
 
 Research on observability, tracing, profiling, instrumentation, and runtime event pipelines — the "always-on" side of runtime introspection, as distinct from pause-and-inspect debugging.
 
-Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers (breakpoints, record/replay, time-travel, DWARF location tracking) are in `DEBUGGERS.md`; breakpoint-like systems appear here only when their patching or probe machinery is useful for tracing. Runtime concurrency mechanisms — schedulers, tasks, actors, channels, cancellation, STM, and I/O blocking boundaries — live in `CONCURRENCY.md`; this document covers only the event schemas, probes, buffers, sampling, and visualization needed to observe them. Memory disciplines and runtime memory architectures — GC, allocators, ownership, regions, hardware tagging, concurrent reclamation — are in `MEMORY.md`; memory-specific tracing mechanisms (heap snapshots, allocation sampling) currently live alongside their host event-pipeline entries in this document rather than being split out. Parser and compiler internals are in `PARSERS.md` and `COMPILERS.md`. Module systems, package identity, and dynamic module loading are in `MODULES.md`.
+Tracers favor structured event emission, low per-event overhead, and production safety over interactive stepping. User-facing debuggers are in `DEBUGGERS.md`; runtime concurrency mechanisms are in `CONCURRENCY.md`; memory disciplines and runtime memory architectures are in `MEMORY.md`. This document keeps the event schemas, probes, buffers, sampling, and visualization needed to observe those systems, plus memory-specific tracing mechanisms such as heap snapshots and allocation sampling when they are part of a host event pipeline.
 
 ---
 
 ## 1. Bytecode and Code Patching
 
-Mechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site. The common axis across the entries below is the cost when a probe is *not* installed: a reserved NOP, a predicted short jump, a single-byte flag read, or literally nothing. Debugger breakpoints use many of the same tricks, but this chapter focuses on the patch-site and disabled-overhead design that tracing systems can reuse.
+Mechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site. The common axis is the cost when a probe is *not* installed: a reserved NOP, a predicted short jump, a single-byte flag read, or literally nothing. Debugger breakpoints use many of the same tricks, but this chapter focuses on patch-site design and disabled-overhead tracing.
 
 ### 1.1. Luau — LOP_BREAK
 
 Luau (Roblox's Lua fork) rejects the standard Lua `debug.sethook()` model because a hook check on every instruction, line, or function entry creates a global tax even when no tool is active. Instead, it treats observation as bytecode patching: the target opcode is replaced with `LOP_BREAK`, while a parallel `debuginsn[]` array stores the original instruction for restoration.
 
-The tracing lesson is the disabled-overhead model, not the debugger UI: do not add a branch to every interpreter dispatch just because some instructions might be observed later. Patch only the requested sites, keep the normal bytecode stream identical when no probe is active, and pay dispatch cost only at enabled probes.
+The key point is the disabled-overhead model: patch only the requested sites, keep the normal bytecode stream identical when no probe is active, and pay dispatch cost only at enabled probes.
 
 Source: https://luau.org/performance/ — "Epsilon-overhead debugger" section.
 
@@ -22,7 +22,7 @@ Source: https://luau.org/performance/ — "Epsilon-overhead debugger" section.
 
 Erlang's BeamAsm JIT emits a tiny function prologue with a predicted jump over a shared instrumentation fragment. Normal execution pays one predictable branch; enabling observation changes a jump offset so control falls through to the fragment. Because the patch is a single byte on x86, it can be installed cheaply, and BeamAsm's W^X-compatible dual mapping lets writes go through a writable alias while execution uses the executable alias.
 
-For tracing, the transferable idea is a compact per-function patch site with a shared slow path. The debugger-specific breakpoint semantics belong in `DEBUGGERS.md`; the tracing-relevant property is that function-entry observation can be enabled without rewriting whole functions or leaving a global hot-path hook active.
+The transferable idea is a compact per-function patch site with a shared slow path: function-entry observation can be enabled without rewriting whole functions or leaving a global hot-path hook active.
 
 Sources: https://www.erlang.org/doc/apps/erts/beamasm — "Tracing and NIF Loading" section.
 
@@ -50,7 +50,7 @@ DTrace's User Statically Defined Tracing (USDT) probes allow application develop
 
 `is-enabled` probes are a related but distinct facility: they let user code cheaply ask whether a probe is active before constructing expensive arguments. That guard prevents wasted formatting, allocation, or data copying when no tracer is listening. Implementations differ in whether the guard is a memory load, a branch, a patched instruction, or a provider-specific fast path.
 
-The key design pattern is stable across implementations: separate the "is anyone listening?" check from the "prepare and emit probe data" work. The expensive part only runs when the probe is active. This two-phase pattern — cheap guard, expensive payload — appears in almost every high-performance tracing system.
+The key design pattern is stable across implementations: separate the "is anyone listening?" check from the "prepare and emit probe data" work. The expensive part only runs when the probe is active.
 
 Source: https://blogs.oracle.com/linux/from-kernel-to-user-space-tracing
 
@@ -72,7 +72,7 @@ Source: https://medium.com/@kcl17/inside-cuda-building-ebpf-uprobes-for-gpu-moni
 
 The consequence is that ftrace can produce entry+exit pairs for *every* kernel function with only one patch site per function (the entry NOP of §1.3). The return side is a runtime stack manipulation — no per-call-site patching, no per-function trampoline, one shared return handler for the whole kernel. The shadow-stack storage is per-task and bounded by current call depth, so the memory cost scales with concurrency, not with binary size.
 
-The design pattern is broadly useful: whenever a tracer needs paired entry/exit events but can only afford to patch one location, **hijack the return address and share a single return handler**. The same pattern appears in user-space profilers (e.g., uftrace's `-P funcgraph`), which is what makes `function_graph`-style output — timed, indented call trees — a tooling category of its own, distinct from both flat samplers (§11.3) and event streams (§3).
+The design pattern is broadly useful: whenever a tracer needs paired entry/exit events but can only afford to patch one location, **hijack the return address and share a single return handler**. The same pattern appears in user-space profilers (e.g., uftrace's `-P funcgraph`).
 
 Sources: https://docs.kernel.org/trace/ftrace.html and https://lwn.net/Articles/370423/
 
@@ -84,7 +84,7 @@ Every eBPF tracer that reads kernel data structures — bpftrace (§3.6), Parca 
 
 The payoff is a one-shot relocation with zero steady-state tax: the relocated program then executes as ordinary BPF code at its chosen attachment point, with normal memory loads and no per-event version dispatch or offset-lookup cost. Portability is *field-level*: the loader can adjust offsets, bitfield positions, array indices, and even widen or narrow load sizes. It cannot invent missing fields — those require `bpf_core_field_exists()` guards in the program source — but for everything short of that it is transparent.
 
-The broader consequence is an entire tooling category becoming viable. Distributable precompiled BPF binaries (the modern bcc tools, Parca Agent, Pyroscope eBPF profiler) only became practical once CO-RE removed the runtime-clang dependency; bpftrace one-liners became kernel-version-portable for the same reason. For a new language targeting kernel observability, CO-RE demonstrates a reusable pattern: **ship a compact typed description of the target alongside the emitted code, and let the loader patch the offsets**. The same idea can generalize to userspace uprobes where equivalent type metadata is available for the target binary, and to any instrumentation surface whose layout drifts across versions.
+The broader consequence is an entire tooling category becoming viable. Distributable precompiled BPF binaries (the modern bcc tools, Parca Agent, Pyroscope eBPF profiler) only became practical once CO-RE removed the runtime-clang dependency; bpftrace one-liners became kernel-version-portable for the same reason. The reusable pattern is simple: **ship a compact typed description of the target alongside the emitted code, and let the loader patch the offsets**.
 
 Sources: https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html and https://nakryiko.com/posts/bpf-core-reference-guide/ and https://docs.kernel.org/bpf/btf.html and https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html
 
@@ -108,7 +108,7 @@ The Linux tracing stack is easiest to understand as a taxonomy of probe stabilit
 
 BPF `fentry` and `fexit` are the modern low-overhead middle ground. They attach eBPF programs to kernel function entry/exit paths using ftrace-style patching and BTF type metadata. Compared with kprobes, they avoid the INT 3 trap path and can expose typed arguments to the verifier and the BPF program. Compared with static tracepoints, they can target many functions that were never annotated as official events.
 
-The language-runtime analogue is valuable. A runtime should distinguish **stable semantic tracepoints** from **unstable implementation probes**. Stable events are for production tools and compatibility promises; implementation probes are for experts diagnosing a specific build. A typed metadata format, like BTF, can make both safer by letting trace programs read arguments and fields by type rather than by guessed offsets.
+The language-runtime analogue is useful: a runtime should distinguish **stable semantic tracepoints** from **unstable implementation probes**. Stable events are for production tools and compatibility promises; implementation probes are for experts diagnosing a specific build.
 
 Sources: https://docs.kernel.org/trace/kprobetrace.html and https://docs.kernel.org/trace/events.html and https://docs.kernel.org/bpf/btf.html and https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/
 
@@ -625,7 +625,17 @@ The cost is the cost of emulation and whole-system setup. But as a design patter
 
 Sources: https://panda.re/ and https://www.ndss-symposium.org/wp-content/uploads/bar2021_23001_paper.pdf
 
-### 7.6. APM Auto-Instrumentation Agents — Managed-Runtime DBI at Class-Load
+### 7.6. Wastrumentation — Portable WebAssembly Dynamic Analysis with Intercession
+
+Munsters, Scull Pupo, and Gonzalez Boix's **Wastrumentation** (ECOOP 2025) is a general-purpose framework for dynamic analysis of WebAssembly modules. Its distinctive feature is **intercession**: instrumentation can mediate or alter behaviour, not only observe it. This puts it between read-only Wasm trace injection and full VM embedding.
+
+The portability point matters. A Wasm analysis framework that rewrites modules at the Wasm level can run across engines and hosts instead of depending on V8-, Wasmtime-, or browser-specific internal hooks. The analysis surface is the Wasm instruction stream and module structure: function entries/exits, memory operations, table calls, indirect calls, imports/exports, and traps can be instrumented in a way that survives host changes.
+
+The design lesson: **Wasm is not only a target IR but also a portable instrumentation substrate**. Languages targeting Wasm can get a cross-engine dynamic-analysis story by preserving enough source/debug metadata through Wasm lowering, then relying on module-level instrumentation instead of native DBI.
+
+Sources: https://github.com/aaronmunsters/wastrumentation and https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.23
+
+### 7.7. APM Auto-Instrumentation Agents — Managed-Runtime DBI at Class-Load
 
 Status (as of 2026-04): commercial APM (DataDog, New Relic, Dynatrace, AppDynamics, Elastic APM) and open-source OpenTelemetry auto-instrumentation both rewrite application bytecode at class-load time to inject spans into unmodified third-party libraries. This is conceptually DBI at a coarser granularity than Frida Stalker (§7.1) or MAMBO (§7.2) — rewriting at the class-or-function boundary in managed runtimes instead of the basic block in native code.
 
@@ -1141,7 +1151,8 @@ The "pay real overhead to gain deep visibility" designs: DBI, shadow state, and 
 |---|---|---|---|---|---|
 | Dynamic binary recompilation | §§7.1, 7.2 | N/A (always on) | 5–50× slowdown, or architecture-specific lower overhead | Every basic block | Frida Stalker, MAMBO |
 | Whole-system replay + plugin composition | §7.5 | VM / recording overhead | Offline heavyweight analyses | Whole VM | PANDA |
-| Managed-runtime DBI at class-load boundary | §7.6 | Agent startup + classloader isolation | Inlined `@Advice` template per method | Per-instrumented-method | DataDog / New Relic / OpenTelemetry Java agent |
+| Wasm module instrumentation with intercession | §7.6 | Rewritten module / loader integration | Per-instrumented Wasm operation or trap | Per-Wasm-instruction / per-function | Wastrumentation |
+| Managed-runtime DBI at class-load boundary | §7.7 | Agent startup + classloader isolation | Inlined `@Advice` template per method | Per-instrumented-method | DataDog / New Relic / OpenTelemetry Java agent |
 | Shadow memory metadata | §8.1 | N/A (always on) | 10–50× slowdown | Every byte / access | Valgrind Memcheck |
 | Compiler-inserted shadow checks | §8.2 | N/A (always on) | ~2× slowdown | Per-memory-access | AddressSanitizer |
 | Race-tracking shadow clocks | §8.3 | N/A (always on) | 5–15× slowdown | Per-memory-access | ThreadSanitizer |
@@ -1364,6 +1375,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 9. DataDog `dd-trace-java` — how instrumentations work (Muzzle) — https://github.com/DataDog/dd-trace-java/blob/master/docs/how_instrumentations_work.md
 10. Microsoft CLR Profiling API `ICorProfilerCallback` — https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/profiling/icorprofilercallback-interface
 11. OpenTelemetry Python zero-code instrumentation — https://opentelemetry.io/docs/zero-code/python/
+12. Wastrumentation repository — https://github.com/aaronmunsters/wastrumentation
+13. Wastrumentation ECOOP 2025 — https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.23
 
 ### Chapter 8 — Shadow State and Compiler-Inserted Checks
 

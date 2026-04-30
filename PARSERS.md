@@ -2,7 +2,7 @@
 
 Research on parser architectures, source location strategies, AST representations, and error recovery across languages and toolchains.
 
-This document focuses on the **front end**: everything from characters to a usable syntax tree. Representation entries here are scoped to parser output and parse-time data flow; the broader CST/AST/IR catalogue lives in `REPRESENTATIONS.md`. Everything downstream — semantic analysis, IR, codegen, runtime — is in `COMPILERS.md`. Debug-info encoding formats (DWARF state machine, JS Source Maps, JVM `LineNumberTable`, CPython PEP 657) are compiler-output concerns and live in `COMPILERS.md` as well. The structure *above* files — module systems, import semantics, package boundaries, build-graph formation — lives in `MODULES.md`.
+This document focuses on the **front end**: everything from characters to a usable syntax tree. Representation entries here are scoped to parser output and parse-time data flow; the broader CST/AST/IR catalogue lives in `REPRESENTATIONS.md`. Everything downstream — semantic analysis, IR, code generation, and runtime concerns — is in `COMPILERS.md`. Debug-info encoding formats (DWARF state machine, JS Source Maps, JVM `LineNumberTable`, CPython PEP 657) are compiler-output concerns and live in `COMPILERS.md` as well. The structure *above* files — module systems, import semantics, package boundaries, build-graph formation — lives in `MODULES.md`.
 
 ---
 
@@ -70,7 +70,7 @@ fn parse(min_bp):
 
 Bob Nystrom's explanation in "Pratt Parsers: Expression Parsing Made Easy" made the algorithm accessible to a much wider audience than Pratt's original paper. The key insight: recursive descent is natural for statements (which start with keywords), and Pratt parsing is natural for expressions (which start with operands). The two compose perfectly — use recursive descent at the statement level, Pratt parsing within expressions.
 
-The elegance is in the extensibility: adding a new operator requires only specifying its binding power and its `led` function. No grammar rewriting, no precedence table refactoring. This is why Pratt parsers dominate in language implementations that need to evolve their operator set.
+The main advantage is extensibility: adding a new operator requires only specifying its binding power and its `led` function. No grammar rewriting or precedence-table refactoring is required. This is why Pratt parsers dominate in language implementations that need to evolve their operator set.
 
 Source: https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
 ### 2.2. Precedence Climbing — The Parameterised Alternative to Pratt
@@ -108,9 +108,9 @@ Sources: https://we-like-parsers.github.io/pegen/peg_parsers.html and https://pe
 
 pest is a Rust PEG parser generator (see §2.3 for the PEG formalism) emphasising accessibility and speed over theoretical guarantees. It follows PEG ordered-choice semantics: alternatives are tried in order, and a later alternative is considered only if the earlier one fails. However, repetitions and predicates are greedy and do not perform regex-style backtracking to make later expressions succeed. Generated parsers read like direct recursive-descent code rather than table-driven state machines.
 
-Pest does not advertise packrat linear-time guarantees the way rust-peg's `#[cache]` attribute and peginator's opt-in memoisation do. In practice pest behaves like a simple PEG recursive-descent interpreter of the grammar, which trades worst-case complexity guarantees for smaller memory footprint and strong performance on typical inputs. For pathological inputs or grammars with costly ordered-choice/backtracking patterns, a memoising alternative (pegen in CPython 3.9+, rust-peg with `#[cache]`) is the safer choice.
+Pest does not advertise packrat linear-time guarantees the way rust-peg's `#[cache]` attribute and peginator's opt-in memoization do. In practice pest behaves like a PEG recursive-descent interpreter of the grammar, trading worst-case complexity guarantees for smaller memory footprint and strong performance on typical inputs. For pathological inputs or grammars with costly ordered-choice/backtracking patterns, a memoizing alternative (pegen in CPython 3.9+, rust-peg with `#[cache]`) is the safer choice.
 
-pest offers readable grammars, good error messages, and fast common-case parsing — offset by the absence of an explicit packrat complexity guarantee, which can matter for adversarial inputs.
+pest offers readable grammars, good error messages, and fast common-case parsing, at the cost of lacking an explicit packrat complexity guarantee for adversarial inputs.
 
 Sources: https://pest.rs/ and https://github.com/pest-parser/pest
 ### 2.5. LPeg — PEGs Compiled to a Parsing Virtual Machine
@@ -227,7 +227,7 @@ Scannerless GLR parsing (SGLR) has been used in the Spoofax language workbench a
 
 The cost: scannerless grammars are more ambiguous than tokenized ones (because character-level alternatives create more nondeterminism), requiring a more powerful — and slower — parsing algorithm. SRNGLR (Economopoulos et al., 2009) is on average 33% faster than SGLR, and 95% faster on highly ambiguous grammars.
 
-The relevance: any language that supports string interpolation, heredocs, or embedded DSLs faces the same lexer composition problem. Scannerless parsing is the principled solution.
+The relevance is straightforward: any language that supports string interpolation, heredocs, or embedded DSLs faces the same lexer-composition problem. Scannerless parsing is the principled solution.
 
 Sources: https://en.wikipedia.org/wiki/Scannerless_parsing and https://ir.cwi.nl/pub/24027/24027B.pdf
 ### 2.17. TCC — No AST, Direct Code Emission

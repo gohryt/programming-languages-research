@@ -2,7 +2,7 @@
 
 Research on language-level module systems: import semantics, export and visibility rules, encapsulation boundaries, dynamic loading, and tooling implications across programming languages.
 
-This document focuses on the structure above files and below whole programs: how languages define units of encapsulation, dependency, initialization, and source-level naming. The companion document `PACKAGING.md` covers the ecosystem layer that sits above modules — package identity, resolution, lockfiles, registries, build systems, workspaces, and reproducibility — which in production languages is usually a separate concern even when it appears unified at first glance. Parser and AST structure live in `PARSERS.md`. Compile-time graph invalidation, incremental compilation, and IR boundaries live in `COMPILERS.md`, though this document cross-references them where module design affects build and tooling behavior. Runtime observability and debugger protocol boundaries live in `TRACERS.md` and `DEBUGGERS.md`. The unifying axis here is *where modularity lives*: in files, directories, declarations, typed interfaces, runtime loaders, or macro phases.
+This document focuses on the structure above files and below whole programs: how languages define units of encapsulation, dependency, initialization, and source-level naming. The companion document `PACKAGING.md` covers the ecosystem layer above modules — package identity, resolution, lockfiles, registries, build systems, workspaces, and reproducibility — which in production languages is usually separate even when it appears unified at first glance. Parser and AST structure live in `PARSERS.md`. Compile-time graph invalidation, incremental compilation, and IR boundaries live in `COMPILERS.md`, though this document cross-references them where module design affects build and tooling behavior. Runtime observability and debugger protocol boundaries live in `TRACERS.md` and `DEBUGGERS.md`. The unifying axis here is *where modularity lives*: in files, directories, declarations, typed interfaces, runtime loaders, or macro phases.
 
 A module system is not just syntax for writing `import foo`. It is the language's answer to a cluster of hard questions:
 
@@ -15,7 +15,7 @@ A module system is not just syntax for writing `import foo`. It is the language'
 
 Because of this, module-system design leaks into nearly every other part of the language toolchain. A file-based module model affects parser and IDE assumptions. A package-based identity model affects the build graph and version resolution. Import-time execution affects debuggability, reproducibility, and cyclic semantics. Macro-phase imports affect compilation order and expandability. In practice, module systems are where language design, compiler architecture, and ecosystem ergonomics meet.
 
-This document follows the style of the other research notes: first define the major mechanism families, then use those families to organize later case studies and concrete language comparisons. The goal is not to catalog syntax. The goal is to build a design vocabulary rich enough to support explicit language-design comparisons later.
+This document first defines the major mechanism families, then uses those families to organize later case studies and concrete language comparisons. The goal is not to catalog syntax. It is to build a design vocabulary rich enough to support explicit language-design comparisons later.
 
 ---
 
@@ -37,7 +37,7 @@ The design choice is therefore not just whether names are nested, but **what hie
 
 A module boundary is also a visibility boundary. It distinguishes implementation details from API surface. The language may expose this with explicit markers (`pub`, `export`, `public`), naming conventions (Go's capitalization), interface files (`.mli`), export lists, or package-private scopes. Whatever the syntax, the purpose is the same: some declarations are promises to the outside world, others are merely local machinery.
 
-This matters for more than hygiene. Visibility is what lets a compiler and a programmer agree on which changes are semantically relevant. If a function is private to a module, the implementer can freely refactor it without breaking downstream users. If it is public, refactoring must preserve the published contract. A weak module system forces programmers to preserve more accidental surface area than they intended; a strong one lets them hide aggressively and evolve internals safely.
+This matters for more than hygiene. Visibility is what lets a compiler and a programmer agree on which changes are semantically relevant. If a function is private to a module, the implementer can freely refactor it without breaking downstream users. If it is public, refactoring must preserve the published contract. A coarse module system forces programmers to preserve more accidental surface area than they intended; a more expressive one lets them hide aggressively and evolve internals safely.
 
 There is also a granularity question. Some languages offer only public vs private. Others add crate-local, package-local, parent-visible, friend-like, or selectively re-exported scopes. That granularity is not academic: it determines whether a large codebase can express "public to sibling implementation modules, but not to external users" without structural hacks.
 

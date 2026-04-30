@@ -2,13 +2,13 @@
 
 This document owns research on language-level and runtime-level concurrency: threads, green threads, tasks, fibers, actors, channels, async/await, structured concurrency, scheduling, cancellation, synchronization, race-freedom, software transactional memory, and the runtime machinery that connects concurrent programs to I/O and operating-system resources.
 
-Ownership boundary: memory-safety and ownership models belong in `MEMORY.md`; type-system treatment of effects, capabilities, and `Send`/`Sync`-style marker traits belongs in `TYPES.md`; compiler lowering and code generation belong in `COMPILERS.md`; tracing, profiling, and runtime event pipelines belong in `TRACERS.md`; debugger workflows for async stacks and concurrency bugs belong in `DEBUGGERS.md`; module/package boundaries belong in `MODULES.md`. This document focuses on the execution model and coordination mechanisms.
+Memory-safety and ownership models belong in `MEMORY.md`; type-system treatment of effects, capabilities, and `Send`/`Sync`-style marker traits belongs in `TYPES.md`; compiler lowering and code generation belong in `COMPILERS.md`; tracing, profiling, and runtime event pipelines belong in `TRACERS.md`; debugger workflows for async stacks and concurrency bugs belong in `DEBUGGERS.md`; module/package boundaries belong in `MODULES.md`. This document focuses on the execution model and coordination mechanisms.
 
 ---
 
 ## 1. Scope and Design Axes
 
-This chapter names the recurring axes along which concurrency designs differ. None of these axes is binary in practice — almost every real runtime makes a different trade-off on each — but separating them clarifies what each later chapter is optimising for. The axes are not ordered by importance; they are ordered by how visible the choice becomes at the source-language level.
+This chapter names the recurring axes along which concurrency designs differ. None of these axes is binary in practice, but separating them clarifies what each later chapter is optimising for.
 
 ### 1.1. Parallelism vs concurrency
 
@@ -34,7 +34,7 @@ Four execution-unit terms recur in this document:
 
 Status (JDK 21+): Java virtual threads are scheduled by the JDK rather than the OS; the JDK scheduler assigns virtual threads to platform-thread carriers in an M:N arrangement (see §5.3). Source: https://openjdk.org/jeps/444
 
-Tokio tasks are lightweight, non-blocking units managed by the Tokio runtime rather than the OS scheduler; tasks should yield instead of blocking worker threads. Source: https://docs.rs/tokio/0.2.9/tokio/task/index.html
+Tokio tasks are lightweight, non-blocking units managed by the Tokio runtime rather than the OS scheduler; tasks should yield instead of blocking worker threads. Source: https://docs.rs/tokio/latest/tokio/task/
 
 ### 1.3. Stackful vs stackless suspension
 
@@ -119,7 +119,7 @@ Source: https://koka-lang.github.io/koka/doc/
 
 Status (JDK 21): Java virtual threads became a final feature, giving the JDK an M:N virtual-thread scheduler over carrier platform threads (full treatment in §5.3).
 
-Status (as of JDK 26 docs): `ForkJoinPool` remains Java's core work-stealing executor and supports scheduled tasks in the JDK 26 API. Source: https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/util/concurrent/ForkJoinPool.html
+Status (as of JDK 26 docs): `ForkJoinPool` remains Java's core work-stealing executor in the JDK API. Source: https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/util/concurrent/ForkJoinPool.html
 
 Status (Swift 5.5+): Swift added async/await, task groups, actors, and `Sendable` checking as part of its concurrency model.
 
@@ -269,7 +269,7 @@ The mechanical core: a Bend program compiles to an HVM2 net (a graph of typed no
 
 The trade-off is real and worth naming: interaction-net evaluation pays a constant-factor overhead vs ordinary execution (every operation is a graph rewrite, not an inline machine instruction), so a sequential Bend program is slower than a sequential C program even on one thread. The bet is that on workloads with abundant intrinsic parallelism, the GPU's thousands of lanes more than compensate. Distinct from Cilk-style work stealing (§3.3), which still requires programmers to identify spawnable tasks; distinct from OpenMP pragmas (§3.9), which require declaring loop-parallel regions; distinct from data-parallel languages (Halide, Triton — `COMPILERS.md §15`), which require expressing computation as parallel array kernels. HVM2's contribution is making **arbitrary higher-order functional programs** parallel without the programmer naming the parallelism.
 
-Status (as of 2026-04): Bend is research-grade; the standard library is small, ecosystem is nascent, and the constant-factor cost makes it unsuitable for the kind of fine-grained sequential code Rust or C target. As an existence proof that a non-explicit-parallelism programming model can scale to GPUs without programmer annotation, however, it is the most original parallel-runtime data point of the 2020s. The compile-target IR (interaction combinator graphs) is treated separately in `REPRESENTATIONS.md §13.11`; the GPU compilation pipeline angle is in `COMPILERS.md §15.6`.
+Status (as of 2026-04): Bend is research-grade; the standard library is small, ecosystem is nascent, and the constant-factor cost makes it unsuitable for the kind of fine-grained sequential code Rust or C target. As an existence proof that a non-explicit-parallelism programming model can scale to GPUs without programmer annotation, however, it is the most original parallel-runtime data point of the 2020s. The compile-target IR (interaction combinator graphs) is treated separately in `REPRESENTATIONS.md §13.12`; the GPU compilation pipeline angle is in `COMPILERS.md §15.6`.
 
 Sources: https://github.com/HigherOrderCO/Bend and https://github.com/HigherOrderCO/HVM2 and https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf and https://higherorderco.com/
 
@@ -300,7 +300,7 @@ Sources: https://activej.io/async-io/eventloop and https://activej.io/boot/worke
 
 Jarred Sumner / Oven's **Bun** (since 2022; v1.0 September 2023) is the production Zig data point in the JavaScript runtime space — an all-in-one runtime, bundler, package manager, and test runner implemented in approximately 700 KLOC of Zig over the **JavaScriptCore** engine (Apple's Safari engine), explicitly *not* V8. The architectural choice is: pick the engine optimised for cold-start latency (JSC's interpreter-tier startup beats V8 Ignition's by a wide margin), pair it with Zig's manual memory management and zero-cost FFI, and unify what Node ships as separate tools (`npm`, `webpack`, `jest`, `tsc --watch`) into one binary with shared runtime infrastructure.
 
-Distinct from Node.js (V8 + libuv): Bun's I/O loop is custom-written in Zig, supports io_uring on Linux, and exposes Node-compatible APIs (`fs`, `http`, `child_process`, `cluster`) plus Web-standard APIs (`fetch`, `WebSocket`, `Response`) on the same runtime. The package manager is content-addressed (a global cache shared across projects), much faster than `npm install` on cold cache, and uses a binary lockfile format (`bun.lock`). The bundler is Webpack-API-compatible but written in Zig and competitive with esbuild and Rolldown (`PACKAGING.md §4` modern JS toolchain).
+Distinct from Node.js (V8 + libuv): Bun's I/O loop is custom-written in Zig, supports io_uring on Linux, and exposes Node-compatible APIs (`fs`, `http`, `child_process`, `cluster`) plus Web-standard APIs (`fetch`, `WebSocket`, `Response`) on the same runtime. The package manager is content-addressed (a global cache shared across projects), much faster than `npm install` on cold cache, and uses a binary lockfile format (`bun.lock`). The bundler is Webpack-API-compatible but written in Zig and competitive with esbuild and Rolldown (`PACKAGING.md §4.9`).
 
 Status (as of 2026-04): production-stable; deployed at scale by Vercel (some Edge functions), Railway (default Node-replacement), several SaaS startups. Distinct from Deno (`PACKAGING.md §3.7`), which is V8-based and capability-sandboxed; Bun targets the "drop-in faster Node" deployment where capability sandboxing is not the goal. The lesson generalises: **a unified-toolchain runtime in a systems language with manual memory management can leapfrog the Node-as-separate-tools baseline**, with the catch that JavaScriptCore-specific behaviour (different from V8's) sometimes surfaces as compatibility gaps.
 
@@ -338,7 +338,7 @@ Virtual-thread and fiber systems choose the opposite trade-off: blocking-looking
 
 Blocking a worker thread in an async runtime can starve unrelated tasks. Practical runtimes provide escape hatches: blocking thread pools, `spawn_blocking`, `block_in_place`, or annotations that let the scheduler compensate.
 
-Tokio's task docs explain that tasks should not perform blocking syscalls and provide APIs for running blocking work in an asynchronous context. Source: https://docs.rs/tokio/0.2.9/tokio/task/index.html
+Tokio's task docs explain that tasks should not perform blocking syscalls and provide APIs for running blocking work in an asynchronous context. Source: https://docs.rs/tokio/latest/tokio/task/
 
 ### 4.6. Elm tasks and effect managers — constrained functional asynchrony
 
@@ -878,7 +878,7 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 ### Chapter 1 — Scope and Design Axes
 
 1. JEP 444: Virtual Threads — https://openjdk.org/jeps/444
-2. Tokio task documentation — https://docs.rs/tokio/0.2.9/tokio/task/index.html
+2. Tokio task documentation — https://docs.rs/tokio/latest/tokio/task/
 3. Rust `Future` trait — https://doc.rust-lang.org/stable/std/future/trait.Future.html
 4. OCaml effect handlers manual — https://ocaml.org/manual/effects.html
 5. Erlang scheduler overview — https://blog.appsignal.com/2024/04/23/deep-diving-into-the-erlang-scheduler.html
@@ -942,7 +942,7 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 1. Rust async book — build an executor — https://rust-lang.github.io/async-book/02_execution/04_executor.html
 2. Rust `Future` trait — https://doc.rust-lang.org/stable/std/future/trait.Future.html
 3. Rust Reference — await expressions — https://doc.rust-lang.org/stable/reference/expressions/await-expr.html
-4. Tokio task documentation — https://docs.rs/tokio/0.2.9/tokio/task/index.html
+4. Tokio task documentation — https://docs.rs/tokio/latest/tokio/task/
 5. Elm concurrent FRP thesis — https://elm-lang.org/assets/papers/concurrent-frp.pdf
 6. Elm Task implementation — https://github.com/elm/core/blob/master/src/Task.elm
 7. C++20 coroutines (cppreference) — https://en.cppreference.com/w/cpp/language/coroutines

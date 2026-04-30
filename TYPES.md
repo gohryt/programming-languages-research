@@ -4,21 +4,23 @@ This document owns research on type systems and the semantic-analysis machinery 
 
 It covers the path from names and scopes to typed programs: symbol tables, name resolution, type representation, inference, checking, subtyping, generics, traits/type classes, gradual typing, dependent typing, effects, ownership-adjacent type disciplines, exhaustiveness, diagnostics, and incremental semantic analysis.
 
-Ownership boundary: parser algorithms belong in `PARSERS.md`; concrete and intermediate representation catalogues belong in `REPRESENTATIONS.md`; lowering, optimization, and code generation belong in `COMPILERS.md`; ownership and memory-safety policy belongs in `MEMORY.md`; module/package boundaries belong in `MODULES.md`; language-server protocol and formatter/linter UX should be treated in a future tooling document if that exists. This document focuses on the semantic rules and algorithms that decide what programs mean before lowering.
+Parser algorithms belong in `PARSERS.md`; representation catalogues belong in `REPRESENTATIONS.md`; lowering, optimization, and code generation belong in `COMPILERS.md`; ownership and memory-safety policy belongs in `MEMORY.md`; module/package boundaries belong in `MODULES.md`. This document focuses on the semantic rules and algorithms that decide what programs mean before lowering.
 
 ---
 
 ## 1. Scope and Design Axes
 
-This chapter names the recurring axes along which type-system designs differ. The axes overlap and combine in practice — most production type checkers make a different trade-off on each — but separating them clarifies what each later chapter is optimising for. The axes below are ordered roughly by how visible the choice is to the language user, from "what counts as well-typed" through "where types live" to "how much the user must annotate."
+This chapter names the recurring axes along which type-system designs differ. The axes overlap and combine in practice, but separating them clarifies what each later chapter is optimising for.
 
 ### 1.1. Static, dynamic, gradual, and hybrid checking
 
 A static type checker rejects some programs before execution; a dynamic language defers most checks to runtime; a gradual type system deliberately allows typed and untyped regions to coexist, usually with runtime casts or contracts at boundaries. The engineering choice is not simply safety versus flexibility: it also changes compilation strategy, runtime metadata, optimizer assumptions, diagnostic quality, and language-server latency.
 
-Typed Racket is a strong example of migratory typing: typed and untyped modules interoperate through contracts, and the type system uses *occurrence typing* — flow-sensitive refinement of a variable's type based on predicate tests in the surrounding control flow — to understand predicates common in dynamic Racket code. Full treatment in §7.3.
+Typed Racket is a strong example of migratory typing: typed and untyped modules interoperate through contracts, and the type system uses occurrence typing to understand predicates common in dynamic code. Full treatment in §7.3.
 
-TypeScript is an intentionally pragmatic structural type system for JavaScript. Its handbook notes unsound compatibility choices made to model common JavaScript idioms; its narrowing machinery tracks control-flow-sensitive refinements. Source: https://www.typescriptlang.org/docs/handbook/type-compatibility.html. Detail in §6.5 (conditional types) and §7.2 (narrowing).
+TypeScript is an intentionally pragmatic structural type system for JavaScript. Its handbook explicitly documents unsound compatibility choices made to model common JavaScript idioms. Detail in §7.2.
+
+Source: https://www.typescriptlang.org/docs/handbook/type-compatibility.html
 
 ### 1.2. Nominal, structural, and path-dependent identity
 
@@ -392,9 +394,11 @@ The main trade-off is placement: refinement types as an optional verification la
 
 **F\* refinement types**: covered from the verification-result side in `MEMORY.md §8.9` (Project Everest, HACL\*, EverCrypt). The Everest deployment is the largest production refinement-types result outside Dafny IAM; F\* is also distinctive in combining refinement with *effect-typed computation*, so refinements can constrain not only return values but also which effects an expression performs.
 
+**Practical type-based taint checking and inference** (Karimipour, Das, Sridharan, Hassanshahi — ECOOP 2025) is the security-refinement counterpart: source/sink/propagation policies are encoded into a type-based taint discipline, with inference reducing the annotation burden. Taint is less expressive than arbitrary refinement logic but more operationally deployable: many security policies are exactly “untrusted input must not reach this sink without a sanitizer.” The important design point is that taint qualifiers can be inferred across APIs and library stubs, making the checker usable on existing code rather than only greenfield programs.
+
 The design lesson: **refinement types are now production-viable for narrow well-specified domains** (cryptographic primitives, access control, parser combinators, sorting) where the refinement predicate is small, the cost of a wrong implementation is high, and the SMT solver has a fast path for the relevant theory. Status (as of 2026-04): broad-domain refinement remains research; narrow-domain refinement has shipped at significant scale.
 
-Sources: https://ucsd-progsys.github.io/liquidhaskell/ and https://dafny.org/ and https://stainless.epfl.ch/ and https://whiley.org/ and https://flux-rs.github.io/flux/ and https://www.fstar-lang.org/
+Sources: https://ucsd-progsys.github.io/liquidhaskell/ and https://dafny.org/ and https://stainless.epfl.ch/ and https://whiley.org/ and https://flux-rs.github.io/flux/ and https://www.fstar-lang.org/ and https://arxiv.org/abs/2504.18529 and https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.18
 
 ### 7.6. MLsub and Algebraic Subtyping — Principal Type Inference with Subtypes
 
@@ -586,6 +590,10 @@ Unison uses abilities and ability handlers; a function type may require an abili
 
 `Status (OCaml 5.2):` the runtime-level `Effect` module exposes effect handlers without static effect safety; from a type-rule perspective, this means OCaml's effects are unchecked at the type level even when handled at runtime. Runtime/maturity detail is owned by `CONCURRENCY.md §5.5` and `COMPILERS.md §19.3`. Source: https://ocaml.org/manual/5.2/effects.html
 
+Dagnino, Giannini, and Zucca's **Monadic type-and-effect soundness** (ECOOP 2025) supplies a meta-theory for type-and-effect systems using monadic operational semantics. The significance is not a new surface feature but a proof architecture: effects are represented in the semantics by monadic structure, and soundness is stated in a way analogous to ordinary progress/preservation while accounting for effectful rewriting. This is useful for implementers because it gives a reusable route for proving effect-system soundness without encoding each effect as a bespoke small-step extension.
+
+Sources: https://arxiv.org/abs/2504.10159 and https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.7
+
 ### 11.3. Effect rows and capability sets
 
 Effect rows use row-polymorphism-like machinery to express extensible sets of effects. Capability sets can be treated similarly, but with an authority interpretation: a function may only perform operations for capabilities in its environment.
@@ -600,7 +608,15 @@ Design choices:
 - how effects appear in public APIs;
 - whether unhandled effects are compile errors or runtime errors.
 
-### 11.4. Effekt — Lexical Effect Handlers with Second-Class Capabilities
+### 11.4. Effectful Object Calculi
+
+Dagnino, Giannini, and Zucca's **An Effectful Object Calculus** (ECOOP 2025) studies objects in the presence of explicit effects. The design point is the interaction between object-oriented constructs — method calls, object identity, field access, inheritance-like dispatch, and exception-like control — and type-and-effect reasoning. Object calculi are often used as small cores for class-based or prototype-based languages; making effects explicit in such a core gives a place to state and prove which operations may allocate, mutate, throw, perform I/O, or interact with handlers.
+
+The lesson: **effects should be designed into the object core, not only added to function types**. Languages with methods, mutable objects, and effect annotations need rules for how receiver effects, method-body effects, overridden-method effects, and object initialization effects compose.
+
+Sources: https://arxiv.org/pdf/2504.15936 and https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.8
+
+### 11.5. Effekt — Lexical Effect Handlers with Second-Class Capabilities
 
 Brachthäuser, Schuster, Ostermann's **Effekt** (Tübingen, 2020+) is a research language whose effect system is built around **second-class capabilities**: an effect handler is a capability that can be received as an argument or be in scope, but cannot be stored in heap data structures, returned from functions, or otherwise escape its lexical introduction site. This eliminates the need for runtime evidence threading at the cost of restricting where capabilities can flow.
 
@@ -620,13 +636,13 @@ Recent compilation work has formalised the lexical-effect-handler discipline as 
 
 Sources: https://effekt-lang.org/ and https://se.cs.uni-tuebingen.de/publications/brachthaeuser20effect.pdf and https://dl.acm.org/doi/10.1145/3428194 and https://dl.acm.org/doi/10.1145/3622831 and https://iris-project.org/pdfs/2025-popl-affect.pdf
 
-### 11.5. Session Types — Typed Communication Protocols
+### 11.6. Session Types — Typed Communication Protocols
 
 Session types (Honda 1993; Honda, Vasconcelos, Kubo — ESOP 1998; multiparty extension Honda, Yoshida, Carbone — POPL 2008) are the canonical typing discipline for **communication protocols**. A session type is an inhabited type for one *side* of a channel; the protocol is the dual pair: `!T.S` ("send `T`, then continue with session `S`") on one endpoint requires `?T.S'` ("receive `T`, then continue with session `S'`") on the other, with `S` and `S'` themselves dual. The type system rejects programs that try to send a message of the wrong type, receive in a state where the protocol expects a send, or close a channel before the protocol completes.
 
 The two-party (binary) form generalises to **multiparty session types (MPST)**: a global type describes the protocol from the system view, and per-role *projections* give each participant its local session type. The Imperial College / OOI **Scribble** specification language is the production-grade MPST tool: participants generate session-typed APIs from a single global protocol description, and the projection algorithm guarantees that local conformance implies global protocol fidelity.
 
-Distinct from typestate (§12.3): typestate tracks *one object's* state machine; session types track *the protocol of communication between multiple parties*. Distinct from algebraic effects (§11.2): effects describe what a function may do; session types describe the contract between communicating processes. They commonly compose — Effekt (§11.4) and Singularity OS's Sing# integrate session types with effect handlers / channel contracts, respectively. Distinct from CSP-style channels (`CONCURRENCY.md §7.1`): CSP gives runtime communication, session types give *static* communication-protocol typing — the same protocol can be a runtime behaviour or a compile-time guarantee.
+Distinct from typestate (§12.3): typestate tracks *one object's* state machine; session types track *the protocol of communication between multiple parties*. Distinct from algebraic effects (§11.2): effects describe what a function may do; session types describe the contract between communicating processes. They commonly compose — Effekt (§11.5) and Singularity OS's Sing# integrate session types with effect handlers / channel contracts, respectively. Distinct from CSP-style channels (`CONCURRENCY.md §7.1`): CSP gives runtime communication, session types give *static* communication-protocol typing — the same protocol can be a runtime behaviour or a compile-time guarantee.
 
 Production and research deployments:
 
@@ -635,17 +651,17 @@ Production and research deployments:
 - **F* session types** (Project Everest) for low-level network protocol verification.
 - **Java Sessions / Mungo / StMungo** — JVM session-types frameworks with Scribble integration.
 - **OCaml session-ocaml** — ML-family experiment.
-- **Effekt session types** — extends Effekt's second-class capabilities (§11.4) with session-typed channels.
+- **Effekt session types** — extends Effekt's second-class capabilities (§11.5) with session-typed channels.
 
 Status (as of 2026-04): full multiparty session types remain research-grade in production languages; binary session types are simpler to integrate but limited to two-party protocols. The architectural lesson is that **session types are the type-level dual of CSP and the actor model**: for a language with channels, session types are the strongest static guarantee available; for a language with actors, MPST adapts naturally as a global-protocol description that projects to per-actor local types. Languages designing channels or actors from scratch should decide early whether session-type integration is in scope, since retrofitting linear-session discipline onto an existing channel API is hard.
 
 Sources: https://www.doc.ic.ac.uk/~yoshida/papers/multiparty-tutorial.pdf and https://www.scribble.org/ and https://groups.inf.ed.ac.uk/abcd/papers/ESOP98.pdf and https://github.com/sessionrs/sessionrs
 
-### 11.6. Verse — Functional-Logic Programming with Failure-as-Effect
+### 11.7. Verse — Functional-Logic Programming with Failure-as-Effect
 
 Tim Sweeney and Simon Peyton Jones's **Verse** (Epic Games, deployed in **Unreal Editor for Fortnite (UEFN)** since 2023) is the largest production deployment of **functional-logic programming** in any language — and the design point worth recording is that **failure is a first-class effect**. Every Verse expression has a *success/failure* outcome alongside its value: `if (x > 0) { y } else { fail }` reads naturally because the failure context is part of the language's evaluation semantics, not an exception bolted on top. Failure backtracks across logical-and and propagates through logical-or, recovering the Mercury / Curry functional-logic tradition with deterministic execution semantics suitable for an authoritative game runtime.
 
-The type-system contribution of interest in this chapter is treating **failure as an effect row** comparable to the algebraic-effects rows of Koka (§11.2) and the second-class capabilities of Effekt (§11.4). A Verse function's signature includes which effect specifiers it may exhibit — `decides`, `varies`, `transacts`, `reads`, `writes`, `allocates`, `suspends` — and the type system rejects programs that invoke a stronger-effect callee from a weaker-effect context. The `transacts` effect is particularly distinctive: a function in `transacts` context may roll back its mutations on failure, recovering software transactional memory (`CONCURRENCY.md §9.4`) at the language level rather than as a library.
+The type-system contribution of interest in this chapter is treating **failure as an effect row** comparable to the algebraic-effects rows of Koka (§11.2) and the second-class capabilities of Effekt (§11.5). A Verse function's signature includes which effect specifiers it may exhibit — `decides`, `varies`, `transacts`, `reads`, `writes`, `allocates`, `suspends` — and the type system rejects programs that invoke a stronger-effect callee from a weaker-effect context. The `transacts` effect is particularly distinctive: a function in `transacts` context may roll back its mutations on failure, recovering software transactional memory (`CONCURRENCY.md §9.4`) at the language level rather than as a library.
 
 The **deterministic execution semantics** is the architectural complement: Verse evaluation in UEFN must produce identical outcomes on every client running the same simulation, so the language commits to a deterministic interleaving of failures, transactions, and effect handlers. This is rare for a production game-runtime language; most game scripting (Lua in Roblox via Luau, C# in Unity, GameplayTags in Unreal Blueprint) accepts non-determinism as the cost of dynamic dispatch and lets gameplay code paper over it.
 
@@ -655,9 +671,9 @@ The lesson generalises: **for languages whose primary use case demands determini
 
 Sources: https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference and https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf
 
-### 11.7. Frank — Bidirectional Effect Types Without Effect Variables
+### 11.8. Frank — Bidirectional Effect Types Without Effect Variables
 
-Lindley, McBride, Hillerström, Convent et al.'s **Frank** (initial paper "Do Be Do Be Do", POPL 2014/2017; expanded JFP article "Doo Bee Doo Bee Doo", 2020) is a strict functional language whose distinguishing contribution is **effect polymorphism without effect variables in source code**. Where Koka (§11.2) and Effekt (§11.4) require programmers to write effect rows like `<exn,async>` explicitly on function types, Frank achieves the same expressive power through a *bidirectional* effect-typing rule: the effect set a function may perform is propagated structurally through type checking, and the source language has no syntax for naming an effect variable.
+Lindley, McBride, Hillerström, Convent et al.'s **Frank** (initial paper "Do Be Do Be Do", POPL 2014/2017; expanded JFP article "Doo Bee Doo Bee Doo", 2020) is a strict functional language whose distinguishing contribution is **effect polymorphism without effect variables in source code**. Where Koka (§11.2) and Effekt (§11.5) require programmers to write effect rows like `<exn,async>` explicitly on function types, Frank achieves the same expressive power through a *bidirectional* effect-typing rule: the effect set a function may perform is propagated structurally through type checking, and the source language has no syntax for naming an effect variable.
 
 The mechanical core is the **adjustment**. A Frank arrow `[E1] A -> [E2] B` says "in an ambient effect set adjusted by `E1` going in, returning a value of `B` adjusted by `E2`." Effect handlers (called *operators* in Frank) take continuation-style arguments and are pattern-matched against effect signatures; the typing rule for operator application threads the ambient effect set through the bidirectional check, and the language never needs an explicit `forall e. e in ...` quantifier the way ML-style row variables would.
 
@@ -691,7 +707,17 @@ Typestate tracks state transitions in the type of a value: open versus closed fi
 
 The trade-off is whether typestate lives as a library pattern (low implementation cost, less uniform diagnostics) or as a first-class checker feature (more uniform error messages and stronger guarantees, but additional checker complexity and surface syntax).
 
-### 12.4. ATS — Linear Plus Dependent Types in a Production Systems Language
+### 12.4. Type-Safe Packed Data with Indexed Readers
+
+Jamet and Vollmer's **type-safe and portable support for packed data** (ECOOP 2025) shows how a library can recover many benefits of compiler-supported packed representations without modifying the compiler. The Haskell `packed-data` library represents packed buffers with phantom/index types that describe the sequence of values in the buffer, and uses an indexed monad `PackedReader before after result` to track cursor movement through the type system. A reader that expects an `Int` cannot accidentally read a `Char`, and a computation that has not consumed the expected bytes cannot be run as if it were finished.
+
+The type-system mechanism is ordinary type indexing plus code generation. Template Haskell derives pack/read/case/transform functions for user ADTs; optional indirection flags change the generated reader types to expose field-size words. This makes layout choices visible at the type level: code written for a buffer with indirections is not silently reused for a buffer without them.
+
+The performance lesson is mixed but useful. Traversals over packed trees can be up to **60% faster** than unpacked Haskell in favourable full-traversal cases by avoiding pointer chasing and deserialization; random field access can be much worse without indirections; monadic abstraction overhead remains visible. The general design lesson is that **data-layout safety can be encoded as a type-level cursor protocol**, giving a safer library-level path to packed data before committing to compiler-native support.
+
+Sources: https://arxiv.org/abs/2504.20166 and https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.38
+
+### 12.5. ATS — Linear Plus Dependent Types in a Production Systems Language
 
 Hongwei Xi's **ATS** (Applied Type System, 2003+) is one of the few production systems languages combining **linear types** (proof obligations consumed on use), **dependent types** (types parametric over runtime values), and **C interoperability**. ATS compiles to portable C and targets the systems-programming domain — kernels, embedded systems, cryptography — where Rust's ownership model would be preferred today, but ATS shipped a more expressive type system a decade earlier.
 
@@ -708,7 +734,7 @@ The lesson is that **combining linearity with dependent types is feasible at pro
 
 Sources: http://www.ats-lang.org/ and https://www.cs.bu.edu/~hwxi/ATS/ATS.html and https://www.cs.bu.edu/~hwxi/atslangweb/ATS2/COURSES/PRACTAlT/HTML/x46.html
 
-### 12.5. Move — Resource Types and Abilities for Smart Contracts
+### 12.6. Move — Resource Types and Abilities for Smart Contracts
 
 Sam Blackshear et al.'s **Move** (Diem/Libra, 2019; now production at **Aptos** and **Sui**, 2022+) is the largest production deployment of linear types in any language, period. The core type-system primitive is the **resource** — a struct whose values must be linearly used: cannot be copied, cannot be silently dropped (must be explicitly destroyed via a constructor of the defining module), and cannot leak from the module that defined it. This is exactly the discipline ATS (§12.4) and Linear Haskell (`MEMORY.md §1.11`) describe, but applied to digital assets where copying or losing a value is a real economic loss.
 
@@ -812,10 +838,11 @@ The technique families below collapse the chapter-level material into a comparis
 | Pluggable type system | Application-specific extra disciplines | One javac plug-in per discipline; cannot share inference machinery | Researchers/security ship checkers without language-committee buy-in | Java + Checker Framework (§1.6) |
 | Bidirectional effect typing without effect variables | Adjustment-driven effect propagation; multi-handlers | Effect polymorphism without user-visible row variables | Error messages must expose inferred effect set | Frank (§11.7) |
 | Dependent types | Proofs and precise invariants | Elaborator, holes, unification, kernel | High implementation complexity | (§10.1, §10.3, §6.9); Cubical Agda / HoTT (§10.5) |
-| Effect systems | Purity, capabilities, checked effects | Effect rows/sets and handler typing | Annotation and inference complexity | (§11.1, §11.2, §11.3); Effekt second-class capabilities (§11.4) |
-| Session types | Statically-typed communication protocols | Linearity discipline + duality + (for MPST) projection | Production tooling research-grade; integrates with channels and actors | Sing#, Scribble, Rust mpstthree (§11.5) |
-| Failure-as-effect functional-logic typing | Domain language with non-determinism + decidability | Effect specifiers (`transacts`/`decides`/`varies`) drive typed search | Confines logic-programming-style search to where effect annotation permits it | Verse (§11.6) |
-| Linear/affine types | Resources and protocols | Use-counting and move analysis | Ergonomic friction | (§12.1, §12.3); ATS linear-plus-dependent (§12.4); Move ability system (§12.5) |
+| Effect systems | Purity, capabilities, checked effects | Effect rows/sets and handler typing | Annotation and inference complexity | (§11.1, §11.2, §11.3); effectful object calculi (§11.4); Effekt second-class capabilities (§11.5) |
+| Session types | Statically-typed communication protocols | Linearity discipline + duality + (for MPST) projection | Production tooling research-grade; integrates with channels and actors | Sing#, Scribble, Rust mpstthree (§11.6) |
+| Failure-as-effect functional-logic typing | Domain language with non-determinism + decidability | Effect specifiers (`transacts`/`decides`/`varies`) drive typed search | Confines logic-programming-style search to where effect annotation permits it | Verse (§11.7) |
+| Linear/affine types | Resources and protocols | Use-counting and move analysis | Ergonomic friction | (§12.1, §12.3); ATS linear-plus-dependent (§12.5); Move ability system (§12.6) |
+| Indexed data-layout protocols | Safe traversal of packed/serialized buffers | Type-level cursor state + generated readers | Safer than pointer arithmetic; less ergonomic than native pattern matching | packed-data (§12.4) |
 | Exhaustiveness checking | Pattern-match safety | Pattern matrix or space algorithms | Hard with open/extensible types | (§8.3) |
 | Incremental semantic analysis | IDEs and fast rebuilds | Query dependency graph and stable IDs | Architecture complexity | (§13.2, §13.3) |
 
@@ -920,6 +947,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 7. Whiley language — https://whiley.org/
 8. Flux refinement types for Rust — https://flux-rs.github.io/flux/
 9. F\* language — https://www.fstar-lang.org/
+9a. Practical Type-Based Taint Checking and Inference — https://arxiv.org/abs/2504.18529
+9b. Practical Type-Based Taint Checking and Inference (ECOOP 2025) — https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.18
 10. Stephen Dolan — Algebraic Subtyping (Cambridge PhD thesis, 2017) — https://www.cl.cam.ac.uk/~sd601/thesis.pdf
 11. Parreaux — "MLstruct: Principal Type Inference in a Boolean Algebra of Structural Types" (EPFL) — https://infoscience.epfl.ch/record/278576
 12. MLscript repository — https://github.com/hkust-taco/mlscript
@@ -967,6 +996,10 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 10. Effekt OOPSLA 2020 (ACM DL) — https://dl.acm.org/doi/10.1145/3428194
 10b. Schuster et al. — Enabling Efficient Compilation of Lexical Effect Handlers (OOPSLA 2023) — https://dl.acm.org/doi/10.1145/3622831
 10c. Affect: An Affine Type and Effect System (POPL 2025) — https://iris-project.org/pdfs/2025-popl-affect.pdf
+10d. Monadic type-and-effect soundness — https://arxiv.org/abs/2504.10159
+10e. Monadic type-and-effect soundness (ECOOP 2025) — https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.7
+10f. An Effectful Object Calculus — https://arxiv.org/pdf/2504.15936
+10g. An Effectful Object Calculus (ECOOP 2025) — https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.8
 11. Yoshida — Multiparty Session Types tutorial — https://www.doc.ic.ac.uk/~yoshida/papers/multiparty-tutorial.pdf
 12. Scribble multiparty protocol description language — https://www.scribble.org/
 13. Honda, Vasconcelos, Kubo — "Language Primitives and Type Discipline for Structured Communication-Based Programming" (ESOP 1998) — https://groups.inf.ed.ac.uk/abcd/papers/ESOP98.pdf
@@ -988,6 +1021,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 7. Move Language Reference — https://move-language.github.io/move/
 8. Diem Move repository — https://github.com/diem/move
 9. Sui Move abilities — https://github.com/MystenLabs/sui/blob/main/external-crates/move/documentation/book/src/abilities.md
+10. Type-safe and portable support for packed data — https://arxiv.org/abs/2504.20166
+11. Type-Safe and Portable Support for Packed Data (ECOOP 2025) — https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.38
 
 ### Chapter 13 — Semantic Analysis for Tooling and Incrementality
 
