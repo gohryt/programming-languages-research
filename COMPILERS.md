@@ -166,6 +166,30 @@ The lesson generalises: **a decorator-driven JIT operating on a typed subset of 
 
 Sources: https://numba.pydata.org/ and https://github.com/numba/llvmlite and https://numba.pydata.org/numba-doc/dev/user/jit.html
 
+### 1.15. Deegen — VM Generation from Bytecode Semantics
+
+**Deegen** (Xu and Kjolstad, PLDI 2025) is a compiler generator for dynamic-language VMs: the language implementer writes bytecode semantics once in C++, and Deegen generates a two-tier execution engine consisting of a direct-threaded interpreter, a copy-and-patch baseline JIT, and the profiling and tier-switching logic that connects them. In Futamura's taxonomy it is closest to a **second projection**: instead of partially evaluating an interpreter at runtime like Truffle (§1.3), Deegen compiles the bytecode semantics to LLVM IR at build time, analyzes and transforms that IR, and emits the VM machinery ahead of time.
+
+The architectural distinction is that Deegen aims to make **"write the bytecode semantics" the single source of truth** for multiple VM tiers. The same semantics definition can be specialized into interpreter handlers, JIT stencils, inline-cache logic, and OSR-entry plumbing. The generated baseline JIT lowers bytecode directly to machine code via copy-and-patch (§1.1), avoiding a runtime optimizer pipeline; dynamic-language-specific optimizations such as bytecode specialization, quickening, monomorphic and polymorphic inline caches, register pinning, tag-register optimization, hot/cold splitting, and OSR-entry support are either automatic or exposed through framework APIs.
+
+The reported results are notable enough to make it more than an academic curiosity: the Deegen-generated LuaJIT Remake interpreter is reported as faster than both PUC Lua's interpreter and LuaJIT's interpreter, while the generated baseline JIT achieves negligible startup delay and reaches a substantial fraction of LuaJIT's optimizing-JIT throughput. The obvious caveats matter: the published evaluation omits garbage collection integration, targets x86-64 only, and does not yet include the future optimizing tier. Still, the design lesson is strong: **for dynamic languages, VM generation can move from parser-generator-style frontend automation toward execution-engine automation** if the semantics are expressed in an analyzable form.
+
+This is relevant to any new language considering a bytecode VM, embedded runtime, or staged execution strategy. Deegen suggests a middle path between "hand-write everything in assembly/macros" and "reuse a host JIT like LLVM or Truffle at runtime": do the hard compilation work at build time, ship a self-contained generated VM, and keep runtime compilation budgets tiny.
+
+Source: https://arxiv.org/html/2411.11469v1
+
+### 1.16. Off-Thread Parsing with Main-Thread Compilation — Ladybird / LibJS
+
+A practical architecture pattern that deserves separate naming is **splitting frontend work by thread-safety boundary rather than by traditional pass names**. In early 2026, Ladybird's LibJS/LibWeb pipeline was restructured so that JavaScript **parsing and scope analysis** run on worker threads, while **bytecode compilation and GC-allocating steps** stay on the main thread. The key precondition was making the parse phase fully VM-free and GC-free; regular-expression compilation had to be deferred to a post-parse phase because the regex subsystem was not thread-safe.
+
+The resulting flow is: the main thread creates source-code objects and roots GC values needed by the callback; a worker thread performs lexing, parsing, and scope analysis into a pre-parsed form; control returns to the main thread; and only then does the runtime perform bytecode generation, regex compilation, and other heap-affine work. The reported effect was directly user-visible: parsing no longer blocked page load on heavy sites.
+
+The design lesson is broader than browsers: **frontends can often be partitioned into a thread-safe, allocation-light phase and a runtime-coupled, heap-affine phase**. This improves responsiveness and parallelism without forcing the whole compiler or runtime to become thread-safe. It also surfaces an important secondary principle: seemingly "parse-time" work such as regex-literal compilation, macro pre-expansion, or symbol canonicalization may need to move later if it depends on GC state, global caches, or non-thread-safe subsystems.
+
+For a new language or toolchain, this is a concrete template for making IDEs, build systems, and embedded runtimes more responsive: isolate parsing and basic binding into a phase that can run anywhere, and keep heap-owning elaboration/codegen in the host thread that already owns VM state. Runtime scheduling consequences belong in `CONCURRENCY.md §11`; this entry focuses on the compiler-phase partition itself.
+
+Source: https://github.com/LadybirdBrowser/ladybird/pull/8211
+
 ---
 
 ## 2. Memory Management in Compilers
@@ -977,7 +1001,7 @@ Generated classes are cached in-memory by their generation key (in-process re-us
 
 The most-deployed Codegen application is **ActiveJ Serializer** — the framework's schema-free serializer that generates per-type binary codec classes at first use, recovering hand-written-codec performance from runtime-introspected Java classes. ActiveJ claims it as the fastest JVM serializer; whether it is *the* fastest is contested, but the design pattern (one generated codec class per serialized type, cached forever, JIT-warm before use) is the same one Kryo, FlatBuffers, and Cap'n Proto Java each implement at varying levels of automation. Codegen is what makes "generate one codec class per type" cheap to implement.
 
-Distinct from the §13 lightweight backends (QBE, Cranelift, TPDE, DynASM, MoarVM lego, Virgil): those generate native machine code; Codegen generates JVM bytecode. Distinct from MetaOCaml/Terra staged programming (§12.3, §12.4): those provide compile-time staging with type-safe quotations; Codegen is runtime, with type inference but without staged-code typing — the bytecode is verifier-checked at class-define time. Distinct from Template Haskell (§12.5): TH is compile-time AST-rewriting, Codegen is runtime bytecode emission. The right comparison point is **JitBuilder**, the JIT-building library shipped as part of Eclipse OMR (see `MEMORY.md §6.21`) — both target managed-runtime bytecode generation with productivity-oriented APIs; Codegen is JVM-only, JitBuilder is multi-language.
+Distinct from the §13 lightweight backends (QBE, Cranelift, TPDE, DynASM, MoarVM lego, Virgil): those generate native machine code; Codegen generates JVM bytecode. Distinct from MetaOCaml/Terra staged programming (§12.3, §12.4): those provide compile-time staging with type-safe quotations; Codegen is runtime, with type inference but without staged-code typing — the bytecode is verifier-checked at class-define time. Distinct from Template Haskell (§12.5): TH is compile-time AST-rewriting, Codegen is runtime bytecode emission. The right comparison point is **JitBuilder**, the JIT-building library shipped as part of Eclipse OMR (see `MEMORY.md §6.22`) — both target managed-runtime bytecode generation with productivity-oriented APIs; Codegen is JVM-only, JitBuilder is multi-language.
 
 Sister technique inside ActiveJ: **Specializer (§17.4)** uses ASM directly (not Codegen) to rewrite existing class instances rather than generate new classes from scratch. The two libraries target adjacent but distinct use cases — Codegen for "I have an AST/schema and want a class implementing it"; Specializer for "I have a class instance and want a specialised static class encoding its values."
 
@@ -2194,6 +2218,8 @@ Rows are grouped by chapter and within a group roughly follow body order. The Ex
 | Type-annotation-driven gradual JIT | `--!native` + type-hint specialization | Bypasses speculation; production at billions/day | Wrong annotations = UB | Roblox Luau native (§1.12) |
 | Whole-program Python AOT | LLVM via typed Python dialect | 10–100× speedups; standalone binary | Drops full-CPython compatibility | Codon (§1.13) |
 | Decorator-driven Python LLVM JIT | `@jit` + llvmlite | Fast NumPy loops without full-language JIT | Object-mode fallback eliminates speedup | Numba (§1.14) |
+| VM generation from bytecode semantics | Build-time LLVM analysis + generated interpreter/JIT | Single source of truth for multiple VM tiers | GC/FFI/portability still require substantial follow-through | Deegen / LuaJIT Remake (§1.15) |
+| Parse-thread / compile-thread phase split | Parse + scope off-thread; codegen + GC on owner thread | Better responsiveness without whole-runtime thread safety | Requires strict separation of GC-free and GC-affine phases | Ladybird LibJS (§1.16) |
 | Arena allocation | One large region | ~2ns per allocation | No individual free | bumpalo, every compiler (§2.1) |
 | String interning | Hash table + buffer | One hash per new string | O(1) equality after intern | rustc Symbol, V8 (§2.2) |
 | Hash consing | Hash table + structure | One hash per construction | O(1) structural equality | BDDs, type representations (§2.2) |
@@ -2383,6 +2409,8 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 31. Numba — A High Performance Python Compiler — https://numba.pydata.org/
 32. llvmlite — lightweight LLVM Python binding — https://github.com/numba/llvmlite
 33. Numba `@jit` documentation — https://numba.pydata.org/numba-doc/dev/user/jit.html
+34. Deegen: A JIT-Capable VM Generator for Dynamic Languages (PLDI 2025) — https://arxiv.org/html/2411.11469v1
+35. Ladybird PR #8211 — Parse JavaScript off the main thread — https://github.com/LadybirdBrowser/ladybird/pull/8211
 
 ### Chapter 2 — Memory Management in Compilers
 

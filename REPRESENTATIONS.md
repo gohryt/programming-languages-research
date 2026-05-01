@@ -146,6 +146,8 @@ Source: https://github.com/RealNeGate/Cuik
 
 Zig's AST stores token indices, not byte offsets. Each AST node references its source position via a `TokenIndex` into the parser's token list; tokens themselves carry only their start byte offset. To recover line/column for diagnostics, the compiler dereferences the token, then dereferences the source manager.
 
+A different but related representation choice appears in Oxc's JavaScript/TypeScript AST: rather than token indexing, Oxc emphasizes **semantic node distinction** in the tree shape itself (`BindingIdentifier` vs `IdentifierReference` vs `IdentifierName`). That design belongs canonically to parser architecture in `PARSERS.md §2.16`, but from the representation angle the lesson is that AST precision can encode downstream semantic intent directly, reducing ambiguity for linters, transforms, and IDE tooling even before full semantic analysis runs.
+
 Layout is struct-of-arrays via `std.MultiArrayList`: parallel arrays of `tag`, `data`, `main_token` rather than an array of structs. Cache locality on whole-AST traversals (e.g., "list every function declaration") is excellent. Once ZIR is generated (§5.2), the AST and token list can be discarded — the AST is genuinely a parser output, not a long-lived compiler artifact.
 
 Source: https://github.com/ziglang/zig/tree/master/lib/std/zig

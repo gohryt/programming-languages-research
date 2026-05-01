@@ -54,7 +54,7 @@ This chapter catalogs the top-level parsing algorithms a language implementation
 - **Generalized CFG parsers**: §2.6 GLL, §2.7 Tomita GLR, §2.8 Earley + Leo, §2.9 CYK/Valiant, §2.10 Parsing with derivatives, §2.28 ambiguity and SPPF
 - **Incremental / editor-oriented**: §2.11 Tree-sitter, §2.12 Lezer (and §7.8 rust-analyzer's parser)
 - **Fast lexing and structural scanning**: §2.13 Accelerated-Zig, §2.14 simdjson (and §5.3–§5.5 lexer generators)
-- **Special models and extensibility**: §2.15 Meriyah, §2.16 Scannerless, §2.17 TCC, §2.18 Parser combinators, §2.19 ANTLR4 ALL(\*), §2.20 Ohm, §2.21 Layout-sensitive, §2.22 Extensible syntax, §2.23 syntax-parse, §2.29 syntax-directed translation, §2.30 beyond-CFG formalisms
+- **Special models and extensibility**: §2.15 Meriyah, §2.16 Oxc, §2.17 Scannerless, §2.18 TCC, §2.19 Parser combinators, §2.20 ANTLR4 ALL(*), §2.21 Ohm, §2.22 Layout-sensitive, §2.23 Extensible syntax, §2.24 syntax-parse, §2.30 syntax-directed translation, §2.31 beyond-CFG formalisms
 
 ### 2.1. Pratt Parsing — Top-Down Operator Precedence
 
@@ -217,7 +217,16 @@ Sources: https://arxiv.org/abs/1902.08318 and https://simdjson.org/
 This is a useful pattern when different consumers have different needs: a bundler or syntax-only pass can parse without `ranges`/`loc`, while diagnostics, transforms, and tooling can enable them. Re-parsing only a specific region is safe only when the parser can reconstruct the surrounding syntactic and option context; otherwise a full-file reparse with locations enabled is the conservative design. The cost of location tracking is not just storage — it's also the cost of maintaining line/column state during scanning, which involves checking for newlines on every character advance.
 
 Source: https://github.com/nicolo-ribaudo/meriyah
-### 2.16. Scannerless Parsing — No Separate Lexer
+### 2.16. Oxc — Arena-Based Hand-Written Parsing for Tooling Throughput
+
+**Oxc** is a modern JavaScript/TypeScript parser and tooling stack written in Rust whose parser architecture is notable less for novel parsing theory than for an aggressively practical set of performance choices. The parser is hand-written recursive descent; AST nodes are allocated in a single arena; short strings are stored inline via `CompactString`; comments and trivia are preserved; and scope binding, symbol resolution, and some syntax errors are deliberately deferred to a later semantic-analysis phase.
+
+The important design pattern is the combination of **semantic precision in the AST** with **minimal parser responsibilities**. Rather than emitting generic ESTree-like identifiers, Oxc distinguishes `BindingIdentifier`, `IdentifierReference`, and `IdentifierName`, which reduces ambiguity for downstream tooling. But the parser itself avoids doing full semantic work in hot paths: it focuses on syntax, recovery, and tree construction, leaving richer checks to the semantic layer. This is a useful middle point between "the parser knows too much" and "the AST is too generic to help later passes."
+
+Performance-wise, Oxc is an existence proof that hand-written recursive descent plus arena allocation is still a top-tier strategy for industrial tooling. Its lexer uses context-sensitive logic for regex-vs-division disambiguation and SIMD-accelerated whitespace skipping; its parser is tuned for cache locality and minimal allocation; and its architecture is explicitly designed so that parser speed improvements compound across linter, formatter, transformer, and language-server workloads. The broader lesson is that for tooling-heavy ecosystems, **parser architecture is not an isolated frontend choice but a platform decision** — the parser's memory layout, trivia strategy, and AST precision shape the entire downstream toolchain.
+
+Sources: https://oxc-project.github.io/docs/learn/architecture/parser.html and https://github.com/oxc-project/oxc/blob/main/ARCHITECTURE.md
+### 2.17. Scannerless Parsing — No Separate Lexer
 
 Scannerless (lexerless) parsing eliminates the traditional lexer/parser pipeline, using a single grammar formalism from characters to syntax trees. The grammar describes both token structure and phrase structure in one unified specification.
 
@@ -230,7 +239,7 @@ The cost: scannerless grammars are more ambiguous than tokenized ones (because c
 The relevance is straightforward: any language that supports string interpolation, heredocs, or embedded DSLs faces the same lexer-composition problem. Scannerless parsing is the principled solution.
 
 Sources: https://en.wikipedia.org/wiki/Scannerless_parsing and https://ir.cwi.nl/pub/24027/24027B.pdf
-### 2.17. TCC — No AST, Direct Code Emission
+### 2.18. TCC — No AST, Direct Code Emission [L233-242]
 
 Fabrice Bellard's Tiny C Compiler parses C and emits machine code in a single pass, with no AST. Source locations flow from the lexer's current position directly into DWARF debug info during code generation. Each time the code generator emits an instruction, it records the current source line.
 
@@ -239,7 +248,7 @@ This is the extreme end of the "no intermediate representation" spectrum. The be
 For interactive use cases (compile-and-run scripts, rapid iteration), TCC's approach is compelling. The compilation is so fast that the compile-time component of edit-compile-run is effectively zero.
 
 Source: https://bellard.org/tcc/
-### 2.18. Parser Combinators — Parsers as First-Class Values
+### 2.19. Parser Combinators — Parsers as First-Class Values [L242-251]
 
 Parser combinators treat parsers as ordinary values in the host language and build larger parsers by composing smaller ones through higher-order functions. Daan Leijen and Erik Meijer's **Parsec** (2001) is the landmark design: monadic combinators in Haskell that produce precise error locations and the set of legal productions at the failure point, with heuristics to avoid naive space leaks. **Megaparsec** (Mark Karpov) is the current industrial-strength descendant — an MTL-style monad transformer with better error quality and documented performance characteristics comparable to Attoparsec when combinators are used carefully.
 
@@ -248,7 +257,7 @@ The Rust lineage spans **nom** (zero-copy, byte-oriented; popular for binary pro
 The trade-off vs. parser generators is real. Combinators give you a parser that is type-checked by the host language, composable at runtime, and free of a separate build step — but they typically run slower than a well-tuned LR or hand-written RD parser, offer weaker grammar introspection (no explicit grammar object to inspect for conflicts or first-sets), and shift responsibility for left-recursion elimination and precedence to the author. Most production compilers that start with combinators eventually migrate to hand-written code (see §5.2 and §6 on Ruff).
 
 Sources: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/parsec-paper-letter.pdf and https://github.com/mrkkrp/megaparsec and https://github.com/rust-bakery/nom and https://github.com/winnow-rs/winnow and https://github.com/zesterer/chumsky
-### 2.19. ANTLR4 — Adaptive LL(\*)
+### 2.20. ANTLR4 — Adaptive LL(*)
 
 Terence Parr and Sam Harwell's **ALL(\*)** algorithm (OOPSLA 2014, with Kathleen Fisher) is the engine behind ANTLR4. The idea is to move grammar analysis from generator time to parse time: at each ambiguous decision point, ALL(\*) launches a subset-construction-style lookahead that explores all viable alternatives in parallel over the actual input, building a prediction DFA lazily and caching it for future visits. When regular lookahead is insufficient, it falls back to GLL-style exploration (see §2.6). The earlier LL(\*) algorithm (PLDI 2011) did static analysis; ALL(\*) is the adaptive, dynamic successor that removed LL(\*)'s grammar restrictions.
 
@@ -257,7 +266,7 @@ The worst case is theoretically O(n⁴), but Parr and Harwell report that ALL(\*
 ALL(\*) is why ANTLR4 displaced yacc/bison for many grammar-first users: grammars stay readable (no manual precedence disambiguation or conflict refactoring), lookahead is effectively unlimited, and the generated parsers produce decent error messages out of the box. The practical limits are code size, the two-pass analyze-then-parse overhead on cold code paths, and the same "generated parser is a black box" pressures that push production compilers towards hand-written recursive descent (see §5.2).
 
 Sources: https://www.antlr.org/papers/allstar-techreport.pdf and https://github.com/antlr/antlr4
-### 2.20. Ohm — PEG with Externalised Semantic Actions
+### 2.21. Ohm — PEG with Externalised Semantic Actions
 
 Ohm (Alex Warth, Patrick Dubroy, et al.) is a PEG variant that deliberately **separates syntax from semantics**. The `.ohm` grammar file contains *only* rules and parsing expressions — no inline action code. Semantic actions live in a separate file as a visitor: one JavaScript (or other host-language) method per grammar rule, keyed by rule name. This is a direct response to the authors' earlier system **OMeta** (Warth & Piumarta, DLS 2007), whose power came partly from allowing inline semantic actions and pattern-matching over arbitrary host-language objects rather than just strings.
 
@@ -266,7 +275,7 @@ The Warth group's argument for separation is modularity: you can apply multiple 
 Compared with traditional PEG tools, Ohm loses the convenience of inline actions but gains grammar reusability and much cleaner tooling surface: since the grammar is pure data, the same `.ohm` file can drive a parser, a syntax highlighter, a fuzzer, and a documentation generator. OMeta's ancestor property — the ability to parse over arbitrary data streams, not just text — is not carried forward in Ohm, which is string-focused.
 
 Sources: https://ohmjs.org/pubs/dls2016/modular-semantic-actions.pdf and http://www.tinlizzie.org/~awarth/papers/dls07.pdf
-### 2.21. Indentation- and Layout-Sensitive Parsing
+### 2.22. Indentation- and Layout-Sensitive Parsing
 
 Peter Landin's "off-side rule" (1966) is the foundational idea: nested blocks are delimited by indentation instead of brackets. The common production technique is a **layout stage** between lexer and parser that inserts virtual `{`, `;`, and `}` tokens based on column positions, so the downstream grammar can stay ordinary context-free.
 
@@ -275,7 +284,7 @@ The **Haskell 2010 Report** gives the canonical specification. A layout-sensitiv
 Data-dependent grammars (§2.6 Iguana) and scannerless GLR (§2.16) offer a more principled alternative: specify indentation as a parameterised constraint inside the grammar itself, which avoids the "layout stage as a separate kludge" problem. Adams (2013) developed a formal theory of indentation-sensitive parsing that composes with LR generators. In practice, most layout-sensitive languages (Haskell, Python, F#, Nim) still ship the simpler lexer-pass design because it gives hand-written parsers total control over the weird cases.
 
 Sources: https://www.haskell.org/onlinereport/haskell2010/haskellch10.html and https://michaeldadams.org/papers/layout_parsing/LayoutParsing.pdf
-### 2.22. Extensible Syntax — Racket Readtables, Lean 4, Rhombus
+### 2.23. Extensible Syntax — Racket Readtables, Lean 4, Rhombus
 
 A distinct family of parsers deliberately exposes the grammar to user code at compile time.
 
@@ -288,17 +297,17 @@ A distinct family of parsers deliberately exposes the grammar to user code at co
 Shared thesis: language extension should be a user-level library concern, not a privileged compiler-authoring one. The cost is a parser that must accommodate a runtime-changing grammar, which rules out most table-driven generators.
 
 Sources: https://docs.racket-lang.org/reference/readtables.html and https://lean-lang.org/papers/lean4.pdf and https://users.cs.utah.edu/plt/publications/oopsla23-faadffggkkmppst.pdf and https://docs.racket-lang.org/shrubbery/index.html
-### 2.23. syntax-parse — Parsing Macro Inputs with Specifications
+### 2.24. syntax-parse — Parsing Macro Inputs with Specifications
 
 Ryan Culpepper and Matthias Felleisen's **syntax-parse** (ICFP 2010 "Fortifying Macros"; JFP 22(4–5) 2012 extended version) is Racket's parser for *macro inputs*. Racket's reader (§2.22) turns text into syntax objects; syntax-parse is the layer above that turns a macro's received syntax object into structured data, with error messages that explain misuse. A macro author writes a pattern — for example `(my-for ([x:id seq] ...) body ...+)` — using **syntax classes** like `id`, `expr`, or user-defined classes with their own pattern structure, optional annotations, side conditions, and attributes. When a macro is called with syntactically ill-formed arguments, syntax-parse does not emit an opaque "bad syntax"; it points at the specific sub-form that failed to match and explains which alternative was expected.
 
-This is macro-level parsing, complementing §2.22: the reader exposes character-level grammar to users, syntax-parse exposes term-level grammar to macro authors. The 2012 paper formalises the system as a pattern language with deterministic error attribution — given several failed alternatives, syntax-parse picks the one that got furthest into the input and reports that, mirroring Parsec/Megaparsec error-quality heuristics (§2.18) but at the syntax-object level. In Racket this is not a niche tool: every non-trivial `define-syntax` in the standard library is written against syntax-parse, and the syntax classes themselves are the standard way to document "what a valid macro call looks like."
+This is macro-level parsing, complementing §2.22: the reader exposes character-level grammar to users, syntax-parse exposes term-level grammar to macro authors. The 2012 paper formalises the system as a pattern language with deterministic error attribution — given several failed alternatives, syntax-parse picks the one that got furthest into the input and reports that, mirroring Parsec/Megaparsec error-quality heuristics (§2.19) but at the syntax-object level. In Racket this is not a niche tool: every non-trivial `define-syntax` in the standard library is written against syntax-parse, and the syntax classes themselves are the standard way to document "what a valid macro call looks like."
 
 syntax-parse delivers specification-driven macro error messages comparable to a parser generator's diagnostics — at the cost of a second parsing layer above the reader and of being Racket-specific in a way that readtables, Pratt, and combinators are not.
 
 Sources: https://www2.ccs.neu.edu/racket/pubs/c-jfp12.pdf and https://docs.racket-lang.org/syntax/Parsing_Syntax.html
 
-### 2.24. Structured Editing, Projectional Editing, and Hybrid Editing
+### 2.25. Structured Editing, Projectional Editing, and Hybrid Editing
 
 Most parser research assumes that programs are edited as plain text and that a parser's job is to recover structure from a character stream. Modern language tooling complicates that assumption. **Structured editing** treats the program's syntax tree as the primary editing object, while **projectional editing** goes further and edits the tree directly instead of parsing text at all. Hybrid systems try to preserve ordinary text editing while retaining stronger structural guarantees than a traditional parse-on-save workflow can provide.
 
@@ -312,7 +321,7 @@ The language-design lesson is that parser strategy and editor strategy are no lo
 
 Sources: https://tratt.net/laurie/blog/2024/structured_editing_and_incremental_parsing.html and https://dl.acm.org/doi/10.1145/3567512.3567522 and https://www.jetbrains.com/help/mps/mps-faq.html
 
-### 2.25. Recursive Descent — The Hand-Written Baseline
+### 2.26. Recursive Descent — The Hand-Written Baseline
 
 Recursive descent deserves an explicit entry because it is not merely an implementation detail behind Pratt parsing (§2.1) or PEG (§2.3). In its simplest form, each grammar production becomes a host-language function, and the parser advances through the token stream by calling these functions directly. Predictive recursive descent chooses alternatives from lookahead tokens; backtracking recursive descent tries alternatives speculatively; resilient recursive descent (§7.8) deliberately consumes a well-formed prefix and emits error nodes instead of failing globally.
 
@@ -322,7 +331,7 @@ The cost is that ambiguity detection moves from generator to author. An LR gener
 
 Sources: https://tratt.net/laurie/blog/2020/which_parsing_approach.html and https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html
 
-### 2.26. Deterministic LL and LR — The Classical Compiler Workhorses
+### 2.27. Deterministic LL and LR — The Classical Compiler Workhorses
 
 The classic parsing families are still the vocabulary of compiler front-ends even when a production parser is hand-written. **LL** parsers read left-to-right and construct a leftmost derivation; they are naturally top-down and align with recursive descent. `LL(1)` uses one token of lookahead, `LL(k)` uses fixed k-token lookahead, and `LL(*)`/`ALL(*)` generalise the lookahead story (§2.19). Grammar engineering for LL usually means eliminating left recursion and left-factoring common prefixes so that a lookahead token selects one production.
 
@@ -332,7 +341,7 @@ For language design, the key question is not "which acronym is best?" but "where
 
 Sources: https://dickgrune.com/Books/PTAPG_2nd_Edition/index.html and https://www.gnu.org/software/bison/manual/bison.html
 
-### 2.27. Shunting-Yard and Operator-Precedence Grammars
+### 2.28. Shunting-Yard and Operator-Precedence Grammars
 
 Dijkstra's **shunting-yard** algorithm is the classic stack-based expression parser: operands go to an output queue, operators sit on a stack, and precedence/associativity decide when stacked operators are popped. It is easy to implement and ideal for calculators, bytecode emitters, and expression-only DSLs. Compared with Pratt (§2.1) and precedence climbing (§2.2), shunting-yard is less natural when expressions contain rich prefix/postfix forms, contextual keywords, lambdas, or error recovery, but it remains the simplest way to translate infix expressions to postfix or bytecode.
 
@@ -340,7 +349,7 @@ The older **operator-precedence grammar** family, associated with Floyd, general
 
 Sources: https://en.wikipedia.org/wiki/Shunting_yard_algorithm and https://en.wikipedia.org/wiki/Operator-precedence_parser
 
-### 2.28. Ambiguity, Parse Forests, and Disambiguation
+### 2.29. Ambiguity, Parse Forests, and Disambiguation
 
 Generalized parsers do not make ambiguity disappear; they make it explicit. When GLR, GLL, Earley, or CYK finds multiple parses, the practical output is usually a **Shared Packed Parse Forest** (SPPF): common subtrees are shared, and ambiguous alternatives are stored as packed nodes. This keeps the representation polynomial rather than exploding into every full parse tree.
 
@@ -357,7 +366,7 @@ The engineering lesson is that "accepts all CFGs" is not the same as "gives the 
 
 Sources: https://lark-parser.readthedocs.io/en/stable/parsers.html and https://tree-sitter.github.io/tree-sitter/creating-parsers/3-writing-the-grammar.html
 
-### 2.29. Syntax-Directed Translation and Attribute Grammars
+### 2.30. Syntax-Directed Translation and Attribute Grammars
 
 Parsing rarely stops at "recognise the sentence." Most compiler front-ends attach work to productions: build AST nodes, record declarations, desugar constructs, emit bytecode, or compute attributes. This family is usually called **syntax-directed translation**. In a yacc-style parser, semantic actions are host-language fragments attached to grammar reductions; in recursive descent, they are ordinary code inside parse functions; in Raku/NQP (§6.3), grammar matches are paired with action methods that build QAST.
 
@@ -367,7 +376,7 @@ The modern tooling lesson from Ohm (§2.20) and syntax-parse (§2.23) is that in
 
 Sources: https://web.cs.wpi.edu/~cs544/PLT6.5.2.html and https://cecs.wright.edu/~tkprasad/papers/Attribute-Grammars.pdf
 
-### 2.30. Beyond-CFG Formalisms — TAG, MCFG, Boolean Grammars, and Friends
+### 2.31. Beyond-CFG Formalisms — TAG, MCFG, Boolean Grammars, and Friends
 
 Most programming-language parsers live in the regular + CFG + context-sensitive-escape-hatch world: regular lexers, CFG-ish syntax, and semantic checks after parsing. Research parsing goes further. **Tree-Adjoining Grammars** (TAG), **Multiple Context-Free Grammars** (MCFG), **Linear Context-Free Rewriting Systems** (LCFRS), and **Range Concatenation Grammars** (RCG) capture mildly context-sensitive patterns important in natural language. **Conjunctive** and **Boolean grammars** extend CFGs with intersection and negation. **Visibly pushdown languages** sit between regular and deterministic context-free languages and model nested calls/returns while retaining strong automata properties.
 
@@ -515,7 +524,7 @@ Source: https://www.gnu.org/software/gperf/
 
 The broader practitioner trend: parser generators (LALRPOP, yacc/Bison, ANTLR, Menhir) are excellent for bootstrapping, grammar documentation, and static conflict analysis, but they can become constraints as a tool matures. Status (as of 2026-04): production compilers and toolchains using hand-written parsers — typically recursive descent plus Pratt/precedence climbing for expressions — include GCC, Clang, Go, rustc, V8, Zig, Ruff (§6.1), and rust-analyzer (§7.8). The usual reasons are custom error recovery, contextual lookahead, incremental reparsing, and hot-path tuning that outweigh the convenience of grammar-driven generation.
 
-This is the decision point that connects the classical algorithms (§2.24–§2.25), generated-tool lineage (§7.3, §7.9), and Ruff's migration (§6.1): the right choice depends less on theoretical power than on who must debug the grammar, own the diagnostics, and optimize the parser. §5.6 covers the contextual-lexer/external-scanner machinery that is usually what pushes a hand-written parser past what a generator can accept; the tree-sitter externals footnote in §8.5 is the practitioner-facing companion.
+This is the decision point that connects the classical algorithms (§2.25–§2.27), generated-tool lineage (§7.3, §7.9), and Ruff's migration (§6.1): the right choice depends less on theoretical power than on who must debug the grammar, own the diagnostics, and optimize the parser. §5.6 covers the contextual-lexer/external-scanner machinery that is usually what pushes a hand-written parser past what a generator can accept; the tree-sitter externals footnote in §8.5 is the practitioner-facing companion.
 
 ### 5.3. Ragel — State-Machine Compiler with Embedded Actions
 
@@ -929,35 +938,37 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 24. simdjson: Parsing Gigabytes of JSON per Second (Langdale & Lemire, VLDB 2019) — https://arxiv.org/abs/1902.08318
 25. simdjson project — https://simdjson.org/
 26. Meriyah — https://github.com/nicolo-ribaudo/meriyah
-27. Scannerless Parsing — https://en.wikipedia.org/wiki/Scannerless_parsing
-28. One Parser to Rule Them All (Data-Dependent Grammars) — https://ir.cwi.nl/pub/24027/24027B.pdf
-29. TCC (Tiny C Compiler) — https://bellard.org/tcc/
-30. Parsec: Direct Style Monadic Parser Combinators (Leijen & Meijer) — https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/parsec-paper-letter.pdf
-31. Megaparsec — https://github.com/mrkkrp/megaparsec
-32. nom (Rust parser combinators) — https://github.com/rust-bakery/nom
-33. winnow (Rust) — https://github.com/winnow-rs/winnow
-34. chumsky (Rust) — https://github.com/zesterer/chumsky
-35. Adaptive LL(*) (Parr, Harwell, Fisher, OOPSLA 2014) — https://www.antlr.org/papers/allstar-techreport.pdf
-36. ANTLR4 — https://github.com/antlr/antlr4
-37. Modular Semantic Actions (Warth et al., DLS 2016) — https://ohmjs.org/pubs/dls2016/modular-semantic-actions.pdf
-38. OMeta (Warth & Piumarta, DLS 2007) — http://www.tinlizzie.org/~awarth/papers/dls07.pdf
-39. Haskell 2010 Report, Chapter 10 (Layout) — https://www.haskell.org/onlinereport/haskell2010/haskellch10.html
-40. Principled Parsing for Indentation-Sensitive Languages (Adams) — https://michaeldadams.org/papers/layout_parsing/LayoutParsing.pdf
-41. Racket Readtables — https://docs.racket-lang.org/reference/readtables.html
-42. Lean 4 system description (de Moura & Ullrich, CADE 2021) — https://lean-lang.org/papers/lean4.pdf
-43. Rhombus (OOPSLA 2023) — https://users.cs.utah.edu/plt/publications/oopsla23-faadffggkkmppst.pdf
-44. Shrubbery Notation — https://docs.racket-lang.org/shrubbery/index.html
-45. Fortifying Macros (Culpepper & Felleisen, JFP 2012) — https://www2.ccs.neu.edu/racket/pubs/c-jfp12.pdf
-46. Racket syntax-parse docs — https://docs.racket-lang.org/syntax/Parsing_Syntax.html
-47. Parsing Techniques — A Practical Guide — https://dickgrune.com/Books/PTAPG_2nd_Edition/index.html
-48. GNU Bison Manual — https://www.gnu.org/software/bison/manual/bison.html
-49. Shunting-yard algorithm — https://en.wikipedia.org/wiki/Shunting_yard_algorithm
-50. Operator-precedence parser — https://en.wikipedia.org/wiki/Operator-precedence_parser
-51. Lark parser algorithms — https://lark-parser.readthedocs.io/en/stable/parsers.html
-52. Tree-sitter grammar writing guide — https://tree-sitter.github.io/tree-sitter/creating-parsers/3-writing-the-grammar.html
-53. L-attributed Attribute Grammars — https://web.cs.wpi.edu/~cs544/PLT6.5.2.html
-54. Attribute Grammars — https://cecs.wright.edu/~tkprasad/papers/Attribute-Grammars.pdf
-55. Parsing Beyond Context-Free Grammars — https://link.springer.com/book/10.1007/978-3-642-14846-0
+27. Oxc parser architecture — https://oxc-project.github.io/docs/learn/architecture/parser.html
+28. Oxc architecture overview — https://github.com/oxc-project/oxc/blob/main/ARCHITECTURE.md
+29. Scannerless Parsing — https://en.wikipedia.org/wiki/Scannerless_parsing
+30. One Parser to Rule Them All (Data-Dependent Grammars) — https://ir.cwi.nl/pub/24027/24027B.pdf
+31. TCC (Tiny C Compiler) — https://bellard.org/tcc/
+32. Parsec: Direct Style Monadic Parser Combinators (Leijen & Meijer) — https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/parsec-paper-letter.pdf
+33. Megaparsec — https://github.com/mrkkrp/megaparsec
+34. nom (Rust parser combinators) — https://github.com/rust-bakery/nom
+35. winnow (Rust) — https://github.com/winnow-rs/winnow
+36. chumsky (Rust) — https://github.com/zesterer/chumsky
+37. Adaptive LL(*) (Parr, Harwell, Fisher, OOPSLA 2014) — https://www.antlr.org/papers/allstar-techreport.pdf
+38. ANTLR4 — https://github.com/antlr/antlr4
+39. Modular Semantic Actions (Warth et al., DLS 2016) — https://ohmjs.org/pubs/dls2016/modular-semantic-actions.pdf
+40. OMeta (Warth & Piumarta, DLS 2007) — http://www.tinlizzie.org/~awarth/papers/dls07.pdf
+41. Haskell 2010 Report, Chapter 10 (Layout) — https://www.haskell.org/onlinereport/haskell2010/haskellch10.html
+42. Principled Parsing for Indentation-Sensitive Languages (Adams) — https://michaeldadams.org/papers/layout_parsing/LayoutParsing.pdf
+43. Racket Readtables — https://docs.racket-lang.org/reference/readtables.html
+44. Lean 4 system description (de Moura & Ullrich, CADE 2021) — https://lean-lang.org/papers/lean4.pdf
+45. Rhombus (OOPSLA 2023) — https://users.cs.utah.edu/plt/publications/oopsla23-faadffggkkmppst.pdf
+46. Shrubbery Notation — https://docs.racket-lang.org/shrubbery/index.html
+47. Fortifying Macros (Culpepper & Felleisen, JFP 2012) — https://www2.ccs.neu.edu/racket/pubs/c-jfp12.pdf
+48. Racket syntax-parse docs — https://docs.racket-lang.org/syntax/Parsing_Syntax.html
+49. Parsing Techniques — A Practical Guide — https://dickgrune.com/Books/PTAPG_2nd_Edition/index.html
+50. GNU Bison Manual — https://www.gnu.org/software/bison/manual/bison.html
+51. Shunting-yard algorithm — https://en.wikipedia.org/wiki/Shunting_yard_algorithm
+52. Operator-precedence parser — https://en.wikipedia.org/wiki/Operator-precedence_parser
+53. Lark parser algorithms — https://lark-parser.readthedocs.io/en/stable/parsers.html
+54. Tree-sitter grammar writing guide — https://tree-sitter.github.io/tree-sitter/creating-parsers/3-writing-the-grammar.html
+55. L-attributed Attribute Grammars — https://web.cs.wpi.edu/~cs544/PLT6.5.2.html
+56. Attribute Grammars — https://cecs.wright.edu/~tkprasad/papers/Attribute-Grammars.pdf
+57. Parsing Beyond Context-Free Grammars — https://link.springer.com/book/10.1007/978-3-642-14846-0
 
 ### Chapter 3 — Flat and Compact AST Representations
 

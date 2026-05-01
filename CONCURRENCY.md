@@ -764,6 +764,12 @@ Sources:
 - https://docs.raku.org/language/concurrency
 - https://stackoverflow.com/questions/62817878/what-are-the-specifics-about-the-continuations-upon-which-rakudo-relies/62819961
 
+### 11.7. Cross-Reference — Phase Partitioning by Thread-Safety Boundary
+
+A recurring runtime-integration pattern is to split frontend work not by traditional compiler chapter headings but by **which phase is safe to run away from the runtime's heap owner**. Ladybird's LibJS pipeline (2026) is a concrete case: parsing and scope analysis were moved to worker threads only after they were made VM-free and GC-free; bytecode generation, regex compilation, and other heap-affine work remained on the main thread. Full compiler-side detail belongs in `COMPILERS.md §1.16`; the concurrency consequence is that a runtime can gain parallelism and responsiveness without making every subsystem thread-safe at once.
+
+Source: `COMPILERS.md §1.16`
+
 ---
 
 ## 12. Runtime Observability and Debuggability

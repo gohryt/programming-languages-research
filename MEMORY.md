@@ -551,13 +551,25 @@ Hans Boehm, Alan Demers, and Mark Weiser's **BDW collector** (1988+) is the cano
 
 The precision cost is bounded in practice — Boehm's empirical analyses show conservative misidentification typically retains <5% extra memory on real programs — but unbounded in the worst case (an integer that happens to match a heap address keeps an object alive indefinitely). To mitigate this, BDW supports **typed allocation** (`GC_malloc_typed`) where the program declares per-object pointer layout, restoring per-field precision while keeping the conservative root scan. Generational and incremental modes are available; the collector compiles on virtually every Unix and Windows platform.
 
-Distinct from precise tracing GCs in §§6.1–6.13: BDW does not require type metadata at every heap allocation, write barriers, or compiler cooperation — exactly the properties that make it deployable in unmodified C/C++ codebases. Distinct from MPS (§6.15): BDW is one collector, MPS is a framework of pluggable pool classes.
+Distinct from precise tracing GCs in §§6.1–6.13: BDW does not require type metadata at every heap allocation, write barriers, or compiler cooperation — exactly the properties that make it deployable in unmodified C/C++ codebases. Distinct from MPS (§6.16): BDW is one collector, MPS is a framework of pluggable pool classes.
 
 Production: GCJ (Java to native via GCC), historical Mono runtime (replaced by SGen in Mono 2.8, 2010), Mozilla SpiderMonkey's xpconnect bridge, many Scheme implementations (Chicken, MIT/GNU, Bigloo, Gambit), Inferno OS's Limbo runtime, Crystal language runtime, and ~20 years of embedded scripting where adding a precise GC was infeasible. Status (as of 2026-04): still actively maintained and the conservative-GC reference for languages and runtimes that did not include GC support from the start.
 
 Sources: https://hboehm.info/gc/ and https://www.hboehm.info/gc/issues.html and https://www.hboehm.info/papers/spe_88_si.pdf
 
-### 6.15. MPS — Memory Pool System as Pluggable GC Framework
+### 6.15. Alloy — GC for Rust with Destructor-as-Finalizer Analysis
+
+**Alloy** (Hughes and Tratt, OOPSLA 2025) is a research GC for Rust that tackles a very specific but important question: can a language built around ownership and destructors gain tracing GC **without discarding existing destructor semantics**? Alloy's answer is "yes, but only with extra compiler analysis." It extends `rustc`, uses BDWGC as the underlying conservative collector, and allows ordinary Rust destructors to serve as GC finalizers where that is provably safe.
+
+The distinctive mechanisms are threefold. First, **finalizer safety analysis** checks whether a destructor is safe to run as a finalizer at all: it rejects destructors that would be unsound because they access references, thread-local state, non-thread-safe data, or other GC values in ways that become dangerous once finalization is decoupled from lexical scope. Second, **premature-finalizer prevention** inserts fences so that GC does not collect a value before the owning `Gc` wrapper's static lifetime has ended. Third, **finalizer elision** removes finalizers whose destructor work is redundant with the collector's own reclamation — for example, when a destructor's only effect is freeing heap memory that the collector would free anyway.
+
+The architectural lesson is not "Rust should become a GC language" so much as **ownership languages can integrate tracing GC if the compiler takes responsibility for the semantic mismatch between destructors and finalizers**. Alloy also shows that finalization is not merely a runtime problem: thread-safety, cycle-safety, and destructor eligibility become compile-time questions. Its use of a conservative collector is also instructive — allowing raw-pointer and integer-cast patterns to continue working pushes the design toward conservative root finding, because precise stack maps would not be sufficient once arbitrary pointer disguising is permitted.
+
+Status matters here. Alloy is explicitly not production-ready as of late 2025: it is a modified compiler plus BDWGC integration, and its evaluation is exploratory rather than deployment-oriented. But it is a valuable reference point for any new language hosted in Rust, or any language exploring a mixed story of ownership plus tracing for selected heap regions. The compiler consequences belong partly to `COMPILERS.md`; the memory-model and finalization consequences belong here.
+
+Source: https://arxiv.org/pdf/2504.01841
+
+### 6.16. MPS — Memory Pool System as Pluggable GC Framework
 
 Ravenbrook's **Memory Pool System** (MPS, 1994+) is a flexible GC framework distinct from BDW's single-collector model: MPS supports both **precise and conservative scanning** and is structured around **pool classes** that the application chooses per allocation domain. A program can mix mark-sweep (`AMC`), copying (`AMS`), automatic mark-compact, and reference-counted pools in one heap, with MPS providing the underlying root scanning, write barriers, and GC scheduling.
 
@@ -569,7 +581,7 @@ Production: Open Dylan's runtime is MPS-based; **Configura's CET designer** (a C
 
 Sources: https://www.ravenbrook.com/project/mps/ and https://memory-pool-system.readthedocs.io/ and https://www.ravenbrook.com/project/mps/master/manual/html/
 
-### 6.16. HotSpot CMS / ParNew / Parallel Scavenge — The Pre-G1 Lineage
+### 6.17. HotSpot CMS / ParNew / Parallel Scavenge — The Pre-G1 Lineage
 
 The HotSpot collector lineage that preceded G1 (§6.6), ZGC (§6.4), and Shenandoah (§6.5) is worth recording for design genealogy. **ParNew** is a parallel young-generation copying collector (1990s) that pairs with **CMS (Concurrent Mark-Sweep)** for the old generation. CMS performs concurrent marking and concurrent sweeping with brief STW initial-mark and final-remark pauses, and *does not compact* — accepting fragmentation in exchange for low pauses, the same trade-off Go's GC (§6.8) makes today. **Parallel Scavenge / Parallel Old** is the throughput-oriented STW alternative: parallel young-and-old generation collection without concurrency, optimising for total throughput rather than pause time.
 
@@ -579,7 +591,7 @@ Status (JDK 14+, 2020): CMS was deprecated in JDK 9 (2017) and removed in JDK 14
 
 Sources: https://docs.oracle.com/en/java/javase/13/gctuning/concurrent-mark-sweep-cms-collector.html and https://openjdk.org/jeps/291 and https://openjdk.org/jeps/363
 
-### 6.17. Project Valhalla — JVM Value Types and Heap Layout
+### 6.18. Project Valhalla — JVM Value Types and Heap Layout
 
 **Project Valhalla** (Brian Goetz, John Rose, Dan Heidinga et al., OpenJDK, 2014+) redefines JVM heap layout by introducing **value classes** (formerly "inline classes") and **primitive types in generics**. The change is fundamental to JVM memory: today every non-primitive value is a heap-allocated object with an 8/16-byte header, and `List<Integer>` boxes every `int` into a heap object. Valhalla's value classes are stack-allocated or inlined into containing structures by default; primitive-backed generics avoid the boxing entirely. This is included in the tracing-GC chapter rather than allocators (§7) because the change is fundamentally about *which objects exist on the GC heap at all*, not about the allocator's internal policy.
 
@@ -598,9 +610,9 @@ Status (as of 2026-04): Valhalla is in **preview** in JDK 25+ (LW5 prototype), w
 
 Sources: https://openjdk.org/projects/valhalla/ and https://openjdk.org/jeps/401 and https://cr.openjdk.org/~briangoetz/valhalla/sov/01-background.html and https://www.youtube.com/watch?v=XBu54ZIXIgM
 
-### 6.18. Compact Object Headers — Project Lilliput / JEP 519
+### 6.19. Compact Object Headers — Project Lilliput / JEP 519
 
-Project Valhalla (§6.17) restructured *which* objects exist on the heap; **Project Lilliput** (Roman Kennke, Andrew Haley et al., OpenJDK 2021+) is the parallel effort to shrink the headers of every object that *does* exist. JEP 519 ("Compact Object Headers") delivered the result in JDK 25 (2025), reducing the JVM object header from 12–16 bytes to **8 bytes** for the vast majority of objects on the heap.
+Project Valhalla (§6.18) restructured *which* objects exist on the heap; **Project Lilliput** (Roman Kennke, Andrew Haley et al., OpenJDK 2021+) is the parallel effort to shrink the headers of every object that *does* exist. JEP 519 ("Compact Object Headers") delivered the result in JDK 25 (2025), reducing the JVM object header from 12–16 bytes to **8 bytes** for the vast majority of objects on the heap.
 
 The mechanism, simplified: a Java object header historically contained two words — a *mark word* (~8 bytes; lock state, identity hash, GC age, biased-locking metadata) and a *class word* (~8 bytes on 64-bit, with compressed oops; the pointer to the Klass metadata). JEP 519 rearranges this to fit *both* the mark-word state and the class pointer into a single 64-bit header by:
 
@@ -609,17 +621,17 @@ The mechanism, simplified: a Java object header historically contained two words
 - **Eliminating biased locking entirely** — already deprecated and disabled by default since JDK 15 (JEP 374), so the change formalised a transition that had already happened operationally.
 - Using lookup tables for the rare cases where 22-bit class pointers are insufficient.
 
-The memory-footprint impact is large for object-heavy workloads. Benchmarks reported in the JEP and in early production rollouts (Cassandra, Spark, Kafka, large-heap microservices) show **5–15% heap reduction** on typical workloads, with corresponding GC-pause and cache-locality benefits. Combined with **Project Valhalla** (§6.17), the two changes attack heap pressure from opposite directions: Valhalla eliminates objects entirely where possible (value-class flattening); Lilliput shrinks the objects that remain. Together they represent the largest JVM memory-layout shift since the original 64-bit JVM port.
+The memory-footprint impact is large for object-heavy workloads. Benchmarks reported in the JEP and in early production rollouts (Cassandra, Spark, Kafka, large-heap microservices) show **5–15% heap reduction** on typical workloads, with corresponding GC-pause and cache-locality benefits. Combined with **Project Valhalla** (§6.18), the two changes attack heap pressure from opposite directions: Valhalla eliminates objects entirely where possible (value-class flattening); Lilliput shrinks the objects that remain. Together they represent the largest JVM memory-layout shift since the original 64-bit JVM port.
 
 Trade-offs are subtle but real. Identity-hash storage moves: an object's identity hash is now lazily materialised on first `System.identityHashCode()` call rather than always present in the header, costing a one-time atomic update per object. Locking remains correct (the locking protocol is more constrained but functionally equivalent); biased-locking removal had already happened in JDK 15. Some debugging tools (heap dumps, JVM TI agents, third-party profilers) needed updates to handle the new layout — Eclipse MAT, YourKit, JProfiler, and async-profiler released compatible versions in 2024–2025.
 
 Status (as of 2026-04): preview/optional in JDK 24 (`-XX:+UnlockExperimentalVMOptions -XX:+UseCompactObjectHeaders`); shipped in JDK 25 LTS (2025) as the default for new deployments. The JDK 25 LTS release is the canonical "post-Valhalla, post-Lilliput" JVM. Cross-architecture rollout (x86-64, AArch64, RISC-V) is essentially complete.
 
-Cross-reference: the architectural lesson pairs with `REPRESENTATIONS.md §9.1` (JVM bytecode) and §9.2 (CIL) — a managed runtime designed in 1995 with then-luxurious 16-byte headers can shed half that cost three decades later, but only at the cost of multi-year design and validation effort. For a new language designer, **per-object metadata size deserves the same scrutiny per-allocation cost gets** — every byte of object header multiplies by every live object on the heap. Valhalla (§6.17) attacks the count of objects; Lilliput attacks the size of each.
+Cross-reference: the architectural lesson pairs with `REPRESENTATIONS.md §9.1` (JVM bytecode) and §9.2 (CIL) — a managed runtime designed in 1995 with then-luxurious 16-byte headers can shed half that cost three decades later, but only at the cost of multi-year design and validation effort. For a new language designer, **per-object metadata size deserves the same scrutiny per-allocation cost gets** — every byte of object header multiplies by every live object on the heap. Valhalla (§6.18) attacks the count of objects; Lilliput attacks the size of each.
 
 Sources: https://openjdk.org/jeps/519 and https://wiki.openjdk.org/display/lilliput and https://shipilev.net/jvm/objects-inside-out/ and https://openjdk.org/jeps/450
 
-### 6.19. Iso — Request-Private Garbage Collection (PLDI 2025)
+### 6.20. Iso — Request-Private Garbage Collection (PLDI 2025)
 
 Tianle Qiu and Stephen M. Blackburn's **Iso** (PLDI 2025; ANU/Google) is the first request-private garbage collector for Java with a competitive performance profile. The mechanism: each request running on the JVM gets its own *request-private heap region*; when the request completes, its private region is reclaimed wholesale without any thread-local-to-shared-heap promotion. This is the GC analogue to Erlang's per-process heaps (§6.9) — each request lives in its own GC universe — but adapted to Java's shared-mutable-heap reality through **opportunistic copying**: allocations stay request-private when no shared references reach them, and only escape to the shared heap when sharing is observed.
 
@@ -631,7 +643,7 @@ Status (as of 2026-04): research-grade, with an artifact at the PLDI 2025 procee
 
 Sources: https://www.steveblackburn.org/pubs/papers/iso-pldi-2025.pdf and https://dl.acm.org/doi/10.1145/3729285 and https://pldi25.sigplan.org/details/pldi-2025-papers/36/Iso-Request-Private-Garbage-Collection
 
-### 6.20. Arborescent Garbage Collection — Synchronous Immediate Cycle Collection (ISMM 2025)
+### 6.21. Arborescent Garbage Collection — Synchronous Immediate Cycle Collection (ISMM 2025)
 
 Lahaie-Bertrand, Oest O'Leary, Melançon, Feeley, and Monnier's **Arborescent GC** (ISMM 2025 Best Paper) addresses the long-standing weakness of reference counting (§3): cycles either leak (ARC, Lobster) or require a separate cycle-collection phase (ORC, Bacon trial-deletion) introducing latency spikes. Arborescent GC instead reclaims unreachable cyclic structures **immediately and synchronously** at the moment the last external reference is dropped, using a dynamic-graph reachability algorithm inspired by Even and Shiloach's classical decremental-connectivity work.
 
@@ -648,7 +660,7 @@ The lesson: **for languages where deterministic memory behaviour matters more th
 
 Sources: https://oestoleary.com/papers/ISMM25.pdf and https://dl.acm.org/doi/10.1145/3735950.3735953 and https://www.iro.umontreal.ca/~feeley/papers/LahaieBertrandOestOLearyMelanconFeeleyMonnierISMM25.pdf
 
-### 6.21. Eclipse OMR — Pluggable Multi-Language Runtime Toolkit
+### 6.22. Eclipse OMR — Pluggable Multi-Language Runtime Toolkit
 
 IBM's **Eclipse OMR** is the open-source extraction of the J9 JVM's runtime components (GC framework, JIT compiler, port library, threading, diagnostic) into a language-agnostic toolkit. Originally built for J9 Java, OMR now serves as the runtime substrate for **OpenJ9** (IBM's drop-in JVM alternative to HotSpot), **Eclipse Omega VM**, and several research/production projects retrofitting GC and JIT capabilities onto languages without their own runtime: **OMR Ruby+** (a Ruby integration with GC and JIT acceleration), **SOM++** (a Smalltalk dialect), and various OMR-based DSL runtimes. JitBuilder is the OMR component that lets a language frontend describe its semantics declaratively and get a JIT-compiled implementation without writing a backend.
 
@@ -660,7 +672,7 @@ Status (as of 2026-04): actively maintained at github.com/eclipse-omr/omr; produ
 
 Sources: https://github.com/eclipse-omr/omr and https://eclipse.dev/omr/starter/whatisomr.html and https://projects.eclipse.org/projects/technology.omr
 
-### 6.22. CRGC — Fault-Recovering Actor Garbage Collection in Pekko
+### 6.23. CRGC — Fault-Recovering Actor Garbage Collection in Pekko
 
 Plyukhin, Agha, and Montesi's **CRGC** (PLDI 2025) studies garbage collection in actor systems where failures and recovery are part of the programming model. Actor runtimes complicate ordinary GC because reachability is not only a heap graph question: actors own mailboxes, in-flight messages, supervision relationships, and failure/restart state. A collector must preserve the actor semantics even when faults occur during or around collection.
 
@@ -670,7 +682,7 @@ This belongs at the boundary between memory management and concurrency: `CONCURR
 
 Sources: https://pldi25.sigplan.org/details/pldi-2025-papers/39/CRGC-Fault-Recovering-Actor-Garbage-Collection-in-Pekko and https://dl.acm.org/doi/10.1145/3729288
 
-### 6.23. Memory Tiering in a Python Virtual Machine
+### 6.24. Memory Tiering in a Python Virtual Machine
 
 Li et al.'s **Memory Tiering in Python Virtual Machine** (VMIL 2025) explores adapting a CPython-like runtime to heterogeneous memory. Memory tiering moves data among memory classes with different latency, bandwidth, capacity, or persistence characteristics — for example DRAM plus slower large-capacity memory — based on runtime hotness and object behaviour.
 
@@ -1210,13 +1222,14 @@ Rows grouped by chapter; within a group, order roughly follows the body text.
 | Optional generational mode | Incremental default | Workload-dependent | 2-cycle aging | Lua 5.4 (§6.12) |
 | Generational parallel STW + per-thread nursery | STW (not concurrent) | Multi-thread parallel collect | Per-thread semi-space; bounds-check write barrier | MoarVM (§6.13) |
 | Conservative tracing GC for unmodified C/C++ | Pause varies | Standard tracing | No source modification; ~5% over-retention typical | Boehm-Demers-Weiser (§6.14) |
-| Pluggable per-pool GC framework | Pool-policy-dependent | Pool-policy-dependent | Per-allocation-domain policy in one heap | Ravenbrook MPS (§6.15) |
-| Concurrent mark-sweep without compaction | Low-ms STW initial/final mark | Concurrent marking + sweeping | Fragmentation accumulates → eventual STW Full GC | HotSpot CMS / ParNew (deprecated) (§6.16) |
-| Value-class flattening retrofitted onto JVM | Inline classes + null-restricted types + primitive generics | 2–5× memory reduction on small-struct workloads | 12+ year retrofit; loses object identity | Project Valhalla (preview JDK 25+) (§6.17) |
-| 8-byte JVM object header | Class pointer compressed to 22 bits + 42-bit mark word | 5–15% heap reduction; better cache locality | Required biased-locking removal first; tooling updates | Project Lilliput / JEP 519 (JDK 25) (§6.18) |
-| Request-private GC | Per-request mark-region heap on Immix substrate | Bypasses global GC for request-local allocations | Research-grade; PLDI 2025 | Iso (§6.19) |
-| Synchronous immediate cycle collection | Arborescence (dynamic-graph reachability) | RC + cycle reclamation in bounded time | Per-edge bookkeeping cost | Arborescent GC (ISMM 2025) (§6.20) |
-| Pluggable language-agnostic runtime toolkit | GC + JIT + threading as reusable libraries | Decades of J9-tested engineering in OSS | OMR-specific APIs and assumptions | Eclipse OMR (§6.21) |
+| Conservative GC integrated with ownership-language destructors | Conservative tracing + compiler analysis for finalizers | Reuses existing destructors; competitive with RC in some workloads | Research-stage; modified compiler; complex safety story | Alloy for Rust (§6.15) |
+| Pluggable per-pool GC framework | Pool-policy-dependent | Pool-policy-dependent | Per-allocation-domain policy in one heap | Ravenbrook MPS (§6.16) |
+| Concurrent mark-sweep without compaction | Low-ms STW initial/final mark | Concurrent marking + sweeping | Fragmentation accumulates → eventual STW Full GC | HotSpot CMS / ParNew (deprecated) (§6.17) |
+| Value-class flattening retrofitted onto JVM | Inline classes + null-restricted types + primitive generics | 2–5× memory reduction on small-struct workloads | 12+ year retrofit; loses object identity | Project Valhalla (preview JDK 25+) (§6.18) |
+| 8-byte JVM object header | Class pointer compressed to 22 bits + 42-bit mark word | 5–15% heap reduction; better cache locality | Required biased-locking removal first; tooling updates | Project Lilliput / JEP 519 (JDK 25) (§6.19) |
+| Request-private GC | Per-request mark-region heap on Immix substrate | Bypasses global GC for request-local allocations | Research-grade; PLDI 2025 | Iso (§6.20) |
+| Synchronous immediate cycle collection | Arborescence (dynamic-graph reachability) | RC + cycle reclamation in bounded time | Per-edge bookkeeping cost | Arborescent GC (ISMM 2025) (§6.21) |
+| Pluggable language-agnostic runtime toolkit | GC + JIT + threading as reusable libraries | Decades of J9-tested engineering in OSS | OMR-specific APIs and assumptions | Eclipse OMR (§6.22) |
 
 ### 11.7. General-purpose allocators
 
@@ -1483,32 +1496,33 @@ References are grouped by chapter and roughly follow subsection order. Broad bac
 26. Boehm-Demers-Weiser GC home — https://hboehm.info/gc/
 27. BDW GC issues and design notes — https://www.hboehm.info/gc/issues.html
 28. Boehm & Weiser, "Garbage Collection in an Uncooperative Environment" (SP&E 1988) — https://www.hboehm.info/papers/spe_88_si.pdf
-29. Ravenbrook Memory Pool System — https://www.ravenbrook.com/project/mps/
-30. MPS documentation (readthedocs mirror) — https://memory-pool-system.readthedocs.io/
-31. MPS official manual (Ravenbrook) — https://www.ravenbrook.com/project/mps/master/manual/html/
-32. Oracle JDK 13 — Concurrent Mark-Sweep collector tuning — https://docs.oracle.com/en/java/javase/13/gctuning/concurrent-mark-sweep-cms-collector.html
-33. JEP 291: Deprecate CMS — https://openjdk.org/jeps/291
-34. JEP 363: Remove CMS — https://openjdk.org/jeps/363
-35. Project Valhalla — https://openjdk.org/projects/valhalla/
-36. JEP 401: Value Classes and Objects (Preview) — https://openjdk.org/jeps/401
-37. Goetz — State of Valhalla, Part 1 (Background) — https://cr.openjdk.org/~briangoetz/valhalla/sov/01-background.html
-37a. State of Valhalla — Goetz talk (YouTube) — https://www.youtube.com/watch?v=XBu54ZIXIgM
-38. JEP 519: Compact Object Headers — https://openjdk.org/jeps/519
-39. OpenJDK Project Lilliput wiki — https://wiki.openjdk.org/display/lilliput
-40. Aleksey Shipilëv — "Java Objects Inside Out" — https://shipilev.net/jvm/objects-inside-out/
-41. JEP 450: Compact Object Headers (Experimental) — https://openjdk.org/jeps/450
-42. Qiu & Blackburn — Iso: Request-Private Garbage Collection (PLDI 2025) — https://www.steveblackburn.org/pubs/papers/iso-pldi-2025.pdf
-43. Iso ACM DL — https://dl.acm.org/doi/10.1145/3729285
-43a. Iso PLDI 2025 details — https://pldi25.sigplan.org/details/pldi-2025-papers/36/Iso-Request-Private-Garbage-Collection
-44. Lahaie-Bertrand et al. — Arborescent Garbage Collection (ISMM 2025) — https://oestoleary.com/papers/ISMM25.pdf
-45. Arborescent GC ACM DL — https://dl.acm.org/doi/10.1145/3735950.3735953
-45a. Arborescent GC author copy (Université de Montréal) — https://www.iro.umontreal.ca/~feeley/papers/LahaieBertrandOestOLearyMelanconFeeleyMonnierISMM25.pdf
-46. Eclipse OMR repository — https://github.com/eclipse-omr/omr
-47. What is OMR? — https://eclipse.dev/omr/starter/whatisomr.html
-48. Eclipse OMR project page — https://projects.eclipse.org/projects/technology.omr
-49. Eclipse OpenJ9 home — https://www.eclipse.org/openj9/
-50. OpenJ9 documentation — https://www.eclipse.org/openj9/docs/
-51. IBM Semeru Runtimes — https://developer.ibm.com/languages/java/semeru-runtimes/
+29. Hughes & Tratt — Garbage Collection for Rust: The Finalizer Frontier (OOPSLA 2025) — https://arxiv.org/pdf/2504.01841
+30. Ravenbrook Memory Pool System — https://www.ravenbrook.com/project/mps/
+31. MPS documentation (readthedocs mirror) — https://memory-pool-system.readthedocs.io/
+32. MPS official manual (Ravenbrook) — https://www.ravenbrook.com/project/mps/master/manual/html/
+33. Oracle JDK 13 — Concurrent Mark-Sweep collector tuning — https://docs.oracle.com/en/java/javase/13/gctuning/concurrent-mark-sweep-cms-collector.html
+34. JEP 291: Deprecate CMS — https://openjdk.org/jeps/291
+35. JEP 363: Remove CMS — https://openjdk.org/jeps/363
+36. Project Valhalla — https://openjdk.org/projects/valhalla/
+37. JEP 401: Value Classes and Objects (Preview) — https://openjdk.org/jeps/401
+38. Goetz — State of Valhalla, Part 1 (Background) — https://cr.openjdk.org/~briangoetz/valhalla/sov/01-background.html
+38a. State of Valhalla — Goetz talk (YouTube) — https://www.youtube.com/watch?v=XBu54ZIXIgM
+39. JEP 519: Compact Object Headers — https://openjdk.org/jeps/519
+40. OpenJDK Project Lilliput wiki — https://wiki.openjdk.org/display/lilliput
+41. Aleksey Shipilëv — "Java Objects Inside Out" — https://shipilev.net/jvm/objects-inside-out/
+42. JEP 450: Compact Object Headers (Experimental) — https://openjdk.org/jeps/450
+43. Qiu & Blackburn — Iso: Request-Private Garbage Collection (PLDI 2025) — https://www.steveblackburn.org/pubs/papers/iso-pldi-2025.pdf
+44. Iso ACM DL — https://dl.acm.org/doi/10.1145/3729285
+44a. Iso PLDI 2025 details — https://pldi25.sigplan.org/details/pldi-2025-papers/36/Iso-Request-Private-Garbage-Collection
+45. Lahaie-Bertrand et al. — Arborescent Garbage Collection (ISMM 2025) — https://oestoleary.com/papers/ISMM25.pdf
+46. Arborescent GC ACM DL — https://dl.acm.org/doi/10.1145/3735950.3735953
+46a. Arborescent GC author copy (Université de Montréal) — https://www.iro.umontreal.ca/~feeley/papers/LahaieBertrandOestOLearyMelanconFeeleyMonnierISMM25.pdf
+47. Eclipse OMR repository — https://github.com/eclipse-omr/omr
+48. What is OMR? — https://eclipse.dev/omr/starter/whatisomr.html
+49. Eclipse OMR project page — https://projects.eclipse.org/projects/technology.omr
+50. Eclipse OpenJ9 home — https://www.eclipse.org/openj9/
+51. OpenJ9 documentation — https://www.eclipse.org/openj9/docs/
+52. IBM Semeru Runtimes — https://developer.ibm.com/languages/java/semeru-runtimes/
 
 ### Chapter 7 — General-Purpose Allocators
 
