@@ -1,0 +1,54 @@
+{
+  "kind": "framework",
+  "name": "Lezer",
+  "aliases": [],
+  "summary": "Incremental LR (with opt-in GLR) parser system built for CodeMirror 6, generating JavaScript modules that run directly in the browser without WebAssembly overhead.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lezer is the parser system built for CodeMirror 6. Like tree-sitter, it is designed for incremental parsing, error tolerance, and providing a syntax tree for editor tooling. Unlike tree-sitter's C/C++ foundation, Lezer generates JavaScript modules that run directly in the browser without WebAssembly overhead.",
+      "refs": [
+        { "target": "tree-sitter#overview", "type": "sibling" },
+        { "target": "incremental-parsing#overview", "type": "exemplifies" }
+      ]
+    },
+    {
+      "id": "parser-architecture",
+      "title": "Parser architecture",
+      "tags": ["parser", "algorithms"],
+      "content": "Lezer uses an LR parsing algorithm with opt-in GLR for grammars that need it, highly specialized for JavaScript's execution model. The focus is throughput and predictability inside a JS runtime rather than parser-theoretic generality.",
+      "refs": [
+        { "target": "deterministic-ll-lr#overview", "type": "uses" },
+        { "target": "tree-sitter#parser-architecture", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "tree-shape",
+      "title": "Compact non-abstract syntax tree",
+      "tags": ["representation", "incrementality"],
+      "content": "Lezer outputs a compact, non-abstract syntax tree: nodes keep track of their width and structure rather than being full JavaScript objects. This minimizes memory consumption and improves cache locality, both critical when the parser runs inside a browser tab.",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "exemplifies" },
+        { "target": "tree-sitter#incrementality", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "error-recovery",
+      "title": "Error recovery",
+      "tags": ["error-recovery", "parser"],
+      "content": "The parser seamlessly recovers from syntax errors, guaranteeing that the editor always has a workable syntax tree for highlighting and code navigation. Like tree-sitter, this is the load-bearing property: an editor cannot afford parse failures on the half-typed program in the buffer.",
+      "refs": [
+        { "target": "tree-sitter#error-recovery", "type": "sibling" },
+        { "target": "language-server#overview", "type": "relevant-to" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Marijn Haverbeke — Lezer",
+      "url": "https://marijnhaverbeke.nl/blog/lezer.html"
+    }
+  ]
+}

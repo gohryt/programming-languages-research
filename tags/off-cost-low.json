@@ -1,0 +1,7 @@
+{
+  "id": "off-cost-low",
+  "tag": "off-cost:low",
+  "name": "Cost when off: low",
+  "description": "Disabled mechanism leaves a small footprint: a NOP, a static-key check, one cached load, a reserved register, or a few bytes of code-size tax. Often single-digit-cycle.",
+  "axis": "off-cost"
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Boyapati — Single-Owner Regions for RTSJ Java",
+  "aliases": ["boyapati-regions", "rtsj-ownership-regions", "ownership-types-regions"],
+  "summary": "Boyapati, Salcianu, Beebee, Rinard (PLDI 2003) fuse ownership types and region types for RTSJ Java. Every object has an owner (object or region); the ownership relation is acyclic; encapsulation and outlives are statically enforced. Eliminates RTSJ runtime checks for scoped-memory access. Directly influenced Encore's and Pony's later capability designs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["region-based", "ownership", "real-time-java"],
+      "content": "Boyapati, Salcianu, Beebee, Rinard (PLDI 2003) fuse **ownership types** and **region types** for **RTSJ Java**. Every object has an owner (object or region); the ownership relation is acyclic; encapsulation and outlives are statically enforced. This eliminates RTSJ runtime checks for scoped-memory access, significantly faster than dynamic checks.\n\nThe work is the cleanest \"regions + ownership types\" combination on a JVM-class language and predates much of the modern capability-based literature. Status (as of 2026-04): the Boyapati line of work itself was not adopted as a JVM extension, but its vocabulary directly influenced Encore's and Pony's later capability designs.",
+      "refs": [
+        { "target": "region-based-memory#non-lexical-and-hybrid-region-models", "type": "instance-of" },
+        { "target": "ownership#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Boyapati ownership + region (MIT-LCS-TR-869)", "url": "https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf" },
+        { "label": "Boyapati ownership + region (PLDI 2003)", "url": "https://dl.acm.org/doi/10.1145/781131.781168" }
+      ]
+    },
+    {
+      "id": "rtsj-context-and-static-encapsulation",
+      "title": "RTSJ context and static enforcement",
+      "tags": ["real-time-java", "region-based", "ownership"],
+      "content": "The Real-Time Specification for Java (RTSJ) introduces *scoped memory* — bounded-lifetime allocation areas — to support real-time programs that cannot tolerate GC pauses. RTSJ's runtime checks for scope assignment rules are expensive, particularly at hot paths.\n\nBoyapati et al. observed that the same scope discipline can be expressed at the type level with ownership types: every object's owner is either another object or a scoped-memory region; the ownership relation is acyclic; and the type system enforces the outlives-relation between owners and owned. With static enforcement, the runtime checks are not needed — scoped-memory access is safe by construction.",
+      "refs": []
+    },
+    {
+      "id": "influence-on-capability-languages",
+      "title": "Influence on Encore and Pony",
+      "tags": ["region-based", "ownership", "encore", "pony"],
+      "content": "The work directly influenced **Encore's** capability lattice (`data/encore`) and **Pony's** reference-capability design. Both Encore and Pony adopt the core idea — a per-object owner that the type system tracks — and extend it with concurrency-flavoured capabilities (linear, immutable, thread-local) suited to actor-based programming.\n\nFor a language designer evaluating ownership-as-region designs, the Boyapati work is the cleanest single-paper introduction: smaller and more focused than the later Pony/Verona literature, with the ownership-acyclicity invariant stated and proved cleanly.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Boyapati ownership + region (MIT-LCS-TR-869)", "url": "https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf" },
+    { "label": "Boyapati ownership + region (PLDI 2003)", "url": "https://dl.acm.org/doi/10.1145/781131.781168" }
+  ]
+}

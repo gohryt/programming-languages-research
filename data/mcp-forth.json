@@ -1,0 +1,48 @@
+{
+  "kind": "runtime",
+  "name": "mcp_forth",
+  "aliases": [
+    "embeddable MCU Forth"
+  ],
+  "summary": "Liam Howatt's mcp_forth (2024): an embeddable native-codegen Forth targeting x86-32, Xtensa (ESP32-S3), and a portable bytecode VM, designed to *self-compile inside* MCUs with 100 KB–10 MB RAM. Unusual because most embeddable language runtimes pick one of those design points; mcp_forth covers the spectrum.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Liam Howatt's **mcp_forth** (2024) is an embeddable native-codegen Forth targeting x86-32, Xtensa (ESP32-S3), and a portable bytecode VM, designed to *self-compile inside* MCUs with 100 KB–10 MB RAM and to drive peripherals as small as 8 KB.\n\nThe architecture is unusual because most embeddable language runtimes pick one of those points (interpreter on tiny MCUs, native codegen on large ones); mcp_forth covers the spectrum with a shared front-end and pluggable back-ends.",
+      "refs": [
+        {
+          "target": "mecrisp#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "zeptoforth#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "mcp_forth (Liam Howatt)",
+          "url": "https://github.com/liamHowatt/mcp_forth"
+        }
+      ]
+    },
+    {
+      "id": "design-position",
+      "title": "Design position",
+      "tags": [
+        "forth",
+        "embedded"
+      ],
+      "content": "The specific value for new-language design is the existence proof: \"compile inside an ESP32-S3\" is achievable with a small enough compiler core, even one that is not extracted from a larger toolchain. Sits next to Mecrisp and zeptoforth as a third design point in the embedded Forth space — multi-backend rather than single-target.\n\nThe cost is the inverse of Mecrisp's: no single backend gets the depth of optimisation a single-target Forth can deliver, and per-target maturity varies.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "mcp_forth",
+      "url": "https://github.com/liamHowatt/mcp_forth"
+    }
+  ]
+}

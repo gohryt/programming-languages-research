@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "WebAssembly Streaming and Lazy Compilation",
+  "aliases": ["streaming compilation", "Wasm lazy compilation"],
+  "summary": "V8's `WebAssembly.compileStreaming()` begins compiling Wasm functions as bytes arrive over the network. Lazy compilation defers function body compilation to first call. Lazy validation defers function body validation until first call. Wasm's structured control flow + function-body section ordering enable these optimisations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "WebAssembly's binary format was designed from the ground up for fast compilation. Several techniques exploit this:\n\n- **Streaming compilation**: V8's `WebAssembly.compileStreaming()` begins compiling WebAssembly functions as bytes arrive over the network, before the entire module is downloaded. The binary format places function bodies after the type and import sections, so the compiler knows all signatures before it encounters any function body. This enables compilation to proceed in parallel with download.\n- **Lazy compilation**: V8 does not compile all functions eagerly. Instead, functions are compiled on first call by the baseline compiler (Liftoff). This avoids compiling functions that are never called — common in large modules that export many unused functions.\n- **One-pass validation and compilation**: WebAssembly's structured control flow (no arbitrary `goto`) and stack machine design enable single-pass validation. The validator maintains a type stack and checks each instruction in sequence — O(n) time, O(1) state per instruction. Liftoff exploits this by compiling during the same single pass: each WebAssembly instruction is immediately translated to machine code.\n- **Lazy validation** (proposed, V8): defer function body validation until the function is first called. Combined with lazy compilation, this means the engine pays no compile-time or validation cost for unused functions.",
+      "refs": [
+        { "target": "virgil-wasm-interpreter#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "V8 WebAssembly Compilation Pipeline", "url": "https://v8.dev/docs/wasm-compilation-pipeline" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["compiler-architecture", "binary-format"],
+      "content": "The design lesson: if a language's binary format is designed for streaming, single-pass compilation, the cold-start latency can be dramatically reduced. WebAssembly's structured control flow is the key enabler — it sacrifices `goto` but gains compilability.\n\nFor a language targeting both native and Wasm compilation, this trade-off is worth understanding. A binary format with section ordering tuned for streaming compilation, with a structured control flow that admits single-pass validation, makes the compiler's life much easier and produces dramatically better cold-start performance.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "V8 Wasm Compilation Pipeline", "url": "https://v8.dev/docs/wasm-compilation-pipeline" }
+  ]
+}

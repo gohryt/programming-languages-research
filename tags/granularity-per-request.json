@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-request",
+  "tag": "granularity:per-request",
+  "name": "Granularity: per request",
+  "description": "Mechanism activates once per logical request crossing service boundaries. Distributed tracing spans, baggage propagation, correlation profiles.",
+  "axis": "granularity"
+}

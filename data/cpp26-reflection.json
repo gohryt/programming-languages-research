@@ -1,0 +1,53 @@
+{
+  "kind": "concept",
+  "name": "C++26 Static Reflection",
+  "aliases": ["P2996", "C++ reflection", "reflection MVP"],
+  "summary": "C++26's P2996 introduces static reflection via two operators: `^^expr` (lift) reflects an entity into a `std::meta::info` value; `[: r :]` (splice) substitutes it back into source position. Eliminates `<type_traits>` and SFINAE-heavy generic code. Conservative MVP: consteval-only, no token splicing, no raw code emission.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "C++26 introduces **static reflection** as a first-class language feature via P2996 (Sutter, Childers, Faisal, Snyder et al.; voted into the C++26 working draft 2024–2025; current revision P2996R13, June 2025). Two new operators define the surface: `^^expr` (the *lift* operator) reflects an entity into a compile-time `std::meta::info` value, and `[: meta-expr :]` (the *splice* operator) substitutes a reflected value back into source position as an identifier, type, or expression.\n\nThe reflection model is a curated subset of what Daveed Vandevoorde's earlier P1240 specified, dropping the most contentious features (raw token splicing, generative function emission) for a conservative MVP that committee members judged shippable.",
+      "refs": [
+        { "target": "compile-time-function-evaluation#cpp-constexpr-consteval", "type": "extends" }
+      ],
+      "sources": [
+        { "label": "P2996R13 — Reflection for C++26", "url": "https://isocpp.org/files/papers/P2996R13.html" },
+        { "label": "P2996R0 — Reflection for C++26 (initial revision)", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2996r0.html" }
+      ]
+    },
+    {
+      "id": "primitives",
+      "title": "Mechanical primitives",
+      "tags": ["cpp", "reflection", "metaprogramming"],
+      "content": "- **`std::meta::info`** — the type of every compile-time reflection value. A consteval-only opaque handle; cannot be runtime-stored.\n- **Member iteration** — `members_of(^^MyType)` returns a `std::vector<info>` of every non-special member, allowing template-free iteration over fields, methods, base classes, and enumerators.\n- **Splice substitution** — `[:r:]` produces a name, type, or expression depending on what `r` reflects; `template_arguments_of`, `type_of`, `name_of`, `is_class`, `is_enum` complete the meta-query API.\n- **`define_aggregate`** — generates an aggregate type at consteval time; the principal generative-code-emission primitive (more constrained than P1240's earlier proposal).",
+      "refs": []
+    },
+    {
+      "id": "applications",
+      "title": "Applications and impact",
+      "tags": ["cpp", "production"],
+      "content": "The most consequential application is **eliminating `<type_traits>` and SFINAE-heavy generic code**: every metafunction in the standard's traits library can be re-expressed as a few-line consteval function over reflection. Production targets include replacing **Qt's `moc`** (the Meta-Object Compiler that has shipped as an external preprocessor since the 1990s precisely because C++ lacked reflection), Boost.PFR's structural reflection over POD types, automatic JSON/protobuf serialisation, and ORM column mappings.\n\nDistinct from D's CTFE + `__traits` and Zig's `comptime`: C++26 reflection is more constrained (consteval-only, no token splicing, no raw code generation in the MVP) but designed to compose cleanly with C++'s template + concept system. Distinct from Rust proc macros: reflection runs *during* template instantiation rather than as a separate pre-compilation phase, so generated code participates in normal type checking and overload resolution rather than producing tokens that the parser re-ingests.",
+      "refs": [
+        { "target": "rust-macros#overview", "type": "contrasts-with" },
+        { "target": "zig-comptime#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Qt wiki — C++ reflection (P2996) and moc", "url": "https://wiki.qt.io/C%2B%2B_reflection_(P2996)_and_moc" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — reflection without macros",
+      "tags": ["language-design"],
+      "content": "The lesson generalises beyond C++: **a reflection MVP can be valuable even when generative code emission is left out** — the ability to *query* type structure compositionally eliminates the most painful 80% of template-metaprogramming use cases without committing to the full Lisp-macro design space. For language designers, P2996 is the cleanest production data point on \"reflection without macros\" — a useful intermediate between Rust's procedural macros and Zig's full compile-time evaluation.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "P2996 R13", "url": "https://isocpp.org/files/papers/P2996R13.html" },
+    { "label": "P2996R0 — initial revision (open-std)", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2996r0.html" },
+    { "label": "Qt wiki — P2996 and moc", "url": "https://wiki.qt.io/C%2B%2B_reflection_(P2996)_and_moc" }
+  ]
+}

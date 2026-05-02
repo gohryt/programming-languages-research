@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Evidence Passing — Dictionary and Witness Compilation",
+  "aliases": ["dictionary passing", "witness passing", "type-class evidence"],
+  "summary": "Wadler-Blott 1989: implicit type-class facts become first-class IR values that ordinary optimisations can specialise. A function with a `Show` constraint becomes a function with an explicit `Show` dictionary parameter. Rust traits, Haskell type classes, Swift protocols, Koka effects all use variants.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Wadler and Blott's \"How to Make Ad-hoc Polymorphism Less Ad Hoc\" (POPL 1989) introduced **evidence passing** (also called dictionary passing or witness passing): implicit facts about types — type-class instances, trait implementations, protocol witnesses, effect handlers — become first-class IR values that ordinary optimisations can specialise.\n\nA function with a `Show` constraint becomes a function with an explicit `Show` dictionary parameter: a record of the methods that constraint provides. Calls site-specifically pass the dictionary; intra-procedural specialisation can inline it; the optimiser can constant-fold the methods if the dictionary is statically known.",
+      "refs": [
+        { "target": "typed-elaboration#overview", "type": "produced-by" },
+        { "target": "effect-handler-lowering#overview", "type": "related-to" }
+      ],
+      "sources": [
+        { "label": "Wadler & Blott — Ad-hoc Polymorphism (POPL 1989)", "url": "https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymorphism.pdf" }
+      ]
+    },
+    {
+      "id": "production-uses",
+      "title": "Production uses",
+      "tags": ["compiler", "type-classes"],
+      "content": "GHC compiles Haskell type classes via dictionary passing. Rust traits use a similar dictionary-passing approach for `dyn Trait` (with monomorphisation as the alternative for `impl Trait`). Swift protocols use witness tables — a dictionary-passing variant where the witness table is a thin pointer-vector rather than a structural record.\n\nKoka's effect handlers use evidence passing to thread handler references through every effectful operation, avoiding continuation capture for the common case of tail-resumptive handlers (Xie & Leijen, ICFP 2021).\n\nThe lesson: **once implicit semantic facts (instances, witnesses, handlers) become explicit IR values, the rest of the optimiser is almost free**. Inlining, constant propagation, dead-code elimination all act on the dictionary just as they would on any other IR value. The hard work is the elaboration that produced the dictionary in the first place.",
+      "refs": [],
+      "sources": [
+        { "label": "Generalized Evidence Passing for Effect Handlers (Xie & Leijen, ICFP 2021)", "url": "https://xnning.github.io/papers/multip.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Wadler-Blott", "url": "https://www.cs.tufts.edu/~nr/cs257/archive/philip-wadler/ad-hoc-polymorphism.pdf" }
+  ]
+}

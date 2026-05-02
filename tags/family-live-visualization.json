@@ -1,0 +1,7 @@
+{
+  "id": "family-live-visualization",
+  "tag": "family:live-visualization",
+  "name": "Family: live visualization debugging",
+  "description": "Continuous-execution debuggers projecting behavior as overlay — WhiteBox, Bret Victor scrubber, Light Table/Eve/Observable, Unreal GDT, GPU frame debuggers, XState inspector.",
+  "axis": "family"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "family-specification-level",
+  "tag": "family:specification-level",
+  "name": "Family: specification-level debugging",
+  "description": "Debugging specifications: TLA+ counterexample traces, Lean/Coq/Agda InfoView proof-state navigators.",
+  "axis": "family"
+}

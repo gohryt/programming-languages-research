@@ -1,0 +1,43 @@
+{
+  "kind": "language",
+  "name": "Encore — Capabilities-as-Regions for Active Objects",
+  "aliases": ["encore-language", "encore-active-objects"],
+  "summary": "Brandauer, Castegren, Clarke, Wrigstad et al.'s Encore (UpScale, 2015–2018) is an actor/active-object language whose type system uses reference capabilities (linear, locally-shared, subordinate, thread-local, read-only) to control aliasing across active-object boundaries. Per-actor unshared local heaps + capability-checked transfer make it the cleanest example of 'capabilities-as-regions' at the language level.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["encore", "actor-region", "region-based", "concurrency-isolation"],
+      "content": "Brandauer, Castegren, Clarke, Wrigstad et al.'s **Encore** (UpScale, 2015–2018) is an actor/active-object language whose type system uses reference capabilities (linear, locally-shared, subordinate, thread-local, read-only) to control aliasing across active-object boundaries. A capability annotates a *type*, demarcating an aliasing regime — ownership is checked structurally rather than via Tofte-Talpin region variables.\n\nEncore is the cleanest example of \"capabilities-as-regions\" at the language level — closer in shape to Pony than to Cyclone, but with a stronger emphasis on parallel-combinator coordination. Status (as of 2026-04): the UpScale project ended; Encore is no longer actively developed as a vehicle, but its capability vocabulary heavily influenced later work.",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "instance-of" },
+        { "target": "actors#overview", "type": "related" },
+        { "target": "ownership#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Encore SFM 2015 paper", "url": "https://ebjohnsen.org/publication/15-encore/15-encore.pdf" }
+      ]
+    },
+    {
+      "id": "capabilities-and-local-heaps",
+      "title": "Per-actor heaps and capability-checked transfer",
+      "tags": ["encore", "actor-region", "region-borrow", "concurrency-isolation"],
+      "content": "Per-actor unshared local heaps + capability-checked transfer: passing an exclusive (linear) capability to another actor is a **move**; subordinate objects cannot escape their owning actor; thread-local capabilities cannot be sent at all. This means the runtime can keep per-actor allocators independent and free of cross-actor pointers, modulo controlled transfer points.\n\nThe capability lattice (linear, locally-shared, subordinate, thread-local, read-only) covers most practical aliasing regimes: linear for moves, locally-shared for read-only sharing within an actor, subordinate for owned helpers, thread-local for non-transferable state, and read-only for shared immutable data. Each capability rules out a specific class of aliasing race.",
+      "refs": [
+        { "target": "linear-affine-types#overview", "type": "related" },
+        { "target": "actors#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "influence",
+      "title": "Influence on later capability designs",
+      "tags": ["encore", "verona", "pony"],
+      "content": "Encore directly influenced **Pony** (the same capability lattice idea, packaged into a production-aimed language) and **Verona** (per-region capabilities with active-region windowing, see `data/verona`). The Boyapati single-owner RTSJ regions work (`data/boyapati-rtsj-regions`) is the older cousin in the \"regions + ownership types\" tradition; Encore is its actor-flavoured descendant.\n\nFor a language designer choosing between Tofte-Talpin region variables and capability-as-region, Encore demonstrates that capability-typing scales to OO/actor-style programs without the inference complexity of region-polymorphism, at the cost of more annotations on shared types.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Encore SFM 2015 paper", "url": "https://ebjohnsen.org/publication/15-encore/15-encore.pdf" },
+    { "label": "Elias Castegren homepage", "url": "https://eliasc.github.io/" }
+  ]
+}

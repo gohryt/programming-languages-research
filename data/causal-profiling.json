@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Causal profiling",
+  "aliases": [
+    "virtual speedup",
+    "Coz"
+  ],
+  "summary": "Profiling family that answers 'which line, if optimized, would most speed up the program?' by inserting microsecond-scale pauses into all threads except when they are executing the target line — virtual speedup as a debugging primitive.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Traditional profilers answer \"which line took the most time?\" Causal profilers answer \"which line, if optimized, would most speed up the program?\" — a qualitatively different question. The mechanism (virtual speedup via orchestrated pauses) is strange enough to stand as its own family.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:heavyweight-instrumentation`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:zero`\n- **on-cost**: `on-cost:medium`\n- **granularity**: `granularity:per-line`\n"
+    },
+    {
+      "id": "coz-causal-profiling",
+      "title": "Coz — Causal Profiling via Virtual Speedup",
+      "tags": [
+        "domain:profiling",
+        "family:heavyweight-instrumentation",
+        "granularity:per-line",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Coz does the causal trick by *virtually speeding up* a line of code — not by making it faster, but by making everything else slower. It inserts microsecond-scale pauses into all threads *except* when they are executing the target line. The effect on relative performance is the same as if the target line had actually been optimized.\n\nBy running the program many times with different virtual speedup amounts (0% to 100%) applied to different lines, Coz builds a profile showing the causal relationship between each line's performance and the program's overall throughput or latency.\n\nTraditional profilers tell you where time is spent. Coz tells you where time *matters*. A line that takes 30% of total time might yield 0% speedup when optimized (because something else is the bottleneck), while a line taking 2% of total time might yield 20% speedup (because it is on the critical path). Only causal profiling can distinguish these cases.\n\nMean overhead is ~17%. The technique requires \"progress points\" — markers where the developer indicates meaningful work completion (e.g., end of a request, end of a frame). This is a small annotation burden but essential for defining what \"throughput\" means.",
+      "sources": [
+        {
+          "url": "https://web.cs.umass.edu/publication/docs/2014/UM-CS-2014-010.pdf"
+        },
+        {
+          "url": "https://blog.acolyer.org/2015/10/14/coz-finding-code-that-counts-with-causal-profling/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://web.cs.umass.edu/publication/docs/2014/UM-CS-2014-010.pdf"
+    },
+    {
+      "url": "https://blog.acolyer.org/2015/10/14/coz-finding-code-that-counts-with-causal-profling/"
+    }
+  ]
+}

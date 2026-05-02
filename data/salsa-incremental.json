@@ -1,0 +1,46 @@
+{
+  "kind": "framework",
+  "name": "Salsa — Incremental Computation Framework",
+  "aliases": ["Salsa", "rust-analyzer Salsa", "ty Salsa"],
+  "summary": "Memoised demand-driven query graph: every computation result is cached and identified by inputs. When inputs change, dependent results are invalidated; everything else is reused. Powers rust-analyzer (Rust IDE) and ty (Astral's Python type checker, 80× faster incremental than Pyright).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Salsa is the incremental computation framework underpinning rust-analyzer. The \"IR\" in Salsa is the memoised graph of query values: every query result (parsed AST, resolved name, inferred type, computed MIR) is cached and identified by its inputs. When an input changes, dependent query results are invalidated; everything else is reused.\n\nThis is IR-as-database: the rust-analyzer compiler's intermediate state isn't a tree or graph in memory but a set of memoised facts in Salsa's storage. Querying for a type triggers lazy computation; storing the result makes it durable for later queries.",
+      "refs": [
+        { "target": "content-addressed-ir#overview", "type": "compared-with" },
+        { "target": "incremental-type-checking#overview", "type": "implements" },
+        { "target": "name-resolution#symbols-and-stable-identity", "type": "memoizes" },
+        { "target": "language-server#frontend-architecture-requirements", "type": "powers" }
+      ],
+      "sources": [
+        { "label": "Salsa Incremental Computation Framework", "url": "https://github.com/salsa-rs/salsa" },
+        { "label": "rustc-dev-guide — query system", "url": "https://rustc-dev-guide.rust-lang.org/query.html" }
+      ]
+    },
+    {
+      "id": "ty-case-study",
+      "title": "ty (Astral) — case study",
+      "tags": ["python", "salsa", "incremental"],
+      "content": "Astral's **ty** (formerly \"Red Knot\") is a Python type checker and language server, written in Rust on top of Salsa. It type-checks the `home-assistant` project in 2.19 seconds — 8.9× faster than mypy (19.6s), 20.8× faster than Pyright (45.7s). In incremental mode (editing a file in the PyTorch repository), ty recomputes diagnostics in 4.7ms — 80× faster than Pyright.\n\nKey design decisions:\n\n- **Incremental from the ground up**: parsing, name resolution, type inference, and diagnostic emission are all memoised, demand-driven computations. When a file changes, only the queries that transitively depend on it are recomputed. This is what enables 4.7ms incremental updates on a multi-million-line codebase.\n- **First-class intersection types**: unlike mypy and Pyright, ty supports intersection types natively, enabling more precise type narrowing.\n- **Diagnostic system inspired by rustc**: ty produces multi-file, multi-span diagnostics that explain not just *what* is wrong but *why*.\n\nty demonstrates that combining Salsa-based incrementality with a Rust implementation creates a new performance tier for language tooling: cold-start performance that matches or exceeds cached performance of existing tools.",
+      "refs": [],
+      "sources": [
+        { "label": "ty: An Extremely Fast Python Type Checker", "url": "https://astral.sh/blog/ty" }
+      ]
+    },
+    {
+      "id": "design-implication",
+      "title": "Design implication for new languages",
+      "tags": ["language-design", "tooling"],
+      "content": "For a new language, the lesson is direct: if the type checker and language server are designed Salsa-style from the start, IDE responsiveness comes for free. Retrofitting incremental computation onto a batch-style compiler architecture is much harder than designing it in.\n\nThe trade-off: Salsa-style architecture requires every computation step to be expressible as a pure function of its inputs, which forces the compiler design toward a query-oriented rather than pass-oriented structure. The architectural cost is real but the IDE benefits are dramatic.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Salsa", "url": "https://github.com/salsa-rs/salsa" },
+    { "label": "ty blog", "url": "https://astral.sh/blog/ty" },
+    { "label": "rustc-dev-guide — query system", "url": "https://rustc-dev-guide.rust-lang.org/query.html" }
+  ]
+}

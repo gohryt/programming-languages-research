@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Link-Time Optimisation — Full LTO and ThinLTO",
+  "aliases": ["LTO", "ThinLTO", "Full LTO"],
+  "summary": "LTO defers part of compilation until link time. Full LTO merges all bitcode into one giant module — maximum optimisation, serial bottleneck. ThinLTO (Tobias Grosser, Teresa Johnson 2016) decouples 'decide what to inline' from 'apply' and parallelises the latter. ThinLTO is the production default for serious C++ at scale.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Link-time optimisation (LTO)** defers part of compilation until link time, when the whole program (or module set) is available. The canonical wins are cross-module inlining, whole-program dead-code elimination, and devirtualisation across translation unit boundaries.\n\n**Full LTO** (GCC's `-flto`, Clang's `-flto=full`) merges all LLVM IR bitcode from every translation unit into one giant module, then runs the full optimiser on it. Maximum code quality; minimal scalability — the link step becomes an O(program size) serial bottleneck, often adding minutes to link times on large projects.\n\n**ThinLTO** (Tobias Grosser, Teresa Johnson et al., 2016) is Clang's scalable alternative. Each translation unit emits bitcode with a summary of what's exported, imported, and called. The linker reads all summaries, builds a call graph, decides per-function what to inline across modules, and *then* parallelises the actual optimisation across the translation units. Link time approaches that of non-LTO builds while retaining most of Full LTO's benefits.",
+      "refs": [
+        { "target": "modern-linkers#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "ThinLTO", "url": "https://clang.llvm.org/docs/ThinLTO.html" }
+      ]
+    },
+    {
+      "id": "design-insight",
+      "title": "Design insight — separate decision from application",
+      "tags": ["compiler", "parallelism"],
+      "content": "ThinLTO's key design insight: cross-module information flow at link time doesn't require serial processing, if you separate \"decide what to do\" from \"do it\" and parallelise the second phase.\n\nThe lesson generalises to any whole-program analysis: build summaries per module that admit decisions, make decisions globally with the summaries, then parallelise the per-module application of those decisions. Every serious C/C++ codebase at scale uses ThinLTO today; Full LTO is reserved for small, performance-critical components.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ThinLTO docs", "url": "https://clang.llvm.org/docs/ThinLTO.html" }
+  ]
+}

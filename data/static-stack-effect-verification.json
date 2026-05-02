@@ -1,0 +1,36 @@
+{
+  "kind": "concept",
+  "name": "Static Stack-Effect Verification in Forth",
+  "aliases": ["Ertl 2021 anchors", "StrongForth", "typeforth"],
+  "summary": "Three concrete static stack-effect checkers establish that compile-time stack discipline is a *safety* mechanism, not just documentation. Ertl 2021 anchors handle statically-unknown effects via placeholder signatures; StrongForth provides full type-checking with overload resolution; typeforth stores 16-bit type IDs in word flag cells.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Three concrete static stack-effect checkers establish that compile-time stack discipline can be a *safety* mechanism, not just documentation. Anton Ertl's \"Practical Considerations in a Static Stack Checker\" (EuroForth 2021) introduces **anchors** — placeholder stack signatures for words with statically-unknown effects (`execute`, `r>`) — together with a single-pass control-flow-join algorithm. Anchors are what made stack checking practical: earlier checkers either rejected too many programs (no `execute`) or too few (no flow merge).\n\n**StrongForth** (Stephan Becher) goes further, providing full strong static type-checking with overloading by stack signature; the compile-time data-type heap shadows the runtime data stack. **typeforth** is a modern minimal implementation storing 16-bit type IDs in word flag cells, treating branching as checkpoint+merge of the typestack, with a `nocheck` escape hatch.",
+      "refs": [
+        { "target": "stack-effect-typing#overview", "type": "implements" }
+      ],
+      "sources": [
+        { "label": "Ertl — Practical Considerations in a Static Stack Checker (EuroForth 2021)", "url": "https://repositum.tuwien.at/handle/20.500.12708/152198" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — stack discipline as safety mechanism",
+      "tags": ["forth", "type-system"],
+      "content": "The theoretical anchor is Stoddart & Knaggs (1992) \"Type Inference in Stack Based Languages\" plus Pöial's EuroForth 1993 stack-effect inference algebra. The fully-realized production-language version is Factor; the Forth lineage above shows that the same discipline can be retrofitted onto an ANS Forth and used as an opt-in safety pass without redesigning the language — at the cost of fragile anchor signatures for `execute`-style words (which understate actual behavior to keep the checker tractable) and the usual opt-in gap, where unannotated code gets no guarantee.",
+      "refs": [
+        { "target": "factor-language#overview", "type": "fully-realized-by" }
+      ],
+      "sources": [
+        { "label": "StrongForth", "url": "https://www.stephan-becher.de/strongforth/" },
+        { "label": "typeforth", "url": "https://github.com/typeforth/typeforth" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Ertl static stack checker", "url": "https://repositum.tuwien.at/handle/20.500.12708/152198" }
+  ]
+}

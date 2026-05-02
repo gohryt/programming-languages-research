@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "C3 Allocator API",
+  "aliases": ["C3 mem and tmem", "@pool", "C3 temp pools"],
+  "summary": "C3's heap+temp split with an `@pool` scoped temp-flush macro and a `VMEM_TEMP` debug mode that turns escaped temp pointers into deterministic segfaults via virtual-memory protection.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "c3", "ergonomics"],
+      "content": "C3 is close to Odin in spirit but more explicit about the temporary-allocation idiom. Heap allocation goes through `mem`, temp allocation through `tmem`, and an `@pool` macro flushes temp allocations at the end of a lexical scope. Many APIs have `t`/`temp_` variants (`tmalloc`, `tnew`, `string::tformat`) that route into `tmem`.\n\nThe reusable lesson C3 contributes: arena-style temp allocation becomes much safer when paired with a debug mode that makes escaped temp pointers crash deterministically.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "odin-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "vmem-temp-and-tracking",
+      "title": "VMEM_TEMP and TrackingAllocator",
+      "tags": ["c3", "memory-safety", "guard-page"],
+      "content": "`VMEM_TEMP` uses virtual-memory protection so use-after-pool segfaults deterministically — when an `@pool` exits, its arena pages are `mprotect`'d unreadable, and any escaped pointer dereference traps. `TrackingAllocator` records leaks and backtraces. The combination means temp-arena bugs are caught at the point of misuse rather than through silent corruption later.\n\nThis pairs nicely with the `tmalloc`/`tnew`/`tformat` idiom: programmers can lean on temp allocation freely, knowing that escaped pointers will trap rather than leak into the next pool's allocations.",
+      "refs": [
+        { "target": "arena-allocation#language-allocator-api-relation", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "C3 memory handling", "url": "https://c3-lang.org/language-common/memory/" },
+    { "label": "C3 debugging allocators", "url": "https://c3-lang.org/misc-advanced/debugging/" }
+  ]
+}

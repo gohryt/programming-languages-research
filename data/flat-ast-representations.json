@@ -1,0 +1,120 @@
+{
+  "kind": "concept",
+  "name": "Flat and Compact AST Representations",
+  "aliases": [
+    "flat-ast",
+    "compact-ast"
+  ],
+  "summary": "Parser-output layouts that prioritize cache locality and trivial serialization; production examples include Cuik's postfix expression array, red-green CSTs (Roslyn, rowan, SwiftSyntax, Lezer, Tree-sitter), Zig's token-indexed AST, arena-based offsets, and Oil's lossless ASDL.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Parser output has two competing jobs: feed the compiler cheaply and preserve enough source structure for diagnostics, formatting, macros, and editor tooling. This record covers the parser-facing view of AST/CST layout: what the parser emits, what source-position information it retains, and what can be dropped after lowering.",
+      "refs": [
+        {
+          "target": "source-location-strategies#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "postfix-expression-encoding",
+      "title": "Postfix expression encoding — Cuik",
+      "tags": [
+        "parser",
+        "ast",
+        "memory-layout"
+      ],
+      "content": "Cuik stores expressions as a flat `Subexpr` array in reverse-Polish order. For a parser, the important point is that child links are implicit in sequence position rather than explicit pointers, so expression parsing can append compact nodes and later codegen can walk them sequentially.\n\nBenefit: excellent locality, no pointer overhead, trivial serialization. Cost: random subtree access requires a walk.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Cuik",
+          "url": "https://github.com/RealNeGate/Cuik"
+        }
+      ]
+    },
+    {
+      "id": "red-green-and-full-fidelity-trees",
+      "title": "Red-green and full-fidelity trees as parser outputs",
+      "tags": [
+        "parser",
+        "cst",
+        "incremental"
+      ],
+      "content": "Editor-oriented systems (Roslyn, rowan, SwiftSyntax, Lezer, Tree-sitter) emit a persistent, error-tolerant CST with lossless token/trivia retention and stable node identity across edits, rather than a one-shot AST. Whether nodes carry absolute byte ranges or width-only green nodes with lazy red wrappers is a representation-side choice.\n\nThe load-bearing properties: every byte of source maps to exactly one tree node (including whitespace and comments), nodes are immutable so they can be shared across versions of the tree, and edits produce a new tree by copying only the changed path from root to edit site. SwiftSyntax in particular makes the syntax tree a language-extension boundary: macros operate on full-fidelity trees, so the parser must preserve every token, comment, and whitespace trivia for byte-exact round-tripping.",
+      "refs": [
+        {
+          "target": "tree-sitter#overview",
+          "type": "example"
+        },
+        {
+          "target": "lezer#overview",
+          "type": "example"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Eric Lippert — Red-Green Trees",
+          "url": "https://ericlippert.com/2012/06/08/red-green-trees/"
+        },
+        {
+          "label": "rowan",
+          "url": "https://github.com/rust-analyzer/rowan"
+        },
+        {
+          "label": "swift-syntax",
+          "url": "https://github.com/swiftlang/swift-syntax"
+        }
+      ]
+    },
+    {
+      "id": "token-indexed-ast",
+      "title": "Token-indexed AST with relative offsets — Zig",
+      "tags": [
+        "parser",
+        "ast",
+        "memory-layout"
+      ],
+      "content": "Zig's parser emits an AST that references tokens by index rather than by byte offset. Diagnostics resolve positions through the token table and source manager, and once ZIR (Zig Intermediate Representation) is emitted the AST plus token list can be discarded — a conservative memory-saving alternative to full-fidelity CSTs.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Zig ZIR",
+          "url": "https://github.com/ziglang/zig/blob/master/src/Zir.zig"
+        }
+      ]
+    },
+    {
+      "id": "arena-based-layouts",
+      "title": "Arena-based parser layouts with offsets",
+      "tags": [
+        "parser",
+        "memory-layout",
+        "performance"
+      ],
+      "content": "Arena-allocated parser output can use 32-bit offsets in place of pointers for child/sibling/parent edges, halving edge size on 64-bit platforms, simplifying bulk-free, and keeping trees serializable — a natural fit for one-phase parser ASTs.\n\nOxc combines this pattern with hand-written recursive descent: AST nodes are allocated in a single arena, short strings are stored inline via `CompactString`, comments and trivia are preserved, and scope binding plus symbol resolution are deferred to a later semantic phase. Oxc distinguishes `BindingIdentifier`, `IdentifierReference`, and `IdentifierName` for downstream tooling. The pattern is an existence proof that hand-written recursive descent plus arena allocation is still a top-tier strategy for industrial JS/TS tooling.",
+      "refs": []
+    },
+    {
+      "id": "lossless-syntax-trees",
+      "title": "Lossless syntax trees — Oil/OSH/YSH and ASDL",
+      "tags": [
+        "parser",
+        "ast",
+        "tooling"
+      ],
+      "content": "Oil's shift from a classical AST to a lossless syntax tree is the parser-side warning that \"AST\" is too lossy for source-to-source tools — shell trivia (comments, heredocs, backslashes, token boundaries) must be retained when execution is not the only consumer. The design question for any language implementer is whether one parser output should serve both execution and tooling.\n\nASDL (Abstract Syntax Description Language) schemas drive both Python's CPython AST and Oil's lossless syntax tree. The schema declares each node type's fields; the codegen produces typed accessors for multiple consumer languages.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Oil lossless trees",
+          "url": "https://www.oilshell.org/blog/2017/02/11.html"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

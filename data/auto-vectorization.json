@@ -1,0 +1,48 @@
+{
+  "kind": "concept",
+  "name": "Auto-Vectorisation and SLP",
+  "aliases": ["loop vectorization", "SLP vectorization", "superword-level parallelism"],
+  "summary": "Compiler transforms scalar code into SIMD code automatically. Loop vectorisation transforms parallel loops into chunked vector operations; SLP (Larsen-Amarasinghe PLDI 2000) packs straight-line isomorphic operations on independent data into vector registers. Notoriously hard to tune.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Modern CPUs have wide SIMD registers (128–512 bits); using them for scalar code requires either explicit intrinsics or an auto-vectoriser. Two main algorithms dominate: **loop vectorisation** transforms `for i: a[i] = b[i] + c[i]` into chunked operations on vector registers, and **SLP (Superword-Level Parallelism)** finds *straight-line* code with isomorphic operations on independent data and packs them into vector operations.\n\nBoth passes are notoriously difficult to tune: too aggressive and they produce slower code than scalar (due to shuffle costs); too conservative and they miss obvious opportunities. Recent work on **VPlan** (LLVM) replaces the legacy vectoriser with a planned rewrite built around vectorisation plans as first-class IR.",
+      "refs": [
+        { "target": "ssa#overview", "type": "operates-on" }
+      ],
+      "sources": [
+        { "label": "LLVM Vectorizers", "url": "https://llvm.org/docs/Vectorizers.html" }
+      ]
+    },
+    {
+      "id": "loop-vectorization",
+      "title": "Loop vectorisation",
+      "tags": ["compiler", "simd", "loops"],
+      "content": "LLVM `LoopVectorize` and GCC's tree-vectorize analyse loops for data parallelism. The transformation requires:\n\n- **Stride analysis**: array accesses must have a known stride (typically unit stride for contiguous SIMD).\n- **Alias checking**: loads and stores in the loop must not alias unpredictably; aliasing forces scalar fallback or runtime checks.\n- **Tail handling**: loops whose iteration count is not a multiple of the vector width need scalar epilogues or masked operations.\n- **Reduction recognition**: accumulator patterns (`sum += a[i]`) must be specially handled to use vector reduction operations.\n\nWhen successful, vectorised inner loops can run 4–8× faster on AVX2 hardware (8-lane f32) and 8–16× on AVX-512 (16-lane f32). When unsuccessful, the cost of failed vectorisation attempts plus alignment fixups can make vectorised code slower than scalar — which is why cost models and compiler hints matter.",
+      "refs": []
+    },
+    {
+      "id": "slp-vectorization",
+      "title": "SLP vectorisation",
+      "tags": ["compiler", "simd"],
+      "content": "**Superword-Level Parallelism** (Larsen & Amarasinghe, PLDI 2000) takes a different approach. Instead of vectorising loops, SLP finds *straight-line* code with isomorphic operations on independent data and packs them into vector operations.\n\nExample: `a = x1+y1; b = x2+y2; c = x3+y3; d = x4+y4` becomes a single 4-wide vector add. SLP is crucial for code that has already been loop-unrolled or that operates on small fixed-size structures (3-component vectors, 4×4 matrices, RGBA pixel manipulation).\n\nThe algorithm builds chains of isomorphic operations starting from any seed pair (e.g., two adds with adjacent loads), expands the chain greedily, and emits vector ops if the cost model favours it. SLP and loop vectorisation compose: first unroll, then SLP-vectorise the unrolled body. Modern LLVM runs both passes and lets the cost model arbitrate.",
+      "refs": [],
+      "sources": [
+        { "label": "SLP Vectorization (Larsen-Amarasinghe, PLDI 2000)", "url": "https://groups.csail.mit.edu/commit/papers/00/pldi00.pdf" }
+      ]
+    },
+    {
+      "id": "tuning-and-vplan",
+      "title": "Tuning challenges and VPlan",
+      "tags": ["compiler", "tradeoffs"],
+      "content": "Both vectorisers depend on cost models that estimate the speedup of vectorised code versus scalar. Cost models are wrong often: gathered loads are slower than predicted, AVX-512 frequency throttling penalises wide vector ops, masking can be expensive on some microarchitectures. Compilers maintain extensive tuning per-target and per-microarchitecture.\n\nVPlan (LLVM, in progress) is the long-term replacement: vectorisation plans are first-class IR, multiple plans for the same loop can be built and compared, and the cost model evaluates plans rather than ad-hoc transformations. This makes the pass more inspectable and the tuning more principled, at the cost of a substantial rewrite of the existing vectoriser.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "LLVM Vectorizers", "url": "https://llvm.org/docs/Vectorizers.html" },
+    { "label": "Larsen-Amarasinghe SLP", "url": "https://groups.csail.mit.edu/commit/papers/00/pldi00.pdf" }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "kind": "language",
+  "name": "Raku/Rakudo Grammars",
+  "aliases": [
+    "rakudo",
+    "nqp-grammars"
+  ],
+  "summary": "Raku exposes a powerful user-visible grammar system with slangs (separate grammar/action pairs for nested syntactic domains); Rakudo on MoarVM compiles via NQP grammars + action methods → QAST → MoarVM bytecode. Distinctive contribution: Longest Token Matching (LTM) over declarative prefixes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Raku exposes a powerful grammar system, and the main high-performance implementation, **Rakudo on MoarVM**, is itself written using **NQP** (Not Quite Perl, the Raku-subset implementation language) grammars plus action methods. The front end pairs `Perl6::Grammar`/`Raku::Grammar` with `Perl6::Actions`/`Raku::Actions`; parsing produces a grammar-shaped parse tree, and action methods map it into **QAST** (the Q Abstract Syntax Tree, NQP's compiler-internal IR) or newer RakuAST structures. The later stages lower this into MoarVM's **MAST** (MoarVM Assembly Syntax Tree, the bytecode-adjacent form) and bytecode.\n\nRegexes and grammars are not just libraries: they are parsed and compiled as nested languages in the same compiler pipeline.",
+      "refs": [
+        {
+          "target": "raku#overview",
+          "type": "parser-of"
+        }
+      ]
+    },
+    {
+      "id": "longest-token-matching",
+      "title": "Longest Token Matching (LTM)",
+      "tags": [
+        "parser",
+        "raku",
+        "grammar"
+      ],
+      "content": "The distinctive parser idea is **Longest Token Matching** (LTM). In Raku alternations using `|`, the engine does not simply try alternatives in source order. It extracts the declarative prefix of each branch — the portion representable by a finite-state machine — builds NFA-style matching machinery, and prefers the branch with the longest declarative match, with specificity and textual order as tie-breakers.\n\nThis is transitive through subrule calls and proto-regexes, so grammar extensions can intermix fairly: a newly introduced operator or term competes by how much input it can consume, not merely by where it was declared. LTM is what makes user-extensible grammars perform: an alternation with hundreds of user-added branches still picks the right one without searching all of them sequentially.",
+      "refs": [
+        {
+          "target": "extensible-syntax#overview",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Raku alternation syntax",
+          "url": "https://docs.raku.org/syntax/%7C"
+        }
+      ]
+    },
+    {
+      "id": "slangs-and-language-switching",
+      "title": "Slangs and language switching",
+      "tags": [
+        "parser",
+        "raku",
+        "extensibility"
+      ],
+      "content": "Rakudo has **slangs**: separate grammar/action pairs for main language syntax, quoting, regexes, and other nested syntactic domains. A grammar can call into another slang with `LANG`, letting the compiler switch parsing languages mid-file.\n\nThe performance trick is that this extensibility is not implemented by blindly backtracking through every grammar rule: the QRegex engine extracts finite declarative prefixes, builds NFA-style dispatch at alternation points, and only falls back to slower procedural matching after that prefix can no longer decide. For language design, Raku demonstrates both the power and cost of user-visible grammar machinery: extensibility and embedded languages become first-class, but parser performance depends on extracting finite declarative prefixes and avoiding non-declarative constructs that defeat LTM.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Rakudo and NQP internals course",
+          "url": "https://edumentab.github.io/rakudo-and-nqp-internals-course/slides-day1.pdf"
+        },
+        {
+          "label": "Rakudo source — main.nqp",
+          "url": "https://github.com/rakudo/rakudo/blob/master/src/main.nqp"
+        }
+      ]
+    },
+    {
+      "id": "design-lessons",
+      "title": "Design lessons",
+      "tags": [
+        "language-design",
+        "parser",
+        "extensibility"
+      ],
+      "content": "Raku is the opposite extreme from Forth's text interpreter: instead of a tiny extensible surface parser plus heavy compilation, it offers a heavyweight user-visible grammar system. Both are extensible at the language level, but at very different layers and with very different performance profiles.\n\nThe design takeaway: if a language wants user-extensible grammars to be both expressive and fast, the implementation must extract declarative prefixes and dispatch them through finite-state machinery (NFAs, DFAs) rather than backtracking. LTM plus slangs is one production answer. Extensible syntax via Pratt-style production tables (Lean 4) is another. Both succeed by keeping the common case dispatchable in O(1) or O(log n), with slow paths reserved for the genuinely ambiguous fragments.",
+      "refs": []
+    }
+  ],
+  "sources": []
+}

@@ -1,0 +1,50 @@
+{
+  "kind": "concept",
+  "name": "Nominal, Structural, and Path-Dependent Type Identity",
+  "aliases": ["type-equivalence", "nominal-vs-structural", "path-dependent-types", "dot-calculus"],
+  "summary": "How a type system decides type compatibility: by declarations and names (nominal), by members or shape (structural), or by a value-level path (path-dependent, as in Scala's p.T-style types and the DOT calculus family). Each axis has predictable consequences for diagnostics, separate compilation, and implementation difficulty.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Nominal systems decide compatibility primarily from declarations and names. Structural systems decide compatibility from members or shape. Path-dependent systems allow a type to depend on a value path, as in Scala's `p.T`-style types and the DOT calculus family (Dependent Object Types — a small core calculus used to study Scala-style type membership and path-dependent typing).\n\nThe distinguishing axis across designs is **what evidence determines that two types are the same**: a name lookup (nominal), a recursive member comparison (structural), or a value-level path equation (path-dependent). The choice cascades into diagnostics, separate compilation, and the soundness story.",
+      "refs": [
+        { "target": "subtyping#overview", "type": "underlies" },
+        { "target": "type-classes-traits#overview", "type": "interacts-with" }
+      ]
+    },
+    {
+      "id": "nominal-vs-structural-tradeoffs",
+      "title": "Nominal versus structural — engineering trade-offs",
+      "tags": ["type-system", "compiler-architecture"],
+      "content": "**Nominal systems** (Java classes, Rust structs, Haskell `newtype`) usually produce simpler error messages and better separate-compilation boundaries: types compare by declaration identity, and the compiler can quickly reject mismatches without recursive structural inspection. The cost is that two structurally-identical types from different declarations are not interchangeable — programmers must add explicit conversions or wrappers.\n\n**Structural systems** (TypeScript, OCaml object types, Go interfaces, polymorphic variants) support flexible object and record encodings but require careful recursive comparison, variance, and caching. Comparing recursive structural types requires cycle detection; comparing them quickly requires interning or memoization (`data/type-representation`).\n\nMost languages mix both: nominal declarations for public types and structural row types for local records, anonymous objects, effects, or pattern matching. OCaml is the canonical mixed example — class types are structural, but most of the type system is nominal.",
+      "refs": [
+        { "target": "row-polymorphism#overview", "type": "natural-fit-for-structural" },
+        { "target": "type-representation#interning-hash-consing-arenas", "type": "depends-on" }
+      ]
+    },
+    {
+      "id": "path-dependent-types-and-dot",
+      "title": "Path-dependent typing and the DOT calculus",
+      "tags": ["type-system", "scala", "dot"],
+      "content": "Path-dependent systems support expressive module/object encodings but make soundness and compiler implementation substantially harder. Scala's `p.T` notation lets a type depend on the value `p`: two `p.T` and `q.T` references are the *same* type only if `p` and `q` denote the same value at compile time.\n\nScala 3's compiler represents many type forms directly, including term references, type references, singleton types, refined types, union/intersection types, match types, method types, polymorphic types, and type bounds. Each is a distinct internal form that the type checker compares according to specific rules.\n\nDOT (Dependent Object Types) is the small core calculus used to study Scala-style type membership and path-dependent typing. **pDOT** extends DOT to paths of arbitrary length and comes with a mechanized proof that the system is sound. DOT-family research exists because full Scala-style path-dependent typing was historically difficult to make sound — the calculus formalizes the sub-language whose soundness can be proven.",
+      "sources": [
+        { "label": "Scala 3 / Dotty Type System Internals", "url": "https://dotty.epfl.ch/docs/internals/type-system.html" },
+        { "label": "Scaling DOT to Scala — Soundness", "url": "https://scala-lang.org/blog/2016/02/17/scaling-dot-soundness.html" },
+        { "label": "A path to DOT: formalizing fully path-dependent types", "url": "https://dl.acm.org/doi/10.1145/3360571" }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": ["type-system", "language-design"],
+      "content": "For language designers, the practical guidance is:\n\n- **Default to nominal** for public APIs: declaration identity is easier to evolve, easier to diagnose, and friendlier to separate compilation.\n- **Use structural where mixing matters**: anonymous records, effect rows, polymorphic variants, gradual-typing boundaries, and cross-language interop.\n- **Avoid full path-dependent typing unless the language genuinely needs it**: the soundness cost is high, the implementation is intricate, and most languages can express the same expressive power through generic-parameter encodings.\n\nMixed designs are common because each axis answers a different need: nominal for stability, structural for composition, path-dependent for module-as-value abstractions."
+    }
+  ],
+  "sources": [
+    { "label": "Scala 3 / Dotty Type System Internals", "url": "https://dotty.epfl.ch/docs/internals/type-system.html" },
+    { "label": "Scaling DOT to Scala — Soundness", "url": "https://scala-lang.org/blog/2016/02/17/scaling-dot-soundness.html" },
+    { "label": "A path to DOT: formalizing fully path-dependent types", "url": "https://dl.acm.org/doi/10.1145/3360571" }
+  ]
+}

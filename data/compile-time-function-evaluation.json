@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Compile-Time Function Evaluation",
+  "aliases": ["CTFE", "constexpr", "consteval"],
+  "summary": "D's CTFE and C++'s constexpr/consteval converged on the same point from different paths: arbitrary pure functions can run at compile time when their arguments are known. D bet on a dynamic interpreter early; C++ layered formal rules incrementally. End state is similar; path dependencies differ.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "D's CTFE and C++'s constexpr/consteval converged on the same point from different paths: a substantial subset of the language can run at compile time when its arguments are known. The mechanism replaces template metaprogramming (C++) and string-mixin code generation (D) with ordinary code that just happens to run at compile time.",
+      "refs": [
+        { "target": "zig-comptime#overview", "type": "alternative-to" },
+        { "target": "type-level-programming#overview", "type": "complementary-mechanism" }
+      ]
+    },
+    {
+      "id": "d-ctfe",
+      "title": "D's CTFE",
+      "tags": ["d-language", "compile-time"],
+      "content": "**D's CTFE** (Compile-Time Function Evaluation) executes arbitrary pure D functions at compile time when their arguments are known. Template arguments, `static if` conditions, and `enum` initialisers can all invoke CTFE transparently. The implementation runs a simplified interpreter over D's frontend AST.\n\nThe rule is pragmatic: \"if it's pure and the arguments are known, it runs at compile time.\" D bet on a dynamic interpreter early in the language's life and scaled the supported subset over time. Most of D, including allocations and string manipulation, runs in CTFE today.",
+      "refs": [],
+      "sources": [
+        { "label": "D CTFE Compile-Time Arguments", "url": "https://dlang.org/articles/ctarguments.html" }
+      ]
+    },
+    {
+      "id": "cpp-constexpr-consteval",
+      "title": "C++ constexpr and consteval",
+      "tags": ["cpp", "compile-time"],
+      "content": "**C++ constexpr / consteval** followed a more conservative trajectory: C++11 introduced `constexpr` for simple expressions, and each standard expanded what's allowed (C++14 added statements, C++17 added more library support, C++20 added `consteval` for mandatory compile-time and limited dynamic allocation during constant evaluation, and C++23 expanded library and language support further). C++26 continues that trajectory.\n\nThe interesting difference from D: D bet on a dynamic interpreter early and scaled up; C++ layered formal rules incrementally and caught up. The end state is similar — both let you run much of the language at compile time — but the path dependencies show. Mainstream C++ `constexpr` evaluation is usually implemented by an interpreter/evaluator inside the compiler rather than by JIT- or AOT-compiling the compile-time program.",
+      "refs": [
+        { "target": "cpp26-reflection#overview", "type": "extended-by" }
+      ],
+      "sources": [
+        { "label": "C++ constexpr (cppreference)", "url": "https://en.cppreference.com/w/cpp/language/constexpr" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "language-design"],
+      "content": "Both approaches face the same fundamental trade-off: the more code permitted at compile time, the slower compilation gets and the more compiler bugs surface in unexpected places. C++'s formal rules approach gives sharper error messages when constraints are violated, at the cost of a constantly-evolving rules surface that compilers must implement carefully. D's interpreter approach gives a smoother rollout and broader feature support at the cost of compile-time performance and occasional surprising runtime divergences when CTFE and runtime semantics differ subtly.\n\nFor a new language: explicit staging (Zig comptime, MetaOCaml, Mojo `@parameter`) provides clearer mental models than implicit CTFE; CTFE is friendlier to retrofit but harder to reason about formally. The choice tracks whether the language's metaprogramming story is layered onto an existing dynamic-runtime semantics or designed staged from the start.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "D CTFE", "url": "https://dlang.org/articles/ctarguments.html" },
+    { "label": "C++ constexpr", "url": "https://en.cppreference.com/w/cpp/language/constexpr" }
+  ]
+}

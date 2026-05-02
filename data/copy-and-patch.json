@@ -1,0 +1,74 @@
+{
+  "kind": "concept",
+  "name": "Copy-and-Patch",
+  "aliases": [],
+  "summary": "Haoran Xu and Fredrik Kjolstad's stencil-based codegen (Stanford, 2021): pre-compile a library of stencils for each bytecode operation with operand holes; codegen becomes copy + patch. 4–6× faster than Liftoff at comparable quality. CPython 3.13+ ships it as an experimental JIT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Haoran Xu and Fredrik Kjolstad (Stanford, 2021) introduced copy-and-patch compilation: instead of emitting machine code instruction by instruction, the compiler pre-compiles a library of \"stencils\" — code snippets for each bytecode operation with \"holes\" for operands. Code generation becomes copying the stencil and patching the holes with concrete values.\n\nEmpirically, compilation is 4–6× faster than the fastest existing baseline compilers (like Liftoff in V8), while producing code of comparable quality. The compilation time is dominated by `memcpy` — there is almost no per-instruction decision-making.\n\nThe technique has historical roots: QEMU's original \"dyngen\" backend by Fabrice Bellard used a similar approach in 2003, compiling C stencils and extracting relocations. Copy-and-patch modernizes this by using LLVM as the stencil compiler, enabling better stencil quality and automatic relocation extraction.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" },
+        { "target": "deegen#overview", "type": "complements" }
+      ],
+      "sources": [
+        {
+          "label": "Xu & Kjolstad — Copy-and-Patch Compilation",
+          "url": "https://arxiv.org/abs/2011.13127"
+        }
+      ]
+    },
+    {
+      "id": "stencil-based-code-generation",
+      "title": "Stencil-based code generation",
+      "tags": ["jit", "codegen", "compiler"],
+      "content": "Each bytecode operation has a precompiled stencil: machine code with relocations marking the operand holes. At codegen time the compiler:\n\n1. Selects the stencil for the current opcode.\n2. Copies the stencil bytes into the JIT code buffer.\n3. Patches the relocation sites with the concrete operand values (immediates, register numbers, branch targets).\n\nThere is no per-instruction decision-making, no register allocation pass, no instruction selection — those decisions live inside the stencils, fixed at stencil-compile time. This is why baseline compilation becomes nearly free: the cost is dominated by `memcpy` rather than analysis.",
+      "refs": [
+        { "target": "llvm#role-in-jit-and-tiered-systems", "type": "alternative-to" },
+        { "target": "cranelift#fit-for-jit-and-tiered-compilation", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "strengths",
+      "title": "Advantages and fit",
+      "tags": ["jit", "performance"],
+      "content": "The main strengths are predictable compilation cost and strong startup behavior. This makes copy-and-patch ideal as a baseline tier in a tiered JIT, where compilation latency is on the critical path and code quality matters less than throughput-to-machine-code.\n\nStatus (as of 2026-04): CPython 3.13 (October 2024) shipped copy-and-patch as an experimental JIT enabled via `--enable-experimental-jit`. CPython 3.14 (October 2025) added free-threading mode (PEP 703) on top, with the Faster CPython team optimising both the adaptive interpreter and the JIT for the no-GIL build. The 3.13 JIT is sometimes slower than the interpreter on individual benchmarks; 3.16 targets 5–10% speedup on the free-threaded JIT. The LuaJIT Remake project by Haoran Xu applies the technique to Lua.",
+      "refs": [
+        { "target": "tiered-compilation#why-tiering-exists", "type": "powers" }
+      ],
+      "sources": [
+        {
+          "label": "CPython 3.14 What's New",
+          "url": "https://docs.python.org/3/whatsnew/3.14.html"
+        }
+      ]
+    },
+    {
+      "id": "relation-to-compiler-ir-choices",
+      "title": "Relation to compiler IR choices",
+      "tags": ["compiler-ir", "jit", "tradeoffs"],
+      "content": "Copy-and-patch does not eliminate the need for higher-level analysis or IR structure; it changes the cost model of the final code emission step. Stencils typically consume bytecode (stack or register), so a bytecode IR is the natural input. Higher tiers above the copy-and-patch baseline can do their own SSA-based analysis and emit better-optimized native code.\n\nDeegen (Xu & Kjolstad, PLDI 2025) generalises the pattern: a bytecode-semantics specification yields a copy-and-patch baseline JIT, an interpreter, and the tiering plumbing that connects them — all generated from one source.",
+      "refs": [
+        { "target": "ssa#jit-and-runtime-relevance", "type": "alternative-to" },
+        { "target": "tiered-compilation#common-architecture-patterns", "type": "fits-into" },
+        { "target": "deegen#overview", "type": "generalized-by" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Xu & Kjolstad — Copy-and-Patch Compilation",
+      "url": "https://arxiv.org/abs/2011.13127"
+    },
+    {
+      "label": "CPython 3.14 What's New",
+      "url": "https://docs.python.org/3/whatsnew/3.14.html"
+    },
+    {
+      "label": "Faster CPython JIT plan",
+      "url": "https://fidget-spinner.github.io/posts/faster-jit-plan.html"
+    }
+  ]
+}

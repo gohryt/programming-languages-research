@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": "PCRE-JIT",
+  "aliases": ["PCRE2 JIT", "Perl-Compatible Regular Expressions JIT"],
+  "summary": "PCRE2's JIT compiler: hand-written templates per pattern compiled into native code. 4–15× faster than PCRE's bytecode interpreter on typical workloads. Inherits PCRE's backtracking semantics (lookaround, backreferences) so worst-case behavior is exponential — the JIT speeds up common cases but can't fix pathological patterns.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "PCRE-JIT is PCRE2's just-in-time compiler for regular expressions. Each pattern is compiled into a hand-written template of native machine code, replacing PCRE's bytecode interpreter for that pattern. Reported speedups are 4–15× over interpretation on typical real-world patterns.\n\nThe JIT inherits PCRE's full Perl-compatible regex semantics: lookaround, backreferences, recursive subpatterns, and other features that make PCRE more expressive than POSIX or RE2-style engines. The cost is that worst-case behaviour stays exponential — pathological patterns that produce catastrophic backtracking in the interpreter still produce catastrophic backtracking in the JIT, just faster.",
+      "refs": [
+        { "target": "re2-rust-regex#overview", "type": "contrasts-with" },
+        { "target": "irregexp#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "PCRE2 JIT", "url": "https://www.pcre.org/current/doc/html/pcre2jit.html" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["regex", "jit", "tradeoffs"],
+      "content": "PCRE-JIT is the right choice when you need PCRE-compatible semantics: lookaround, backreferences, and recursion are not expressible in NFA/DFA-based engines. The JIT makes this expressiveness affordable for common patterns at the cost of unpredictable worst-case behaviour.\n\nFor regex workloads where pattern stability matters more than expressiveness — log filtering, network packet inspection, syntax highlighting on user-untrusted patterns — the predictable linear-time guarantees of RE2-style engines are usually preferable. PCRE-JIT and RE2 occupy distinct points in the regex-engine design space; choice depends on whether the application can accept exponential worst case in exchange for syntactic richness.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "PCRE2 JIT", "url": "https://www.pcre.org/current/doc/html/pcre2jit.html" }
+  ]
+}

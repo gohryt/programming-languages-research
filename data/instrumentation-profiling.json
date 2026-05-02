@@ -1,0 +1,283 @@
+{
+  "kind": "concept",
+  "name": "Instrumentation profilers",
+  "aliases": [
+    "scoped-span profilers"
+  ],
+  "summary": "Profilers that build a per-span or per-event record explicitly at sites the developer or the language chose, with the engineering challenge being making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Tools that build a per-span or per-event record explicitly at sites the developer (or the language) chose, in contrast to the sampling profilers of `data/sampling-profiling` and `data/continuous-profiling` that interrupt arbitrary code at a fixed cadence. The cost model is per-annotated-site, not per-wall-clock-sample, and the distinguishing engineering challenge is making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production builds. The chapter also covers the vendor-maintained microarchitecture-aware production analysers — Intel **VTune** and AMD **μProf** for Linux/Windows microarchitectural diagnostics; Microsoft **PerfView** and **Windows Performance Analyzer (WPA)** for ETW-native .NET-and-kernel profiling — that pair tightly with the runtime/OS event providers no third-party tool maintains as comprehensively.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`, `family:direct-execution-interposition`, `family:hardware-tracing`\n- **domain**: `domain:profiling`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-function`, `granularity:per-instruction`\n"
+    },
+    {
+      "id": "tracy-spall",
+      "title": "Tracy / Spall — Nanosecond Instrumentation Profilers",
+      "tags": [
+        "domain:profiling",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "Tracy and Spall are instrumentation-based profilers popular in game development, where per-frame performance visibility is essential.\n\n**Tracy** achieves ~2ns overhead per span using a lock-free queue. The client collects events and holds them in memory until a server connects and pulls the data. The server reconstructs the timeline in real-time. Tracy supports CPU sampling, GPU tracing, memory allocation tracking, lock contention visualization, and context switch recording — all in a single tool with a custom native UI that handles hundreds of millions of events.\n\n**Spall** takes a different approach: ~12ns per span, but the output is a compact binary file viewed in a web-based UI. Spall's simplicity is the point — a single-header C library for tracing, a web frontend for viewing. It supports `clang -finstrument-functions` for automatic whole-program tracing without manual annotation.\n\nBoth demonstrate that with careful engineering, instrumentation overhead can be low enough to leave enabled in development builds permanently. The 2–12ns per span cost is negligible compared to the microseconds or milliseconds that actual work takes, but the visibility gained is transformative.",
+      "sources": [
+        {
+          "url": "https://github.com/wolfpld/tracy"
+        },
+        {
+          "url": "https://gravitymoth.com/spall/spall-web.html"
+        }
+      ]
+    },
+    {
+      "id": "ruby-yarv-tracepoint",
+      "title": "Ruby YARV — Historical Trace Instructions and TracePoint",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-instruction",
+        "off-cost:low",
+        "on-cost:medium",
+        "ruby"
+      ],
+      "content": "Older YARV designs included `trace` instructions at compile time at line boundaries, method entries, and returns. The TracePoint API enabled or disabled them at runtime: when disabled, trace instructions behaved as NOPs; when enabled, they called registered callbacks.\n\nThis is best treated as the historical bytecode-level design point rather than a blanket description of modern Ruby internals. Ruby issue #14104 documents work to remove trace instructions, so the durable lesson is not \"Ruby still uses trace opcodes everywhere,\" but that compile-time insertion of trace points with a runtime toggle has a measurable disabled cost — negligible per point, but not literally zero — and can become a substantial part of an interpreter's instruction-set surface. Modern Ruby TracePoint should therefore be read as the user-facing tracing abstraction, with implementation details varying by version.",
+      "sources": [
+        {
+          "url": "https://docs.ruby-lang.org/en/master/TracePoint.html"
+        },
+        {
+          "url": "https://bugs.ruby-lang.org/issues/14104"
+        }
+      ]
+    },
+    {
+      "id": "erlang-dbg-match-spec",
+      "title": "Erlang dbg — Match Specification Tracing in Production",
+      "tags": [
+        "domain:tracing",
+        "erlang",
+        "family:buffered-event-emission",
+        "granularity:per-function",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "Erlang's `dbg` module provides function call tracing with match specifications — pattern-matching expressions that filter which calls generate trace events. You can trace all calls to a function, or only calls where the first argument matches a specific pattern, or only calls that return a specific value.\n\n```erlang\n%% Trace calls to math:sin/1 only when argument equals 3.14\ndbg:tpl(math, sin, 1, dbg:fun2ms(fun([X]) when X == 3.14 -> return_trace() end))\n```\n\nThe match specification is compiled into an efficient matcher by the VM. When the pattern doesn't match, the overhead is minimal — a quick pattern check in the VM's call dispatch path. When it does match, a trace message is generated and sent to a trace handler process.\n\nThis is routinely used in production Erlang systems to diagnose issues without restarting or redeploying. The key design: tracing is an opt-in, per-function, pattern-filtered mechanism built into the VM from the start. It is not an afterthought bolted on via external tools.\n\nThe `recon` library by Fred Hebert wraps `dbg` in safety rails (rate limiting, automatic timeout) to make production tracing even safer.",
+      "sources": [
+        {
+          "url": "https://www.erlang.org/doc/apps/runtime_tools/dbg.html"
+        },
+        {
+          "url": "https://ferd.github.io/recon/recon_trace.html"
+        }
+      ]
+    },
+    {
+      "id": "tcl-variable-execution-traces",
+      "title": "Tcl — Variable and Execution Traces",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Tcl provides first-class tracing as a language feature via the `trace` command. You can attach callbacks to:\n\n- **Variable traces:** fire when a variable is read, written, or unset. `trace add variable x write myHandler` calls `myHandler` every time `x` is assigned.\n- **Execution traces:** fire when a command enters or leaves execution, including per-step tracing through a procedure. `trace add execution myProc enterstep myHandler` calls `myHandler` for every command executed inside `myProc`.\n\nThe implementation is in the interpreter's variable access and command dispatch paths. When no traces are active on a variable or command, there is no overhead — the trace list is simply empty. When traces are active, each access checks the trace list and invokes callbacks.\n\nTcl's approach is notable for making tracing a *language-level* concept rather than a tool-level concept. Any Tcl code can set up traces on any other Tcl code's variables or commands. This enables debuggers, profilers, and monitoring tools to be written entirely in Tcl itself, with no special VM support beyond the trace mechanism.\n\nThe limitation is overhead: execution traces on hot commands add a function call per step. But for debugging and development, where the goal is understanding rather than performance, this is acceptable.",
+      "sources": [
+        {
+          "url": "https://www.tcl-lang.org/cgi-bin/tct/tip/86.html"
+        },
+        {
+          "url": "https://wiki.tcl-lang.org/page/Tracing+with+enterstep"
+        }
+      ]
+    },
+    {
+      "id": "graalvm-truffle-instrumentation",
+      "title": "GraalVM Truffle — AST Wrapper Node Instrumentation",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-instruction",
+        "jvm",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Truffle's instrumentation framework inserts \"wrapper nodes\" into the AST around instrumentable nodes. When no instrumentation is active, the wrapper node is not present — the AST is the same as the non-debug case. When a tool (debugger, profiler) requests instrumentation, Truffle inserts wrapper nodes that intercept execution events (enter, return, exception) and forward them to the tool.\n\nThe critical property: Truffle's partial evaluation and compilation pipeline treats wrapper nodes like any other AST nodes. After JIT compilation, an active wrapper's event dispatch can be inlined and optimized. When instrumentation is removed, the wrapper node is removed and the code is recompiled — returning to full speed.\n\nThis means the cost of instrumentation is paid only in interpreted mode or during recompilation. Once the JIT stabilizes with the instrumentation in place, the overhead is minimal. And when instrumentation is removed, performance returns to the non-instrumented baseline after a recompilation.\n\nThis is arguably the most sophisticated approach to \"zero overhead when disabled\" in this survey: not through patching, but through treating instrumentation as part of the program's optimizable AST.",
+      "sources": [
+        {
+          "url": "https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/"
+        },
+        {
+          "url": "https://www.graalvm.org/latest/graalvm-as-a-platform/implement-instrument/"
+        }
+      ]
+    },
+    {
+      "id": "huglo-low-overhead-ruby-tracer",
+      "title": "HUGLO — Hyper-Ultra-Giga Low-Overhead Ruby Profiler",
+      "tags": [
+        "domain:profiling",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:low",
+        "on-cost:medium",
+        "ruby"
+      ],
+      "content": "Sampling profilers often fail to catch P99.9 tail latency because they only see the *average* state of the program. Tracing profilers catch everything but are traditionally too slow for production. In a personal blog, Matt Stuchlik details building HUGLO, a Ruby tracer capturing function calls, syscalls, and thread states with strictly less than 100ns of overhead per call. By utilizing extreme micro-optimizations and native extensions to avoid Ruby-level object allocations, he built a production-safe, continuously-running tracer that catches the exact outliers that standard profilers obscure.",
+      "sources": [
+        {
+          "url": "https://blog.mattstuchlik.com/2025/04/23/low-overhead-ruby-tracing.html"
+        }
+      ]
+    },
+    {
+      "id": "mozilla-gecko-profiler",
+      "title": "Mozilla Gecko Profiler — Two-Tier Sampler + Marker-Based Timeline",
+      "tags": [
+        "browser",
+        "domain:profiling",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Firefox ships an in-process profiler that sits in two tiers: a **Base Profiler** in `mozglue/baseprofiler` that loads at process start, and the full **Gecko Profiler** that takes over once `libxul` is mapped. Both write into the same unified profile buffer. This is the explicit answer to \"who profiles the profiler's own initialization\" — the Base Profiler catches Firefox's earliest startup (before libxul, before most of the JS engine) and hands its accumulated buffer to the full profiler when libxul is ready. JFR (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`) and EventPipe (`data/runtime-event-pipelines#dotnet-eventpipe`) solve this differently (bootclasspath and post-start IPC respectively); Mozilla's two-tier design is a cleaner fit for a monolithic native process with a late-loaded engine.\n\nThe distinctive emission primitive is **markers vs labels**. Markers (`profiler_add_marker(\"FirstPaint\", PaintMarker{...})`) always write; labels (`AUTO_PROFILER_LABEL`) only surface if the sampler happens to catch the thread while the RAII label is on the pseudo-stack. Marker payloads are strongly-typed C++ templates with a schema (`MarkerSchema` declares fields + tooltip labels + chart-label format), and the schema is carried in the profile JSON so the frontend renders unknown marker types without code changes. JavaScript code enters markers via the W3C `performance.mark` / `performance.measure` User Timing API, which Gecko forwards into the profiler buffer automatically — layout, paint, GC, network, DOM events, JS execution, and app-level custom markers all land on one timeline. The browser analogue of `os_signpost` (`data/runtime-event-pipelines#apple-os-signpost-instruments`) or ETW events, with a web-standard entry point.\n\nStack correlation is the hard part. The sampler pauses each registered thread and walks the native stack (Windows `StackWalk64`, Linux via Mozilla-authored **LUL** unwinder for frame-pointer-free code, macOS via in-process remote unwind), interleaves it with the JS engine's interpreter/JIT stack (SpiderMonkey exposes a pseudo-stack plus PC→line maps for JIT code), and splices in C++ RAII label pseudo-frames. The result is a single stack from `nsLayoutUtils::PaintFrame` through JS `render` into `computeStyles`. The same safepoint-bias problem discussed in `data/cooperative-safepoints#safepoint-bias-async-get-call-trace` applies to SpiderMonkey's Baseline and IonMonkey JITs.\n\n**profiler.firefox.com** is the frontend — a React/Redux SPA that natively renders Gecko's profile format and also imports Linux `perf script` output, Android SimplePerf, Chrome `trace_event` JSON, Android Studio profiler, and dhat. A Chrome extension (2024) starts Chrome's internal profiler and hands the trace straight to the Firefox Profiler for analysis. Mozilla is explicitly positioning profiler.firefox.com as a universal viewer, the same pattern as Perfetto (`data/trace-storage-and-visualization#perfetto-fuchsia-trace-format`).",
+      "sources": [
+        {
+          "url": "https://firefox-source-docs.mozilla.org/tools/profiler/index.html"
+        },
+        {
+          "url": "https://firefox-source-docs.mozilla.org/tools/profiler/markers-guide.html"
+        },
+        {
+          "url": "https://firefox-source-docs.mozilla.org/tools/profiler/code-overview.html"
+        },
+        {
+          "url": "https://github.com/firefox-devtools/profiler"
+        },
+        {
+          "url": "https://profiler.firefox.com/"
+        }
+      ]
+    },
+    {
+      "id": "vtune-profiler-amd-uprof",
+      "title": "VTune Profiler and AMD μProf — Vendor-Maintained Microarchitecture-Aware Profilers",
+      "tags": [
+        "domain:profiling",
+        "family:hardware-tracing",
+        "granularity:per-instruction",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Intel **VTune Profiler** and AMD's symmetric **μProf** are commercial-grade production profilers exposing the full PMU surface (`data/hardware-tracing#precise-pmu-sampling`) plus vendor-specific microarchitectural-analysis features. The architectural distinction from the open-source profilers of §`data/instrumentation-profiling#tracy-spall`, 13, 14 is **microarchitecture-aware analysis pipelines**: VTune ships with **Top-Down Microarchitecture Analysis (TMAM)** — a hierarchical decomposition of execution time into **front-end-bound**, **back-end-bound**, **bad-speculation**, and **retiring** categories, with deeper sub-categories at each level — that requires per-microarchitecture PMU event mapping the open-source ecosystem cannot maintain at the same depth or release cadence. The TMAM mapping is updated for each new Intel microarchitecture (Skylake → Ice Lake → Sapphire Rapids → Granite Rapids) as part of VTune's release.\n\nDistinguishing analysis modes:\n\n- **Memory Access Analysis** (PEBS-LL, `data/hardware-tracing#precise-pmu-sampling`): per-load latency distribution, which DRAM channel served the request, NUMA-domain attribution, cache-miss source attribution (L1/L2/L3/DRAM/remote-socket).\n- **Microarchitecture Exploration**: TMAM-driven hot-path breakdown showing which CPU pipeline stage (fetch, decode, execute, retire) is the bottleneck for each function, broken down per-instruction.\n- **Threading Analysis**: critical-path analysis through synchronisation primitives, lock-contention attribution, OpenMP/TBB parallelism-efficiency metrics including imbalance and serial-region cost.\n- **GPU Offload Analysis**: cross-CPU/GPU timeline integration analogous to Nsight Systems `data/gpu-tracing#cupti-nsight-systems` but for Intel iGPU and Intel Arc / Data Center GPU Max parts.\n- **HPC Performance Characterization**: vectorisation, FLOPS, memory-bandwidth-vs-roofline analysis with ISA-aware code-path classification.\n\n**AMD μProf** is the equivalent on AMD silicon, with **IBS** (`data/hardware-tracing#precise-pmu-sampling`) as the precise-sampling primitive instead of PEBS, and AMD-microarchitecture-specific TMAM analogue. Both run on Linux and Windows; both ship CPU-microarchitecture documentation that translates raw PMU counter values into actionable diagnostics. **Apple's Instruments** (`data/runtime-event-pipelines#apple-os-signpost-instruments`) plays a similar vendor-maintained role for Apple Silicon, with M-series-specific analysis templates, though without a published TMAM-equivalent.\n\nThe production-tools lesson is that **microarchitecture-aware analysis requires vendor cooperation**: the PMU event mapping and TMAM decomposition are Intel/AMD/Apple intellectual property updated per silicon generation. Open-source profilers (perf, async-profiler `data/cooperative-safepoints#safepoint-bias-async-get-call-trace`) expose the raw events; VTune / μProf / Instruments supply the interpretation layer. For workloads where microarchitectural efficiency matters (HPC, low-latency trading, high-throughput servers, AI inference), this interpretation is what distinguishes production performance work from raw sample collection.\n\nStatus (as of 2026-04): both VTune and μProf are free-as-in-beer (registration-walled binaries), supported on Linux and Windows; VTune additionally supports macOS for collection but not full analysis. Neither is open-source; both rely on the open-source perf substrate underneath.",
+      "sources": [
+        {
+          "url": "https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html"
+        },
+        {
+          "url": "https://www.amd.com/en/developer/uprof.html"
+        },
+        {
+          "url": "https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2024-0/top-down-microarchitecture-analysis-method.html"
+        }
+      ]
+    },
+    {
+      "id": "perfview-windows-performance-analyzer",
+      "title": "PerfView and Windows Performance Analyzer — ETW-Native Profiling Stacks",
+      "tags": [
+        "domain:profiling",
+        "dotnet",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium",
+        "windows"
+      ],
+      "content": "Vance Morrison's **PerfView** (Microsoft, 2011+; open-source 2014) is the canonical .NET performance and memory analyser, and **Windows Performance Analyzer (WPA)** is the GUI for ETW (`data/runtime-event-pipelines#etw-providers-controllers-consumers`). Both occupy the Windows-side equivalent of Linux's perf + flame-graph + heaptrack ecosystem, with deeper integration into the .NET runtime and the Windows kernel ETW substrate. Vendor-maintained, Windows-only, and tightly coupled to ETW's kernel and user-mode provider catalogue.\n\n**PerfView** is structured around four modes:\n\n- **CPU sampling** via ETW: kernel-side sampling (`PROFILE` ETW provider) plus stackwalk events. PerfView ingests the resulting `.etl` file and produces flame graphs, stack-aggregated views, and call-tree breakdowns. Distinct from Linux perf (``data/sampling-profiling#statistical-sampling-substrates``): PerfView lives entirely on top of ETW, so its cost when off is zero (no sampling running), and its cost when on is identical to ETW's kernel sampling overhead.\n- **GC and allocation analysis**: per-allocation site stack capture via the .NET CLR ETW provider, with heap-walk integration so users can see \"this allocation site allocated 4 GB of strings, 99% of which were retained by this static field.\" This is the canonical .NET memory-leak diagnosis path; comparable in scope to Java Flight Recorder's allocation profiling (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`) but with substantially deeper allocation-site stacks via ETW's stackwalk events.\n- **Wall-clock blocking analysis**: combines CPU samples with thread-blocking events (lock acquire, await suspension, synchronous I/O) to produce an \"off-CPU-aware\" wall-clock profile. Distinct from on-CPU flame graphs (`data/trace-storage-and-visualization#flame-graphs`) by accounting for blocked time, similar to off-CPU flame graphs (`data/trace-storage-and-visualization#off-cpu-flame-graphs`) but driven by ETW thread-state events rather than eBPF.\n- **`.NET Counters`**: low-overhead always-on counters (allocation rate, GC time, working-set, exception rate, tiered-compilation events) viewable live via `dotnet-counters` or recorded in PerfView.\n\n**WPA** is the more general Windows-side analyser. It ingests ETL traces from any ETW provider (kernel scheduling, file I/O, network, DirectX, Win32, custom application providers) and renders configurable timeline + table views. WPA is Microsoft's answer to Perfetto (``data/trace-storage-and-visualization#perfetto-fuchsia-trace-format``) for Windows-native trace analysis: same \"universal trace timeline\" pattern, ETW as the single capture format, GUI for visual exploration plus scriptable analysis via WPA Profile XML files. WPA's **Generic Events** view exposes any provider's emitted events; **Stack views** drill into kernel-stackwalk-augmented event traces; **CPU Usage (Sampled)** is the WPA flame-graph equivalent.\n\nThe production-tools lesson is similar to VTune / μProf (`data/instrumentation-profiling#vtune-profiler-amd-uprof`): **vendor-maintained Windows analyser stacks pair tightly with the runtime/OS event providers**. PerfView's value over generic profilers comes from understanding .NET CLR ETW events (GC start/stop, JIT compilation, exception throw, type-load, tier-up to optimised code) at the same depth that VTune understands Intel PMU events. WPA's value comes from understanding kernel ETW providers (scheduler context-switch reasons, page-fault sources, file-I/O wait categories, registry access patterns) that no third-party tool maintains as comprehensively.\n\nDistinct from Linux ecosystem: where Linux observability is fragmented across perf, ftrace, eBPF, bpftrace, Sysdig, and a dozen GUI tools, the Windows ecosystem is **ETW-as-substrate plus PerfView/WPA-as-analyser**, much more vertically integrated. The downside is platform lock-in; the upside is consistent UX and deep semantic awareness of Microsoft platform events.\n\nStatus (as of 2026-04): PerfView is open-source (MIT) and continues to track .NET runtime evolution (now covering .NET 8+, AOT-compiled binaries, and `JsonEventSource`). WPA ships in the **Windows Performance Toolkit**, part of the Windows Assessment and Deployment Kit (ADK). Both are free; both remain Windows-only.",
+      "sources": [
+        {
+          "url": "https://github.com/microsoft/perfview"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/perfview-tool"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/wolfpld/tracy"
+    },
+    {
+      "url": "https://gravitymoth.com/spall/spall-web.html"
+    },
+    {
+      "url": "https://docs.ruby-lang.org/en/master/TracePoint.html"
+    },
+    {
+      "url": "https://bugs.ruby-lang.org/issues/14104"
+    },
+    {
+      "url": "https://www.erlang.org/doc/apps/runtime_tools/dbg.html"
+    },
+    {
+      "url": "https://ferd.github.io/recon/recon_trace.html"
+    },
+    {
+      "url": "https://www.tcl-lang.org/cgi-bin/tct/tip/86.html"
+    },
+    {
+      "url": "https://wiki.tcl-lang.org/page/Tracing+with+enterstep"
+    },
+    {
+      "url": "https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/"
+    },
+    {
+      "url": "https://www.graalvm.org/latest/graalvm-as-a-platform/implement-instrument/"
+    },
+    {
+      "url": "https://blog.mattstuchlik.com/2025/04/23/low-overhead-ruby-tracing.html"
+    },
+    {
+      "url": "https://firefox-source-docs.mozilla.org/tools/profiler/index.html"
+    },
+    {
+      "url": "https://firefox-source-docs.mozilla.org/tools/profiler/markers-guide.html"
+    },
+    {
+      "url": "https://firefox-source-docs.mozilla.org/tools/profiler/code-overview.html"
+    },
+    {
+      "url": "https://github.com/firefox-devtools/profiler"
+    },
+    {
+      "url": "https://profiler.firefox.com/"
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html"
+    },
+    {
+      "url": "https://www.amd.com/en/developer/uprof.html"
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2024-0/top-down-microarchitecture-analysis-method.html"
+    },
+    {
+      "url": "https://github.com/microsoft/perfview"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/perfview-tool"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "runtime",
+  "name": "FreeForth",
+  "aliases": [
+    "FreeForth2"
+  ],
+  "summary": "Christophe Lavarenne's subroutine-threaded i386 Forth with one genuinely novel codegen trick: the top two stack cells live in two registers, and `swap` is implemented by *renaming the registers at compile time* — no machine instructions emitted at all. Tail-call→jump conversion and pop-less conditional jumps follow the same renaming scheme.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Christophe Lavarenne's **FreeForth** (and the maintained FreeForth2 by dan4thewin) is a subroutine-threaded i386 Forth with one genuinely novel codegen trick: the top two stack cells live in two registers, and `swap` is implemented by *renaming the registers at compile time* — no machine instructions emitted at all. Tail-call→jump conversion and pop-less conditional jumps follow the same renaming scheme, and there is no separate interpret mode (everything goes through compiled anonymous functions).",
+      "refs": [],
+      "sources": [
+        {
+          "label": "FreeForth (Lavarenne)",
+          "url": "http://christophe.lavarenne.free.fr/ff/"
+        }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — compile-time register renaming for stack ops",
+      "tags": [
+        "forth",
+        "codegen"
+      ],
+      "content": "The pattern generalises: when a stack machine's top-of-stack lives in registers, every primitive that swaps or rotates the top *N* items can be a compile-time renaming rather than an emit-store-emit-load sequence. For a small fixed *N* (typically 2 or 3), this collapses an entire class of stack-shuffling overhead.\n\nFreeForth is the cleanest existing example of the technique in a Forth, and it transfers directly to any other stack-VM frontend that pins TOS to registers — with the limitation that the technique only handles shuffles of a fixed small N (typically 2 or 3 regs), and procedure boundaries still pay normal stack save/restore cost.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "FreeForth2 (dan4thewin)",
+          "url": "https://github.com/dan4thewin/FreeForth2"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "FreeForth",
+      "url": "http://christophe.lavarenne.free.fr/ff/"
+    }
+  ]
+}

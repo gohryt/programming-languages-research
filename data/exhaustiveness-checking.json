@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Exhaustiveness and Usefulness Checking",
+  "aliases": ["exhaustiveness", "useless-clause-detection", "maranget"],
+  "summary": "Pattern-match diagnostics that ask two questions: can some value reach no branch (exhaustiveness)? Can a branch ever match anything not matched earlier (usefulness)? Maranget's algorithm produces witness patterns for missing cases. Modern languages complicate this with guards, GADTs, view patterns, union types, path-dependent types, and open variants.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Pattern-match diagnostics ask two questions:\n\n- **exhaustiveness**: can some value reach no branch?\n- **usefulness**: can a branch ever match anything not matched earlier?\n\nMaranget's algorithm for ML-style pattern-matching warnings detects useless clauses and non-exhaustive matches and can produce witness patterns for missing cases — a witness is a constructor pattern that no current branch covers, which the diagnostic can render to show the programmer exactly which case is missing.",
+      "refs": [
+        { "target": "algebraic-data-types#overview", "type": "supports" },
+        { "target": "gadts#overview", "type": "complicated-by" },
+        { "target": "pattern-matching-decision-trees#overview", "type": "complementary-pass" }
+      ],
+      "sources": [
+        { "label": "Maranget — Warnings for pattern matching", "url": "http://moscova.inria.fr/~maranget/papers/warn/index.html" }
+      ]
+    },
+    {
+      "id": "modern-complications",
+      "title": "Modern complications",
+      "tags": ["type-system", "diagnostics"],
+      "content": "Modern languages complicate Maranget's basic algorithm with guards, GADTs, view patterns, union types, path-dependent types, and open variants. Each requires extending the pattern matrix with new equational facts:\n\n- **guards** require tracking which branch paths are conditionally reachable; guarded patterns can render usefulness undecidable in general.\n- **GADTs** introduce local type equalities; a branch matching a `Lit : Expr Int` constructor knows `a ~ Int` for the rest of that branch, which can rule out other branches.\n- **view patterns** apply functions before matching; usefulness must consider the function's possible return values.\n- **open variants and union types** make exhaustiveness module-local — code can be exhaustive given the visible cases but non-exhaustive after a downstream module adds a case.\n\nGHC-related work (\"GADTs meet their match\") handles GADTs, guards, and laziness in a unified framework; Scala-oriented work abstracts the type-system-specific part as *spaces* — set-theoretic descriptions of the values reaching each branch. Both treat the algorithm as a generic operation over an abstract domain rather than a specific algorithm over patterns.",
+      "sources": [
+        { "label": "GADTs meet their match", "url": "https://dl.acm.org/doi/10.1145/2784731.2784748" },
+        { "label": "Generic exhaustivity checking with spaces", "url": "https://infoscience.epfl.ch/nanna/record/225497/files/p61-liu.pdf?withWatermark=0&withMetadata=0&version=1&registerDownload=1" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Maranget — Warnings for pattern matching", "url": "http://moscova.inria.fr/~maranget/papers/warn/index.html" },
+    { "label": "GADTs meet their match", "url": "https://dl.acm.org/doi/10.1145/2784731.2784748" },
+    { "label": "Generic exhaustivity checking with spaces", "url": "https://infoscience.epfl.ch/nanna/record/225497/files/p61-liu.pdf?withWatermark=0&withMetadata=0&version=1&registerDownload=1" }
+  ]
+}

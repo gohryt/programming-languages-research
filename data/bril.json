@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Bril",
+  "aliases": ["big-red-intermediate-language"],
+  "summary": "Cornell CS 6120 teaching IR. Every Bril program is a JSON document — functions, basic blocks, and instructions encoded as nested objects. Demonstrates that the wire format itself can be the IR, with no separate textual or binary form.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Bril (Big Red Intermediate Language) is a research IR designed at Cornell for teaching compiler construction (CS 6120). Its claim to fame: the IR is JSON-shaped. Every Bril program is a JSON document with functions, basic blocks, and instructions encoded as nested objects. Tools, optimizers, and analyzers can be written in any language that can parse JSON.\n\nBril is intentionally minimal — fewer instructions than LLVM, no type system beyond a small set of primitives, no implicit conversions. The didactic point is that an IR doesn't need to be complex to support real optimizations (LICM, GVN, dead-code elimination, register allocation).",
+      "refs": [
+        { "target": "ssa#overview", "type": "instance-of" },
+        { "target": "llvm#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Bril (Cornell CS 6120)", "url": "https://capra.cs.cornell.edu/bril/" }
+      ]
+    },
+    {
+      "id": "json-as-wire-format",
+      "title": "JSON wire format as the IR",
+      "tags": ["compiler-ir", "pedagogy", "tooling"],
+      "content": "The JSON encoding makes Bril uniquely accessible for student projects: a 50-line Python script can read a Bril program, transform it, and write it back. As a representation, Bril shows that *the wire format itself can be the IR* — there is no separate textual form, no separate binary, just JSON.\n\nThis design choice is unusual: most IRs (LLVM IR, MLIR, Cranelift CLIF) maintain at least two representations (binary for tools, textual for humans), and the textual form is rarely directly editable. Bril collapses the distinction.",
+      "refs": []
+    },
+    {
+      "id": "didactic-role",
+      "title": "Didactic role",
+      "tags": ["pedagogy", "compiler-design"],
+      "content": "Bril is pedagogically the inverse of LLVM IR: rather than a battle-tested industrial substrate that students must navigate to do anything, Bril is a deliberately stripped-down medium where every classic optimisation can be implemented in tens of lines.\n\nThe broader design lesson is that compiler-construction teaching benefits from an IR whose surface area is small enough that students can hold the whole language in their heads. JSON shape supports that goal — there is no parser to write, no binary format to learn, no textual surface to memorise.",
+      "refs": [
+        { "target": "ssa#overview", "type": "minimal-form-of" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Bril (Cornell CS 6120)", "url": "https://capra.cs.cornell.edu/bril/" }
+  ]
+}

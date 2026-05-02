@@ -1,0 +1,90 @@
+{
+  "kind": "library",
+  "name": "Intel oneTBB",
+  "aliases": [
+    "intel-tbb",
+    "tbb",
+    "threading-building-blocks"
+  ],
+  "summary": "C++ task-parallelism library (originally Intel TBB 2006, open-sourced as oneTBB 2021 under the UXL Foundation) offering library-level rather than directive-level parallelism — templates, function objects, and concurrent containers compose with ordinary C++ code without any compiler awareness.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Intel's **Threading Building Blocks** (TBB, 2006+) — open-sourced as **oneTBB** in 2021 under the UXL Foundation — is a C++ task-parallelism library that complements OpenMP (`data/openmp`) by offering library-level rather than directive-level parallelism. Where OpenMP requires compiler support and pragma annotations, TBB is \"just C++\": templates, function objects, and concurrent containers compose with ordinary code without any compiler awareness.",
+      "refs": [
+        {
+          "target": "work-stealing#overview",
+          "type": "uses"
+        },
+        {
+          "target": "openmp#vs-cilk-tbb-stdexec",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Intel oneTBB product page",
+          "url": "https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html"
+        },
+        {
+          "label": "oneTBB repository (UXL Foundation)",
+          "url": "https://github.com/uxlfoundation/oneTBB"
+        }
+      ]
+    },
+    {
+      "id": "architectural-pillars",
+      "title": "Architectural pillars",
+      "tags": [
+        "parallelism",
+        "library",
+        "cpp"
+      ],
+      "content": "- **Tasks, not threads**: programmers express algorithms as task graphs (`parallel_for`, `parallel_invoke`, `parallel_pipeline`, `flow_graph`) or higher-level patterns. The TBB runtime manages a thread pool sized by hardware concurrency, schedules tasks via **work-stealing** across worker queues (the same algorithm Cilk introduced), and balances load automatically.\n- **Concurrent containers**: `concurrent_hash_map`, `concurrent_queue`, `concurrent_vector`, `concurrent_unordered_map` are designed for lock-free or fine-grained-locking concurrent access from multiple tasks. Distinct from C++ `std::` containers, which require external synchronisation.\n- **`flow_graph`**: dependency-graph executor for explicit task-DAG construction. Each node is a function; edges are typed data flows; the graph runs on the TBB thread pool. Comparable to OpenMP's `depend(in:/out:)` task model but expressed as runtime data-structure construction rather than pragma annotations.\n- **`parallel_pipeline`**: pipeline-parallelism primitive for staged data processing, with explicit per-stage parallelism control (serial-in-order, serial-out-of-order, parallel).\n- **NUMA support and `task_arena` partitioning**: lets programs split worker-thread pools across NUMA domains or workload classes (e.g. a UI arena vs a background-compute arena that share no workers).",
+      "refs": []
+    },
+    {
+      "id": "vs-openmp-and-stdexec",
+      "title": "Contrast with OpenMP and std::execution",
+      "tags": [
+        "library",
+        "comparison",
+        "cpp"
+      ],
+      "content": "Distinct from OpenMP (`data/openmp`): TBB is a pure C++ library (no compiler support needed), giving it portability advantages but losing OpenMP's Fortran and C compatibility. Distinct from C++26 `std::execution` (`data/async-await#cpp-coroutines-and-senders`): TBB is task-DAG-and-thread-pool focused on bulk parallelism; senders/receivers is async-graph composition focused on heterogeneous async; the two address overlapping but distinct workloads.\n\nThe lesson generalises: a task-parallelism library can substitute for a parallel-programming language extension (OpenMP) when the host language has sufficient template / generics machinery to express scheduling abstractions ergonomically. C++ has it; C does not, which is why C codebases tend to use OpenMP and C++ codebases can choose between TBB, OpenMP, and `std::execution`.",
+      "refs": []
+    },
+    {
+      "id": "production-and-licensing",
+      "title": "Production use and licensing",
+      "tags": [
+        "production",
+        "ecosystem"
+      ],
+      "content": "Production: Intel Embree (production ray tracing), OpenVDB (volumetric data structures used at Pixar, DreamWorks), LightGBM (gradient boosting), AutoCAD, CGAL (computational geometry library), POV-Ray, many Adobe and Autodesk products, scientific-computing libraries that need C++-native task parallelism without an OpenMP runtime dependency. **Eigen** and several BLAS implementations support oneTBB as one parallel backend among OpenMP, std::thread, and serial.\n\nStatus (as of 2026-04): oneTBB is part of the **oneAPI specification** (UXL Foundation), Apache 2.0 licensed, ships with Intel oneAPI HPC Toolkit, and is available standalone via vcpkg / Conan / system package managers. The 2021 transition from \"Intel TBB\" to \"oneTBB\" coincided with namespace stabilisation, ABI commitments under the oneAPI specification, and migration to a community-governance model.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "oneAPI specification — oneTBB elements",
+          "url": "https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Intel oneTBB product page",
+      "url": "https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html"
+    },
+    {
+      "label": "oneTBB repository",
+      "url": "https://github.com/uxlfoundation/oneTBB"
+    },
+    {
+      "label": "oneAPI specification — oneTBB",
+      "url": "https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/"
+    }
+  ]
+}

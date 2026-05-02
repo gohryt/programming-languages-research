@@ -1,0 +1,73 @@
+{
+  "kind": "concept",
+  "name": "SIMD Parsing",
+  "aliases": [
+    "simd-tokenization",
+    "simd-lexing"
+  ],
+  "summary": "SIMD-accelerated tokenization and structural parsing techniques that operate on 64-byte blocks simultaneously; production examples are Validark's Accelerated-Zig-Parser (~2.75× tokenizer speedup) and simdjson (gigabytes/sec, often memory-bandwidth-bound).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "SIMD parsing exploits the observation that tokenization is embarrassingly SIMD-friendly: it operates on independent byte-level predicates. The same 64-byte chunk can be tested for all token-start conditions simultaneously. The technique scales beyond tokens into structural parsing where SIMD instructions identify quotes, brackets, and delimiters in parallel.",
+      "refs": [
+        {
+          "target": "lexer-generators#keyword-recognition",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "accelerated-zig-tokenization",
+      "title": "Accelerated-Zig-Parser — SIMD tokenization with bitstring scanning",
+      "tags": [
+        "parser",
+        "simd",
+        "performance"
+      ],
+      "content": "Validark's SIMD-accelerated tokenizer achieves 2.75x faster and 2.47x less memory than the mainline Zig tokenizer. Key techniques:\n\n- **SIMD bitstring scanning**: produces bitstrings per 64-byte chunk for identifiers, quotes, whitespace, and comments simultaneously, then uses vector compression to find token extents.\n- **Perfect hash functions**: keywords and operators mapped into 7-bit address space. Single 16-byte comparison per identifier to check against keyword table. Uses Phil Bagwell's array-mapped trie compression for packed lookup buffers.\n- **Token length encoding**: stores token lengths as `u8` instead of absolute `u32` start offsets. Almost all tokens are <256 bytes. A `0` sentinel indicates the next 4 bytes contain the true length. This is a 4x memory reduction for the common case.\n- **Sentinel padding**: source buffer padded with sentinel characters at the end. Eliminates bounds-checking in inner loops — the SIMD scan cannot overrun because sentinels terminate every scan pattern.\n- **Newline bitmap as reusable artifact**: SIMD scanning produces a non-newline bitmap as a side product. Later pipeline stages reuse it for line-number computation without re-scanning the source.\n\nThe general principle: tokenization is embarrassingly SIMD-friendly because it operates on independent byte-level predicates.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Accelerated-Zig-Parser",
+          "url": "https://github.com/Validark/Accelerated-Zig-Parser"
+        }
+      ]
+    },
+    {
+      "id": "simdjson-structural-parsing",
+      "title": "simdjson — structural parsing at memory bandwidth",
+      "tags": [
+        "parser",
+        "simd",
+        "structured-data"
+      ],
+      "content": "Geoff Langdale and Daniel Lemire pioneered parsing gigabytes of data per second by heavily utilizing SIMD instructions (e.g., AVX-512) for more than just tokenization. In libraries like `simdjson` and `simdcsv`, the parser operates in two distinct stages:\n\n1. **Structural Index Generation**: SIMD instructions simultaneously identify all structural characters (quotes, colons, brackets, delimiters) across a block of 64 bytes. This produces a bitmap index of all structurally significant locations.\n2. **Structural Processing**: A second pass iterates only over the structural characters identified in the first stage to build the actual parsed representation.\n\nBy eliminating byte-by-byte loops and branch mispredictions, this approach can parse at gigabytes per second, frequently bottlenecking on main memory bandwidth rather than the CPU. The two-stage model has been adopted in CSV parsing, log-line parsing, and structured-event-stream processing — anywhere the input has a small alphabet of structural characters and a large bulk of \"value\" bytes.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "simdjson paper",
+          "url": "https://arxiv.org/abs/1902.08318"
+        },
+        {
+          "label": "simdjson",
+          "url": "https://simdjson.org/"
+        }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design tradeoffs",
+      "tags": [
+        "simd",
+        "tradeoffs",
+        "design-guidance"
+      ],
+      "content": "SIMD parsing has clear sweet spots and clear limits. It excels when the input is: a homogeneous byte stream (no nested layers parser needs to re-tokenize), with a small fixed alphabet of structural characters, processed in large enough blocks to amortize SIMD setup cost (typically ≥64 bytes), and where downstream consumers are themselves fast enough to keep up with the tokenizer.\n\nIt struggles when: tokens have complex context-dependent meaning (parser feedback into the lexer, heredocs, string interpolation), keyword recognition needs deep lookups, or the language is small enough that memory bandwidth is not the bottleneck. For most general-purpose programming-language compilers, SIMD lexing is overkill — modern hand-written lexers already saturate L1 cache and the bottleneck is downstream parsing or codegen. SIMD pays off most for high-throughput data processing (JSON, CSV, log streams) and for languages with very large source files where tokenization is itself the hot path.",
+      "refs": []
+    }
+  ],
+  "sources": []
+}

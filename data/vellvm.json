@@ -1,0 +1,52 @@
+{
+  "kind": "tool",
+  "name": "Vellvm — Verified LLVM IR Semantics",
+  "aliases": [
+    "verified LLVM"
+  ],
+  "summary": "Zhao, Zdancewic et al. POPL 2012: a Coq formalisation of LLVM IR semantics. Individual LLVM optimisations (mem2reg, SROA, parts of GVN) verified against the formal semantics. Designed to retrofit formal correctness onto an existing production compiler one pass at a time.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Vellvm** (Zhao, Zdancewic, et al., POPL 2012) takes a different tack from CompCert and CakeML: rather than building a new verified compiler, formalise the semantics of LLVM IR in Coq, then verify individual LLVM optimisations against that semantics. The goal is retrofitting formal correctness onto an existing production compiler, one pass at a time.\n\nVellvm has verified mem2reg, SROA, and parts of GVN. The resulting \"verified\" versions can be swapped into LLVM and produce the same output as the originals on proven-correct inputs, with a formal guarantee that the optimisation preserves semantics.",
+      "refs": [
+        {
+          "target": "compcert#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "translation-validation#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "llvm#overview",
+          "type": "formalises"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Vellvm (Zhao et al., POPL 2012)",
+          "url": "https://www.seas.upenn.edu/~jianzhou/Vellvm.pdf"
+        }
+      ]
+    },
+    {
+      "id": "design-position",
+      "title": "Design position",
+      "tags": [
+        "verified-compiler",
+        "llvm"
+      ],
+      "content": "The project's practical value is as a reference semantics: having a machine-checked spec of what LLVM IR means is useful even if only portions of the optimiser are verified. It is the model for how verification might incrementally infiltrate industrial compilers.\n\nFor language designers using LLVM as a backend: Vellvm's existence means specific optimisation passes can be swapped for verified variants in safety-critical contexts, without abandoning the LLVM ecosystem entirely. Compcert's all-or-nothing approach (use CompCert, accept the performance penalty) is one extreme; Vellvm's per-pass replacement is a middle ground.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Vellvm POPL 2012",
+      "url": "https://www.seas.upenn.edu/~jianzhou/Vellvm.pdf"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Name Mangling",
+  "aliases": ["symbol mangling", "Itanium C++ ABI mangling", "Rust v0 mangling"],
+  "summary": "Encodes overloading, namespaces, and generics into linker symbols. Itanium C++ ABI's scheme (`_ZN9Namespace8functionEi` for `Namespace::function(int)`) is used by GCC, Clang, every Unix C++. Rust uses RFC 2603 (v0). Must be unambiguous, demangleable, and stable.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "C++ overloading, templates, and namespaces produce multiple functions with the same source name; **name mangling** encodes the full signature into a unique linker symbol. The Itanium C++ ABI's mangling scheme (used by GCC, Clang, and every Unix C++) produces symbols like `_ZN9Namespace8functionEi` for `Namespace::function(int)`.\n\nRust's mangling (RFC 2603, `v0` scheme) is similar in purpose: encodes the crate, module path, type parameters, and hashes. Swift mangles differently again, capturing Swift-specific constructs (protocols, generics with constraints).",
+      "refs": [
+        { "target": "calling-conventions#overview", "type": "interacts-with" },
+        { "target": "object-file-formats#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "Itanium C++ ABI", "url": "https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling" }
+      ]
+    },
+    {
+      "id": "requirements",
+      "title": "Mangling requirements",
+      "tags": ["abi", "linker"],
+      "content": "A mangling scheme is required whenever the language supports any of: overloading, generics, namespaces, nested types. Whatever scheme is chosen must be:\n\n- **Unambiguous**: no two distinct source entities produce the same mangled name.\n- **Reversible** (demangleable): debuggers need to reconstruct source names from symbols.\n- **Stable**: mangled names in public libraries must not change across compiler versions without careful ABI versioning.\n\nThe Itanium ABI scheme is recursive: a function's mangled name encodes its scope (recursive substitutions are heavily optimised), parameter types (recursively mangled), template arguments (recursively mangled), and qualifiers. This produces compact symbols even for deeply nested generic instantiations.",
+      "refs": [],
+      "sources": [
+        { "label": "Rust v0 Symbol Mangling RFC", "url": "https://rust-lang.github.io/rfcs/2603-symbol-name-mangling-v0.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Itanium C++ ABI", "url": "https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling" },
+    { "label": "Rust v0 mangling RFC", "url": "https://rust-lang.github.io/rfcs/2603-symbol-name-mangling-v0.html" }
+  ]
+}

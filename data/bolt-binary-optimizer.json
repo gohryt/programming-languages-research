@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": "BOLT — Post-Link Binary Optimiser",
+  "aliases": ["BOLT", "Facebook BOLT"],
+  "summary": "Panchenko et al. CGO 2019: takes a compiled ELF binary plus a perf sample profile, and rewrites the binary's layout for better cache behaviour. Reorders basic blocks, function clusters, outlines cold code. Reported 5–15% speedup on top of -O3 + LTO + PGO. Significance: even after state-of-the-art compilation, post-link layout still wins.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**BOLT** (Panchenko et al., CGO 2019) is a *post-link* optimiser from Facebook: it takes a compiled ELF binary plus a perf sample profile, and rewrites the binary's layout for better cache behaviour. No recompilation required; BOLT operates on the already-linked executable.\n\nBOLT's main optimisations are code layout: reordering basic blocks within functions so hot paths fall through, reordering functions so hot ones cluster in the same pages, and outlining cold code. Reported gains on Facebook's HHVM and Clang itself are 5–15% over `-O3` + LTO + PGO — on top of everything the compiler already did.",
+      "refs": [
+        { "target": "propeller#overview", "type": "compared-with" },
+        { "target": "pgo-instrumentation#overview", "type": "complementary-to" }
+      ],
+      "sources": [
+        { "label": "BOLT (Panchenko et al., CGO 2019)", "url": "https://research.facebook.com/publications/bolt-a-practical-binary-optimizer-for-data-centers-and-beyond/" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — gains exist after compilation",
+      "tags": ["compiler-architecture", "performance"],
+      "content": "BOLT's significance is not just the gains but the location of the optimisation. After the linker has produced the final binary, BOLT still finds substantial wins, implying that even state-of-the-art compiler pipelines leave performance on the table. The architecture of the compiler pipeline — many separate passes, each with incomplete global view — is the reason BOLT can improve things.\n\nFor a language designer, the lesson: post-link optimisation is a real performance-recovery option. Designing object-file formats and linkers that expose block-granularity layout control from the start (Propeller's approach) is even better — it bakes BOLT-style optimisations into the standard pipeline rather than requiring a separate post-link tool.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "BOLT CGO 2019", "url": "https://research.facebook.com/publications/bolt-a-practical-binary-optimizer-for-data-centers-and-beyond/" }
+  ]
+}

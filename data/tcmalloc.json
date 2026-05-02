@@ -1,0 +1,39 @@
+{
+  "kind": "tool",
+  "name": "TCMalloc",
+  "aliases": ["Google TCMalloc", "Temeraire"],
+  "summary": "Google's per-CPU thread-caching allocator with a hugepage-aware Temeraire backend that maximises 2 MiB-page coverage for TLB efficiency across a fleet of millions of machines.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "general-purpose-allocator", "production", "userspace"],
+      "content": "Google's TCMalloc — the modern open-source reincarnation, separate from gperftools — is optimised for *aggregate* CPU cost across millions of machines, not per-allocation throughput on a single core. It uses per-CPU (not just per-thread) caches and a hugepage-aware page heap (Temeraire) that maximises 2 MiB-page coverage for TLB efficiency across the fleet.\n\nAlongside jemalloc, TCMalloc is the dominant fleet-scale allocator. The OSDI 2021 Temeraire paper documents the production CPU savings.",
+      "refs": [
+        { "target": "allocators#fleet-and-decay-allocators", "type": "part-of" },
+        { "target": "jemalloc#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "per-cpu-and-hugepage",
+      "title": "Per-CPU caches and hugepage-aware backend",
+      "tags": ["thread-cache", "huge-page", "transparent-huge-page", "size-class"],
+      "content": "Per-CPU mode uses Linux restartable sequences (`rseq`) to access cache state without atomics or per-thread storage explosion. The cache count is bounded by CPU count rather than thread count, which matters at the scale where a single binary may host thousands of goroutine-style threads.\n\nTemeraire's `HugeFiller`, `HugeCache`, `HugeAllocator`, and `HugeRegion` heuristics pack allocations onto already-full hugepages while keeping others fully empty so they can be returned to the OS. Hot/cold size-class hints split the page heap: cold allocations get `MADV_NOHUGEPAGE` and live in a separate region, enabling memory tiering. The backend cooperates explicitly with the OS page-size hierarchy (4 KiB to 2 MiB to 1 GiB), which is what makes Temeraire pay off at fleet scale.",
+      "refs": [
+        { "target": "linux-folio-mthp#overview", "type": "context" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production"],
+      "content": "Status (as of 2026-04): documented fleet-wide deployment per Google's published descriptions across search, YouTube, and Borg jobs; exact rollout share is vendor- and time-specific. The OSDI 2021 paper documents fleet-CPU savings from Temeraire enablement. TCMalloc is the production existence proof that allocator designs cooperating with the OS page-size hierarchy outperform single-page-size assumptions at scale.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "TCMalloc design", "url": "https://google.github.io/tcmalloc/design" },
+    { "label": "Temeraire docs", "url": "https://google.github.io/tcmalloc/temeraire.html" },
+    { "label": "Temeraire OSDI 2021", "url": "https://storage.googleapis.com/pub-tools-public-publication-data/pdf/cebd5a9f6e300184fd762f190ffd8978b724e0c8.pdf" }
+  ]
+}

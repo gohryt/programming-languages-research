@@ -1,0 +1,56 @@
+{
+  "kind": "framework",
+  "name": "Nanopass",
+  "aliases": ["nanopass-framework"],
+  "summary": "Sarkar, Waddell, Dybvig's compiler-construction style (ICFP 2004): break compilation into dozens of tiny, focused passes, each with a formally defined intermediate language. Production-tested by Chez Scheme — one of the fastest Scheme compilers despite the many-pass architecture.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Traditional compilers typically use a small number of monolithic passes (parsing, semantic analysis, lowering, optimization, codegen). The Nanopass approach — most famously used by Chez Scheme — breaks the compilation process into dozens or even hundreds of extremely small, focused passes (\"nanopasses\").\n\nIn a nanopass compiler, each pass performs a single, specific transformation, and the intermediate language is formally defined at each step. A domain-specific language generates the boilerplate for traversing the AST and ensuring that the IL conforms to the required grammar before and after each pass.",
+      "refs": [
+        { "target": "mlir#overview", "type": "alternative-approach" },
+        { "target": "ssa#overview", "type": "complements" }
+      ],
+      "sources": [
+        {
+          "label": "Sarkar, Waddell, Dybvig — A Nanopass Framework for Compiler Education (ICFP 2004)",
+          "url": "https://dl.acm.org/doi/10.1145/1016850.1016870"
+        }
+      ]
+    },
+    {
+      "id": "design-goals",
+      "title": "Design goals",
+      "tags": ["compiler-design", "compiler-engineering"],
+      "content": "Nanopass design focuses on:\n\n- **Small per-pass scope**: each pass does one transformation. Adding loop unrolling means writing one pass; reading an existing compiler means reading 50 small passes rather than 5 huge ones.\n- **Explicit intermediate languages**: every pass's input and output IL has a formal grammar. The DSL ensures the input matches the expected grammar before the pass runs and the output matches the next pass's expected input.\n- **Generated traversal boilerplate**: most pass code is the actual transformation, not the visitor scaffolding. The DSL generates the walking code.\n\nRather than hiding many concerns inside a few large compiler stages, Nanopass makes transformation boundaries part of the compiler's visible structure.",
+      "refs": [
+        { "target": "mlir#overview", "type": "shares-philosophy" }
+      ]
+    },
+    {
+      "id": "advantages",
+      "title": "Advantages",
+      "tags": ["compiler-engineering", "maintainability"],
+      "content": "The perceived downside of many small passes — excessive compilation time — was proven false by Chez Scheme, which remains one of the fastest Scheme compilers available despite running ~50 nanopasses.\n\nThe practical benefits:\n\n- **Easier debugging**: each pass's input/output IL is explicit, so locating where a regression was introduced is straightforward.\n- **Clearer invariants between phases**: each pass declares what shape it expects and produces.\n- **Architecture that evolves through small steps**: adding a new optimization is often a new pass, not a modification to an existing pass.\n\nThis is especially attractive in educational and language-experiment settings, where compiler clarity matters as much as performance.",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["compiler-engineering", "tradeoffs"],
+      "content": "Nanopass designs accumulate many intermediate forms and a large number of passes. This can increase boilerplate, pipeline length, and the conceptual scaffolding needed to understand the whole compiler at once.\n\nThe DSL itself is a learning curve: contributors must understand both the source language being compiled and the meta-language that defines the IL grammars and pass shapes. For projects without strong educational or research-correctness motivations, the simpler MLIR approach (one stable IR family with multiple dialects) may be a better fit.",
+      "refs": [
+        { "target": "llvm#strengths-and-tradeoffs", "type": "contrasts-with" },
+        { "target": "cranelift#research-comparison-points", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Sarkar, Waddell, Dybvig — A Nanopass Framework for Compiler Education (ICFP 2004)",
+      "url": "https://dl.acm.org/doi/10.1145/1016850.1016870"
+    }
+  ]
+}

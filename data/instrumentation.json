@@ -1,0 +1,105 @@
+{
+  "kind": "concept",
+  "name": "Instrumentation",
+  "aliases": [],
+  "summary": "Inserts explicit probe points into code, runtimes, or APIs so execution can be traced, measured, or analyzed; production examples include Tracy/Spall (~2–12ns spans), Erlang dbg + match specs, GraalVM Truffle wrapper nodes, Mozilla Gecko Profiler markers, and APM auto-instrumentation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Instrumentation inserts explicit probe points into code, runtimes, or APIs so that execution can be observed later through traces, metrics, spans, or analysis hooks. Its main strength is semantic richness: events can be tied directly to meaningful program boundaries rather than inferred statistically afterward.\n\nTools that build a per-span or per-event record explicitly at sites the developer (or the language) chose, in contrast to the sampling profilers that interrupt arbitrary code at a fixed cadence. The cost model is per-annotated-site, not per-wall-clock-sample, and the distinguishing engineering challenge is making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production builds.",
+      "refs": [
+        {
+          "target": "sampling-profiling#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "compiler-inserted-tracing#overview",
+          "type": "related"
+        },
+        {
+          "target": "distributed-tracing#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "probe-placement-and-disabled-overhead",
+      "title": "Probe placement and disabled-overhead design — Tracy/Spall",
+      "tags": [
+        "tracing",
+        "instrumentation",
+        "runtime"
+      ],
+      "content": "Instrumentation systems differ in where probe points live and how much they cost when inactive. Good designs keep the disabled path cheap while still making semantic events explicit when tracing is enabled.\n\n**Tracy** achieves ~2ns overhead per span using a lock-free queue. The client collects events and holds them in memory until a server connects and pulls the data. The server reconstructs the timeline in real-time. Tracy supports CPU sampling, GPU tracing, memory allocation tracking, lock contention visualization, and context switch recording — all in a single tool with a custom native UI that handles hundreds of millions of events.\n\n**Spall** takes a different approach: ~12ns per span, but the output is a compact binary file viewed in a web-based UI. Spall's simplicity is the point — a single-header C library for tracing, a web frontend for viewing. It supports `clang -finstrument-functions` for automatic whole-program tracing without manual annotation.\n\nBoth demonstrate that with careful engineering, instrumentation overhead can be low enough to leave enabled in development builds permanently. The 2–12ns per span cost is negligible compared to the microseconds or milliseconds that actual work takes, but the visibility gained is transformative.\n\n**HUGLO** (Matt Stuchlik, 2025) is a Ruby tracer capturing function calls, syscalls, and thread states with strictly less than 100ns of overhead per call — production-safe, continuously-running tracing that catches the exact outliers standard sampling profilers obscure.",
+      "refs": [
+        {
+          "target": "breakpoints#gdb-int3-displaced-stepping",
+          "type": "related"
+        },
+        {
+          "target": "compiler-inserted-tracing#patchable-sites-and-side-tables",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Tracy",
+          "url": "https://github.com/wolfpld/tracy"
+        },
+        {
+          "label": "Spall",
+          "url": "https://gravitymoth.com/spall/spall-web.html"
+        }
+      ]
+    },
+    {
+      "id": "span-oriented-and-event-oriented-instrumentation",
+      "title": "Span-oriented and event-oriented instrumentation — Erlang dbg, Tcl, Truffle",
+      "tags": [
+        "tracing",
+        "profiling",
+        "observability"
+      ],
+      "content": "Instrumentation may emit spans, instant markers, counters, or typed events depending on what the runtime and viewer need. These event models affect how traces can later be stored, queried, correlated, and visualized.\n\n**Erlang dbg** provides function call tracing with **match specifications** — pattern-matching expressions that filter which calls generate trace events. The match specification is compiled into an efficient matcher by the VM. When the pattern doesn't match, the overhead is minimal; when it does match, a trace message is generated and sent to a trace handler process. Routinely used in production Erlang systems to diagnose issues without restarting or redeploying. The `recon` library by Fred Hebert wraps `dbg` in safety rails (rate limiting, automatic timeout) for production tracing.\n\n**Tcl** provides first-class tracing as a language feature via the `trace` command. Variable traces fire when a variable is read, written, or unset; execution traces fire when a command enters or leaves execution, including per-step tracing. When no traces are active, there is no overhead. Tcl makes tracing a *language-level* concept rather than a tool-level concept — debuggers, profilers, and monitoring tools can be written entirely in Tcl with no special VM support.\n\n**GraalVM Truffle's** instrumentation framework inserts \"wrapper nodes\" into the AST around instrumentable nodes. When no instrumentation is active, the wrapper node is not present. When a tool requests instrumentation, Truffle inserts wrapper nodes that intercept execution events and forward them to the tool. Truffle's partial evaluation and compilation pipeline treats wrapper nodes like any other AST nodes — after JIT compilation, an active wrapper's event dispatch can be inlined and optimized. Arguably the most sophisticated approach to \"zero overhead when disabled\" — not through patching, but through treating instrumentation as part of the program's optimizable AST.",
+      "refs": [
+        {
+          "target": "trace-storage-and-visualization#overview",
+          "type": "related"
+        },
+        {
+          "target": "distributed-tracing#google-dapper",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Erlang dbg",
+          "url": "https://www.erlang.org/doc/apps/runtime_tools/dbg.html"
+        }
+      ]
+    },
+    {
+      "id": "runtime-native-instrumentation-surfaces",
+      "title": "Runtime-native instrumentation surfaces",
+      "tags": [
+        "runtime",
+        "tracing",
+        "tooling"
+      ],
+      "content": "Many runtimes expose native tracing surfaces for allocation, scheduling, task lifecycle, GC, and synchronization events. These runtime-semantic events are often more useful than raw code-level probes because they preserve the system's own concurrency and memory vocabulary.\n\nEvent emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically. The mechanism shape (providers + sessions + ring buffers) is remarkably consistent across very different runtimes — JVM, .NET, Windows kernel, Linux kernel, Erlang, Haskell, Go, Apple, database engines, MoarVM.\n\n**Mozilla Gecko Profiler** sits in two tiers: a **Base Profiler** in `mozglue/baseprofiler` that loads at process start, and the full **Gecko Profiler** that takes over once `libxul` is mapped. The distinctive emission primitive is **markers vs labels**. Markers always write; labels only surface if the sampler happens to catch the thread. Marker payloads are strongly-typed C++ templates with a schema carried in the profile JSON so the frontend renders unknown marker types without code changes. JavaScript code enters markers via the W3C `performance.mark` / `performance.measure` User Timing API. **profiler.firefox.com** is the frontend — natively renders Gecko's profile format and also imports Linux `perf script` output, Android SimplePerf, Chrome `trace_event` JSON, and dhat.\n\n**APM Auto-Instrumentation Agents** (DataDog, New Relic, Dynatrace, Elastic APM, OpenTelemetry) rewrite application bytecode at class-load time to inject spans into unmodified third-party libraries. The dominant rewriting library is **Byte Buddy** (Rafael Winterhalter), which wraps ASM with a declarative matcher DSL and `@Advice.OnMethodEnter` / `@Advice.OnMethodExit` annotations. **Muzzle** (DataDog, adopted by OpenTelemetry) validates each instrumentation's external symbols against the actual user classpath at agent startup, silently skipping instrumentations whose target version doesn't match.",
+      "refs": [
+        {
+          "target": "async-debugging#go-runtime-trace-delve",
+          "type": "related"
+        },
+        {
+          "target": "concurrency-debugging#overview",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

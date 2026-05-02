@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": "Apache Spark Tungsten and Whole-Stage CodeGen",
+  "aliases": ["Tungsten", "Spark whole-stage codegen", "Janino codegen"],
+  "summary": "Spark 2.0 (2016): generates JVM bytecode for SQL operator stages — maximal runs of pipelined operators without shuffle boundaries. Each stage becomes a Java class via Janino, then HotSpot JITs it. Reuses HotSpot's full optimiser for free; class-loading and GC overhead is the cost.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Apache Spark's **Tungsten / Whole-Stage CodeGen** (introduced in Spark 2.0, 2016) generates JVM bytecode for SQL query operators fused into \"stages\" — maximal runs of pipelined operators without shuffle boundaries. Each stage becomes a Java class emitted at query planning time and loaded via the JVM's class loader; HotSpot then JITs it to native code.",
+      "refs": [
+        { "target": "databricks-photon#overview", "type": "succeeded-by" },
+        { "target": "hyper-umbra#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Apache Spark as a Compiler", "url": "https://databricks.com/blog/2016/05/23/apache-spark-as-a-compiler-joining-a-billion-rows-per-second-on-a-laptop.html" }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Design",
+      "tags": ["spark", "jvm", "codegen"],
+      "content": "The implementation leans on **Janino**, a lightweight Java compiler that produces bytecode in-process. Unlike HyPer's LLVM codegen, Spark's approach nests a managed runtime (JVM) inside a query engine — heavier but portable across every JVM platform.\n\nThe key engineering insight: by going through JVM bytecode, Spark gets HotSpot's full optimiser for free, at the cost of class loading overhead and GC pressure from transient generated classes. The design is a reasonable choice when the host platform is already the JVM and querying frequency is moderate.\n\nFor higher-throughput requirements, Photon (Spark's C++ vectorised engine) replaces Tungsten codegen entirely. The progression Tungsten → Photon mirrors the broader industry shift from compile-everything to vectorise-everything.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Spark whole-stage codegen", "url": "https://databricks.com/blog/2016/05/23/apache-spark-as-a-compiler-joining-a-billion-rows-per-second-on-a-laptop.html" }
+  ]
+}

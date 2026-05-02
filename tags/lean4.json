@@ -1,0 +1,7 @@
+{
+  "id": "lean4",
+  "tag": "lean4",
+  "name": "Lean 4",
+  "description": "Sections referring to Lean 4 specifically (the Mathlib-era theorem prover and dependently-typed programming language). Use this rather than the bare `lean` tag, which has been merged here.",
+  "aliases": ["lean"]
+}

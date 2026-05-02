@@ -1,0 +1,47 @@
+{
+  "kind": "runtime",
+  "name": "colorForth",
+  "aliases": [
+    "Moore colorForth"
+  ],
+  "summary": "Chuck Moore's idiosyncratic Forth: source representation is color-tagged 32-bit cells (4-bit token class + 28-bit symbol). The on-disk file *is* the parsed AST. Tiny subroutine-threaded compiler that inlines several primitive arithmetic operations. Source notation, compiler size, and machine model are co-designed.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**colorForth** (Chuck Moore) is the most idiosyncratic line in the Forth tradition: a color-tagged source representation paired with a tiny subroutine-threaded compiler that inlines several primitive arithmetic operations. The editor stores source as 32-bit cells where the upper 4 bits encode token class (color-coded in display) and the lower 28 bits encode the symbol. The on-disk file *is* the parsed AST.\n\nThere is no surface text-to-tokens pass; the editor produces tokens directly, and the compiler is a trivial walker over the pre-parsed cells. This is the most extreme \"representation as ground truth\" in the Forth tradition: the program form on disk is the same form the compiler consumes.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "colorForth presentation",
+          "url": "https://www.ultratechnology.com/color4th.html"
+        },
+        {
+          "label": "colorForth — parsed source representation",
+          "url": "https://colorforth.github.io/parsed.html"
+        }
+      ]
+    },
+    {
+      "id": "co-design",
+      "title": "Co-design — source, compiler, machine model",
+      "tags": [
+        "forth",
+        "language-design"
+      ],
+      "content": "colorForth is interesting because source notation, compiler size, and machine model are co-designed. The arrayForth derivative for the GreenArrays GA144 chip takes this further — the chip's 18-bit instruction-slot constraints inform the source representation directly.\n\nFor a language designer, colorForth is the data point on \"what happens if you co-design source representation with the compiler and target hardware?\" The answer: dramatic compactness, fast compilation, and a development environment that fits in a few hundred lines. The cost is that the design is so unconventional it doesn't compose with anything else; colorForth is its own ecosystem.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "colorForth",
+      "url": "https://www.ultratechnology.com/color4th.html"
+    },
+    {
+      "label": "colorForth — parsed source representation",
+      "url": "https://colorforth.github.io/parsed.html"
+    }
+  ]
+}

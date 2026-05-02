@@ -1,0 +1,42 @@
+{
+  "kind": "runtime",
+  "name": "Azul C4 — The Pauseless Lineage",
+  "aliases": ["C4", "Continuously Concurrent Compacting Collector", "Azul Pauseless GC", "Zing GC", "Azul Prime GC"],
+  "summary": "Azul's Continuously Concurrent Compacting Collector (production since 2010) is the direct ancestor of ZGC and Shenandoah. Generational pauseless collector using a Loaded Value Barrier read barrier to support concurrent compaction, concurrent remapping, and concurrent incremental-update tracing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "concurrent-gc", "compacting-gc", "pauseless", "low-latency-gc", "generational-gc", "jvm", "production"],
+      "content": "Azul's **Continuously Concurrent Compacting Collector** (C4, production since 2010) is the direct ancestor of ZGC and Shenandoah. A generational **pauseless** collector using a Loaded Value Barrier (LVB) read barrier to support concurrent compaction, concurrent remapping, and concurrent incremental-update tracing.\n\nThe sole collector in Azul Prime (formerly Zing).",
+      "refs": [
+        { "target": "garbage-collection#low-latency-collectors", "type": "instance-of" },
+        { "target": "zgc", "type": "predecessor-of" },
+        { "target": "shenandoah-gc", "type": "predecessor-of" },
+        { "target": "g1-gc", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "loaded-value-barrier",
+      "title": "Loaded Value Barrier and self-healing",
+      "tags": ["read-barrier", "load-reference-barrier", "self-healing-barrier", "concurrent-compaction"],
+      "content": "**LVB read barrier** ensures every loaded reference is \"self-healed\" to a safe form, allowing relocation without STW remap. The barrier checks each loaded reference against the colored-pointer state and, if needed, redirects through the forwarding word and writes the corrected pointer back into the source field.\n\nThis is the technique ZGC adopted (colored pointers + load barrier + self-healing) and that Shenandoah evolved from Brooks-style forwarding pointers into. Both inherit C4's invariant that a barrier slow path must run at most once per location."
+    },
+    {
+      "id": "simultaneous-generational",
+      "title": "Simultaneous-generational concurrency",
+      "tags": ["concurrent-gc", "generational-gc", "concurrent-compaction"],
+      "content": "**Simultaneous-generational concurrency**: young and old generation collections run concurrently and independently, never blocking each other. This is stronger than Generational ZGC's design: in C4, neither generation's collector can be paused or starved by the other.\n\nOS-kernel virtual-memory enhancements (originally on Linux) sustain the high VM mapping rate required for pauseless operation. The kernel changes — fast `madvise`/`munmap` paths, optimised TLB shootdowns — were upstreamed in part and are visible in modern Linux kernels."
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment and significance",
+      "tags": ["jvm", "production", "pauseless"],
+      "content": "C4 is the sole collector in Azul Prime (formerly Zing). Status (as of 2026-04): commercial JVM distribution; the architectural ancestor of OpenJDK ZGC and Shenandoah.\n\nThe lesson: **pauseless concurrent compaction was production-ready a decade before OpenJDK had it**. Azul's contribution to the JVM ecosystem is largely the demonstration that the design point exists and the gradual upstreaming of techniques into OpenJDK via the ZGC and Shenandoah projects."
+    }
+  ],
+  "sources": [
+    { "label": "Azul C4", "url": "https://www.azul.com/products/components/pgc/" },
+    { "label": "C4 — The Continuously Concurrent Compacting Collector (ISMM 2011)", "url": "https://dl.acm.org/doi/10.1145/1993478.1993491" }
+  ]
+}

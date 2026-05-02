@@ -1,0 +1,47 @@
+{
+  "kind": "concept",
+  "name": "Arena Allocation",
+  "aliases": ["bump allocator", "region allocator", "linear allocator"],
+  "summary": "Bump-pointer allocation from a contiguous memory region; freed in bulk when a phase ends. The dominant memory-management strategy in compilers because AST and IR nodes share phase-aligned lifetimes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Arena (bump) allocation is the dominant memory management strategy in compiler frontends and middle-ends. The pattern: allocate a large contiguous region, bump a pointer forward for each allocation, never free individual objects. When a compilation phase ends, free the entire arena at once.\n\nThis is acceptable in compilers because AST nodes, IR instructions, and type objects all have the same lifetime — they live for one compilation phase and die together. Per-object deallocation would be unnecessary work; bulk free at phase boundaries is dramatically cheaper.\n\nLanguage-facing allocator API models (explicit allocator parameters, context allocators, temp allocators, allocator toolkits) are a separate memory-management concern. This record covers arenas as an internal compiler implementation technique.",
+      "refs": [
+        { "target": "hash-consing#overview", "type": "complementary-technique" },
+        { "target": "struct-of-arrays#overview", "type": "complementary-technique" }
+      ]
+    },
+    {
+      "id": "bump-pointer-mechanism",
+      "title": "Bump-pointer mechanism",
+      "tags": ["compiler", "memory", "performance"],
+      "content": "Allocation reduces to a pointer bump plus an alignment check — typically about 2 ns. There is no per-object deallocation, no free list, no fragmentation. The trade-off is that objects in the arena cannot be individually freed, which is acceptable when all allocated objects share a compilation-phase lifetime.\n\nThe `bump-scope` crate extends bump allocation with allocation scopes/checkpoints: callers can reset the arena to a previous point, freeing everything allocated after that point. This supports nested phases — parse a function body, optimize it, emit code, reset the arena for the next function — without giving up the bulk-free property.\n\nArenas also enable pointer-free representations: instead of storing pointers to children, store 32-bit offsets into the arena. Indices halve the per-edge cost compared to 64-bit pointers, save substantial memory on large ASTs, and make serialization trivial — the arena bytes are the serialized form. This is the same approach data-oriented design uses in ECS game engines and that flat-AST representations adopt.",
+      "refs": [
+        { "target": "flat-ast-representations#overview", "type": "enables" }
+      ]
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["compiler", "production"],
+      "content": "Rust's `bumpalo` crate is the canonical implementation in the Rust ecosystem. Many hand-written C and C++ parsers use `mmap`-backed arenas with the same pattern. Most compiler frontends — rustc, Clang, GCC, Zig, Swift's parser — allocate ASTs and IR nodes through some form of arena rather than the general allocator.\n\nThe scoped variant, supporting reset to checkpoints, is widely used for pass-local scratch allocations: a pass allocates working data, runs, and resets the arena before the next pass starts. This avoids both per-object teardown and any ambient global allocator pressure during the pass.\n\nMany compilers' \"AST\" type is structurally an arena plus an entry point — there is no separate AST type at all. The arena is the AST.",
+      "refs": [],
+      "sources": [
+        { "label": "bumpalo arena allocator (Rust)", "url": "https://docs.rs/bumpalo/" }
+      ]
+    },
+    {
+      "id": "language-allocator-api-relation",
+      "title": "Relation to language-level allocator APIs",
+      "tags": ["language-design", "tradeoffs"],
+      "content": "Arena allocation as a compiler internal is distinct from arena allocation as a language feature. Languages such as Zig, Odin, C3, Jai, and Beef expose explicit allocator parameters or context allocators that let user code request arena behavior — this is a memory-management API design concern, not a compiler implementation concern.\n\nThe two interact when the language's compiler is itself written in the language and uses its own allocator API for compiler-internal allocations (Zig's compiler is the notable example). Otherwise, the compiler's choice of internal arena allocator is independent of how user code manages memory.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "bumpalo arena allocator", "url": "https://docs.rs/bumpalo/" }
+  ]
+}

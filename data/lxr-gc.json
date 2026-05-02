@@ -1,0 +1,39 @@
+{
+  "kind": "concept",
+  "name": "LXR — RC + Immix for Low Latency at Throughput",
+  "aliases": ["LXR", "LXR GC", "RC Immix"],
+  "summary": "Zhao, Blackburn, McKinley's LXR (PLDI 2022) combines reference counting with Immix's mark-region heap to deliver low pauses via regular brief stop-the-world cycles plus occasional concurrent tracing for cycles — contradicting the orthodoxy that low pauses require concurrent copying.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "mark-region", "low-latency-gc", "research"],
+      "content": "Zhao, Blackburn, McKinley's **LXR** (PLDI 2022) combines reference counting with Immix's mark-region heap to deliver low pauses *via* regular brief stop-the-world cycles plus occasional concurrent tracing for cycles. It contradicts the orthodoxy that low pauses require concurrent copying — the design assumption underlying C4, ZGC, and Shenandoah.\n\nLXR is the cleanest counterexample to that orthodoxy: combining RC with Immix's mark-region heap delivers low pauses via brief regular STW + occasional concurrent tracing. On Lucene with a tight heap, LXR reports 7.8x throughput and 10x better p99.99 tail latency over Shenandoah.",
+      "refs": [
+        { "target": "garbage-collection#tracing-vs-reference-counting", "type": "instance-of" },
+        { "target": "immix-gc", "type": "extends" },
+        { "target": "reference-counting#overview", "type": "combines" },
+        { "target": "shenandoah-gc", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Field-logging coalescing barrier and RC remembered sets",
+      "tags": ["mark-region", "write-barrier", "tricolor"],
+      "content": "Field-logging **coalescing write barrier** with only ~1.6% mutator overhead, jointly maintaining RC, remembered sets, and the concurrent SATB log. **RC remembered sets** enable judicious copying of mature objects without full evacuation. **Lazy decrement processing** and survival-rate-driven pause modulation keep STW windows brief.\n\nThe mechanism leverages the fact that Immix already partitions the heap into blocks and lines: LXR layers per-object reference counts onto Immix's region structure, so most reclamation happens incrementally via RC, with periodic tracing only to handle cycles."
+    },
+    {
+      "id": "results",
+      "title": "Empirical results and significance",
+      "tags": ["garbage-collection", "low-latency-gc", "research"],
+      "content": "On Lucene with a tight heap LXR reports 7.8x throughput and 10x better p99.99 tail latency over Shenandoah. The architectural lesson: **low pause and high throughput are not in tension if the collector pays its cost incrementally rather than concurrently**. Brief regular STW + RC can hit *both* better throughput and better tail latency than concurrent copying.\n\nResearch collector implemented atop MMTk; not in production but actively developed. Status (as of 2026-04): research-grade, with continued development at ANU and Microsoft.",
+      "refs": [
+        { "target": "mmtk", "type": "implemented-on" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "LXR — RC + Immix (PLDI 2022)", "url": "https://www.steveblackburn.org/pubs/papers/lxr-pldi-2022.pdf" },
+    { "label": "LXR arXiv preprint", "url": "https://arxiv.org/pdf/2210.17175v1" }
+  ]
+}

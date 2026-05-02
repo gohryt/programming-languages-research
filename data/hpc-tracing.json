@@ -1,0 +1,131 @@
+{
+  "kind": "concept",
+  "name": "HPC tracing",
+  "aliases": [
+    "MPI tracing",
+    "Score-P",
+    "OTF2",
+    "Vampir"
+  ],
+  "summary": "Tracing stack for high-performance computing — distinct from APM/observability because it must reason about MPI send/receive matching, collective-synchronization alignment, and trillions of events per run across thousands of ranks.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "High-performance computing has evolved its own tracing stack largely separate from the APM / observability world. The distinctive axis is **inter-rank causality**: MPI send/receive matching, collective-synchronization alignment, and trillions of events per run across thousands of ranks. Tools like Perfetto, JFR, OpenTelemetry have no notion of these primitives; the HPC ecosystem has been building against them since the 1990s.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:parallel-hpc`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:always-on`, `off-cost:zero`\n- **on-cost**: `on-cost:dominant`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-function`\n"
+    },
+    {
+      "id": "score-p",
+      "title": "Score-P — The Shared Instrumentation Backbone",
+      "tags": [
+        "domain:profiling",
+        "family:parallel-hpc",
+        "granularity:per-event",
+        "hpc",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "**Score-P (Scalable Performance Measurement Infrastructure for Parallel Codes)** is the common measurement layer shared by Vampir, Scalasca, TAU, and Periscope. It emerged from the BMBF SILC + DOE PRIMA consortium effort around 2011 specifically to consolidate what used to be per-tool instrumentation and trace formats — before Score-P, each HPC profiler had its own instrumentation pass, its own MPI wrapper, its own trace format. Agreeing on one backbone was a prerequisite for any of them to scale.\n\nInstrumentation enters Score-P through four routes simultaneously: **compiler hooks** (GCC/Intel/PGI/Cray emit `__cyg_profile_func_enter`/`_exit` calls), **MPI library interposition** through the standard `PMPI_*` profiling interface (which MPI itself specifies precisely so tools can wrap every call without source changes), **OPARI2 source-to-source rewriting** for OpenMP directives (because OpenMP pragmas expand too late for the compiler hooks to see them), and **PAPI / perf sampling** for hardware counters attached as sample events. Output is either OTF2 (event traces, `data/hpc-tracing#otf2-vampir-scalasca`) or CUBE4 (aggregated call-path profiles — the HPC analogue of pprof `profile.proto` in `data/continuous-profiling#pprof-profile-proto`).\n\nThe design insight worth carrying forward is the **consortium-backbone pattern**: when multiple tools need the same instrumentation surface, the leverage is in standardizing the measurement layer so every tool benefits from improvements to any one of them. PAPI, `PMPI_*`, and Score-P together illustrate how HPC made this work at community scale.",
+      "sources": [
+        {
+          "url": "https://www.vi-hps.org/projects/score-p/overview/overview.html"
+        },
+        {
+          "url": "https://perftools.pages.jsc.fz-juelich.de/cicd/scorep/tags/latest/html/instrumentation.html"
+        }
+      ]
+    },
+    {
+      "id": "otf2-vampir-scalasca",
+      "title": "OTF2 — Per-Rank Lockless Parallel Trace Format",
+      "tags": [
+        "domain:profiling",
+        "family:parallel-hpc",
+        "granularity:per-event",
+        "hpc",
+        "off-cost:always-on",
+        "on-cost:medium"
+      ],
+      "content": "**OTF2 (Open Trace Format 2)** is the HPC trace interchange format, designed at TU Dresden / Jülich specifically for scalable I/O. The mechanical trick is physical file layout, not encoding: each rank writes its own local event file plus a small local definition file, and a single tiny global anchor (`traces.otf2`) holds the definition-ID mappings. There is no global lock, no global merge pass at write time, and readers can slice a single rank or a single time interval without touching the other files.\n\nThe 2011 design paper (Eschweiler, Wagner, Geimer, Knüpfer, Nagel, Wolf — ParCo 2011) and the 2012 encoding-techniques follow-up add per-record delta compression and on-the-fly token translation: each rank uses its own local definition ID space, and the reader translates to a global space lazily. This avoids the \"unification\" copy that killed OTF2's predecessors OTF and EPILOG at scale. For a modern comparison, OTF2 is to HPC what CTF (`data/runtime-event-pipelines#lttng-ctf`) is to Linux tracing — lockless, self-describing, designed for the scaling axis of its domain.\n\nScalasca's analysis engine **`scout`** is itself a parallel MPI program that reads each local OTF2 trace on the same rank that produced it, then does a distributed replay matching `MPI_Send`/`MPI_Recv` pairs and collective entry timestamps to classify \"Late Sender\", \"Late Receiver\", \"Wait at Barrier\", \"Wait at N×N\" patterns. It computes **delay cost** (the root-cause region upstream of the visible wait) and **critical path** — a fundamentally different analysis model from an APM waterfall, because the causality graph is over MPI messages, not HTTP spans.\n\nThe OTF2 ecosystem assumes a server-side viewer model: **Vampir** (TU Dresden ZIH) is the canonical OTF2 visualizer, and its distinctive choice is that **VampirServer runs as an MPI job alongside the trace files on the HPC filesystem** while the GUI is a thin client requesting aggregated time slices at the current zoom level. This is how Vampir displays traces that do not fit in the visualization host's RAM — the server lives where the data lives. Perfetto's implicit in-order forest (`data/trace-storage-and-visualization#implicit-in-order-forests`) is the same level-of-detail pattern, single-machine; Vampir scales it across the cluster that captured the trace.\n\nThe other long-running parallel-profiler lineage is **TAU (Tuning and Analysis Utilities)** from the University of Oregon Performance Research Lab. TAU predates Score-P and continues in parallel; its distinctive contribution is **dyninst-based dynamic instrumentation** via `tau_exec` / `tau_run`, attaching to a running MPI executable without recompilation and patching in measurement probes live. TAU feeds into Score-P today but maintains its own tracing formats (SLOG2, TAU-trace) and its own ParaProf visualizer — useful when the target cannot be rebuilt against Score-P, or when a site has existing TAU tooling.\n\nFor a new language targeting HPC workloads, the practical implication is concrete: speak OTF2 and the `PMPI_*` profiling interface, not OTLP. TAU and Score-P cover the instrumentation side; Vampir and Scalasca cover analysis; OTF2 is the wire format that makes them interchangeable.",
+      "sources": [
+        {
+          "url": "https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/docs/otf2-2.2/html/index.html"
+        },
+        {
+          "url": "https://ebooks.iospress.nl/publication/26566"
+        },
+        {
+          "url": "https://apps.fz-juelich.de/scalasca/releases/scalasca/2.6/docs/manual/scout.html"
+        },
+        {
+          "url": "https://vampir.eu/"
+        },
+        {
+          "url": "https://tu-dresden.de/zih/forschung/projekte/vampir"
+        },
+        {
+          "url": "https://www.cs.uoregon.edu/research/tau/docs/html-docs/latest/usersguide/usersguide.html"
+        },
+        {
+          "url": "https://apps.fz-juelich.de/scalasca/releases/scalasca/2.5/help/scalasca_patterns-2.5.html"
+        }
+      ]
+    },
+    {
+      "id": "vampir-server-rendering",
+      "title": "Vampir — Server-Side Rendering for Trillion-Event Traces",
+      "tags": [
+        "domain:profiling",
+        "family:parallel-hpc",
+        "granularity:per-event",
+        "hpc",
+        "off-cost:always-on",
+        "on-cost:dominant"
+      ],
+      "content": "Folded into `data/hpc-tracing#otf2-vampir-scalasca` above as part of the OTF2 viewer story; heading retained for cross-reference stability."
+    },
+    {
+      "id": "tau-dyninst",
+      "title": "TAU — Dyninst-Based Attach and Parallel Profiler Lineage",
+      "tags": [
+        "domain:profiling",
+        "family:parallel-hpc",
+        "granularity:per-function",
+        "hpc",
+        "off-cost:always-on",
+        "on-cost:medium"
+      ],
+      "content": "Folded into `data/hpc-tracing#otf2-vampir-scalasca` above; heading retained for cross-reference stability."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.vi-hps.org/projects/score-p/overview/overview.html"
+    },
+    {
+      "url": "https://perftools.pages.jsc.fz-juelich.de/cicd/scorep/tags/latest/html/instrumentation.html"
+    },
+    {
+      "url": "https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/docs/otf2-2.2/html/index.html"
+    },
+    {
+      "url": "https://ebooks.iospress.nl/publication/26566"
+    },
+    {
+      "url": "https://apps.fz-juelich.de/scalasca/releases/scalasca/2.6/docs/manual/scout.html"
+    },
+    {
+      "url": "https://vampir.eu/"
+    },
+    {
+      "url": "https://tu-dresden.de/zih/forschung/projekte/vampir"
+    },
+    {
+      "url": "https://www.cs.uoregon.edu/research/tau/docs/html-docs/latest/usersguide/usersguide.html"
+    },
+    {
+      "url": "https://apps.fz-juelich.de/scalasca/releases/scalasca/2.5/help/scalasca_patterns-2.5.html"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "kind": "language",
+  "name": "Java",
+  "aliases": [],
+  "summary": "JVM language whose modularity story is package + JPMS (Java Platform Module System, JEP 261, Java 9 / 2017) layered above a 25-year-old classpath model; exports/requires/opens/uses/provides are declared in module-info.java, with strong-encapsulation enforcement at compile, link, and runtime; OSGi remains the dynamic alternative for plugin-heavy systems.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Java is the canonical JVM language. Its module-system retrofit (JPMS / Project Jigsaw, Java 9, 2017) is one of the most expensive in software history alongside C++20 modules — the canonical retrofit story studied below. Concurrency, GC, memory, and runtime aspects live in `data/virtual-threads`, `data/jvm-bytecode`, `data/g1-gc`, `data/zgc`, `data/shenandoah-gc`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "packages-and-the-classpath",
+      "title": "Packages and the long road from the classpath",
+      "tags": ["java", "packages", "classpath"],
+      "content": "A Java **package** is a flat namespace declared at the top of each file (`package com.example.foo;`). Until JPMS, packages were the only language-level modularity feature in Java: they grouped types, served as the boundary for the package-private (default) access level, and shaped the conventional directory layout of source trees. Crucially, packages never owned a published artifact identity. A JAR could contain types from any number of packages; multiple JARs could split-package contributors to the same package; and the runtime classpath was a flat search path with last-loader-wins resolution semantics.\n\nThis produced a long-running set of pathologies: classpath hell (multiple incompatible JARs claiming the same fully qualified class name), accidental access via `sun.misc.Unsafe` and other internal types whose package-private status did not survive cross-JAR loading, no language-level expression of \"this JAR depends on that JAR,\" and no enforced strong encapsulation between platform internals and applications."
+    },
+    {
+      "id": "jpms-module-info",
+      "title": "JPMS — module-info.java and explicit dependencies",
+      "tags": ["java", "jpms", "module-systems"],
+      "content": "**JPMS (Java Platform Module System)**, shipped in Java 9 (2017) as Project Jigsaw, layered an explicit module system *above* packages without retiring them. A module is declared by a `module-info.java` file at the root of a module artifact:\n\n```\nmodule com.example.foo {\n    requires com.example.bar;\n    requires transitive java.sql;\n    exports com.example.foo.api;\n    exports com.example.foo.spi to com.example.consumer;\n    opens com.example.foo.internal to com.example.reflective.framework;\n    uses com.example.foo.spi.Plugin;\n    provides com.example.foo.spi.Plugin with com.example.foo.impl.PluginImpl;\n}\n```\n\nThe key elements:\n\n- `requires` — directed module dependency edges, optionally `transitive` (re-exposed to consumers).\n- `exports` — which packages are exported, optionally qualified `to` specific consumer modules (a friend mechanism).\n- `opens` — like `exports` but additionally permits deep reflective access; needed because frameworks like Spring and Hibernate routinely break encapsulation through reflection.\n- `uses`/`provides` — declarative `ServiceLoader` participation, encoded in module metadata so the runtime can resolve services without classpath scanning.\n\nJPMS modules form an explicit dependency DAG validated at compile time, link time (`jlink`), and run time. A reads-graph is constructed at startup; reflective access into packages that are not `opens` raises `IllegalAccessError`. The platform itself (`java.base`, `java.sql`, `java.xml`, etc.) became modular, allowing custom runtime images via `jlink` that strip unused modules — useful for container images and embedded deployments.",
+      "refs": [
+        { "target": "visibility-and-exports#export-models", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Project Jigsaw spec", "url": "https://openjdk.org/projects/jigsaw/spec/" },
+        { "label": "JEP 261 — Module System", "url": "https://openjdk.org/jeps/261" }
+      ]
+    },
+    {
+      "id": "jpms-adoption-and-cost",
+      "title": "JPMS adoption cost and OSGi alternative",
+      "tags": ["java", "jpms", "ecosystem"],
+      "content": "The cost was severe ecosystem disruption. JPMS adoption took years: Maven Central had to learn `Automatic-Module-Name` manifest entries for legacy JARs, build tools needed module-path support alongside the classpath, and many frameworks needed to add `opens` directives or migrate away from deep reflection. Status (as of 2026-04): large parts of the Java ecosystem still run on the classpath rather than the module path, treating JPMS as opt-in rather than the default.\n\n**OSGi** (Open Services Gateway initiative, 1999+) is the older alternative — a runtime module system that was widely deployed in Eclipse, Apache Karaf, Equinox, and Liferay. OSGi bundles are versioned, resolution is dynamic, and modules can be installed/uninstalled while the JVM runs. OSGi remains the choice for plugin-heavy systems where dynamic install/uninstall matters (Eclipse IDE plugins, embedded systems with hot-swap requirements). JPMS does not subsume OSGi; the two coexist.",
+      "refs": []
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — bake modules in early",
+      "tags": ["java", "design-guidance", "retrofit"],
+      "content": "JPMS proved that retrofitting a module system onto a 25-year-old runtime is *possible* and can deliver real benefits: strong encapsulation of platform internals (closing access to `sun.misc.Unsafe`-style backdoors), reliable reflection boundaries, custom runtime images, and explicit dependency graphs. But it also proved how expensive the retrofit is: every existing artifact had to either declare a module, accept being treated as an \"automatic module\" with weaker guarantees, or stay on the classpath.\n\n**Committing to a real module system from version 1 is dramatically better than discovering twenty years later that namespaces alone do not suffice.**",
+      "refs": [
+        { "target": "cpp20-modules#header-units-and-migration", "type": "comparable-retrofit" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Project Jigsaw", "url": "https://openjdk.org/projects/jigsaw/spec/" },
+    { "label": "JEP 261", "url": "https://openjdk.org/jeps/261" },
+    { "label": "Oracle — understanding Java 9 modules", "url": "https://www.oracle.com/corporate/features/understanding-java-9-modules.html" },
+    { "label": "dev.java — modules", "url": "https://dev.java/learn/modules/" }
+  ]
+}

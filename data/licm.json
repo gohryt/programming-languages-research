@@ -1,0 +1,58 @@
+{
+  "kind": "concept",
+  "name": "Loop-Invariant Code Motion",
+  "aliases": [],
+  "summary": "Hoists computations out of loops when their operands don't change across iterations. Aho-Sethi-Ullman dominator-based formulation: a value is loop-invariant if all its operands are defined outside the loop or are themselves loop-invariant. The largest single scalar optimisation for loop-heavy code.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "LICM hoists computations out of loops when their operands don't change across iterations. The classical formulation (Aho-Sethi-Ullman) uses dominator-based analysis: an expression is loop-invariant if all its operands are either defined outside the loop or are themselves loop-invariant.\n\nThe payoff on numerical code is substantial — pulling address computations, pure function calls, and constant sub-expressions out of inner loops is often the single biggest scalar win. LLVM's `LICM` pass additionally hoists loads and stores that can be proven safe and handles PHI reduction.",
+      "refs": [
+        {
+          "target": "ssa#overview",
+          "type": "operates-on"
+        }
+      ],
+      "sources": [
+        {
+          "label": "LLVM LICM implementation",
+          "url": "https://llvm.org/doxygen/LICM_8cpp_source.html"
+        }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "title": "Algorithm",
+      "tags": [
+        "compiler",
+        "optimization",
+        "loops"
+      ],
+      "content": "Identify the loop's natural form (header, latch, exits). Compute loop-invariant values via fixed-point: a value is invariant if all its operands are defined outside the loop or are themselves invariant. Hoist invariant values to the loop's *preheader* — the block immediately preceding the header that is the unique entry to the loop.\n\nLoad hoisting requires more care: a load is safe to hoist if no aliasing store happens between the preheader and the load's original position. If the loop is guaranteed to execute at least once, the load can simply be hoisted; if not, hoisting must be guarded so the load executes only when the loop body would have run.\n\nMost compilers also handle store sinking: a store whose value is invariant and which is not aliased by other loop body operations can be moved to the loop exit, executing once instead of every iteration.",
+      "refs": []
+    },
+    {
+      "id": "speculative-hoisting",
+      "title": "Speculative hoisting and faulting operations",
+      "tags": [
+        "compiler",
+        "correctness"
+      ],
+      "content": "The subtle correctness concern: hoisting *speculatively executed* operations can introduce faults on paths where the loop body would not have run. A division by an invariant denominator hoisted out of a loop will trap if the denominator happens to be zero — even if the loop body would never have executed.\n\nMost compilers gate speculative hoisting on `mustexec` analysis (the operation is on a path that must execute if the loop runs at all) or on explicit \"can this op trap?\" queries. Side-effect-free pure operations (arithmetic on non-trapping types, address computations) hoist freely; potentially-trapping operations (division, memory loads with possible faults) require proof of safety.\n\nLLVM and GCC both run multiple LICM passes at different points in the pipeline because earlier passes (SROA, GVN, SCCP) expose new invariants that LICM can then act on. Pass ordering matters; e-graphs subsume part of this pass-ordering problem by exploring both forms simultaneously.",
+      "refs": [
+        {
+          "target": "partial-redundancy-elimination#overview",
+          "type": "generalised-by"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "LLVM LICM source",
+      "url": "https://llvm.org/doxygen/LICM_8cpp_source.html"
+    }
+  ]
+}

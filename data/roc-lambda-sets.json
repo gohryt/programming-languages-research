@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Roc Lambda Sets",
+  "aliases": ["lambda sets", "Roc surgical monomorphization"],
+  "summary": "Roc tracks the exact set of functions (lambdas) that can inhabit a function type at any call site, then defunctionalises surgically — specialising only where it yields performance benefit or avoids boxing. C-like performance and predictable memory usage in a purely functional language without traditional monomorphization's code bloat.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Monomorphization (used heavily in Rust and C++) replaces polymorphic functions with concrete implementations for each specific type, which can lead to severe code bloat. The Roc programming language introduces \"Surgical Monomorphization\" using a technique called \"Lambda Sets\".\n\nAt compile time, Roc tracks the exact set of functions (lambdas) that can inhabit a function type at any call site. It then performs defunctionalization: turning higher-order functions into first-order functions by replacing function pointers with a tag and a switch statement. The \"surgical\" part means the compiler only specialises the code exactly where it yields a performance benefit or avoids heap allocation (boxing).",
+      "refs": [
+        { "target": "defunctionalization#overview", "type": "applies" }
+      ],
+      "sources": [
+        { "label": "Roc — Fast page", "url": "https://www.roc-lang.org/fast" }
+      ]
+    },
+    {
+      "id": "lambda-set-tracking",
+      "title": "Lambda set tracking",
+      "tags": ["compiler", "type-system"],
+      "content": "A function type in Roc carries not only its arity and parameter types but also the set of concrete lambda values that can inhabit it. The compiler infers this set from data-flow: which lambda literals reach this call site? The lambda set may be a singleton (monomorphic call), a small set (polymorphic with a few variants), or unbounded (escapes through generic data structures).\n\nWhen the lambda set is small and known, the compiler defunctionalises locally: at the call site, replace the indirect call through a function pointer with a tag-and-switch over the known lambdas. Each branch of the switch inlines the concrete lambda body. This recovers the speed of monomorphization without the global code-bloat cost.",
+      "refs": []
+    },
+    {
+      "id": "production-status",
+      "title": "Production status",
+      "tags": ["roc", "compiler"],
+      "content": "Roc's lambda sets are an active area of compiler engineering. A 2024 alias-analysis bug surfaced where Morphic's incorrect uniqueness inference allowed in-place mutation when `joinpoint`/`jump` formed loops. The fix was to *limit Morphic to trivial analysis* until the bug was resolved — illustrating the difficulty of proving uniqueness across CFG back-edges.\n\nThe upstream `morphic-lang/morphic` is the cleaner reference implementation than the Roc embedding. The pattern — lambda-set-tracking plus surgical defunctionalisation — is independent of Roc and applicable to any language with first-class functions and a willingness to do whole-program analysis.",
+      "refs": [],
+      "sources": [
+        { "label": "Roc Morphic loop bug", "url": "https://github.com/roc-lang/roc/issues/7367" },
+        { "label": "morphic-lang/morphic", "url": "https://github.com/morphic-lang/morphic" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Roc Fast page", "url": "https://www.roc-lang.org/fast" },
+    { "label": "morphic-lang/morphic", "url": "https://github.com/morphic-lang/morphic" }
+  ]
+}

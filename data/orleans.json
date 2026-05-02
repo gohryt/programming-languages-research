@@ -1,0 +1,52 @@
+{
+  "kind": "framework",
+  "name": "Orleans",
+  "aliases": ["microsoft-orleans", "virtual-actors"],
+  "summary": "Microsoft Research's virtual-actor framework on .NET in which grains have logical identities that exist conceptually forever; the runtime materialises a grain on demand on whichever silo has capacity, deactivates it after idle, persists state via configured storage, and resurrects it on the next call.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Microsoft Research's **Orleans** (Bykov, Geller, Kliot, Larus, Pandya, Thelin — OSDI 2014) introduced the **virtual actor** model. A *grain* (Orleans's actor) has a logical identity (typically a key — `UserId 12345`) that exists conceptually forever, regardless of whether any instance is currently running. The runtime materialises a grain on demand on whichever silo (server) has capacity, **deactivates** it after idle, persists state via a configured storage provider, and resurrects it on the next call. Activations are entirely runtime-managed.",
+      "refs": [
+        { "target": "actors#overview", "type": "instance-of" },
+        { "target": "akka#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Orleans documentation", "url": "https://learn.microsoft.com/en-us/dotnet/orleans/" },
+        { "label": "Bykov et al., \"Orleans: Cloud Computing for Everyone\" (MSR-TR-2014-41)", "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2014/12/Orleans-MSR-TR-2014-41.pdf" }
+      ]
+    },
+    {
+      "id": "vs-akka-and-beam",
+      "title": "Contrast with Akka and BEAM",
+      "tags": ["actors", "comparison", "lifecycle"],
+      "content": "The novelty vs Akka (`data/akka`) and BEAM is that **the developer never explicitly creates or destroys actors**: calling `GrainFactory.GetGrain<IUser>(12345)` returns a proxy whose lifecycle is the runtime's concern. This eliminates whole categories of bugs — orphan references, location tracking, actor restart-after-crash, supervisor-tree configuration — that traditional actor frameworks expose.\n\nCluster sharding is implicit: any silo can hold any grain, and the directory layer routes calls to the active silo. Compare Akka Cluster Sharding, where the developer configures shard regions, shard ranges, and rebalancing policy explicitly; Orleans hides all of that behind grain identity.",
+      "refs": [
+        { "target": "akka#cluster-and-persistence", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs-and-fit",
+      "title": "Trade-offs and workload fit",
+      "tags": ["tradeoffs", "production", "scaling"],
+      "content": "Trade-off: virtual actors cost more per call (silo resolution, possible activation, possibly persistence load) than direct actor refs. The model fits **stateful services with very large numbers of independent entities mostly idle** — multiplayer game lobbies, IoT device twins, per-user session state, financial-account aggregates — where most entities are inactive most of the time and the runtime can pack live activations onto a small fraction of the cluster. For workloads where every entity is hot continuously, traditional actors (Akka, BEAM) are cheaper.",
+      "refs": []
+    },
+    {
+      "id": "production-and-status",
+      "title": "Production and status",
+      "tags": ["production", "dotnet"],
+      "content": "Status (as of 2026-04): production at Halo 4 / 5 / Infinite (343 Industries), Microsoft Skype (historical), Honeywell, Mesh Systems, the Microsoft Gaming Cloud. Orleans 7+ adds nullable reference types, AOT compatibility, and improved streaming providers.\n\nThe lesson generalises beyond .NET: location-transparent virtual identities plus runtime-managed activation is the cleanest production answer to \"how do I run a billion stateful entities on a hundred machines?\"",
+      "refs": [],
+      "sources": [
+        { "label": "Bernstein, Bykov et al., \"Orleans\" (OSDI 2014)", "url": "https://www.usenix.org/conference/osdi14/technical-sessions/presentation/bernstein" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Orleans documentation", "url": "https://learn.microsoft.com/en-us/dotnet/orleans/" },
+    { "label": "Orleans MSR-TR-2014-41", "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2014/12/Orleans-MSR-TR-2014-41.pdf" }
+  ]
+}

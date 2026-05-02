@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Oil OSH Lossless Syntax Tree",
+  "aliases": ["oil-shell-lossless-tree"],
+  "summary": "The Oil shell explicitly migrated from a classical AST to a lossless syntax tree: every comment, every here-doc indent, every brace-expansion subtle lives in the tree. Schema-defined in ASDL, generating typed Python and C++ accessors from one specification.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The Oil shell project explicitly migrated from a classical AST to a *lossless syntax tree*: every comment, every here-doc indent, every brace-expansion subtle lives in the tree. The motivating constraint is that a shell has to support both *execution* and *source-to-source tooling* (lint, format, refactor) from one parse, and shells are exactly the language where comments and whitespace carry semantic weight (heredoc terminators, line-continuation backslashes, IFS interactions).",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "instance-of" },
+        { "target": "asdl#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "From AST to Lossless Syntax Tree (Oil Shell)", "url": "https://www.oilshell.org/blog/2017/02/11.html" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Trivia as semantics",
+      "tags": ["cst", "shell", "design"],
+      "content": "Oil's tree is schema-defined in ASDL, generating typed Python and C++ accessors from one specification. The lesson: when the language has interactions between trivia and semantics, fidelity must be a first-class design concern, not an afterthought.\n\nFor any language where whitespace, comments, or formatting carries meaning (Python's significant indentation, F#'s indent-based blocks, Markdown), the choice between AST and lossless CST is not a tooling-only question — it shapes what the parser can preserve.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "From AST to Lossless Syntax Tree (Oil Shell)", "url": "https://www.oilshell.org/blog/2017/02/11.html" }
+  ]
+}

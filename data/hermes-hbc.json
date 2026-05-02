@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "Hermes HBC",
+  "aliases": ["hermes-bytecode"],
+  "summary": "Hermes Bytecode — the executable form of Meta's Hermes JavaScript engine, used in React Native. Register-based and compact; what makes it distinctive is the shipping model — Hermes precompiles JS to HBC at app build time and ships only HBC to devices, not source. There is no JIT; HBC is interpreted.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Hermes Bytecode is the executable form of Meta's Hermes JavaScript engine, used in React Native. HBC is register-based and compact like other modern bytecodes; what makes it distinctive is the *shipping model*. Hermes precompiles JS to HBC at app build time and ships only HBC to devices, not source — unusual among JS engines. There is no JIT; HBC is interpreted.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "hermes-hir#overview", "type": "lowered-from" }
+      ],
+      "sources": [
+        { "label": "Hermes design document", "url": "https://github.com/facebook/hermes/blob/main/doc/Design.md" }
+      ]
+    },
+    {
+      "id": "tradeoffs-and-status",
+      "title": "Trade-offs and status",
+      "tags": ["bytecode", "mobile", "performance"],
+      "content": "The trade-off: Hermes JS code runs 5–10× slower than V8 once warm, but starts 30–50% faster cold — the right trade for a mobile bundler.\n\nStatus (as of 2026-04): figures match the public Hermes design notes; Hermes remains JIT-less, while V8/JSC continue to add tiers, so the steady-state gap is unlikely to close. The ship-only-bytecode model (no source on device) also removes a class of reverse-engineering surface, useful for shipped mobile apps.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "limit-case-of" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Hermes design document", "url": "https://github.com/facebook/hermes/blob/main/doc/Design.md" }
+  ]
+}

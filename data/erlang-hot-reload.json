@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Erlang Hot Module Reload",
+  "aliases": ["BEAM hot reload", "Erlang code loading"],
+  "summary": "BEAM keeps two versions of each module active simultaneously: existing process calls complete on the old version, fully-qualified calls always dispatch to the current version. When a third version is loaded, processes still on the now-two-versions-old code are killed. The pure-functional share-nothing process model is the precondition.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Erlang's **BEAM** virtual machine supports hot module reload natively: a running system can load a new version of a module while existing processes continue executing the old version. The VM keeps two versions of each module active simultaneously (old and current). Existing process calls to the old version complete naturally; fully-qualified calls (`Module:Func(...)`) always dispatch to the current version, enabling gradual migration.\n\nWhen a third version is loaded, BEAM kills any remaining processes still executing the now-two-versions-old code, then promotes current→old and loads new→current. This cap of \"at most two versions in flight\" is what makes the semantics tractable.",
+      "refs": [
+        { "target": "julia-revise#overview", "type": "compared-with" },
+        { "target": "lisp-incremental-redefinition#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Erlang Code Loading", "url": "https://www.erlang.org/doc/system/code_loading.html" }
+      ]
+    },
+    {
+      "id": "preconditions",
+      "title": "Preconditions for hot reload",
+      "tags": ["erlang", "language-design"],
+      "content": "Hot swap is core to Erlang's positioning as a language for 99.999% uptime systems — telecom switches, messaging backbones. The key enabler is Erlang's pure-functional, share-nothing process model: processes don't share state, so replacing a module's code doesn't invalidate references held by other processes. The language design and the runtime feature are co-designed.\n\nFor a new language wanting Erlang-style hot reload, the precondition list is non-trivial: flat module identity, individually loadable artifacts, fully-qualified-vs-local-call distinction, no shared mutable state between processes. These are language-design choices that have to be made early; retrofitting hot reload onto a non-isolated runtime is much harder.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Erlang Code Loading", "url": "https://www.erlang.org/doc/system/code_loading.html" }
+  ]
+}

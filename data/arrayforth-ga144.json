@@ -1,0 +1,31 @@
+{
+  "kind": "language",
+  "name": "arrayForth on GA144",
+  "aliases": ["arrayforth", "ga144-multicomputer"],
+  "summary": "Chuck Moore's language for the GreenArrays GA144 multicomputer. The GA144's 144 small CPUs each have 18-bit memory words that pack several small instruction fields per word. Source representation is colorForth-style pre-parsed cells, with even tighter coupling between language-level token classes and machine-level instruction slots.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "arrayForth, Chuck Moore's language for the GreenArrays GA144 multicomputer, takes the colorForth model further. The GA144's 144 small CPUs each have 18-bit memory words that pack several small instruction fields per word; the language is designed around the chip's specific instruction-slot constraints. Source representation is colorForth-style pre-parsed cells, but with even tighter coupling between language-level token classes and machine-level instruction slots.",
+      "refs": [
+        { "target": "colorforth#overview", "type": "extends" },
+        { "target": "forth-text-interpreter#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "GreenArrays GA144 documentation", "url": "https://www.greenarraychips.com/home/documents/greg/GA144.htm" }
+      ]
+    },
+    {
+      "id": "pl-isa-codesign",
+      "title": "PL/ISA co-design taken to its limit",
+      "tags": ["forth", "embedded", "pl-design"],
+      "content": "This is PL/ISA co-design taken to its limit: the source representation, the language semantics, the compiler, and the hardware ISA were all designed together. The lesson is that representation choices propagate through the whole stack, and that designing them in isolation leaves performance on the table.\n\nThe GA144's 18-bit words pack typically four instruction slots, and arrayForth code uses pre-parsed cells whose token boundaries align with those slot boundaries. The result is that a programmer working in arrayForth is, in effect, manipulating instruction-encoding directly through the language's lexical surface.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "GreenArrays GA144 documentation", "url": "https://www.greenarraychips.com/home/documents/greg/GA144.htm" }
+  ]
+}

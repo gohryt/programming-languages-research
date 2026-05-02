@@ -1,0 +1,247 @@
+{
+  "kind": "concept",
+  "name": "Sampling profilers — substrates and stack unwinding",
+  "aliases": [
+    "sampling profiler",
+    "stack unwinding",
+    "frame pointers",
+    "DWARF unwinding"
+  ],
+  "summary": "Every sampling profiler is built on two primitives: a substrate that decides when and how samples are delivered (timer, PMU overflow, signal, ring buffer), and an unwinder that converts interrupted register state into a call stack (frame pointers, DWARF .eh_frame, ORC, SFrame, LBR).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Every sampling profiler — perf, pprof, async-profiler, py-spy, Parca, VTune — is built on two primitives: first, *interrupt or observe a thread often enough to get statistically useful samples*; second, *given that snapshot, reconstruct the call stack*. The choice of sampling substrate determines bias, delivery cost, signal-safety constraints, and lost-sample behavior. The choice of unwinding mechanism determines whether production sampling is viable once a sample has been taken. This section catalogs both layers, with the main trade-off axis for unwinding being **cost-at-walk-time vs cost-at-steady-state**.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:sampling-substrate`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-frame`, `granularity:per-sample`\n"
+    },
+    {
+      "id": "statistical-sampling-substrates",
+      "title": "Statistical Sampling Substrates — Timers, PMU Overflows, Signals, and Ring Buffers",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "granularity:per-sample",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Before a profiler can unwind anything, it needs a reason to take a sample. The classic Unix substrate is timer-driven signal delivery: `setitimer(ITIMER_PROF)` or POSIX timers raise `SIGPROF` against a running thread after some amount of CPU time or wall time. The profiler's signal handler captures the interrupted PC/register state, optionally walks the stack immediately, and records a compact sample. This is portable and simple, but it inherits every signal-handler constraint: the handler must avoid allocation, locks, most runtime APIs, and any operation that is not async-signal-safe.\n\nLinux `perf_event_open` generalizes the substrate. A perf event can be a counter (read occasionally for an aggregate) or a sampled event (write records into an `mmap` ring buffer on overflow). The trigger can be time, CPU cycles, instructions, cache misses, branch misses, context switches, software events, or precise PMU events such as PEBS/IBS/SPE (`data/hardware-tracing#precise-pmu-sampling`). The ring-buffer model decouples sample production from userspace consumption: the kernel writes records into per-event buffers, and the profiler drains them asynchronously.\n\nThis layer introduces its own failure modes. Sampling by frequency (\"99 Hz\") and sampling by period (\"every 1,000,000 cycles\") answer different questions. High rates can be throttled by the kernel, overflow buffers, or perturb cache behavior enough to bias the workload. Hardware event sampling can suffer skid: the sampled PC may be near, but not exactly at, the instruction that caused the event, unless precise sampling support is available. Signal-based profilers can deadlock themselves if they try to walk runtime metadata protected by locks held by the interrupted thread.\n\nFor a new language, the design pattern is to separate **sample trigger**, **sample transport**, and **stack attribution**. The runtime may expose a safe self-sampling path, register code metadata so external profilers can unwind it, or provide a per-thread/per-CPU ring buffer for samples. Whatever the choice, the profiler must report lost samples and throttling explicitly; silent drops are worse than lower sample rates.",
+      "sources": [
+        {
+          "url": "https://man7.org/linux/man-pages/man2/perf_event_open.2.html"
+        },
+        {
+          "url": "https://www.brendangregg.com/perf.html"
+        },
+        {
+          "url": "https://man7.org/linux/man-pages/man2/setitimer.2.html"
+        },
+        {
+          "url": "https://man7.org/linux/man-pages/man7/signal-safety.7.html"
+        }
+      ]
+    },
+    {
+      "id": "frame-pointers",
+      "title": "Frame Pointers — Zero Walk Cost, 1–3% Steady-State Tax",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "granularity:per-frame",
+        "off-cost:medium",
+        "on-cost:low"
+      ],
+      "content": "The classical method: every function prologue saves the caller's frame pointer (e.g., `push %rbp; mov %rsp, %rbp` on x86-64), so the stack is a linked list of frames that can be walked by following `rbp` → `rbp` → `rbp` until null. Walking is a handful of instructions per frame, safe from a signal handler, requires no metadata at all.\n\nThe cost is structural: one general-purpose register is reserved for the frame pointer (instead of being available to the register allocator), and every non-leaf function pays two extra instructions on entry/exit. Measured steady-state overhead on typical workloads is 1–3%. For two decades GCC/Clang defaulted to `-fomit-frame-pointer`, reclaiming the register for performance.\n\nIn 2022–2024 this consensus reversed. **Fedora 38** (April 2023) and **Ubuntu 24.04** (April 2024) shipped with frame pointers re-enabled by default, with Canonical and Red Hat both publishing detailed rationales: the 1–3% cost is paid once across the distribution, but the *diagnostic* value — continuous profiling, production flame graphs, and crash stack traces that actually work — is paid in dividends for every debugging session, for every user. Python followed with PEP 831 (frame pointers for CPython). Brendan Gregg's \"The Return of the Frame Pointers\" (2024) is the definitive narrative.",
+      "sources": [
+        {
+          "url": "https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer"
+        },
+        {
+          "url": "https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default"
+        },
+        {
+          "url": "https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html"
+        },
+        {
+          "url": "https://peps.python.org/pep-0831/"
+        }
+      ]
+    },
+    {
+      "id": "dwarf-eh-frame-cfi",
+      "title": "DWARF `.eh_frame` / CFI — Zero Tax, Expensive Walk",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "granularity:per-frame",
+        "off-cost:zero",
+        "on-cost:high"
+      ],
+      "content": "DWARF Call Frame Information (CFI) — shipped in every ELF binary's `.eh_frame` section for exception unwinding — describes how to recover each frame's caller by executing a **bytecode program**. The instructions describe where the caller's registers are saved relative to the current CFA (Canonical Frame Address), which itself can be computed by an arbitrary expression over the current register file.\n\nThe design win: zero steady-state cost. Registers and instructions are unperturbed; the metadata is read only when unwinding actually happens.\n\nThe design cost: the unwind rules are an expressive stack-machine / interpreted program, and every frame requires evaluating its FDE (Frame Description Entry) instructions. In practice, walking a DWARF stack from a signal handler is so slow that it can dominate the profile of the profiler itself. Red Hat's unwinder deep-dive reports DWARF walking is roughly 20–40× slower than frame-pointer walks. Ian Lance Taylor's `.eh_frame` series explains why: the bytecode was designed for exception-handling correctness, not sampler-friendly speed.",
+      "sources": [
+        {
+          "url": "https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding"
+        },
+        {
+          "url": "https://www.airs.com/blog/archives/460"
+        }
+      ]
+    },
+    {
+      "id": "linux-orc-unwinder",
+      "title": "Linux ORC Unwinder — DWARF Without the Bytecode",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "granularity:per-frame",
+        "kernel",
+        "linux",
+        "off-cost:medium",
+        "on-cost:low"
+      ],
+      "content": "Josh Poimboeuf's **ORC** (Oops Rewind Capability) unwinder, merged into Linux 4.14 (2017), replaced DWARF for in-kernel unwinding. The motivating constraint was political (Linus Torvalds rejected a full DWARF state-machine interpreter in the kernel) and practical (DWARF is too slow and too complex to run safely from interrupt context). ORC's design: a purpose-built static unwind table, emitted at build time by the `objtool` static analyzer, storing only what a kernel unwinder actually needs — CFA offset, frame pointer recoverability, return-address location — and no bytecode.\n\nMeasured speedup vs DWARF in the kernel is 20–40×. The space cost is an extra ~1.3 MB per kernel build. The conceptual win is that **objtool validates unwind correctness statically** — if the kernel's code doesn't admit a consistent unwind table, the build fails. This is a design pattern worth naming: when unwinding is load-bearing, emit the table as a *first-class build output* validated by a static analyzer, rather than trusting whatever the compiler happened to emit.",
+      "sources": [
+        {
+          "url": "https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html"
+        },
+        {
+          "url": "https://lwn.net/Articles/728339/"
+        },
+        {
+          "url": "https://lwn.net/Articles/727553/"
+        }
+      ]
+    },
+    {
+      "id": "sframe-unwind-format",
+      "title": "SFrame — DWARF Minus Everything DWARF Doesn't Need",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "granularity:per-frame",
+        "linux",
+        "off-cost:medium",
+        "on-cost:low"
+      ],
+      "content": "**SFrame** (Indu Bhagat / Oracle, in binutils 2.40+, glibc 2.39+) brings the ORC philosophy to userspace. It is a new unwind-table format designed for *sampling profilers*, not exception handling. The core design choice: encode only CFA / FP / RA per PC range, binary-searchable, ~8 bytes per FDE row. No general bytecode interpreter. No callee-saved-register recovery (samplers don't need it). No support for arbitrary CFI programs (compilers that emit complex CFI must either simplify or fall back to DWARF).\n\nThe result is a metadata format whose fast-path walk is comparable to frame-pointer walking — fast enough to use from a signal handler at sustained sampling rates — without the 1–3% steady-state tax. The trade-off: SFrame cannot unwind through all the edge cases DWARF handles (signal trampolines, hand-written assembly, exotic calling conventions), so a production profiler needs a fallback path when SFrame is absent. The SFrame and frame-pointer communities are converging on a \"both/either\" model: ship both, let the sampler pick per thread.",
+      "sources": [
+        {
+          "url": "https://sourceware.org/binutils/docs/sframe-spec.html"
+        },
+        {
+          "url": "https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe"
+        },
+        {
+          "url": "https://lwn.net/Articles/930622/"
+        },
+        {
+          "url": "https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs"
+        }
+      ]
+    },
+    {
+      "id": "lbr-call-stack-sampling",
+      "title": "LBR Call-Stack Sampling — Hardware Shortcut",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "granularity:per-frame",
+        "intel",
+        "off-cost:medium",
+        "on-cost:low"
+      ],
+      "content": "Intel's Last Branch Record ring buffer (introduced in `data/hardware-tracing#hardware-lbr` as a TSX debugging tool) can also be used as a zero-cost stack-unwinding shortcut. `perf record --call-graph lbr` configures the PMU so that on each sample, the CPU hands the kernel the last 16 or 32 taken branches — which is *already* the call chain the profiler wants, with no metadata lookup, no frame-pointer walk, no DWARF interpretation.\n\nCost: the branch ring buffer is continuously updated in hardware; enabling it has a measurable but small overhead on branch-intensive code. Walk cost: zero (the data is already in the sample). The critical limitation is **stack depth**: hardware caps the recorded history at 16 or 32 branches, which is often shallower than real-world call chains, so flame graphs generated from LBR samples are systematically truncated near the root. For many workloads this is acceptable; for deeply-nested code (enterprise frameworks, interpreters with dispatch chains) it is not.\n\nLBR-based sampling sits at the \"zero-cost walk\" endpoint of the spectrum. It is complementary to frame pointers and SFrame — a production system can prefer LBR when branches fit, fall back to FP/SFrame when they don't.",
+      "sources": [
+        {
+          "url": "https://lwn.net/Articles/619180/. See §5.2 for the underlying LBR mechanism."
+        },
+        {
+          "url": "https://lwn.net/Articles/619180/"
+        }
+      ]
+    },
+    {
+      "id": "go-frame-pointer-discipline",
+      "title": "Go's Unconditional Frame-Pointer Discipline",
+      "tags": [
+        "domain:profiling",
+        "family:sampling-substrate",
+        "go",
+        "granularity:per-frame",
+        "off-cost:medium",
+        "on-cost:low"
+      ],
+      "content": "Go made frame pointers a default-on runtime policy for its most important production architectures, starting with amd64 in Go 1.7 and expanding/solidifying support on other architectures over time. There is no ordinary `-fno-omit-frame-pointer` style user knob for Go code. The decision was measured — the Go team quantified the cost at roughly 1–3% on representative workloads and deemed it acceptable in exchange for Go binaries being continuously profilable, crash-traceable, and compatible with external profilers without requiring full debug-info distribution. This is a language-level policy choice, not just a compiler flag.\n\nThe dividend compounds. Felix Geisendörfer's 2023 work on Go's execution tracer (`data/runtime-event-pipelines#go-runtime-trace-flight-recorder`) reduced its runtime overhead from ~20% to under 1% almost entirely by switching the tracer's stack capture from its previous mechanism to frame-pointer walks. That speedup is only available because *every* Go binary has frame pointers; a tracer that had to probe for them, or fall back to DWARF, could not achieve the same baseline.\n\nFor a new language: \"always emit frame pointers\" is the single most consequential profilability decision. The 1–3% cost is measurable; the cost of not making it is a decade of tool-author workarounds (see `data/cooperative-safepoints#safepoint-bias-async-get-call-trace` on async-profiler). The decision is cheapest when made on day one — retrofitting FP discipline onto an established ABI is much harder.",
+      "sources": [
+        {
+          "url": "https://go.googlesource.com/proposal/+/master/design/24543-non-cooperative-preemption.md"
+        },
+        {
+          "url": "https://blog.felixge.de/reducing-gos-execution-tracer-overhead-with-frame-pointer-unwinding/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://man7.org/linux/man-pages/man2/perf_event_open.2.html"
+    },
+    {
+      "url": "https://www.brendangregg.com/perf.html"
+    },
+    {
+      "url": "https://man7.org/linux/man-pages/man2/setitimer.2.html"
+    },
+    {
+      "url": "https://man7.org/linux/man-pages/man7/signal-safety.7.html"
+    },
+    {
+      "url": "https://fedoraproject.org/wiki/Changes/fno-omit-frame-pointer"
+    },
+    {
+      "url": "https://ubuntu.com/blog/ubuntu-performance-engineering-with-frame-pointers-by-default"
+    },
+    {
+      "url": "https://www.brendangregg.com/blog/2024-03-17/the-return-of-the-frame-pointers.html"
+    },
+    {
+      "url": "https://peps.python.org/pep-0831/"
+    },
+    {
+      "url": "https://developers.redhat.com/articles/2023/07/31/frame-pointers-untangling-unwinding"
+    },
+    {
+      "url": "https://www.airs.com/blog/archives/460"
+    },
+    {
+      "url": "https://www.kernel.org/doc/html/latest/arch/x86/orc-unwinder.html"
+    },
+    {
+      "url": "https://lwn.net/Articles/728339/"
+    },
+    {
+      "url": "https://lwn.net/Articles/727553/"
+    },
+    {
+      "url": "https://sourceware.org/binutils/docs/sframe-spec.html"
+    },
+    {
+      "url": "https://blogs.oracle.com/linux/beyond-eh-frame-frame-pointers-the-technical-underpinnings-of-sframe"
+    },
+    {
+      "url": "https://lwn.net/Articles/930622/"
+    },
+    {
+      "url": "https://maskray.me/blog/2025-10-26-stack-walking-space-and-time-trade-offs"
+    },
+    {
+      "url": "https://lwn.net/Articles/619180/. See §5.2 for the underlying LBR mechanism."
+    },
+    {
+      "url": "https://go.googlesource.com/proposal/+/master/design/24543-non-cooperative-preemption.md"
+    },
+    {
+      "url": "https://blog.felixge.de/reducing-gos-execution-tracer-overhead-with-frame-pointer-unwinding/"
+    }
+  ]
+}

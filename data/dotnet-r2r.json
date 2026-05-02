@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": ".NET ReadyToRun",
+  "aliases": ["R2R", "CrossGen2", "ReadyToRun format"],
+  "summary": ".NET Core 3.0 (2019)+: assemblies contain both IL and pre-compiled native code for the target architecture. CLR uses native code directly when available (skipping JIT for already-compiled methods); IL stays available so methods can still be re-JITed for runtime specialisation. CrossGen2 produces R2R cross-platform.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**ReadyToRun** (introduced .NET Core 3.0, 2019) is .NET's hybrid format: assemblies contain both IL (the traditional JIT input) and pre-compiled native code for the target architecture. At runtime, the CLR uses the native code directly, skipping JIT for methods that are already compiled. The IL stays available so *methods can still be re-JITed* when tiered compilation or profile-guided re-optimisation decides to.\n\nThe motivation is startup latency: pure JIT pays a compile cost on every first call; pure AOT produces large binaries and misses runtime specialisation opportunities. R2R's native code is typically less optimised than what the JIT would eventually produce (the AOT doesn't have the JIT's profile data), but it's available immediately.",
+      "refs": [
+        { "target": "project-leyden#overview", "type": "compared-with" },
+        { "target": "graalvm-native-image#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": ".NET ReadyToRun Format", "url": "https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/readytorun-format.md" }
+      ]
+    },
+    {
+      "id": "crossgen2",
+      "title": "CrossGen2 — cross-platform AOT",
+      "tags": ["dotnet", "aot"],
+      "content": "**CrossGen2** is the AOT compiler that produces R2R images. It runs on any platform and targets any .NET runtime architecture, replacing the earlier CrossGen with a rewritten pipeline based on RyuJIT's infrastructure. CrossGen2 enables cross-compilation — building Windows ARM64 R2R binaries on a Linux x86-64 build machine.\n\nR2R is the production default for most .NET framework assemblies. Application developers opt in via `<PublishReadyToRun>true</PublishReadyToRun>`. The measured effect: ~2-3× startup speedup for CLI tools and ASP.NET services, with minimal steady-state performance difference versus pure JIT.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": ".NET R2R format", "url": "https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/readytorun-format.md" }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "kind": "concept",
+  "name": "Distributed tracing and observability",
+  "aliases": [
+    "distributed tracing",
+    "request tracing",
+    "OpenTelemetry"
+  ],
+  "summary": "Mechanisms for tracing a single logical request across service boundaries — the layer where HTTP calls, message queues, and RPCs fragment one user intent into many machine-local events; Dapper, head-vs-tail sampling, OpenTelemetry, and Pivot Tracing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mechanisms for tracing a single logical request across service boundaries — the layer where HTTP calls, message queues, and RPCs fragment one user intent into many machine-local events. The engineering challenge is propagating causal context across language, transport, and organizational boundaries while sampling at rates that scale to whole-fleet volumes. Entries trace the lineage from Dapper (the origin) through sampling-strategy evolution (head → tail → consistent probability) to OpenTelemetry (the current standard) and Pivot Tracing (the research counterpoint).\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`\n- **domain**: `domain:observability`\n- **off-cost**: `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:medium`\n- **granularity**: `granularity:per-request`\n"
+    },
+    {
+      "id": "google-dapper",
+      "title": "Google Dapper — The Origin of Distributed Tracing",
+      "tags": [
+        "domain:observability",
+        "family:buffered-event-emission",
+        "granularity:per-request",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "Sigelman et al.'s \"Dapper, a Large-Scale Distributed Systems Tracing Infrastructure\" (Google Technical Report, 2010) is the founding paper for request-path tracing across service boundaries. The system targets three non-negotiable constraints: **low overhead** (every instrumented RPC pays the cost), **application-level transparency** (achieved by instrumenting Google's small set of shared RPC, threading, and control-flow libraries — application code is not modified), and **ubiquitous deployment** (every binary in production uses the shared libraries, so coverage is fleet-wide by default). The span / trace-tree model that underlies every modern distributed tracer (OpenTelemetry, Zipkin, Jaeger, Datadog APM) is Dapper's contribution.\n\nThe paper's central engineering claim is that at Google scale, tracing every request is not just expensive — it is *statistically pointless*. Uniform low-rate sampling (Google's default was around one trace per thousand in 2010) preserves aggregate fidelity for the questions operators actually ask, which are about distributions and outliers, not individual requests. The design consequence is that **the sampling decision is made at the trace root and propagated** via the trace ID itself — every downstream service independently sees the same in/out decision without coordination. This \"head-based sampling\" remains the dominant model 15 years later and is the direct ancestor of OpenTelemetry's `TraceIdRatioBased` + `ParentBased` samplers.\n\nThe lineage worth naming briefly: Dapper (2010, Google-internal) → **Zipkin** (Twitter Hack Week 2012, effectively \"Dapper for Thrift\" on Finagle/Scribe/Cassandra) → **OpenTracing** (2016, vendor-neutral API) and **OpenCensus** (2017, Google's combined tracing+metrics library) → **Jaeger** (Uber 2017, Go rewrite with push architecture, later a CNCF hosted project) → **OpenTelemetry** (2019, CNCF-brokered merger of OpenTracing and OpenCensus, covered in `data/distributed-tracing#opentelemetry`).",
+      "sources": [
+        {
+          "url": "https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/"
+        },
+        {
+          "url": "https://static.googleusercontent.com/media/research.google.com/en//archive/papers/dapper-2010-1.pdf"
+        },
+        {
+          "url": "https://blog.x.com/engineering/en_us/a/2012/distributed-systems-tracing-with-zipkin"
+        },
+        {
+          "url": "https://www.uber.com/us/en/blog/distributed-tracing/"
+        }
+      ]
+    },
+    {
+      "id": "head-vs-tail-sampling",
+      "title": "Head-Based vs Tail-Based Sampling",
+      "tags": [
+        "domain:observability",
+        "family:buffered-event-emission",
+        "granularity:per-request",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "Dapper's head-based sampling (`data/distributed-tracing#google-dapper`) is cheap — decide once at the trace root, propagate via trace ID, no buffering — but it cannot retain rare tails. \"Sample every trace that errored or exceeded 1s p99\" is impossible at the root because the root does not yet know the outcome. **Tail-based sampling** addresses this directly: buffer every span of every trace in a decision window (typically 5–30 seconds), evaluate a policy against the completed trace, and *then* decide what to retain. The OpenTelemetry Collector's `tailsamplingprocessor` is the reference implementation.\n\nThe trade-off is buffering cost. Head-based pipelines scale trivially — every service drops unsampled traces at emission time — but can systematically miss the bugs operators most want to see. Tail-based pipelines catch outliers cleanly but require centralized buffering (all spans of a trace must converge at the same collector) and force trace re-assembly. Production pipelines commonly chain both: probabilistic head sampling at the edge to protect aggregate volume, then tail policies at the collector to preserve errors, latency outliers, and explicit business-event flags.\n\nThe **Consistent Probability Sampling** extension (OpenTelemetry TraceState spec) encodes a rejection threshold `T` directly in TraceState so downstream tiers can *lower* but not *raise* the sampling rate consistently with the root's decision. This is the modern refinement of Dapper's trace-ID-based sampling: a hierarchical sampling pipeline that preserves probability coherence end-to-end, rather than letting each tier roll its own dice.",
+      "sources": [
+        {
+          "url": "https://opentelemetry.io/docs/concepts/sampling/"
+        },
+        {
+          "url": "https://opentelemetry.io/docs/specs/otel/trace/tracestate-probability-sampling/"
+        },
+        {
+          "url": "https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor"
+        }
+      ]
+    },
+    {
+      "id": "opentelemetry",
+      "title": "OpenTelemetry — The Observability Standard",
+      "tags": [
+        "domain:observability",
+        "family:buffered-event-emission",
+        "granularity:per-request",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "Status (as of 2026-04): OpenTelemetry (OTEL) is the de facto standard for distributed tracing, metrics, and logging across service boundaries. It defines:\n\n- **Traces**: a tree of spans representing the path of a request through a distributed system. Each span has a trace ID, span ID, parent span ID, start/end timestamps, attributes (key-value metadata), and events (timestamped log entries within a span).\n- **Context propagation**: trace context (trace ID, span ID, trace flags) is serialized into HTTP headers (W3C Trace Context format: `traceparent: 00-{trace_id}-{span_id}-{flags}`) and propagated across service boundaries. Each service extracts the context, creates a child span, and propagates the updated context to downstream calls.\n- **Baggage**: arbitrary key-value pairs that propagate alongside trace context — enabling cross-cutting concerns like tenant ID, feature flags, or user ID to flow through the entire request path without explicit parameter passing.\n\nThe architecture separates concerns:\n- **API**: language-specific interfaces for creating spans and propagating context. Applications code against the API.\n- **SDK**: configurable implementation that batches, samples, and exports telemetry data. Swappable exporters send data to backends (Jaeger, Zipkin, Datadog, Grafana Tempo).\n- **Collector**: a standalone process that receives, processes, and forwards telemetry data — acting as a proxy between applications and backends.\n\nOTEL has become the de facto standard, with official SDKs for Go, Java, Python, JavaScript, Rust, C++, .NET, Ruby, PHP, Swift, and Erlang/Elixir. Cloud providers (AWS, GCP, Azure) and observability vendors have converged on OTEL as the common wire format.\n\nThe connection to language design: if a language runtime provides built-in context propagation (similar to Racket's continuation marks, covered in `data/time-travel-debugging#racket-continuation-marks`, or Go's `context.Context`), distributed tracing becomes a first-class capability rather than a library concern. The runtime can automatically create spans for function calls, propagate context across async boundaries, and correlate traces with local profiling data.",
+      "sources": [
+        {
+          "url": "https://opentelemetry.io/docs/concepts/signals/traces/"
+        },
+        {
+          "url": "https://opentelemetry.io/docs/concepts/context-propagation/"
+        }
+      ]
+    },
+    {
+      "id": "pivot-tracing",
+      "title": "Pivot Tracing — Dynamic Queries Over Distributed Causality",
+      "tags": [
+        "domain:observability",
+        "family:buffered-event-emission",
+        "granularity:per-request",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Mace, Roelke, and Fonseca's \"Pivot Tracing\" (SOSP 2015) is a research counterpoint to static-span systems like OpenTelemetry. Instead of the developer deciding *at instrumentation time* what spans to create and what attributes to attach, users write **tracing queries at runtime** — declarative statements about what data to collect at which points in the system — and Pivot Tracing installs dynamic probes on the fly (DTrace-style, `data/runtime-event-pipelines#dtrace-d-bpftrace`) across every node that participates.\n\nThe load-bearing primitive is the **happened-before join** (`⋈→`), a relational operator that joins two tuple streams by Lamport's happened-before relation. Example: \"join every HDFS read with the user ID of the client that caused it.\" Naively, this requires correlating events from multiple machines after the fact. Pivot Tracing evaluates it inline by propagating **baggage** alongside each request through the RPC graph — when the first event (user-ID) fires it writes to baggage; when the second event (HDFS-read) fires it reads from baggage and emits the joined tuple. No central event log, no post-hoc correlation pass, no pre-planning which attributes to record.\n\nThe design insight worth preserving for a language-design audience: **baggage + dynamic probes** is a viable primitive stack for *retroactive* questions (\"which tenant's traffic caused this disk-read latency spike?\"), not just pre-declared spans. This is qualitatively different from OpenTelemetry, where every attribute a trace can carry must be added to the instrumentation ahead of time. The cost-when-off is effectively nil (no probes installed); cost-when-on scales with baggage size and probe frequency. It remains a research system, not a production one, but as a data point for \"what could static-span tracing be replaced with?\" it is the cleanest example.",
+      "sources": [
+        {
+          "url": "https://sigops.org/s/conferences/sosp/2015/current/2015-Monterey/printable/122-mace.pdf"
+        },
+        {
+          "url": "https://doi.org/10.1145/2815400.2815415"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/"
+    },
+    {
+      "url": "https://static.googleusercontent.com/media/research.google.com/en//archive/papers/dapper-2010-1.pdf"
+    },
+    {
+      "url": "https://blog.x.com/engineering/en_us/a/2012/distributed-systems-tracing-with-zipkin"
+    },
+    {
+      "url": "https://www.uber.com/us/en/blog/distributed-tracing/"
+    },
+    {
+      "url": "https://opentelemetry.io/docs/concepts/sampling/"
+    },
+    {
+      "url": "https://opentelemetry.io/docs/specs/otel/trace/tracestate-probability-sampling/"
+    },
+    {
+      "url": "https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor"
+    },
+    {
+      "url": "https://opentelemetry.io/docs/concepts/signals/traces/"
+    },
+    {
+      "url": "https://opentelemetry.io/docs/concepts/context-propagation/"
+    },
+    {
+      "url": "https://sigops.org/s/conferences/sosp/2015/current/2015-Monterey/printable/122-mace.pdf"
+    },
+    {
+      "url": "https://doi.org/10.1145/2815400.2815415"
+    }
+  ]
+}

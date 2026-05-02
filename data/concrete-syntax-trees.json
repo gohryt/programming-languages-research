@@ -1,0 +1,78 @@
+{
+  "kind": "concept",
+  "name": "Concrete Syntax Trees",
+  "aliases": ["cst", "lossless-syntax-tree"],
+  "summary": "Source-faithful tree that preserves every token and trivia. Lossless variants make byte-exact round-tripping a guarantee. Mechanism varies: structural sharing of immutable green nodes (Roslyn, rowan), full-fidelity byte retention (SwiftSyntax), or schema-derived APIs (ASDL, ungrammar).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A concrete syntax tree preserves every token, every comment, every piece of trivia from the source. Lossless trees take this further: byte-exact round-tripping is a guarantee, not a hope.\n\nThe distinguishing axis across implementations is what mechanism enforces the lossless property: structural sharing of immutable green nodes (Roslyn, rowan), full-fidelity byte-level retention (SwiftSyntax), or schema-derived APIs that make trivia a first-class field on every node (ASDL, ungrammar). All entries serve tooling — refactoring, formatting, IDE navigation, code generation — where fidelity to the original source is mandatory and any lossy detail is a bug.",
+      "refs": [
+        { "target": "abstract-syntax-trees#overview", "type": "contrasts-with" },
+        { "target": "tree-sitter#overview", "type": "exemplified-by" },
+        { "target": "lezer#tree-shape", "type": "exemplified-by" }
+      ]
+    },
+    {
+      "id": "what-csts-preserve",
+      "title": "What CSTs preserve",
+      "tags": ["representation", "tooling"],
+      "content": "Concrete syntax trees preserve token boundaries, delimiters, nesting, and often comments, whitespace, or explicit error placeholders. This fidelity makes them valuable for formatting, refactoring, source mapping, error-tolerant editing, and macro systems where round-trip must be exact.\n\nA recurring theme across CST families is *the schema as the ground truth*: when the tree shape lives in one specification (ASDL, ungrammar), every consumer (visitors, accessors, serializers) is generated from it rather than reinvented per consumer.",
+      "refs": [
+        { "target": "language-server#overview", "type": "essential-for" }
+      ]
+    },
+    {
+      "id": "production-implementations",
+      "title": "Production implementations",
+      "tags": ["representation", "tooling"],
+      "content": "Major production CST implementations:\n\n- **Roslyn red-green** (C#, VB.NET): two-layer tree. Immutable position-free green nodes store kind + width + children; ephemeral red nodes wrap them with absolute text positions and parent pointers computed lazily. Editing produces a new green tree that shares unchanged subtrees — O(edit-size) update rather than O(file-size).\n- **rowan** (rust-analyzer, Typst, Lelwel): Rust port of red-green with green-node interning by hash, thin ~16-byte `SyntaxNode` handles, content-agnostic node-kind enum supplied by the consumer.\n- **SwiftSyntax** (Apple): Roslyn red-green plus byte-exact round-trip as a first-party API guarantee. Required because Swift macros (SE-0382, SE-0389; Swift 5.9+) receive a SwiftSyntax tree and return one — lossy round-trip would silently mangle source.\n- **Lezer**: binary buffer trees. Children encoded as offsets into a flat `Uint16Array` rather than JS objects. Browser-tab-sized memory.\n- **Tree-sitter trees**: immutable, error-tolerant, incremental; nodes carry byte ranges directly because the primary consumer is editor highlighting (\"what is at byte offset X?\").\n- **Oil/OSH lossless syntax tree**: ASDL-driven; serves both shell execution and source-to-source tooling from one parse.",
+      "refs": [
+        { "target": "tree-sitter#incrementality", "type": "exemplifies" },
+        { "target": "lezer#overview", "type": "exemplifies" },
+        { "target": "roslyn-red-green#overview", "type": "instance" },
+        { "target": "rowan#overview", "type": "instance" },
+        { "target": "swiftsyntax#overview", "type": "instance" },
+        { "target": "oil-osh-lossless#overview", "type": "instance" },
+        { "target": "asdl#overview", "type": "schema-substrate" }
+      ],
+      "sources": [
+        {
+          "label": "Eric Lippert — Red-Green Trees",
+          "url": "https://ericlippert.com/2012/06/08/red-green-trees/"
+        },
+        {
+          "label": "rowan repository",
+          "url": "https://github.com/rust-analyzer/rowan"
+        },
+        {
+          "label": "swift-syntax",
+          "url": "https://github.com/swiftlang/swift-syntax"
+        }
+      ]
+    },
+    {
+      "id": "lossless-and-incremental-variants",
+      "title": "Lossless and incremental variants",
+      "tags": ["incrementality", "tooling"],
+      "content": "Lossless CST systems are typically also incremental: green-node sharing in Roslyn/rowan means reusing unchanged structure across edits is the default, not an optimization. Tree-sitter and Lezer extend this with parse-tree reuse across edits — the tree of last parse is consumed by the next parse, with byte-range bookkeeping deciding which subtrees survive.\n\nThis is what makes lossless trees the substrate for editor tooling: every keystroke produces a new tree, but most of the previous tree is reused.",
+      "refs": [
+        { "target": "incremental-parsing#tree-reuse-and-partial-updates", "type": "implements" },
+        { "target": "tree-sitter#incrementality", "type": "exemplifies" }
+      ]
+    },
+    {
+      "id": "trade-offs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "representation"],
+      "content": "CSTs preserve much more detail than ASTs or lowered IRs, which makes them better for tooling but noisier for semantic analysis and optimization. Many systems therefore lower CSTs into AST or HIR forms once source fidelity is no longer the primary concern.\n\nByte-exact round-trip imposes engineering cost: macro plugin binaries inflate (every Swift macro carries SwiftSyntax), and per-edit invalidation requires structural sharing infrastructure. The gain is that source-faithful tooling — formatters, linters, refactoring engines, IDE navigation — does not need a separate parse.",
+      "refs": [
+        { "target": "abstract-syntax-trees#trade-offs", "type": "alternative-to" },
+        { "target": "high-level-ir#overview", "type": "downstream" }
+      ]
+    }
+  ],
+  "sources": []
+}

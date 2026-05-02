@@ -1,0 +1,50 @@
+{
+  "kind": "language",
+  "name": "Lobster",
+  "aliases": ["lobster-lang"],
+  "summary": "Wouter van Oortmerssen's statically-typed Python-ish language using flow-sensitive lifetime analysis to elide ~95% of RC ops at compile time, with a custom bump-style allocator for the rest. Lifetime analysis plays a borrow-checker-like role; cycles banned in practice, leak-on-exit reports as a pragmatic escape.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["reference-counting", "compile-time-rc", "lobster", "borrow-inference", "production"],
+      "content": "Lobster is a statically-typed Python-ish language using flow-sensitive lifetime analysis to elide ~95% of RC ops at compile time, with a custom bump-style allocator for the rest. Its lifetime analysis plays a borrow-checker-like role: it tracks ownership through flow-sensitive type inference and specialisation, removing inc/dec on locally-scoped references entirely.\n\nInline structs (zero-overhead values) plus race-free, GIL-free multithreading via a distributed memory model mean RC objects do not cross thread boundaries — sidestepping the atomic-RC cost that haunts Swift and CPython. Cost is claimed within an order of magnitude of C, far above Python/Lua.\n\nStatus (as of 2026-04): production single-author language with active development; not widely deployed but a clean reference for what flow-sensitive RC elision plus a small custom runtime can achieve in a Python-shaped surface syntax.",
+      "refs": [
+        { "target": "reference-counting#lobster-and-roc-morphic", "type": "covered-by" }
+      ],
+      "sources": [
+        { "label": "Lobster reference", "url": "https://aardappel.github.io/lobster/language_reference.html" },
+        { "label": "Lobster philosophy", "url": "https://aardappel.github.io/lobster/philosophy.html" }
+      ]
+    },
+    {
+      "id": "lifetime-analysis",
+      "title": "Flow-sensitive lifetime analysis",
+      "tags": ["borrow-inference", "alias-analysis", "uniqueness-inference", "compile-time-rc", "inc-elision", "dec-elision"],
+      "content": "Lobster's lifetime analysis is borrow-checker-adjacent: it tracks where references flow, which scopes own them, and which uses are read-only borrows. When a reference's lifetime is provably contained within its enclosing scope, the compiler emits no `inc`/`dec` at all — the value is known to outlive every use, and the destructor at scope exit covers cleanup. Specialisation extends this: polymorphic functions are monomorphised on the lifetime of their argument so the elision survives across call boundaries.\n\nThe author claims ~95% of RC ops are elided. The remaining ~5% — mostly references that escape into heap-resident data structures or get returned from functions in non-tail position — go through a custom bump-style allocator with explicit ref-count fields, lighter than a general malloc-style heap.",
+      "refs": [
+        { "target": "borrowing#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Lobster language design overview", "url": "http://strlen.com/language-design-overview/" }
+      ]
+    },
+    {
+      "id": "cycles-and-threading",
+      "title": "Cycles, threading, leak-at-exit",
+      "tags": ["weak-reference", "non-atomic-rc", "lobster"],
+      "content": "Cycles are banned in practice. If leaked, they are reported at exit with a human-readable diagnostic — a clever pragmatic move: the cycle problem is pushed back to the programmer, but with tooling support rather than silent leaks. Compared to Swift (programmer manages `weak`/`unowned`), Nim ORC (Bacon trial-deletion at runtime), and Lean 4 (cycles banned by language), Lobster occupies a fourth point: cycles allowed, leaked, reported.\n\nThe race-free, GIL-free multithreading model uses a distributed memory layout where each thread owns a private heap and inter-thread communication goes through explicit message passing. RC objects do not cross thread boundaries, which means RC ops can stay non-atomic in the common path — the same simplification that makes Lean 4's positive-RC fast path work, achieved by language convention rather than a sign-bit sentinel.",
+      "refs": [
+        { "target": "reference-counting#determinism-cycles-and-weak-references", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Lobster philosophy", "url": "https://aardappel.github.io/lobster/philosophy.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Lobster reference", "url": "https://aardappel.github.io/lobster/language_reference.html" },
+    { "label": "Lobster philosophy", "url": "https://aardappel.github.io/lobster/philosophy.html" },
+    { "label": "Lobster language design overview", "url": "http://strlen.com/language-design-overview/" }
+  ]
+}

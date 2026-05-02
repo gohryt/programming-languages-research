@@ -1,0 +1,41 @@
+{
+  "kind": "tool",
+  "name": "Materialize and Differential Dataflow",
+  "aliases": ["Materialize", "differential dataflow", "IVM"],
+  "summary": "Frank McSherry's differential dataflow (Naiad 2013–2015; productionised at Materialize 2019+): SQL compiles into a graph of differential operators that transform changes (deltas) rather than full result sets, maintaining materialised views always-current with input data. Sub-millisecond IVM at production scale.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Frank McSherry's **differential dataflow** (Naiad project, MSR Cambridge 2013–2015; productionised at **Materialize**, 2019+) compiles SQL into a fundamentally different runtime artifact from HyPer / Photon / DuckDB / Spark: the query plan becomes a **graph of differential operators**, each operator transforming *changes* (deltas) rather than full result sets, and the overall pipeline maintains its output as an **incrementally-updated materialised view** that is always current with the input data. This is **incremental view maintenance (IVM)** as a first-class compilation target rather than as a feature retrofitted onto a batch engine.",
+      "refs": [
+        { "target": "hyper-umbra#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Materialize home", "url": "https://materialize.com/" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["database", "ivm"],
+      "content": "The mechanical core: every relation has a *timestamp* (a partial order, supporting both wall-clock time and logical iteration counts for fixed-point queries), every record carries a *multiplicity* (positive for insertions, negative for deletions), and operators (`map`, `filter`, `join`, `reduce`, `iterate`) are defined to consume and produce difference streams while preserving the invariant that integrating the difference stream over time yields the correct snapshot.\n\nThe compiler turns an SQL query into a fixed dataflow graph; the runtime feeds input changes through the graph, and the materialised output is always consistent with the inputs. Distinct from streaming SQL engines that re-evaluate over windows (Flink, Kafka Streams, ksqlDB): Materialize produces *strict serialisability* — every input change is reflected in every materialised view atomically — at sub-millisecond latency, with no window-boundary effects.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — IVM as compilation paradigm",
+      "tags": ["database", "compiler", "language-design"],
+      "content": "The compilation lesson generalises beyond SQL: **IVM is a distinct compilation paradigm**, not a feature. A query compiler targeting IVM produces a runtime data structure that maintains state incrementally; the operator algebra (delta-based, with timestamps and retractions) is designed for incremental composition rather than batch evaluation.\n\nFor any language whose users want \"this expression is always up to date as inputs change\" (Excel-like reactive computation, real-time dashboards, live indices), IVM-as-compilation-target is more direct than batch + cache-invalidation.\n\nStatus (as of 2026-04): Materialize is in production for real-time dashboards, live anomaly detection, and operational analytics; competitors include **RisingWave** (similar IVM model), **Epsio** (IVM as a layer over PostgreSQL), and IVM features in PostgreSQL, ClickHouse, and Snowflake (more limited, view-maintenance-only).",
+      "refs": [],
+      "sources": [
+        { "label": "Differential dataflow repository", "url": "https://github.com/TimelyDataflow/differential-dataflow" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Materialize", "url": "https://materialize.com/" },
+    { "label": "Differential dataflow", "url": "https://github.com/TimelyDataflow/differential-dataflow" }
+  ]
+}

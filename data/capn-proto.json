@@ -1,0 +1,125 @@
+{
+  "kind": "library",
+  "name": "Cap'n Proto / CapTP",
+  "aliases": [
+    "capnp",
+    "captp",
+    "capn-web"
+  ],
+  "summary": "Cap'n Proto (Kenton Varda, 2013+) is a typed binary serialisation format with zero-copy reads and a distributed object-capability RPC protocol descended from E's CapTP. Promise pipelining lets dependent calls travel in one round-trip; three-vat introduction handles secure capability handoff. Production at Cloudflare Workers; OCapN under standardisation; Cap'n Web (2025) is the JavaScript-native sibling.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "capn-proto",
+        "ocap",
+        "rpc",
+        "distributed",
+        "unforgeable-handle",
+        "binary-capability"
+      ],
+      "content": "**Cap'n Proto** (Kenton Varda, 2013+) is a typed binary serialisation format with zero-copy reads and a distributed object-capability RPC protocol descended from E's **CapTP** (Capability Transport Protocol). It is one of the few production-grade systems carrying the full ocap discipline — including unforgeable distributed capabilities and promise pipelining — into mainstream tooling.\n\nThe schema and the RPC are deliberately co-designed: interface refs are first-class wire types — a method can return a capability, accept a capability as a parameter, or take a capability that the caller introduces from a third vat. The combination of a typed IDL with first-class capability references is what makes Cap'n Proto the canonical example of capability discipline at the wire level.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "e-language",
+          "type": "wire-protocol-of"
+        },
+        {
+          "target": "wasi-component-model",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Cap'n Proto RPC",
+          "url": "https://capnproto.org/rpc.html"
+        }
+      ]
+    },
+    {
+      "id": "schema-and-zero-copy",
+      "title": "Schema language and zero-copy reads",
+      "tags": [
+        "capn-proto",
+        "binary-capability",
+        "rpc"
+      ],
+      "content": "Cap'n Proto's schema language (`.capnp` files) is a typed IDL similar in role to Protobuf's `.proto` and WIT files, but with two significant design differences:\n\n- **Zero-copy reads**: serialised messages have a fixed offset layout that matches in-memory representation, so reading a field is a pointer dereference rather than a parse. The wire format *is* the in-memory format. There is no separate \"deserialise to objects\" step. Encoding is correspondingly designed for word-aligned random access.\n- **Interface types are first-class**: Protobuf has only data types; Cap'n Proto's `interface` declares a remote object with methods, and references to such interfaces serialise as capability pointers. This is what closes the gap with WASI Component Model resource handles — both are typed binary IDLs where capability references are part of the schema.\n\nThe zero-copy property is also why Cap'n Proto is competitive with Flatbuffers for hot-path serialisation; the ocap and zero-copy stories reinforce each other rather than trading off.",
+      "refs": [
+        {
+          "target": "wasi-component-model",
+          "type": "shares-design-space-with"
+        }
+      ]
+    },
+    {
+      "id": "captp-pipelining-and-three-vat",
+      "title": "CapTP — promise pipelining and three-vat introduction",
+      "tags": [
+        "capn-proto",
+        "rpc",
+        "distributed",
+        "granovetter-introduction"
+      ],
+      "content": "**Promise pipelining**: pre-send calls against the *result* of an in-flight call, eliminating chatty RPC patterns; equivalent to E's eventual-send composition. A client can write `db.lookup(id).getName()` and the second call travels with the first — the server-side composes them, returning only the final result. Round-trip count drops from N to 1 for chained dependent calls.\n\n**Three-vat introduction**: secure handoff of a capability from vat A to vat C via vat B without B gaining authority over the introduced capability. This is the network-protocol equivalent of E's Granovetter operator — \"introduction is the only way to grow the reference graph\" — and it is the protocol-level guarantee that distributed ocap retains the ocap invariants of single-machine ocap.\n\n**Distributed acyclic GC** (Spritely Goblins, Agoric): cross-vat ref counting with the ocap invariant preserved. The full distributed-GC story for ocap-cycle handling is still active research; current production deployments rely on acyclic graphs plus best-effort cycle detection at vat boundaries.",
+      "refs": [
+        {
+          "target": "spritely-goblins",
+          "type": "implements"
+        },
+        {
+          "target": "e-language",
+          "type": "wire-protocol-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Spritely Goblins CapTP doc",
+          "url": "https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html"
+        }
+      ]
+    },
+    {
+      "id": "deployment-and-capn-web",
+      "title": "Production, OCapN, Cap'n Web",
+      "tags": [
+        "capn-proto",
+        "production",
+        "rpc",
+        "js"
+      ],
+      "content": "Status (as of 2026-04):\n\n- **Cap'n Proto** is in production at Cloudflare Workers (the inter-isolate communication substrate for Workers and Durable Objects), at Sandstorm.io (sandboxed-app personal cloud), and as the IPC layer for several other systems. The C++ reference implementation is mature; ports to Rust (`capnp-rust`), Go, JavaScript, and Python exist.\n- **OCapN** (Spritely + Agoric) is in active standardisation — a vendor-neutral wire format for object-capability networking that aims to be the cross-implementation `IP for ocap`. Spritely Goblins, Agoric, and an experimental MetaMask LavaMoat backend all participate.\n- **Cap'n Web** (Cloudflare 2025) is the JavaScript-native sibling of the same protocol family — a TypeScript implementation with the same promise-pipelining and capability semantics, runnable in browsers, Cloudflare Workers, Node.js, Bun, and Deno. Under 10 kB gzipped. The lesson generalises: **object-capability RPC is now economically deployable in browser-and-server JavaScript**, not just in research languages or kernel-class systems.",
+      "refs": [
+        {
+          "target": "spritely-goblins",
+          "type": "shares-protocol-family-with"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "complementary-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Cap'n Web",
+          "url": "https://blog.cloudflare.com/capnweb-javascript-rpc-library/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Cap'n Proto RPC",
+      "url": "https://capnproto.org/rpc.html"
+    },
+    {
+      "label": "Spritely Goblins CapTP doc",
+      "url": "https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html"
+    }
+  ]
+}

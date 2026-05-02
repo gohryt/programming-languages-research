@@ -1,0 +1,63 @@
+{
+  "kind": "concept",
+  "name": "Partial Redundancy Elimination",
+  "aliases": [
+    "PRE",
+    "Lazy Code Motion"
+  ],
+  "summary": "Morel and Renvoise (1979): eliminate expressions that are redundant on *some* control-flow paths but not all. Generalises both CSE and LICM. Knoop, Rüthing, Steffen's Lazy Code Motion (1992) refined the placement to minimise register pressure.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Morel and Renvoise (1979) introduced PRE as a generalisation of both CSE and LICM: eliminate expressions that are redundant on *some* control-flow paths but not all. The classical algorithm places computations at points that make them fully redundant at the use site, balancing speedup against code-size increase from additional computations on previously-unaffected paths.\n\nPRE is the compiler-theoretic framework underlying LICM and CSE: both are special cases of PRE where the set of paths is restricted to loops or straight-line code respectively.",
+      "refs": [
+        {
+          "target": "global-value-numbering#overview",
+          "type": "related-to"
+        },
+        {
+          "target": "licm#overview",
+          "type": "generalises"
+        },
+        {
+          "target": "ssa#overview",
+          "type": "operates-on"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Morel-Renvoise PRE",
+          "url": "https://dl.acm.org/doi/10.1145/359060.359069"
+        }
+      ]
+    },
+    {
+      "id": "lazy-code-motion",
+      "title": "Lazy Code Motion",
+      "tags": [
+        "compiler",
+        "optimization"
+      ],
+      "content": "**Lazy Code Motion** (Knoop, Rüthing, Steffen 1992) improved on Morel-Renvoise by minimising register pressure — placing computations as late as possible while preserving the partial-redundancy elimination. The classical PRE places computations early to expose more redundancy; LCM observes that placing them at the latest possible point still eliminates the same redundancies but keeps the values' live ranges shorter, reducing spill pressure.\n\nLCM uses four dataflow analyses: anticipability (the expression is needed on every path forward), availability (computed already on every path back), latestness (latest point where placement is safe), and redundancy (whether placement here actually eliminates a redundancy). The algorithm computes these in sequence and places each expression at its latest legal point.\n\nModern compilers (GCC, LLVM) use variants of Lazy PRE rather than the original Morel-Renvoise formulation. The register-pressure consideration matters more on modern backends with limited register sets and long basic blocks.",
+      "refs": []
+    },
+    {
+      "id": "as-a-framework",
+      "title": "PRE as an optimisation framework",
+      "tags": [
+        "compiler",
+        "optimization"
+      ],
+      "content": "PRE's framing — eliminate redundancy partial across paths, not just full — generalises naturally to many other optimisations. LICM is PRE restricted to loop boundaries. CSE is PRE restricted to a single basic block. Hoisting and sinking are PRE with placement constraints in one direction or the other.\n\nThis framing matters because each individual optimisation can be implemented as a special case of the same dataflow framework. GCC's GIMPLE optimisations use a unified PRE framework for many of these transformations; LLVM keeps them as separate passes for engineering clarity but the underlying dataflow is the same shape.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Morel-Renvoise — Global optimization by suppression of partial redundancies",
+      "url": "https://dl.acm.org/doi/10.1145/359060.359069"
+    }
+  ]
+}

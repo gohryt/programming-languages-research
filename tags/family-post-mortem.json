@@ -1,0 +1,7 @@
+{
+  "id": "family-post-mortem",
+  "tag": "family:post-mortem",
+  "name": "Family: post-mortem debugging",
+  "description": "Frozen-state forensics: core dumps, kdump+crash, KGDB/KDB, embedded probe stacks, production crash pipelines (minidumps, symbolication).",
+  "axis": "family"
+}

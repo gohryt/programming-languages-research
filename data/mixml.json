@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "MixML",
+  "aliases": ["mixin-modules"],
+  "summary": "Derek Dreyer's research module calculus (Dreyer-Rossberg, ICFP 2008) and the broader mixin-module tradition; explores module composition via mixin merging rather than functor application, supporting type-safe recursion across module boundaries through slot-and-export composition.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Derek Dreyer's **MixML** (Dreyer-Rossberg, ICFP 2008) and the broader mixin-module tradition (Bracha-Cook 1990; Flatt-Felleisen 1998; Hirschowitz-Leroy 2002) explore module systems whose composition operator is *mixin merging* rather than functor application.\n\nA mixin module declares required imports (slots) and provided exports; mixing unifies slots and exports, propagating type identities and recursively composing.",
+      "refs": [
+        { "target": "module-calculi#overview", "type": "extends" },
+        { "target": "backpack-haskell#overview", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "MixML — ICFP 2008 (Dreyer-Rossberg)", "url": "https://people.mpi-sws.org/~dreyer/papers/mixml/icfp08.pdf" }
+      ]
+    },
+    {
+      "id": "type-safe-recursive-composition",
+      "title": "Type-safe recursive cross-module composition",
+      "tags": ["mixml", "module-calculus", "recursion"],
+      "content": "MixML's contribution is **type-safe recursion across module boundaries**: two modules can mutually depend through their interfaces if their composition resolves all slots — structurally similar to Backpack's indefinite modules but with composition rather than instantiation as the primitive.\n\nThe slot-and-export model means that two modules with mutually recursive types or values can be composed into a third module with no remaining slots, where the recursion is statically resolved at composition time."
+    },
+    {
+      "id": "non-adoption-and-lesson",
+      "title": "Non-adoption and design lesson",
+      "tags": ["mixml", "design-guidance"],
+      "content": "Mixin modules have not landed in any major production language. Scala's traits are loosely inspired but operate at the value/class level, not the module level.\n\nThe lesson is that **recursive cross-module dependency is solvable with the right algebraic structure**, but production languages typically ban cycles instead — a simpler answer that vastly simplifies implementation. The Bracha-Cook mixin tradition remains a research-grade exploration with no clear migration path into mainstream language design.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "MixML ICFP 2008", "url": "https://people.mpi-sws.org/~dreyer/papers/mixml/icfp08.pdf" },
+    { "label": "Derek Dreyer's homepage", "url": "https://www.mpi-sws.org/~dreyer/" }
+  ]
+}

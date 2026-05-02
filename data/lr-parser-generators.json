@@ -1,0 +1,67 @@
+{
+  "kind": "tool",
+  "name": "LR Parser Generators",
+  "aliases": ["yacc", "bison", "menhir", "lalrpop"],
+  "summary": "The LALR(1)/LR(1) parser-generator lineage: Yacc (Bell Labs, 1975) established the template; GNU Bison continues it; Menhir (OCaml) adds incremental + error-message infrastructure; LALRPOP (Rust) is the modern Rust-native LR(1) generator with built-in fallible actions.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The classic LR parser-generator family established the Unix-era parser-generator shape: a grammar file with tokens, precedence declarations, productions, and semantic actions; generated code implementing an LALR(1) shift/reduce parser; and conflict reports for grammar ambiguities. Modern descendants add incremental APIs (Menhir), Rust-native ergonomics (LALRPOP), and richer diagnostic infrastructure (Menhir's error-message generation).",
+      "refs": [
+        { "target": "deterministic-ll-lr#overview", "type": "implements" }
+      ]
+    },
+    {
+      "id": "yacc-and-bison",
+      "title": "Yacc / Bison — the classic LR lineage",
+      "tags": ["parser-generator", "lr", "history"],
+      "content": "**Yacc** (Bell Labs, 1975) established the classic Unix parser-generator shape: a grammar file with tokens, precedence declarations, productions, and semantic actions; generated C code implementing an LALR(1) shift/reduce parser; and conflict reports for grammar ambiguities. **GNU Bison** is the modern continuation, supporting traditional LALR(1), canonical LR(1), IELR(1), and GLR.\n\nBison matters because many parser concepts are easiest to understand in its vocabulary: shift/reduce conflicts, reduce/reduce conflicts, `%left`/`%right` precedence declarations, `%prec` overrides, semantic value stacks, location stacks, and generated error paths. Even when an implementer chooses recursive descent or tree-sitter, knowing the Yacc/Bison model clarifies what is gained and lost by leaving table-driven LR.",
+      "refs": [],
+      "sources": [
+        { "label": "Bison manual", "url": "https://www.gnu.org/software/bison/manual/bison.html" }
+      ]
+    },
+    {
+      "id": "menhir",
+      "title": "Menhir — incremental API and error-message infrastructure",
+      "tags": ["parser-generator", "ocaml", "incremental"],
+      "content": "**Menhir** is OCaml's modern yacc, but two implementation ideas separate it from the classical lineage.\n\nThe first is the **incremental API** (in `--table` mode): parser states are persistent data structures, so parsing can stop at any token boundary and resume from a saved checkpoint — exactly the substrate IDE integration and custom recovery want.\n\nThe second is **error-message infrastructure**, building on François Pottier's \"Reachability and Error Diagnosis in LR(1) Parsers\" (CC 2016): given an LR(1) automaton, the tool enumerates every state in which an error can be detected and computes a minimal input sentence that drives the parser to that state. The grammar author maintains a `.messages` file pairing each erroneous sentence with a hand-written diagnostic, and the `--compile-errors` workflow verifies coverage as the grammar evolves. CompCert's C parser has used this in production; the result is per-error-state prose that reads as if hand-authored, qualitatively unlike ANTLR4's defaults.\n\nMenhir also exposes an inspection API for parser states and an unparsing API for AST-to-text round-trips, which most generators omit.",
+      "refs": [],
+      "sources": [
+        { "label": "Menhir manual", "url": "https://gallium.inria.fr/~fpottier/menhir/manual.html" }
+      ]
+    },
+    {
+      "id": "lalrpop",
+      "title": "LALRPOP — Rust-native LR(1) generator",
+      "tags": ["parser-generator", "rust", "lr"],
+      "content": "Niko Matsakis's **LALRPOP** (2015+) is the Rust-ecosystem LR(1) parser generator: grammar declarations in a `.lalrpop` file, compiled to Rust code via a build-script step, producing an LALR(1) (with `LR(1)` opt-in) parser whose action functions are Rust expressions. The design is clearly in the yacc/Bison lineage but optimised for Rust idioms — pattern matching on token enums, lifetime-parameterised AST nodes, errors via `Result`, and grammar rule combinators that play well with macros.\n\nDistinguishing features:\n\n- **Rust-native action code**: each grammar rule's action is an arbitrary Rust expression with full access to the type system, generic pattern matching, and lifetime annotations.\n- **Built-in fallible actions**: rules can return `Result<T, E>` and LALRPOP integrates this into the parsing automaton without panic-or-die error paths.\n- **Macro-friendly grammar combinators**: `Comma<T>` (comma-separated list), `Tier<Op, Next>` (precedence-climbing scaffold) and similar parameterised rules are first-class in LALRPOP's macro layer.\n- **Full LALR(1) and opt-in LR(1)**: most grammars use the smaller LALR(1) tables; conflicting grammars opt into canonical LR(1).\n\nProduction: rustc historically used LALRPOP for some embedded-DSL parsing; Ruff used a LALRPOP-generated Python parser before migrating to hand-written recursive descent. Status (as of 2026-04): production-stable, still maintained, the de facto LR(1) parser generator for Rust when one is needed.",
+      "refs": [
+        { "target": "ruff-parser#migration-rationale", "type": "case-study" }
+      ],
+      "sources": [
+        { "label": "LALRPOP", "url": "https://lalrpop.github.io/lalrpop/" },
+        { "label": "LALRPOP source repository", "url": "https://github.com/lalrpop/lalrpop" }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design tradeoffs",
+      "tags": ["parser-generator", "tradeoffs", "design-guidance"],
+      "content": "LR parser generators are excellent for grammar-first workflows: static conflict detection at generator time, machine-checked grammar documentation, and easy experimentation with grammar changes. They become constraints when the project needs custom error recovery (CPCT+ and similar techniques are research-grade), incremental reparsing (Menhir's incremental API is unusual), hot-path tuning, or context-sensitive lookahead.\n\nThe Tratt 2020 essay argues recursive descent silently resolves ambiguities the programmer may not realise exist, and that LR parsing's static ambiguity detection is undervalued. That framing is a useful counterweight to the hand-written-RD consensus production compilers have converged on: LR is best when correctness-by-construction matters more than latency, recovery, or domain-specific lookahead.\n\nLark's `conf_lalr` example is a representative production usage of LALR(1) for Python-ecosystem parsing — config file grammars where LR's static conflict detection catches grammar bugs the user-facing yaml/toml parsers might let pass.",
+      "refs": [],
+      "sources": [
+        { "label": "Lark — LALR config example", "url": "https://lark-parser.readthedocs.io/en/stable/examples/advanced/conf_lalr.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Bison manual", "url": "https://www.gnu.org/software/bison/manual/bison.html" },
+    { "label": "Menhir manual", "url": "https://gallium.inria.fr/~fpottier/menhir/manual.html" },
+    { "label": "LALRPOP", "url": "https://lalrpop.github.io/lalrpop/" },
+    { "label": "LALRPOP source repository", "url": "https://github.com/lalrpop/lalrpop" },
+    { "label": "Lark — LALR config example", "url": "https://lark-parser.readthedocs.io/en/stable/examples/advanced/conf_lalr.html" }
+  ]
+}

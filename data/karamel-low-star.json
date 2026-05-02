@@ -1,0 +1,56 @@
+{
+  "kind": "framework",
+  "name": "KaRaMeL / Low* — F* Pipeline to Verified C",
+  "aliases": ["karamel", "kremlin", "kremlin-low-star", "low-star", "lowstar"],
+  "summary": "KaRaMeL (formerly KreMLin) extracts a verified C-extractable subset of F* called Low* into readable C; Low* programs verify against a stack/heap memory model, integrated with F*'s effect system (ICFP 2017). The pipeline underlies Project Everest's HACL*, EverCrypt, EverParse, and miTLS; HACL*/EverCrypt code ships in Mozilla Firefox NSS, the Linux kernel WireGuard implementation, mbedTLS, Microsoft WinQuic, the Tezos blockchain, and the ElectionGuard SDK.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["formal-verification", "c-verifier", "low-star", "f-star"],
+      "content": "Dependently typed ML with effects (F\\*) plus a verified C-extractable subset (Low\\*); Low\\* programs verify against a stack/heap memory model and compile to readable C via **KaRaMeL** (formerly KreMLin). The F\\* / Low\\* / KaRaMeL pipeline is also catalogued in `data/verification-intermediate-languages` as part of the verification-IL family alongside Boogie, Viper, and WhyML.\n\n**Low\\* memory model** (ICFP 2017) — region-based stack/heap with abstract pointers, integrated with F\\*'s effect system. **EverCrypt agile multiplexer**: single verified API selects HACL\\* (C) or ValeCrypt (asm) at runtime, sealing the abstraction. **Vale/F\\* integration** connects C-level and assembly-level proofs against a shared spec.\n\nThis record covers the **KaRaMeL transpiler and the Low\\* subset** specifically; the full F\\* language including the refinement-type/effect system is covered in `data/fstar`.",
+      "refs": [
+        { "target": "fstar#overview", "type": "subset-of" },
+        { "target": "verification-intermediate-languages#fstar-lowstar", "type": "instance-of" },
+        { "target": "compcert#overview", "type": "compared-with" },
+        { "target": "refinement-types#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "HACL* / EverCrypt overview", "url": "https://hacl-star.github.io/Overview.html" },
+        { "label": "Project Everest", "url": "https://www.microsoft.com/en-us/research/project/project-everest-verified-secure-implementations-https-ecosystem/" },
+        { "label": "EverCrypt OPLSS 2019", "url": "https://fstar-lang.org/oplss2019/EverCrypt-06282019.pdf" }
+      ]
+    },
+    {
+      "id": "low-star-memory-model",
+      "title": "Low* — verified C-extractable subset",
+      "tags": ["low-star", "c-verifier", "memory-safety-proof", "region-based"],
+      "content": "**Low\\*** is the C-extractable subset of F\\* (ICFP 2017). It restricts F\\*'s feature set to constructs that map directly to C: scalar types, fixed-width integers, mutable references, arrays of fixed length, structs, and pointer arithmetic within bounded regions.\n\nThe **memory model** is region-based: each function operates inside a stack frame (a region scoped to the call), with pointers carrying explicit region annotations. The F\\* effect system tracks which regions a function may read and write, enabling the verifier to discharge memory-safety obligations (no use-after-free, no out-of-bounds, no aliasing violations) without runtime checks. This is unusual among C verifiers — most use a flat heap model and require manual disjointness reasoning, where Low\\*'s region discipline makes the disjointness automatic from the type signatures.\n\nThe key insight: **a verification-focused IL paired with a code-extractable subset gives both proof and production binary from one source**. Low\\* programs simultaneously serve as the proof artefact (verified in F\\*) and the source of the production C binary (extracted by KaRaMeL).",
+      "refs": [
+        { "target": "fstar#effect-and-refinement-integration", "type": "depends-on" }
+      ]
+    },
+    {
+      "id": "karamel-extraction",
+      "title": "KaRaMeL — Low* to readable C",
+      "tags": ["compiler", "c-verifier"],
+      "content": "**KaRaMeL** (formerly KreMLin) extracts Low\\* programs to **readable C**. The output is not just \"any C\" but C that engineers without F\\* expertise can audit: meaningful identifier names, compatible struct layouts, idiomatic control flow. This was an explicit design goal — verified-cryptography deployments need C code that downstream consumers (Mozilla, the Linux kernel) will accept as part of their codebase, not opaque generated artefacts.\n\nKaRaMeL is part of the trusted base: a bug in KaRaMeL could produce miscompiled C from a verified Low\\* source. In practice the extraction is conservative (close to a structural transcription rather than an optimising compiler) which keeps the trusted code path narrow.",
+      "refs": []
+    },
+    {
+      "id": "everest-deployments",
+      "title": "Project Everest — production deployments",
+      "tags": ["production", "industrial"],
+      "content": "Project Everest (Microsoft Research, INRIA, CMU, MIT) verifies the cryptographic stack from primitives up to TLS:\n\n- **HACL\\*** — verified primitives (Curve25519, Poly1305, ChaCha20, etc.), shipped in Mozilla NSS, Linux kernel via WireGuard, mbedTLS, Microsoft WinQuic, Tezos blockchain, ElectionGuard SDK;\n- **EverCrypt** — verified cryptographic provider with provider-agnostic API and runtime multiplexing between HACL\\* (C) and ValeCrypt (assembly);\n- **EverParse** — verified parser combinators for binary protocols;\n- **miTLS** — verified TLS implementation.\n\nThe shipping evidence: HACL\\* primitives are in production at Mozilla (Firefox NSS — Curve25519, ChaCha20, Poly1305 since NSS 3.33+), in the Linux kernel's Wireguard implementation, in mbedTLS, in Microsoft Azure cryptographic stacks (WinQuic), in the Tezos blockchain, and in the ElectionGuard SDK. Status (as of 2026-04): consumer/integration list reflects publicly documented deployments; exact module coverage and version pin per downstream are time-sensitive.\n\n**The deepest real-world deployment of formal verification for memory-safe code.** The lesson: cryptographic primitives are the killer app for formal verification — small, performance-critical, well-specified, and security-load-bearing.",
+      "refs": [
+        { "target": "fstar#everest-deployment", "type": "shared-deployment-context" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "HACL* / EverCrypt overview", "url": "https://hacl-star.github.io/Overview.html" },
+    { "label": "Project Everest", "url": "https://www.microsoft.com/en-us/research/project/project-everest-verified-secure-implementations-https-ecosystem/" },
+    { "label": "EverCrypt OPLSS 2019", "url": "https://fstar-lang.org/oplss2019/EverCrypt-06282019.pdf" },
+    { "label": "KaRaMeL repository", "url": "https://github.com/FStarLang/karamel" }
+  ]
+}

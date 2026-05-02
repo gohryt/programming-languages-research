@@ -1,0 +1,47 @@
+{
+  "kind": "concept",
+  "name": "LowFat — Aligned-Allocator Pointer Bounds",
+  "aliases": [
+    "Low-Fat Pointers"
+  ],
+  "summary": "Software pointer-bounds via aligned size-class allocator: bounds are encoded in the pointer's bit-pattern itself, derived from address alignment. Single-digit % overhead for heap at the cost of no sub-object detection. Research project; no production deployment.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "software-pointer-bounds",
+        "bounds-check",
+        "research",
+        "memory-safety"
+      ],
+      "content": "**LowFat** encodes bounds in the pointer's bit-pattern itself via an aligned size-class allocator. The size class — and therefore the bounds — can be recovered from the pointer's high-bit alignment, so no separate metadata table is required.\n\nThis is much cheaper than SoftBound for heap allocations (single-digit %) but at the cost of no sub-object bounds detection — bounds are per-allocation only.\n\nResearch only; never deployed in production toolchains. Worth naming for design genealogy: the trade-off it makes (cheaper bounds via implicit metadata, no sub-object precision) is the same trade-off MTE makes (cheaper checks via per-granule tags, no sub-object precision).",
+      "refs": [
+        {
+          "target": "softbound-cets",
+          "type": "compared-with"
+        },
+        {
+          "target": "arm-mte",
+          "type": "related"
+        },
+        {
+          "target": "cheri",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "LowFat allocator",
+          "url": "https://github.com/GJDuck/LowFat"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "LowFat allocator",
+      "url": "https://github.com/GJDuck/LowFat"
+    }
+  ]
+}

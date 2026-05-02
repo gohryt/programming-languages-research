@@ -1,0 +1,99 @@
+{
+  "kind": "concept",
+  "name": "Retroactive and partial evaluation debugging",
+  "aliases": [
+    "retroactive console.log",
+    "Replay.io",
+    "typed-hole live evaluation",
+    "structured print"
+  ],
+  "summary": "Debugging techniques that collapse the diagnostic into the edit/run cycle along the axis of when the diagnostic is introduced — Replay.io adds prints retroactively after the bug, Hazel evaluates programs with typed holes, Rust dbg!/Elixir dbg/2/icecream make print-debugging a compiler-macro feature.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The debugger does not have to exist at a separate moment from the program. Entries in this chapter collapse debugging *into* the edit/run cycle along the axis of **when the diagnostic is introduced** — before execution, during editing, or after recording. Replay.io adds print statements retroactively *after* the bug occurred (recorded execution becomes a query target); Hazel evaluates programs with typed holes so every keystroke produces feedback (the unfinished program is its own debugger surface); `dbg!` / `dbg/2` / icecream turn print debugging into a compiler-macro feature with zero attach-step (the diagnostic is part of the source). Each entry shifts the boundary between \"writing code\" and \"debugging code\" toward continuity.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:retroactive-evaluation`\n- **domain**: `domain:debugging`\n- **on-cost**: `on-cost:low`\n- **granularity**: `granularity:per-event`\n"
+    },
+    {
+      "id": "replay-io-retroactive-console-log",
+      "title": "Replay.io — Retroactive Console.log",
+      "tags": [
+        "browser",
+        "domain:debugging",
+        "family:retroactive-evaluation"
+      ],
+      "content": "Status (as of 2026-04): commercial service. Replay.io is a time-travel debugger for web applications that records a browser session deterministically. The unique feature: after recording, you can **add console.log statements retroactively**. Click on a line of code, type an expression, press enter — and the logged values appear in the console as if the log statement had always been there.\n\nThe implementation: Replay maintains a pool of forked browser processes at various points in the recording. When you add a retroactive print statement, Replay finds the nearest process fork, replays forward to each point where the line executes, evaluates the expression, and returns the results. Because the work is done in parallel across multiple forks, and no fork is more than ~100ms away from a checkpoint, results appear in \"low logarithmic time.\"\n\nThis is philosophically significant: it eliminates the \"I should have added a log here\" regret that plagues traditional debugging. The recording captures everything; print statements become a *query language* for the recording rather than instrumentation that must exist before the bug occurs.",
+      "sources": [
+        {
+          "url": "https://docs.replay.io/time-travel-intro/add-console-logs-on-the-fly"
+        },
+        {
+          "url": "https://docs.replay.io/basics/time-travel/how-does-time-travel-work"
+        }
+      ]
+    },
+    {
+      "id": "hazel-typed-holes-live-eval",
+      "title": "Hazel — Live Evaluation of Incomplete Programs",
+      "tags": [
+        "domain:debugging",
+        "family:retroactive-evaluation"
+      ],
+      "content": "Hazel is a live functional programming environment where programs with **typed holes** — missing subexpressions — can still be typechecked and partially evaluated. The editor inserts holes automatically to guarantee that every editor state is meaningful. There are no \"syntax error\" states where all feedback stops.\n\nWhen a program has holes, Hazel evaluates as far as it can, producing partial results. A function with a hole in one branch can still be evaluated on inputs that take the other branch. A list operation with a hole in its transform function can still report the list's length. The result is continuous, live feedback even while the program is being written.\n\nThis inverts the traditional model where feedback requires a complete, parseable, compilable program. In Hazel, *every keystroke* produces feedback because *every editor state* has both static (type) and dynamic (evaluation) meaning.\n\nThe connection to debugging: Hazel dissolves the distinction between \"writing\" and \"debugging.\" You see the program's behavior as you construct it, not after. Bugs are visible the moment they are introduced, because you can see values flowing through incomplete code in real time.\n\n> The *parser-side* perspective on Hazel — typed holes as an error-recovery strategy — is covered in `data/error-recovery#language-level-recovery`.",
+      "sources": [
+        {
+          "url": "https://hazel.org/"
+        },
+        {
+          "url": "https://arxiv.org/abs/1805.00155"
+        }
+      ]
+    },
+    {
+      "id": "structured-print-debugging",
+      "title": "Structured Print Debugging — Rust `dbg!`, Elixir `dbg/2`, icecream",
+      "tags": [
+        "domain:debugging",
+        "family:retroactive-evaluation",
+        "granularity:per-event",
+        "on-cost:low"
+      ],
+      "content": "Print debugging is universal and universally apologetic. Rust's `dbg!()` macro (stabilized 2019), Elixir's `dbg/2` (2022), and Python's `icecream` (plus its 15+ community ports) turn it into a language-level feature that — for a large class of bugs — substitutes for traditional interactive debuggers, trading interactive stepping for zero-setup source-level traces.\n\nThe design pattern is shared across all three implementations:\n1. **Expression-returning**: `dbg!(x + 1)` returns its argument, so it is insertable into any expression position without restructuring code — `let y = dbg!(f(x)) + 1;` works.\n2. **Automatic source capture**: prints the expression *as written*, the file and line, and optionally the enclosing function — Rust via macro syntactic capture, icecream via Python's `executing` AST-locator library that reliably locates `ic()` calls in source.\n3. **Pretty output**: uses the language's debug formatter (`Debug` trait, `Kernel.inspect/2`, `pprint`) rather than string coercion.\n\n**Elixir's `dbg/2` goes furthest**: inside a pipeline, `x |> f() |> g() |> dbg()` prints the intermediate value *at every pipeline stage*, showing the full data evolution from a single annotation. Even better, when run under `iex`, `dbg` transparently upgrades to an interactive **pry session** — the program pauses at the call site, the user inspects locals and steps, `continue` resumes. Print-debug escalates to interactive-debug with no code change.\n\nThe original contribution is *meta*: the debugger is the compiler macro itself. There is no attach step, no breakpoint lookup, no DWARF, no protocol. The cost is zero when the line is removed, and full-source-context when the line is present. This generalizes Chris Wellons's INT3;NOP pattern (`data/breakpoints#wellons-int3-nop-conditional`) — compile the debugging directly into the code — but at language level rather than assembly level, and with the language's own formatter doing the work.\n\nFor a language designer, the implementation cost is small: a macro that captures `stringify!(expr)` and `file!()/line!()` alongside the evaluated value. The ergonomic payoff is large enough that the 15-port community ecosystem formed around Python's `ic()` within a few years.",
+      "sources": [
+        {
+          "url": "https://doc.rust-lang.org/std/macro.dbg.html"
+        },
+        {
+          "url": "https://www.germanvelasco.com/blog/using-dbg-to-replace-io-inspect-and-pry-into-code"
+        },
+        {
+          "url": "https://github.com/gruns/icecream"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://docs.replay.io/time-travel-intro/add-console-logs-on-the-fly"
+    },
+    {
+      "url": "https://docs.replay.io/basics/time-travel/how-does-time-travel-work"
+    },
+    {
+      "url": "https://hazel.org/"
+    },
+    {
+      "url": "https://arxiv.org/abs/1805.00155"
+    },
+    {
+      "url": "https://doc.rust-lang.org/std/macro.dbg.html"
+    },
+    {
+      "url": "https://www.germanvelasco.com/blog/using-dbg-to-replace-io-inspect-and-pry-into-code"
+    },
+    {
+      "url": "https://github.com/gruns/icecream"
+    }
+  ]
+}

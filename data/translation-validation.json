@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Translation Validation",
+  "aliases": ["per-compilation verification", "Alive2", "Crellvm"],
+  "summary": "Pnueli, Siegel, Singerman 1998: rather than prove the compiler correct, check *each compilation run* for correctness. Encode source and target as SMT formulae, check equivalence. Alive2 (PLDI 2021) verifies LLVM optimisations and has found dozens of real bugs. More scalable than full compiler verification at the cost of being per-run.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A pragmatic alternative to whole-compiler verification: rather than prove the compiler correct, check *each compilation run* for correctness. **Translation validation** (Pnueli, Siegel, Singerman 1998) compares source and target after compilation, producing a proof certificate for that specific run.",
+      "refs": [
+        { "target": "compcert#overview", "type": "alternative-to" },
+        { "target": "vellvm#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Alive2 Translation Validation (Lopes et al., PLDI 2021)", "url": "https://web.ist.utl.pt/nuno.lopes/pubs/alive2-pldi21.pdf" }
+      ]
+    },
+    {
+      "id": "modern-tools",
+      "title": "Modern translation-validation tools",
+      "tags": ["compiler", "verification", "smt"],
+      "content": "Modern translation validation tools:\n\n- **Alive2** (Lopes et al., PLDI 2021) verifies LLVM IR optimisations by encoding source and optimised versions as SMT queries and checking for equivalence. Alive2 has found dozens of real bugs in LLVM optimisations.\n- **Crellvm** (Kang et al., 2018) did similar work earlier, focused on proving optimisations correct per-compilation.\n\nTranslation validation is more scalable than full verification — it doesn't require a mechanised proof of every transformation — at the cost of being per-run rather than once-and-done. For most practical scenarios this is the right trade. The SMT solver does the heavy lifting; the verifier engineer writes encodings of source and target rather than proofs of correctness.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Alive2 PLDI 2021", "url": "https://web.ist.utl.pt/nuno.lopes/pubs/alive2-pldi21.pdf" }
+  ]
+}

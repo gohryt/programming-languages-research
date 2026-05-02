@@ -1,0 +1,77 @@
+{
+  "kind": "language",
+  "name": "F#",
+  "aliases": [
+    "f-sharp"
+  ],
+  "summary": ".NET ML-family language whose distinguishing module-system property is that file order in the .fsproj project file is part of language semantics: files are compiled top-to-bottom, a declaration in a later file is invisible to an earlier file, and cycles between files are impossible by construction.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "F# (Don Syme et al., 2005+) is the ML-family functional language on the .NET platform. This record covers the language-level module-system surface; the most distinctive property in the entire survey is the role of project-file file ordering.",
+      "refs": [
+        {
+          "target": "module-systems#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "csharp#overview",
+          "type": "platform-sibling"
+        }
+      ]
+    },
+    {
+      "id": "file-order-as-language-semantics",
+      "title": "File order as project-file semantics",
+      "tags": [
+        "fsharp",
+        "modules",
+        "compilation-order"
+      ],
+      "content": "F# is the most distinctive entry in the production-language family because **file order in the project file is part of the language's semantics**. F# compiles source files top-to-bottom in the order listed in the `.fsproj` file, and a declaration in file `B.fs` cannot reference a declaration in file `C.fs` if `C.fs` appears below `B.fs`. There is no forward declaration. Cycles between files are impossible because the compiler simply does not allow a later file's declarations to be visible to an earlier one.\n\nThis is the mirror image of every other module system in this survey: rather than letting the import graph emerge from declarations and then validating acyclicity, F# imposes a strict total order at the project level and lets imports respect it for free. The benefit is striking compile-time and reasoning simplicity — there is no possibility of complex dependency cycles, and the order is humanly visible in the project file. The cost is that refactoring (moving declarations between files) sometimes requires reordering the project, and large projects can have project files thousands of lines long.",
+      "refs": [
+        {
+          "target": "import-semantics#cycles-and-initialization",
+          "type": "extreme-example"
+        }
+      ]
+    },
+    {
+      "id": "module-and-namespace",
+      "title": "module Foo, namespace Foo, and [<AutoOpen>]",
+      "tags": [
+        "fsharp",
+        "modules",
+        "namespaces"
+      ],
+      "content": "F# also has `module Foo` and `namespace Foo` declarations. Modules are compilation-unit organizers (a file can be one module or several); namespaces are CLR-level namespaces inherited from .NET. The **`[<AutoOpen>]`** attribute on a module makes its contents implicitly imported when the enclosing namespace is referenced — a controlled mechanism for global-feeling helpers without polluting every consumer's import list.\n\nThe design lesson is that **strict file ordering eliminates entire classes of module-system complexity** at the price of project-file ergonomics. Most languages would never accept this trade-off, but for a language whose audience already accepts strict editor-driven workflows (F# users typically use Visual Studio or Rider, both of which display file order graphically), it works.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "F# modules",
+          "url": "https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/modules"
+        },
+        {
+          "label": "F# namespaces",
+          "url": "https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/namespaces"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "F# modules",
+      "url": "https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/modules"
+    },
+    {
+      "label": "F# namespaces",
+      "url": "https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/namespaces"
+    },
+    {
+      "label": "F# component design guidelines",
+      "url": "https://learn.microsoft.com/en-us/dotnet/fsharp/style-guide/component-design-guidelines"
+    }
+  ]
+}

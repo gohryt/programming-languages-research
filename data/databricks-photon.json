@@ -1,0 +1,34 @@
+{
+  "kind": "tool",
+  "name": "Databricks Photon",
+  "aliases": ["Photon", "Databricks vectorized engine"],
+  "summary": "Spark's native C++ execution engine (SIGMOD 2022): vectorised interpretation with SIMD-friendly kernels. ~80% of fully-compiled-code performance without per-query JIT compilation latency. Selective codegen for hot paths supplements vectorisation. Reaches the same point HyPer aims at without the JIT overhead.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Photon** (Databricks, SIGMOD 2022) is Apache Spark's native C++ execution engine, a full rewrite of Spark's SQL execution layer. Unlike HyPer's per-query codegen, Photon uses a **vectorised interpreter**: operations process batches of rows at a time with SIMD-friendly kernels, amortising dispatch overhead across the batch.\n\nThe architectural choice is deliberate: vectorised interpretation reaches ~80% of the performance of fully compiled code while avoiding per-query compilation latency. For workloads that mix many short queries with a few long-running ones, vectorisation is the better default. Photon supplements this with selective codegen for hot paths.",
+      "refs": [
+        { "target": "duckdb#overview", "type": "shares-design-with" },
+        { "target": "hyper-umbra#overview", "type": "alternative-to" },
+        { "target": "spark-tungsten#overview", "type": "successor-to" }
+      ],
+      "sources": [
+        { "label": "Photon (Databricks, SIGMOD 2022)", "url": "https://www.databricks.com/wp-content/uploads/2022/07/photon-sigmod22.pdf" }
+      ]
+    },
+    {
+      "id": "industry-convergence",
+      "title": "Industry convergence",
+      "tags": ["database", "vectorisation"],
+      "content": "Photon, DuckDB, and Velox illustrate a broader convergence: the best analytical query engines of 2024 are neither pure interpreters nor pure compilers, but vectorised engines with optional codegen. The dominant axis of optimisation has become **batching + SIMD**, not instruction-per-tuple compilation.\n\nThe lesson: vectorisation captures most of compilation's benefits without compilation's compile-time cost. For workloads where many distinct queries run, this trade-off is overwhelmingly favourable.",
+      "refs": [
+        { "target": "velox#overview", "type": "shares-design-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Photon SIGMOD 2022", "url": "https://www.databricks.com/wp-content/uploads/2022/07/photon-sigmod22.pdf" }
+  ]
+}

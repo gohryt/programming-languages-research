@@ -1,0 +1,50 @@
+{
+  "kind": "runtime",
+  "name": "zeptoforth",
+  "aliases": [
+    "Cortex-M Forth"
+  ],
+  "summary": "Modern Cortex-M Forth mixing subroutine threading, native code inlining, and a preemptively multitasking RTOS. Leans toward 'serious embedded application environment' while remaining performance-conscious — most tiny Forths stay minimal.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**zeptoforth** is a modern Cortex-M Forth that mixes subroutine threading, native code inlining, and a preemptively multitasking RTOS. It is interesting because most tiny Forths stay minimal, but zeptoforth leans toward \"serious embedded application environment\" while remaining performance-conscious.",
+      "refs": [
+        {
+          "target": "mecrisp#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "zeptoforth project page",
+          "url": "https://hackaday.io/project/170826-zeptoforth"
+        }
+      ]
+    },
+    {
+      "id": "position",
+      "title": "Position",
+      "tags": [
+        "forth",
+        "embedded"
+      ],
+      "content": "zeptoforth's combination of native codegen, RTOS multitasking, and a Forth interactive console makes it more than a minimal Forth — it is positioned as a development environment for non-trivial Cortex-M applications. The trade-off is footprint: zeptoforth is larger than Mecrisp's classic minimal implementations, but offers a richer programming environment in exchange.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "zeptoforth inline discussion",
+          "url": "https://github.com/tabemann/zeptoforth/discussions/190"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "zeptoforth",
+      "url": "https://hackaday.io/project/170826-zeptoforth"
+    }
+  ]
+}

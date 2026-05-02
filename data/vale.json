@@ -1,0 +1,50 @@
+{
+  "kind": "language",
+  "name": "Vale — Region-Borrowing Prototype and Group Borrowing",
+  "aliases": ["vale-language", "vale-lang"],
+  "summary": "Evan Ovadia's Vale layers region borrowing on top of generational references. Pure functions and `region` blocks can temporarily make data immutable, eliminating generation checks for code inside the block. The August 2025 Group Borrowing proposal (Nick Smith) is a zero-overhead alternative to aliasable-xor-mutable. The 'regions as immutability projection' design point — distinct from regions as deallocation discipline. Cross-ref `data/vale-generational-references` for the runtime check mechanism.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["vale", "region-based", "region-borrow"],
+      "content": "Evan Ovadia's **Vale** layers region borrowing on top of generational references. The sister record `data/vale-generational-references` covers the runtime mechanism (48-bit generation counters, ~2-10% runtime cost, traps on stale reads). This record covers the language-level design: how Vale combines generational references with opt-in region/pure annotations to give users zero-overhead immutability where they want it.\n\nAnnotation burden is opt-in: programs run without regions; add `pure`/region annotations only where you want zero generation checks. This is the **\"regions as immutability projection\"** design point — distinct from regions as deallocation discipline. Status (as of 2026-04): single-developer language, prototype-strong, with significant published design write-ups.",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "instance-of" },
+        { "target": "vale-generational-references#overview", "type": "extends" }
+      ],
+      "sources": [
+        { "label": "Vale Grimoire", "url": "https://verdagon.dev/grimoire/grimoire" }
+      ]
+    },
+    {
+      "id": "region-borrowing-prototype",
+      "title": "Region-borrowing prototype (July 2023)",
+      "tags": ["vale", "region-borrow", "pure-block", "non-lexical-region"],
+      "content": "The first region-borrowing prototype shipped July 2023: pure functions and `region` blocks can temporarily make data immutable, eliminating generation checks for code inside the block. A pure function cannot mutate its arguments; if the compiler proves a callee is `pure`, generational checks on its arguments can be elided because the data cannot have been freed during the call.\n\n`region` blocks generalise the pattern: a syntactic block is annotated as a read-only region, and the compiler uses that annotation to elide generation checks on data covered by the region. The result is opt-in zero-overhead read paths inside otherwise check-bearing code.",
+      "refs": [
+        { "target": "vale-generational-references#region-borrowing", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Vale region-borrowing prototype", "url": "https://verdagon.dev/blog/regions-prototype" }
+      ]
+    },
+    {
+      "id": "group-borrowing-proposal",
+      "title": "Group Borrowing proposal (August 2025)",
+      "tags": ["vale", "region-borrow"],
+      "content": "The August 2025 **Group Borrowing** proposal (Nick Smith, endorsed by Ovadia) is a *zero-overhead* alternative to aliasable-xor-mutable — adds mutable aliasing without RC/GC/generational refs, described as cleaner than Vale's regions, still draft. Hybrid-Generational Memory was effectively abandoned after ~32 iterations; Ovadia explicitly says regions + generational refs subsumed it.\n\nGroup Borrowing argues that the right primitive is not exclusive-mutable-or-shared-immutable, but *grouped* mutable aliasing where a set of references can be simultaneously mutable as long as they belong to the same explicit group. This is meaningfully different from Rust's borrow rules and from generational references, and the design has been positioned as a fourth option (alongside borrow checking, GC, RC) for the basic memory-safety question.",
+      "refs": [
+        { "target": "borrowing#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Vale Group Borrowing", "url": "https://verdagon.dev/blog/group-borrowing" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Vale region-borrowing prototype", "url": "https://verdagon.dev/blog/regions-prototype" },
+    { "label": "Vale Group Borrowing", "url": "https://verdagon.dev/blog/group-borrowing" },
+    { "label": "Vale Grimoire", "url": "https://verdagon.dev/grimoire/grimoire" }
+  ]
+}

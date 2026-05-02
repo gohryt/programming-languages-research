@@ -1,0 +1,64 @@
+{
+  "kind": "framework",
+  "name": "MMTk — Memory Management Toolkit",
+  "aliases": [
+    "Memory Management Toolkit"
+  ],
+  "summary": "Portable, language-agnostic GC framework written in Rust providing a catalog of pluggable plans (NoGC, MarkSweep, SemiSpace, Immix, GenImmix, StickyImmix, LXR) accessed through a clean binding API. Drives Ruby's Modular GC (Feature #20470) shipped in Ruby 3.4 (January 2025).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "garbage-collection",
+        "pluggable-gc",
+        "language-agnostic-gc-toolkit",
+        "rust"
+      ],
+      "content": "**MMTk** is a portable, language-agnostic GC framework written in Rust providing a catalog of pluggable plans (NoGC, MarkSweep, SemiSpace, Immix, GenImmix, StickyImmix, LXR) accessed through a clean binding API. Cross-runtime architecture with separate bindings (mmtk-openjdk, mmtk-julia, mmtk-ruby, mmtk-v8); plans share allocators, barriers, and tracing infrastructure.\n\nThe \"GC as portable library\" idea is what makes LXR-class research immediately transferable to multiple production runtimes.",
+      "refs": [
+        {
+          "target": "garbage-collection#hybrids-and-boundaries",
+          "type": "instance-of"
+        },
+        {
+          "target": "immix-gc",
+          "type": "implements"
+        },
+        {
+          "target": "lxr-gc",
+          "type": "hosts"
+        }
+      ]
+    },
+    {
+      "id": "architecture",
+      "title": "Plans, bindings, and the binding API",
+      "tags": [
+        "pluggable-gc",
+        "language-agnostic-gc-toolkit",
+        "framework"
+      ],
+      "content": "MMTk's architecture splits GC into three layers:\n\n- **Plans**: complete GC algorithms (NoGC, MarkSweep, SemiSpace, Immix, GenImmix, StickyImmix, LXR). A plan composes spaces, allocators, and tracing strategies.\n- **Spaces and allocators**: shared building blocks (immix space, mark-sweep space, copy space, large-object space, immortal space) that plans reuse.\n- **Bindings**: per-runtime glue translating between MMTk's object model and the host runtime's (mmtk-openjdk, mmtk-julia, mmtk-ruby, mmtk-v8). Bindings handle root scanning, write barriers, and object metadata.\n\nFirst-class support for hierarchical Immix and reference-counting plans not available in any production runtime."
+    },
+    {
+      "id": "deployment",
+      "title": "Production adoption",
+      "tags": [
+        "garbage-collection",
+        "production"
+      ],
+      "content": "**Ruby 3.4 Modular GC** (Feature #20470, January 2025) is the first production-language adoption of MMTk as a bundled gem — shipped experimentally with MarkSweep currently and Immix in testing. Julia binding active. V8 binding stalled. OpenJDK binding most mature, with research plans (LXR) used as performance baselines.\n\nThe pattern of adoption (research → MMTk plan → bindings → optional production deployment) means new collectors invented on MMTk become available across all binding languages with engineering investment proportional to the binding rather than the collector.\n\nStatus (as of 2026-04): actively maintained at github.com/mmtk; production via Ruby 3.4 Modular GC."
+    }
+  ],
+  "sources": [
+    {
+      "label": "MMTk",
+      "url": "https://github.com/mmtk"
+    },
+    {
+      "label": "Ruby 3.4 Modular GC and MMTk",
+      "url": "https://railsatscale.com/2025-01-08-new-for-ruby-3-4-modular-garbage-collectors-and-mmtk/"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Forth Text Interpreter",
+  "aliases": ["forth-parsing", "concatenative-parsing"],
+  "summary": "Forth's \"parser\" is not grammar-driven: a text interpreter scans blank-delimited words, looks them up in the dictionary, and either executes or compiles them; parsing is extensible at the word level because executing a word can change how the rest of the source line is consumed. Performance comes from compilation strategy, not syntax analysis.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Forth is a useful outlier because the \"parser\" is not a grammar-driven syntax-tree builder. A traditional Forth system has a **text interpreter** that repeatedly scans the next blank-delimited word from the input buffer, looks it up in the dictionary, and either executes it immediately or compiles its execution token depending on `STATE`. The input cursor is exposed as `>IN`; words such as `:`, `'`, `.\"`, `S\"`, and defining words are themselves **parsing words** that consume additional characters from the same input stream. This means parsing is extensible at the word level: executing a word can change how the rest of the current source line is consumed.",
+      "refs": []
+    },
+    {
+      "id": "recognizers-and-extensibility",
+      "title": "Recognizers and extensibility",
+      "tags": ["parser", "forth", "extensibility"],
+      "content": "The performance lesson is separation of concerns. The textual parser is intentionally simple — scan a word, dictionary lookup, recognizer chain, dispatch — while high-performance Forth systems invest in compilation strategy.\n\nModern Forth **recognizers** generalize the old \"if not found, try number conversion\" fallback into an extensible chain: one recognizer may identify integers, another floating literals, another quoted strings, another target-specific constants. VFX explicitly calls this out as a way to install new numeric literals and make the text interpreter easier to change; Gforth's manual similarly warns that parsing words should usually have a non-parsing factor because consuming from the input stream is hard to compose.",
+      "refs": [],
+      "sources": [
+        { "label": "Gforth — Text Interpreter", "url": "https://gforth.org/manual/The-Text-Interpreter.html" },
+        { "label": "Gforth — The Input Stream (net2o mirror)", "url": "https://net2o.de/gforth/The-Input-Stream.html" },
+        { "label": "ANS Forth — Dictionaries", "url": "https://forth-standard.org/standard/dictionaries" }
+      ]
+    },
+    {
+      "id": "compilation-strategies",
+      "title": "Gforth and VFX — compilation strategy as the optimization lever",
+      "tags": ["forth", "compilation", "performance"],
+      "content": "**Gforth** uses direct-threaded execution plus static and dynamic superinstructions in `gforth-fast`; the manual reports roughly 2× speedups from dynamic superinstructions with replication, with similar gains in the broader Ertl/Gregg superinstruction literature.\n\n**VFX Forth** represents the more aggressive native-code end: it preserves Forth's interactive model but compiles optimised native code with inlining and cross-word stack-traffic elimination, generating code MPE describes as within ~25% of hand-written assembler.\n\nThe parsing lesson is language-agnostic: a tiny extensible surface parser can coexist with serious optimisation if the compilation boundary is chosen carefully.",
+      "refs": [],
+      "sources": [
+        { "label": "Gforth dynamic superinstructions", "url": "https://gforth.org/manual/Dynamic-Superinstructions.html" },
+        { "label": "VFX Forth", "url": "https://mpeforth.com/software/pc-systems/vfx-forth-common-features/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Gforth — Text Interpreter", "url": "https://gforth.org/manual/The-Text-Interpreter.html" },
+    { "label": "Gforth — The Input Stream (net2o mirror)", "url": "https://net2o.de/gforth/The-Input-Stream.html" },
+    { "label": "Gforth dynamic superinstructions", "url": "https://gforth.org/manual/Dynamic-Superinstructions.html" },
+    { "label": "VFX Forth", "url": "https://mpeforth.com/software/pc-systems/vfx-forth-common-features/" },
+    { "label": "ANS Forth — Dictionaries", "url": "https://forth-standard.org/standard/dictionaries" }
+  ]
+}

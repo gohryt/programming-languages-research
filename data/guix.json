@@ -1,0 +1,66 @@
+{
+  "kind": "tool",
+  "name": "GNU Guix",
+  "aliases": [],
+  "summary": "GNU project's Lisp-based variant of the Nix functional-package-management model: package definitions are Scheme expressions instead of Nix expressions; same content-addressed store and hermetic-build reproducibility; emphasises bootstrappable builds traceable to a small bootstrap seed.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Guix** (GNU project) is a Lisp-based variant of the same functional-package-management model as Nix (`data/nix-flakes`). Package definitions are **Scheme expressions** instead of Nix expressions; the underlying store and reproducibility model are the same.\n\nBoth systems treat every package as a pure function from inputs to outputs, run builds in hermetic sandboxes, and store outputs in content-addressed paths. The two ecosystems coexist with minor cross-pollination (similar concepts, different surface syntax, different community).",
+      "refs": [
+        {
+          "target": "nix-flakes#overview",
+          "type": "sibling"
+        },
+        {
+          "target": "reproducible-builds#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "package-management#overview",
+          "type": "instance-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "GNU Guix — Defining Packages",
+          "url": "https://guix.gnu.org/manual/en/html_node/Defining-Packages.html"
+        }
+      ]
+    },
+    {
+      "id": "bootstrappable-builds",
+      "title": "Bootstrappable builds — tracing to a seed",
+      "tags": [
+        "guix",
+        "bootstrap",
+        "supply-chain"
+      ],
+      "content": "Guix additionally emphasizes **bootstrappable builds** — every package can be traced back to a small bootstrap seed. The compiler-bootstrap angle (mes-stage0, the ~512-byte bootstrap binary that grows into a working GCC) is covered in `data/gnu-mes-stage0`.\n\nThe distinction matters because most package managers (Cargo, npm, Nix-without-bootstrap) start their dependency chain at \"a downloaded compiler binary,\" which is itself an unauditable artifact unless someone independently rebuilt it. Guix's bootstrappable-builds discipline pushes the trust root all the way down to a tiny manually-auditable seed, defending against \"trusting trust\" attacks at the compiler layer.",
+      "refs": [
+        {
+          "target": "gnu-mes-stage0#overview",
+          "type": "uses"
+        }
+      ]
+    },
+    {
+      "id": "design-positioning-vs-nix",
+      "title": "Design positioning vs Nix",
+      "tags": [
+        "guix",
+        "comparison",
+        "design-guidance"
+      ],
+      "content": "Distinct from Nix flakes (`data/nix-flakes`): Guix uses Scheme (a Lisp dialect) as the package-definition language, while Nix uses its own dedicated Nix expression language. Both are functional, both are pure, both produce hermetic builds. The choice between them is largely about (a) preferred host language for package definitions, (b) ecosystem and package availability (Nixpkgs is much larger), and (c) GNU/FSF alignment (Guix only ships free-software-licensed packages by default).\n\nFor a language designer choosing between Nix and Guix as a model, the key observation is that the *functional, hermetic, content-addressed* model works regardless of the surface language. Either Scheme or a Nix-style expression language can host the discipline; the design depth is in the build-derivation calculus, not the syntax."
+    }
+  ],
+  "sources": [
+    {
+      "label": "GNU Guix — Defining Packages",
+      "url": "https://guix.gnu.org/manual/en/html_node/Defining-Packages.html"
+    }
+  ]
+}

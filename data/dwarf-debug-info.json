@@ -1,0 +1,113 @@
+{
+  "kind": "concept",
+  "name": "DWARF debug information and optimized-code challenges",
+  "aliases": [
+    "dwarf",
+    "DWARF location expressions",
+    "debuginfod",
+    "debug-info correctness"
+  ],
+  "summary": "Native debug-info format that maps optimized machine code back to source-level structure, types, variables, and stack state via location expressions and location lists; debuginfod (2019+) is the modern build-ID-keyed HTTP distribution layer.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The *encoding* side of DWARF — how line tables are packed into binaries — is covered in `data/bytecode-source-tables`. This section covers the debugger-side correctness problem: tracking variables and source positions *through* optimization so the debugger can display meaningful state.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:debug-metadata`\n- **domain**: `domain:debugging`\n- **granularity**: `granularity:per-frame`\n"
+    },
+    {
+      "id": "dwarf-location-expressions",
+      "title": "DWARF Location Expressions — Tracking Variables Through Optimization",
+      "tags": [
+        "compiler",
+        "domain:debugging",
+        "family:debug-metadata",
+        "granularity:per-frame"
+      ],
+      "content": "DWARF debug information describes where variables live at each point in execution using \"location descriptions\" — stack machine programs that compute a variable's address or value. A simple local variable might be described as \"register R12\" or \"frame pointer + 16.\" But after optimization, variables are split, merged, partially spilled, or eliminated entirely.\n\nDWARF handles this with location lists: a variable's location can change at different program counter ranges. At PC 0x100–0x120, the variable is in R12. At PC 0x120–0x140, it has been spilled to [RBP-24]. At PC 0x140–0x160, it has been optimized away entirely (\"value unavailable\"). The debugger consults the location list for the current PC to determine where to find each variable.\n\nThe correctness problem is severe. Li et al. (PLDI 2020) presented the first systematic framework for validating debug information in optimized code, finding that both GCC and LLVM produce incorrect DWARF information that causes debuggers to display wrong variable values. Assaiante et al. (2022) studied completeness — variables whose locations should be reportable but aren't — finding that 6–22% of variable locations are unnecessarily missing across GCC and Clang.\n\nThe practical consequence: debugging optimized code is unreliable. Variables show as \"optimized out\" even when their value is recoverable, and worse, sometimes show incorrect values. This is why developers often resort to `-O0` for debugging, sacrificing the 2–5x performance of optimized code. A language that generates correct, complete debug information — or provides its own debugging mechanism that bypasses DWARF — sidesteps this entire class of problems.",
+      "sources": [
+        {
+          "url": "https://dwarfstd.org/doc/Debugging-using-DWARF-2012.pdf"
+        },
+        {
+          "url": "https://faculty.cc.gatech.edu/~qzhang414/papers/pldi20_yuanbo1.pdf"
+        },
+        {
+          "url": "https://export.arxiv.org/pdf/2211.09568v1.pdf"
+        }
+      ]
+    },
+    {
+      "id": "debug-info-across-tiers",
+      "title": "Debug Information Across Tiers — The Mapping Problem",
+      "tags": [
+        "compiler",
+        "domain:debugging",
+        "family:debug-metadata",
+        "granularity:per-frame"
+      ],
+      "content": "When a program passes through multiple compilation stages (source → AST → IR → optimized IR → machine code), each transformation must carry debug information forward. Every instruction in the final machine code should map back to a source location, and every live variable should be locatable.\n\nThe mapping problem compounds across tiers:\n- **Inlining** duplicates source locations — the same source line appears at multiple machine code addresses.\n- **Loop unrolling** multiplies instructions — one source loop body becomes N copies.\n- **Dead code elimination** removes instructions — some source lines have no corresponding machine code.\n- **Register allocation** moves values — a variable's storage changes at spill/reload boundaries.\n\nFor JIT-compiled languages, the problem is worse: the JIT must emit debug information on the fly, and deoptimization must reconstruct source-level state from optimized representations. V8's TurboFan and HotSpot's C2 both maintain \"frame state\" metadata that describes how to reconstruct the interpreter's stack frame from the optimized code's register allocation — enabling deoptimization at any safepoint (see `data/osr-deoptimization` on OSR).\n\nThe lesson: debug information is not optional metadata bolted on at the end. It is a cross-cutting concern that every compilation pass must maintain. Designing the IR with debug info propagation in mind (as LLVM does with `!dbg` metadata on every instruction) is essential.",
+      "sources": [
+        {
+          "url": "https://llvm.org/docs/SourceLevelDebugging.html"
+        }
+      ]
+    },
+    {
+      "id": "bytecode-to-native-source-map",
+      "title": "Bytecode-to-Native Source Map — Apache Harmony / HotSpot",
+      "tags": [
+        "domain:debugging",
+        "family:debug-metadata",
+        "granularity:per-frame",
+        "jvm"
+      ],
+      "content": "JVMs maintain metadata that maps between bytecode offsets, source positions, and relevant native-code addresses. For debuggable or deoptimizable code, the JIT records enough information to map selected native PCs back to bytecode/source locations, handle safepoints, and reconstruct inlined frames. This allows a breakpoint requested at a bytecode offset to be implemented in native code where possible, and allows a native fault or sampled PC to be explained via native address → bytecode offset → line number table. The mapping is implementation-dependent and becomes approximate or many-to-many under optimization and inlining.\n\nSource maps are the critical bridge between the user's mental model (source lines) and the machine's reality (instruction pointers or bytecode offsets). Without bidirectional mapping, debugging is impossible. Every debuggable system has this mapping in some form.",
+      "sources": [
+        {
+          "url": "https://harmony.apache.org/subcomponents/drlvm/breakpoints_and_ss.html"
+        }
+      ]
+    },
+    {
+      "id": "debuginfod",
+      "title": "debuginfod — Build-ID-Keyed HTTP Symbol Distribution",
+      "tags": [
+        "domain:debugging",
+        "family:debug-metadata"
+      ],
+      "content": "A recurring production problem: stripped binaries save 10× disk and RAM, but strip their own debug info with them. Traditional answers — ship a debug build alongside, maintain a symbol server per tool — are clumsy. `debuginfod` (elfutils, 2019+) is the HTTP-native modern answer and is now integrated into GDB, LLDB, Valgrind, and delve.\n\nThe primitive is the **build-ID**: a 160-bit SHA-1 embedded in the ELF header at link time via `ld --build-id`. The build-ID uniquely identifies a specific compiled artifact — rebuild with any change and it changes. `debuginfod` is an HTTP service keyed on build-ID: `GET /buildid/<hex>/debuginfo`, `GET /buildid/<hex>/executable`, `GET /buildid/<hex>/source/<path>` return the matching `.debug` file, the full binary, and source listings on demand.\n\nWhen GDB attaches to a stripped binary, it reads the build-ID from the ELF, sends it to the servers listed in `DEBUGINFOD_URLS`, and caches the response under `$XDG_CACHE_HOME/.debuginfod_client/`. Distribution servers — `debuginfod.archlinux.org`, `debuginfod.ubuntu.com`, Fedora's, and `debuginfod.elfutils.org` (a federated front-end that fans out to multiple upstreams) — index every package's `.debug` files and source trees and serve them globally. Ubuntu, Arch, and Fedora auto-enable the client via shell profile.\n\nThe implication for language design: **debug info becomes a separate concern from the binary and can be retrieved on demand by the debugger**. A language emitting standard DWARF with build-IDs gets the entire debuginfod ecosystem for free. Delve (Go debugger) supports it; Valgrind and KDE Crash Report do too. Sanitizer symbolization is more constrained because crash-time reporting may run in-process or in a tightly controlled helper, but modern sanitizer flows commonly delegate to external symbolizers such as `llvm-symbolizer`; debuginfod can participate when the symbolizer and distribution are built/configured for it.\n\nThe broader pattern is content-addressed symbol distribution: Microsoft's symsrv + SymbolSource has offered a similar service for PDB files for decades, keyed on the PDB signature/GUID plus age. debuginfod's contribution is making this ecosystem *default-on* for open-source stripped Linux binaries.",
+      "sources": [
+        {
+          "url": "https://sourceware.org/elfutils/Debuginfod.html"
+        },
+        {
+          "url": "https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://dwarfstd.org/doc/Debugging-using-DWARF-2012.pdf"
+    },
+    {
+      "url": "https://faculty.cc.gatech.edu/~qzhang414/papers/pldi20_yuanbo1.pdf"
+    },
+    {
+      "url": "https://export.arxiv.org/pdf/2211.09568v1.pdf"
+    },
+    {
+      "url": "https://llvm.org/docs/SourceLevelDebugging.html"
+    },
+    {
+      "url": "https://harmony.apache.org/subcomponents/drlvm/breakpoints_and_ss.html"
+    },
+    {
+      "url": "https://sourceware.org/elfutils/Debuginfod.html"
+    },
+    {
+      "url": "https://sourceware.org/gdb/onlinedocs/gdb/Debuginfod.html"
+    }
+  ]
+}

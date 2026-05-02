@@ -1,0 +1,73 @@
+{
+  "kind": "tool",
+  "name": "Numba",
+  "aliases": [],
+  "summary": "Lam, Pitrou, Seibert et al. (Anaconda, 2012+): decorator-driven Python JIT. `@jit` or `@njit` on a function triggers type inference from actual arguments, lowers to a typed IR, and emits machine code via llvmlite. Lives inside an ordinary CPython process. Strongest on tight NumPy loops; falls back to CPython dispatch outside the typed subset.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Numba (Anaconda, 2012+) takes the opposite position from Codon: instead of replacing CPython, it lives *inside* a normal CPython process and compiles selected functions on demand. The `@jit` (or `@njit` — \"no-Python\" mode) decorator marks a function for JIT compilation; on first call, Numba's frontend infers Python and NumPy types from the call's actual arguments, lowers a typed IR, and emits machine code via llvmlite (Numba's LLVM Python binding, ~14 MB vs LLVM's full ~100 MB).",
+      "refs": [
+        { "target": "llvm#backend-role", "type": "uses" },
+        { "target": "tiered-compilation#overview", "type": "alternative-to" },
+        { "target": "codon#overview", "type": "alternative-approach" }
+      ],
+      "sources": [
+        {
+          "label": "Numba",
+          "url": "https://numba.pydata.org/"
+        }
+      ]
+    },
+    {
+      "id": "decorator-driven-jit",
+      "title": "Decorator-driven JIT",
+      "tags": ["jit", "python", "tooling"],
+      "content": "Numba's model is built around explicitly marking functions for compilation rather than accelerating a whole runtime uniformly. This makes it a useful contrast to JIT systems embedded deeply into language runtimes or bytecode VMs: incremental adoption is the killer feature — users add `@jit` to their hot loops without rewriting the program.\n\nGPU support via `@cuda.jit` extends the same decorator surface to CUDA kernels. AOT mode lets functions be compiled ahead of time and cached across processes.",
+      "refs": [
+        { "target": "copy-and-patch#overview", "type": "alternative-to" },
+        { "target": "deegen#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "typed-subset-boundary",
+      "title": "Typed subset boundary",
+      "tags": ["python", "compiler", "tradeoffs"],
+      "content": "The deployment niche is *numerical and array-heavy* code: Numba shines on tight `for` loops over NumPy arrays, ufuncs, and reductions, where type inference reliably collapses to fixed numeric types. The compiled function reuses NumPy's memory layout directly, so no marshalling cost crosses the JIT boundary.\n\nThe price of staying inside CPython is real: anything that calls Python C-extension functions whose signatures Numba can't infer falls back to \"object mode\" with full CPython dispatch overhead, often eliminating the speedup entirely. The typed-subset boundary is fundamental to this design point.",
+      "refs": [
+        { "target": "codon#compatibility-tradeoffs", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "llvm-backend-role",
+      "title": "LLVM backend role",
+      "tags": ["llvm", "backend", "python"],
+      "content": "Numba is a strong practical illustration of LLVM's role as a reusable backend for a high-level language tool. The llvmlite library is a project deliverable in its own right: a slim Python binding to LLVM (~14 MB vs LLVM's full ~100 MB) that other Python-based JIT projects can reuse.\n\nThe lesson generalises: a decorator-driven JIT operating on a typed subset of an existing dynamic language is a viable middle ground between full-language acceleration (PyPy, GraalPy, CPython JIT) and language-replacement compilation (Codon).",
+      "refs": [
+        { "target": "llvm#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        {
+          "label": "llvmlite",
+          "url": "https://github.com/numba/llvmlite"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Numba",
+      "url": "https://numba.pydata.org/"
+    },
+    {
+      "label": "llvmlite",
+      "url": "https://github.com/numba/llvmlite"
+    },
+    {
+      "label": "Numba @jit documentation",
+      "url": "https://numba.pydata.org/numba-doc/dev/user/jit.html"
+    }
+  ]
+}

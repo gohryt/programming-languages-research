@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "First-Class Verification Dialects for MLIR",
+  "aliases": ["mlir-verif-dialects"],
+  "summary": "Fehr, Fan, Pompougnac, Regehr, and Grosser (PLDI 2025): bring verification artifacts into MLIR as dialects rather than translating out to a separate one-off verifier format too early. Compiler transformations and verification obligations coexist in the same multi-level infrastructure.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Fehr, Fan, Pompougnac, Regehr, and Grosser's **First-Class Verification Dialects for MLIR** (PLDI 2025) brings verification artifacts into MLIR as dialects rather than translating out to a separate one-off verifier format too early. The premise is that compiler transformations and verification obligations should coexist in the same multi-level infrastructure: operations, regions, types, attributes, and rewrite passes can carry both executable semantics and proof-relevant facts.",
+      "refs": [
+        { "target": "mlir#overview", "type": "extends" },
+        { "target": "verification-intermediate-languages#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "First-Class Verification Dialects for MLIR (PLDI 2025)", "url": "https://pldi25.sigplan.org/details/pldi-2025-papers/60/First-Class-Verification-Dialects-for-MLIR" }
+      ]
+    },
+    {
+      "id": "vs-traditional-vil",
+      "title": "Verification dialects vs traditional VILs",
+      "tags": ["verification", "mlir", "compiler-ir"],
+      "content": "This is a different point from Boogie/Viper/WhyML. Traditional VILs are stable targets consumed by external provers. Verification dialects instead let compiler passes lower, transform, and preserve proof obligations alongside ordinary IR, using MLIR's dialect-conversion machinery. The advantage is locality: a transformation can rewrite code and the corresponding verification representation in one framework. The risk is framework weight and dialect-design complexity.\n\nThe design lesson: **verification can be a first-class multi-level IR concern**, not only a post-lowering export step. Languages that already use MLIR can encode refinements, memory models, permissions, or proof obligations in dialects and delay commitment to a specific external prover until later in the pipeline.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "First-Class Verification Dialects for MLIR (PLDI 2025)", "url": "https://pldi25.sigplan.org/details/pldi-2025-papers/60/First-Class-Verification-Dialects-for-MLIR" },
+    { "label": "Fehr et al. — First-Class Verification Dialects for MLIR", "url": "https://users.cs.utah.edu/~regehr/papers/pldi25.pdf" }
+  ]
+}

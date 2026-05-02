@@ -1,0 +1,26 @@
+{
+  "kind": "concept",
+  "name": "NBR — Neutralization-Based Reclamation",
+  "aliases": ["NBR", "neutralization-based reclamation"],
+  "summary": "Singh, Brown, Mashtizadeh (PPoPP 2021) use an EBR-like fast path; when the thread-local retire buffer overflows, the reclaimer sends a POSIX signal to all threads, which respond by re-validating their position (handshake) — neutralising any thread holding stale references. Bounds memory like HP but reclamation speed like EBR (38% faster than DEBRA on BST, 243% faster than HP on lazy linked-list). No record-layout changes, no recovery code.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["safe-memory-reclamation", "neutralization-based", "epoch-based", "bounded-memory"],
+      "content": "Singh, Brown, Mashtizadeh's **Neutralization-Based Reclamation** (PPoPP 2021) uses an EBR-like fast path; when the thread-local retire buffer overflows, the reclaimer sends a POSIX signal to all threads, which respond by re-validating their position (a handshake) — \"neutralising\" any thread holding stale references.\n\nResult: bounds memory like HP but reclamation speed like EBR. Reported wins: 38% faster than DEBRA on a binary search tree benchmark; 243% faster than HP on a lazy linked-list. **No record-layout changes, no recovery code** — the data structure does not need to be modified to support NBR, unlike VBR which requires version stamps in every node.\n\nWorks for many lock-based as well as lock-free structures using only atomic R/W/CAS, broadening its applicability beyond classical lock-free SMR territory.",
+      "refs": [
+        { "target": "epoch-based-reclamation", "type": "extends" },
+        { "target": "hazard-pointers", "type": "compared-with" },
+        { "target": "vbr-reclamation", "type": "contrasts-with" },
+        { "target": "interval-based-reclamation", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "NBR (PPoPP 2021)", "url": "https://rcs.uwaterloo.ca/~ali/papers/ppopp21-nbr.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "NBR paper", "url": "https://rcs.uwaterloo.ca/~ali/papers/ppopp21-nbr.pdf" }
+  ]
+}

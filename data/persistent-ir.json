@@ -1,0 +1,62 @@
+{
+  "kind": "concept",
+  "name": "Persistent IR",
+  "aliases": [],
+  "summary": "IR designed to survive across compiler phases or sessions, enabling incremental recomputation, structural sharing, and durable compiler state. Examples: Unison's hashed AST database, Salsa's memoized query graph, Lean 4's persistent arrays.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A persistent IR survives across compilation sessions. The boundary between \"IR\" and \"database\" blurs: the compiler's intermediate state lives in a durable structure that the next session, the next query, or the language server reuses.\n\nThe distinguishing axis across implementations is what persistence enables: incremental compilation memoization (Salsa), distributed execution and rename-without-cost (Unison), or fast persistent data structures inside the compiler itself (Lean 4).",
+      "refs": [
+        { "target": "content-addressed-ir#overview", "type": "complements" },
+        { "target": "language-server#overview", "type": "essential-for" }
+      ]
+    },
+    {
+      "id": "why-persistence-matters",
+      "title": "Why persistence matters",
+      "tags": ["incrementality", "compiler-design", "storage"],
+      "content": "Persistence is what makes compilers behave like databases instead of one-shot pipelines. The properties that follow:\n\n- **Reuse across edits**: a one-character change should recompile one function, not the whole program.\n- **Reuse across sessions**: a language server should not redo work the previous session already completed.\n- **Concurrent queries**: multiple readers can query without blocking each other when the IR is immutable.\n- **Distributed execution**: a persistent artifact can be shipped, cached, and consumed elsewhere.\n\nrust-analyzer's adoption of Salsa demonstrates the gain: queries that depend on unchanged inputs are skipped entirely, turning a multi-second analysis pass into a millisecond cache hit.",
+      "refs": [
+        { "target": "language-server#design-constraints", "type": "powers" }
+      ]
+    },
+    {
+      "id": "common-techniques",
+      "title": "Common techniques",
+      "tags": ["data-structures", "incrementality", "representation"],
+      "content": "Production techniques for persistent IR:\n\n- **Memoized query graph** (Salsa, rust-analyzer): every query result (parsed AST, resolved name, inferred type, computed MIR) is cached and identified by its inputs. When an input changes, dependent results are invalidated; everything else is reused. Salsa 2.0+ supports parallel query evaluation.\n- **Persistent arrays / HAMTs** (Lean 4): the compiler's intermediate state lives in HAMT-style tries with a tail buffer that mutates in place under unique reference count. Sharing structure across versions makes rollback trivial — drop the reference to the new state.\n- **Hash-addressed AST database** (Unison): the codebase is a SQLite-backed store of hashed AST nodes; renames and deduplication are metadata-only.\n- **Build-system caching** (Bazel, Nix): persistence at the artifact level rather than IR level, but the same query-cache shape.",
+      "refs": [
+        { "target": "content-addressed-ir#representation-consequences", "type": "uses" },
+        { "target": "mlir#overview", "type": "potential-substrate" }
+      ],
+      "sources": [
+        {
+          "label": "Salsa — Incremental Computation Framework",
+          "url": "https://github.com/salsa-rs/salsa"
+        }
+      ]
+    },
+    {
+      "id": "trade-offs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "storage", "compiler"],
+      "content": "Persistent representations improve reuse and sharing, but they impose architectural commitments:\n\n- **Schema stability**: every IR change becomes a schema migration affecting every cached value.\n- **Serialization**: the IR must be representable as durable bytes, which constrains data-structure choice.\n- **Dependency tracking**: the system must know which inputs each query read, or invalidation is unsafe. This is what Salsa's automatic dependency-tracking handles, but at the cost of running every read through the framework.\n- **Compatibility**: stored artifacts must remain readable across compiler updates, or the persistence is lost on every release.\n\nPersistence is therefore a first-class architectural decision, not a storage optimization layered on top.",
+      "refs": [
+        { "target": "content-addressed-ir#trade-offs", "type": "shares" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Salsa — Incremental Computation Framework",
+      "url": "https://github.com/salsa-rs/salsa"
+    },
+    {
+      "label": "Unison — The Big Idea",
+      "url": "https://www.unison-lang.org/docs/the-big-idea/"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "tool",
+  "name": "Ruff Parser",
+  "aliases": ["ruff"],
+  "summary": "Ruff (Python linter and formatter, written in Rust) migrated from RustPython parser → LALRPOP-generated → hand-written recursive descent (v0.4.0, April 2024); reported ~2× faster parsing and 20–40% overall speedup; canonical case study for the hand-written-vs-generated trade-off.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ruff is a Python linter and formatter written in Rust. Its parser evolution is one well-documented data point for the broader hand-written-vs-generated trade-off in modern parser engineering.\n\nRuff initially used the RustPython parser, then a LALRPOP-generated parser. In v0.4.0 (April 2024), it switched to a hand-written recursive descent parser; the project reported roughly 2x faster parsing and a 20–40% overall speedup across linting and formatting, with 2.2–2.4x speedup per file on micro-benchmarks.",
+      "refs": [
+        { "target": "recursive-descent#overview", "type": "uses" },
+        { "target": "lr-parser-generators#overview", "type": "migrated-from" }
+      ]
+    },
+    {
+      "id": "migration-rationale",
+      "title": "Migration rationale",
+      "tags": ["parser", "tooling", "case-study"],
+      "content": "The reasons cited for the migration mirror the general pattern of production compilers leaving generators behind:\n\n- **Control and flexibility**: Python has syntactic constructs (e.g., parenthesized `with` items) that the team found awkward to encode in a generator's grammar DSL but straightforward in hand-written code.\n- **Performance**: the generated parser was opaque to hot/cold-path distinction and domain-specific tuning. Hand-written code allowed direct control over allocation, lookahead, and branch prediction.\n- **Error recovery**: hand-written code allows context-sensitive recovery (inserting missing colons, recovering from invalid assignment targets) directly in local control flow. Generators can support sophisticated recovery via hooks, annotations, or external repair, but the previous setup made the necessary recoveries impractical. Diagnostics shifted from generic \"Unexpected token\" to structured messages like \"Expected 'def', 'with' or 'for' to follow 'async', found 'while'\".\n- **Editor resilience**: a tool that runs as a language server must produce useful trees on syntactically invalid code; the hand-written parser made resilient parsing tractable.",
+      "refs": [
+        { "target": "error-recovery#resilient-parsing-for-tooling", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "Ruff v0.4.0 announcement", "url": "https://astral.sh/blog/ruff-v0.4.0" }
+      ]
+    },
+    {
+      "id": "broader-pattern",
+      "title": "Broader pattern — when generators stop paying off",
+      "tags": ["parser", "design-guidance", "tooling"],
+      "content": "Ruff's migration matches a broader practitioner trend: parser generators (LALRPOP, yacc/Bison, ANTLR, Menhir) are excellent for bootstrapping, grammar documentation, and static conflict analysis, but they can become constraints as a tool matures. Production compilers and toolchains using hand-written parsers — typically recursive descent plus Pratt/precedence climbing for expressions — include GCC, Clang, Go, rustc, V8, Zig, Ruff, and rust-analyzer. The usual reasons are custom error recovery, contextual lookahead, incremental reparsing, and hot-path tuning that outweigh the convenience of grammar-driven generation.\n\nThe right choice depends less on theoretical power than on who must debug the grammar, own the diagnostics, and optimize the parser. Ruff is the cleanest recent data point because it documents the exact migration path and quantifies the gain.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Ruff v0.4.0 announcement", "url": "https://astral.sh/blog/ruff-v0.4.0" }
+  ]
+}

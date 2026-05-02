@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "CIL",
+  "aliases": [".net-cil", "msil", "common-intermediate-language"],
+  "summary": ".NET's stack-based, typed, verifiable bytecode (ECMA-335). Shares the JVM's stack-based shape; adds explicit value types, reified generics, unsafe pointer types, and tail-call instructions. JIT-compiled by RyuJIT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "CIL is .NET's bytecode, sharing the JVM's stack-based, typed, verifiable shape (ECMA-335). The deltas worth recording are what CIL adds beyond JVM: explicit value types (structs that don't heap-allocate), reified generics (preserved through CIL rather than erased), unsafe pointer types, and tail-call instructions.\n\nThe runtime (CoreCLR) JIT-compiles CIL via RyuJIT. The design philosophy is \"the runtime is a target, not a translator\": source languages (C#, F#, VB.NET, IronPython, IronRuby) compile to CIL with as little semantic loss as possible, and the runtime JITs the features rather than the front-end lowering them away.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "jvm-bytecode#overview", "type": "shares-pattern-with" }
+      ],
+      "sources": [
+        { "label": "ECMA-335 (Common Language Infrastructure)", "url": "https://ecma-international.org/publications-and-standards/standards/ecma-335/" }
+      ]
+    },
+    {
+      "id": "value-types-and-generics",
+      "title": "Value types and reified generics",
+      "tags": ["bytecode", "type-system"],
+      "content": "CIL's distinctive features over JVM bytecode are value types and reified generics. A `struct` in C# allocates on the stack or inline in containing objects rather than heap-allocating; CIL preserves that distinction through to the JIT, which can flatten value-type fields into surrounding storage.\n\nReified generics keep type parameters in the CIL metadata at runtime: `List<int>` is a distinct type from `List<string>` at the bytecode level. This is the opposite of Java's erasure, and is the reason Project Valhalla on the JVM is a multi-year retrofit — what CIL got at design time, the JVM is recovering decades later.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ECMA-335 (Common Language Infrastructure)", "url": "https://ecma-international.org/publications-and-standards/standards/ecma-335/" }
+  ]
+}

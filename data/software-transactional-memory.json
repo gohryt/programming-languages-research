@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "Software Transactional Memory",
+  "aliases": ["stm"],
+  "summary": "Coordination mechanism that groups memory operations into transactions which commit atomically or retry; composes better than locks because transactions can be combined without manually imposing a global lock ordering. Production examples include Haskell STM (TVar/atomically/retry/orElse) and Clojure refs (MVCC-style snapshot isolation in dosync blocks).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "STM lets code group memory operations into transactions that commit atomically or retry. It composes better than locks because transactions can be combined without manually imposing a global lock ordering: a function that updates two STM variables can be called from another transaction that updates a third, and the runtime takes responsibility for the resulting atomicity.\n\nSTM came out of 1990s–2000s research and reached production via two influential designs: GHC's `TVar`-based STM in Haskell, and Clojure's `ref` system over MVCC-style snapshot isolation.",
+      "refs": [
+        { "target": "synchronization-primitives#locks-and-mutexes", "type": "alternative" }
+      ]
+    },
+    {
+      "id": "haskell-stm",
+      "title": "Haskell STM",
+      "tags": ["stm", "haskell", "composition"],
+      "content": "GHC supports Software Transactional Memory with atomic blocks, transactional variables, `retry`, `orElse`, and invariants. The core API: `TVar a` for transactional references, `atomically :: STM a -> IO a` to commit, `retry :: STM a` to abort and re-run when watched state changes, `orElse :: STM a -> STM a -> STM a` to compose alternatives.\n\nThe coordination angle is that `retry` and `orElse` provide a different vocabulary from locks or channels: a transaction blocks until watched state changes, rather than explicitly waiting on a condition variable or mailbox. Combined with GHC's cheap lightweight threads (`data/virtual-threads#mn-scheduling-model`), this makes a blocking transaction a park of a lightweight computation rather than a sleep of an expensive kernel thread, which broadens the situations where STM is practical.\n\n`STM` is a separate monad from `IO`, statically preventing programmers from performing arbitrary side effects (file I/O, mutable IORefs) inside a transaction — a guarantee that production STM systems in less-typed languages cannot offer.",
+      "refs": [
+        { "target": "virtual-threads#mn-scheduling-model", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "GHC STM documentation", "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/stm.html" }
+      ]
+    },
+    {
+      "id": "clojure-refs-and-mvcc",
+      "title": "Clojure refs and MVCC snapshot isolation",
+      "tags": ["stm", "clojure", "mvcc"],
+      "content": "Clojure refs use STM with MVCC-style snapshot isolation and automatic retry on conflicts. The discipline: `(dosync (alter ref-a inc) (alter ref-b dec))` runs as a transaction; conflicting transactions retry. Persistent data structures make speculative updates cheap — a transaction's writes go to a new immutable version of each ref's value, and commit just CAS-installs the new version.\n\nClojure's broader concurrency story explicitly separates **coordinated** synchronous changes (refs in `dosync`), **independent** synchronous changes (`atom`s with CAS), and **independent** asynchronous changes (`agent`s with a queue of pending updates). This separation is one of the cleanest production examples of \"different state-coordination problems want different primitives\".",
+      "refs": [],
+      "sources": [
+        { "label": "Clojure refs and transactions", "url": "https://clojure.org/reference/refs" },
+        { "label": "Clojure concurrent programming", "url": "https://clojure.org/concurrent_programming" }
+      ]
+    },
+    {
+      "id": "tradeoffs-and-design-guidance",
+      "title": "Trade-offs and design guidance",
+      "tags": ["stm", "tradeoffs", "design-guidance"],
+      "content": "STM strengths: composability across libraries (no need to publish a global lock-ordering convention), elegant blocking primitives (`retry` + `orElse`), interaction with persistent data structures.\n\nSTM costs: transactions can starve under contention; long transactions waste work; opacity-vs-eager-snapshot trade-offs make optimisation subtle; and the language must restrict transactional code to memory operations only — arbitrary I/O cannot live inside a transaction without violating atomicity.\n\nSTM is most useful when (a) the language has cheap lightweight threads or futures so retries don't pin expensive kernel resources, and (b) the type system can statically separate transactional from non-transactional code. Without those, STM is fragile in production. Hardware Transactional Memory (Intel TSX, IBM Power) is a separate hardware-assisted variant; it has not displaced software STM in mainstream language runtimes."
+    }
+  ]
+}

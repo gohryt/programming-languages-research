@@ -1,0 +1,57 @@
+{
+  "kind": "framework",
+  "name": "Pest",
+  "aliases": [],
+  "summary": "Rust PEG parser generator emphasizing accessibility and speed over theoretical guarantees. Behaves as a PEG recursive-descent interpreter without packrat memoization.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "pest is a Rust PEG parser generator emphasizing accessibility and speed over theoretical guarantees. It follows PEG ordered-choice semantics: alternatives are tried in order, and a later alternative is considered only if the earlier one fails. Generated parsers read like direct recursive-descent code rather than table-driven state machines.",
+      "refs": [
+        { "target": "peg-parsing#overview", "type": "instance-of" },
+        { "target": "parser-combinators#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "no-packrat-by-default",
+      "title": "No packrat memoization by default",
+      "tags": ["parser", "memoization", "performance"],
+      "content": "Pest does not advertise packrat linear-time guarantees the way rust-peg's `#[cache]` attribute and peginator's opt-in memoization do. In practice pest behaves like a PEG recursive-descent interpreter of the grammar, trading worst-case complexity guarantees for smaller memory footprint and strong performance on typical inputs.\n\nRepetitions and predicates are greedy and do not perform regex-style backtracking to make later expressions succeed. For pathological inputs or grammars with costly ordered-choice patterns, a memoizing alternative (pegen in CPython 3.9+, rust-peg with `#[cache]`) is the safer choice.",
+      "refs": [
+        { "target": "peg-parsing#packrat-parsing", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "grammar-authoring",
+      "title": "Grammar authoring and ergonomics",
+      "tags": ["parser", "grammar", "tooling"],
+      "content": "Pest's distinguishing strength is grammar-first authoring that fits Rust development workflows: a `.pest` file declares the grammar, the `pest_derive` crate generates the parser at build time, and rule definitions feel close to the abstract grammar rather than to the generated code. Error messages are framed in grammar terms, which makes pest a productive choice for DSLs, configuration languages, and small languages where grammar clarity matters more than performance ceiling.",
+      "refs": [
+        { "target": "antlr4#grammar-authoring", "type": "related" },
+        { "target": "recursive-descent#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "parser"],
+      "content": "pest offers readable grammars, good error messages, and fast common-case parsing — at the cost of lacking an explicit packrat complexity guarantee for adversarial inputs. It is attractive where grammar clarity and direct Rust integration matter, but it inherits PEG ordered-choice semantics and does not provide the editor-resilience of tree-sitter or the formal expressiveness of GLR/Earley families.",
+      "refs": [
+        { "target": "peg-parsing#strengths-and-tradeoffs", "type": "inherits" },
+        { "target": "tree-sitter#overview", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "pest documentation",
+      "url": "https://pest.rs/"
+    },
+    {
+      "label": "pest repository",
+      "url": "https://github.com/pest-parser/pest"
+    }
+  ]
+}

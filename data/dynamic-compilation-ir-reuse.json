@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Reusing Highly Optimised IR in Dynamic Compilation",
+  "aliases": ["IR cache", "Oracle Labs IR reuse"],
+  "summary": "Oracle Labs ECOOP 2025: cache and preserve highly optimised IR across recompilations in dynamic compilation systems. Reduces the repeated optimisation work that re-running the optimiser would do, at the cost of assumption-invalidation tracking and IR-version compatibility.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Dynamic compilers (JITs) typically discard optimised IR after producing machine code, then re-run the optimiser if the function needs recompilation due to deoptimisation, profile changes, or speculative invalidation. The Oracle Labs ECOOP 2025 paper presents techniques for **caching and reusing highly optimised IR** across these recompilations.\n\nThe payoff: the second compilation pass starts from the optimised IR of the first, skipping most of the optimisation work that produced it. Recompilations after deopt or speculation invalidation finish in a fraction of the time they would otherwise.",
+      "refs": [
+        { "target": "osr-deoptimization#overview", "type": "interacts-with" },
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ],
+      "sources": [
+        { "label": "Reusing Highly Optimized IR in Dynamic Compilation (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.25" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["jit", "cache"],
+      "content": "The cost is in tracking what assumptions the cached IR depends on. Every speculative optimisation in the cached IR is conditional on a runtime assumption; if any of those assumptions invalidate, the cached IR is invalid for those parts. Tracking assumption dependencies precisely is non-trivial.\n\nThe second cost is IR versioning: the optimiser's IR format may change between runs (across compiler updates, across runtime restarts), so cached IR from one version may not be loadable by a later one. Production systems handle this with version tags and a fallback to recompilation when the cache is stale.\n\nThe trade-off pays off most when recompilation is frequent — speculative-deopt-heavy workloads, streaming workloads where profile changes trigger frequent re-specialisation, and warm-up tiers that re-optimise on additional profile data.",
+      "refs": [],
+      "sources": [
+        { "label": "Oracle Labs publication page", "url": "https://labs.oracle.com/pls/apex/f?p=94065:10:983652587227:11670" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "ECOOP 2025 paper", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.25" }
+  ]
+}

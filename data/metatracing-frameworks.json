@@ -1,0 +1,35 @@
+{
+  "kind": "framework",
+  "name": "Meta-Tracing Frameworks",
+  "aliases": ["RPython meta-tracer", "PyPy framework", "2SOM"],
+  "summary": "RPython meta-tracer builds a JIT for an interpreter rather than for a program: trace the interpreter's execution as it runs the program, partial-evaluate against the trace, and produce a specialised JIT for that program. PyPy is the production demonstration; 2SOM is the multi-tier example.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**RPython** (the implementation language behind PyPy) provides a meta-tracing framework: a JIT generator that produces a tracing JIT for an interpreter rather than for a program. The interpreter is written in RPython; the meta-tracer traces the interpreter's execution as it runs the user program, then partial-evaluates against the trace to produce specialised native code.\n\nThis is Futamura's first projection in production form: the JIT is derived from the interpreter, not hand-written. Adding a new language to PyPy means writing only the interpreter; the JIT comes for free.",
+      "refs": [
+        { "target": "futamura-projections#truffle-graal-realisation", "type": "alternative-to" },
+        { "target": "trace-based-jit#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "PyPy musings on tracing", "url": "https://pypy.org/posts/2025/01/musings-tracing.html" }
+      ]
+    },
+    {
+      "id": "two-som",
+      "title": "2SOM — adding tiers without a second backend",
+      "tags": ["jit", "research"],
+      "content": "**2SOM** is a research artifact that demonstrates adding a warm-up tier to a meta-traced JIT without a second full backend. The technique: the same RPython interpreter is given multiple definitions at different levels of detail; the meta-tracer can trace any of them. The fast-path interpreter handles cold code; a more detailed interpreter handles warm code; the JIT specialises against the trace of whichever interpreter the meta-tracer recorded.\n\nThis avoids the cost of writing a second JIT backend while still getting tier-up behaviour. The cost is design effort to maintain multiple correct interpreter definitions; the benefit is much less engineering than building a full method-level optimising JIT alongside the trace JIT.",
+      "refs": [],
+      "sources": [
+        { "label": "A Lightweight Method for Generating Multi-Tier JIT", "url": "https://arxiv.org/html/2504.17460v1" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "PyPy musings", "url": "https://pypy.org/posts/2025/01/musings-tracing.html" },
+    { "label": "2SOM multi-tier paper", "url": "https://arxiv.org/html/2504.17460v1" }
+  ]
+}

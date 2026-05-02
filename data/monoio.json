@@ -1,0 +1,32 @@
+{
+  "kind": "runtime",
+  "name": "Monoio",
+  "aliases": ["monoio-runtime"],
+  "summary": "Bytedance's Rust thread-per-core io_uring runtime; same design family as Glommio with each worker bound to a CPU core running its own io_uring loop and futures pinned to a single core for their lifetime.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Monoio** (Bytedance) is the second canonical Rust thread-per-core `io_uring` runtime, alongside Glommio (`data/glommio`). Each worker thread runs its own independent single-threaded event loop bound to a specific CPU core via affinity, with its own `io_uring` instance for asynchronous I/O. Inter-core coordination is by explicit message passing through bounded channels rather than work-stealing across a shared scheduler.\n\nFutures are pinned to one core for their lifetime, eliminating cross-core synchronisation on the hot path. Distinct from Tokio's M:N work-stealing model where futures freely migrate between worker threads.",
+      "refs": [
+        { "target": "event-loop-scheduling#overview", "type": "example" },
+        { "target": "io-integration#readiness-and-completion-models", "type": "uses" },
+        { "target": "glommio#overview", "type": "sibling" },
+        { "target": "work-stealing#fork-join-fit", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Monoio repository", "url": "https://github.com/bytedance/monoio" }
+      ]
+    },
+    {
+      "id": "design-family-and-production",
+      "title": "Design family and production use",
+      "tags": ["concurrency", "runtime", "production"],
+      "content": "Monoio shares Glommio's design point: thread-per-core ownership, no work-stealing, per-core `io_uring` rings, message-passing for cross-core coordination. The trade-off is identical — perfect cache locality and zero shared-state contention, at the cost of needing to manually balance work across cores.\n\nProduction use: Bytedance internal services (TikTok-adjacent infrastructure), proxies, and high-throughput edge services. Status (as of 2026-04): Apache-2.0 licensed, actively maintained. The existence of two independent thread-per-core runtimes from independent vendors (Datadog, Bytedance) is itself the data point: the design has converged across the industry for the latency-and-throughput-dominant workloads where work-stealing's cross-core synchronisation cost shows up in tail latency."
+    }
+  ],
+  "sources": [
+    { "label": "Monoio repository", "url": "https://github.com/bytedance/monoio" }
+  ]
+}

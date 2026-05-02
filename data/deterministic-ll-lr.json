@@ -1,0 +1,108 @@
+{
+  "kind": "concept",
+  "name": "Deterministic LL/LR",
+  "aliases": [
+    "ll-lr-parsing",
+    "ll-parsing",
+    "lr-parsing"
+  ],
+  "summary": "Classical grammar-driven deterministic parsing families: top-down LL (predictive, leftmost derivation) and bottom-up LR (shift-reduce, rightmost derivation in reverse). Still the vocabulary of compiler front-ends even when the production parser is hand-written.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The classic parsing families are still the vocabulary of compiler front-ends even when a production parser is hand-written.\n\nLL parsers read left-to-right and construct a leftmost derivation; they are naturally top-down and align with recursive descent. `LL(1)` uses one token of lookahead, `LL(k)` uses fixed k-token lookahead, and `LL(*)` / `ALL(*)` generalise the lookahead story.\n\nLR parsers read left-to-right and construct a rightmost derivation in reverse; they are bottom-up and operate as shift/reduce automata. The family includes `LR(0)`, `SLR(1)`, `LALR(1)`, canonical `LR(1)`, `LR(k)`, and practical variants such as Bison's `IELR(1)`. `SLR` is compact but weak, `LALR(1)` is the yacc-era sweet spot, canonical `LR(1)` has better conflict precision but larger tables, and `IELR(1)` aims to preserve canonical LR(1) language recognition with LALR-like table size.",
+      "refs": [
+        {
+          "target": "recursive-descent#overview",
+          "type": "implements"
+        },
+        {
+          "target": "antlr4#all-star-algorithm",
+          "type": "extends"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Grune & Jacobs — Parsing Techniques (2nd ed.)",
+          "url": "https://dickgrune.com/Books/PTAPG_2nd_Edition/index.html"
+        },
+        {
+          "label": "GNU Bison Manual",
+          "url": "https://www.gnu.org/software/bison/manual/bison.html"
+        }
+      ]
+    },
+    {
+      "id": "ll-vs-lr-intuition",
+      "title": "LL vs LR intuition",
+      "tags": [
+        "parser",
+        "grammar-design",
+        "algorithms"
+      ],
+      "content": "LL approaches are top-down and predictive — at each non-terminal, lookahead picks the production. Grammar engineering for LL means eliminating left recursion and left-factoring common prefixes so that a lookahead token selects one production.\n\nLR approaches are bottom-up: a shift/reduce automaton accumulates terminals and recognises right-hand sides as they complete. LR generators surface conflicts statically as shift/reduce or reduce/reduce reports, which is the chief diagnostic advantage of the family.",
+      "refs": [
+        {
+          "target": "peg-parsing#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "recursive-descent#grammar-mapping",
+          "type": "complements"
+        }
+      ]
+    },
+    {
+      "id": "grammar-engineering-tradeoffs",
+      "title": "Where ambiguity is discovered",
+      "tags": [
+        "parser",
+        "tradeoffs",
+        "parser-generator"
+      ],
+      "content": "For language design, the key question is not \"which acronym is best?\" but \"where should ambiguity be discovered?\"\n\n- LL-style parsers tend to put ambiguity resolution in source-code control flow (the parser author chooses).\n- LR-style generators surface conflicts statically as shift/reduce or reduce/reduce reports.\n- Generalized parsers (GLR, GLL, Earley) accept ambiguity and return a forest.\n- PEG bakes priority into ordered choice.\n\nA language designer can intentionally target an LL/RD-friendly grammar for implementation simplicity, an LR-friendly grammar for conflict diagnostics and generator support, or a more expressive syntax with a generalized or PEG parser.",
+      "refs": [
+        {
+          "target": "ambiguity-and-parse-forests#disambiguation-strategies",
+          "type": "related"
+        },
+        {
+          "target": "peg-parsing#strengths-and-tradeoffs",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "relevance-to-tooling",
+      "title": "Relevance to tooling",
+      "tags": [
+        "tooling",
+        "incrementality",
+        "error-recovery"
+      ],
+      "content": "Classical deterministic parsing remains foundational, but interactive tooling usually adds stronger recovery, incremental updates, and partial-parse tolerance on top. Editor-resilient parsers (tree-sitter, Lezer, rust-analyzer's resilient LL) extend the LR/LL substrate with parallel error recovery, incremental tree reuse, and ERROR-node retention.",
+      "refs": [
+        {
+          "target": "tree-sitter#error-recovery",
+          "type": "extends"
+        },
+        {
+          "target": "language-server#design-constraints",
+          "type": "relevant-to"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Grune & Jacobs — Parsing Techniques (2nd ed.)",
+      "url": "https://dickgrune.com/Books/PTAPG_2nd_Edition/index.html"
+    },
+    {
+      "label": "GNU Bison Manual",
+      "url": "https://www.gnu.org/software/bison/manual/bison.html"
+    }
+  ]
+}

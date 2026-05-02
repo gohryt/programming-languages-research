@@ -1,0 +1,30 @@
+{
+  "kind": "tool",
+  "name": "DynASM",
+  "aliases": ["LuaJIT macroassembler", "Mike Pall macroassembler"],
+  "summary": "Mike Pall's preprocessor-based macroassembler, originally built for LuaJIT. A C preprocessor + tiny runtime: assembly instructions interspersed with C code; preprocessor converts to C macros emitting raw machine code bytes at runtime. Avoids IR, instruction selection, and register allocation entirely. Used by LuaJIT, MoarVM lego JIT, and PHP 8 (early version).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "For generating machine code on the fly without the weight of a full compiler backend like LLVM or even Cranelift, macroassemblers provide a highly efficient solution. **DynASM**, created by Mike Pall for LuaJIT, is a prominent example.\n\nDynASM is a C preprocessor and a tiny runtime. The developer writes assembly instructions directly interspersed with C code. A preprocessor converts these assembly lines into C macros that emit the raw machine code bytes at runtime. It avoids the overhead of intermediate representations, instruction selection passes, or register allocation algorithms, delegating those tasks to the human programmer writing the assembly.\n\nThe result is JIT compilers that are extraordinarily small, fast, and capable of generating highly optimised, architecture-specific machine code with near-zero compilation latency.",
+      "refs": [
+        { "target": "copy-and-patch#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "LuaJIT DynASM", "url": "https://luajit.org/dynasm.html" }
+      ]
+    },
+    {
+      "id": "production-use",
+      "title": "Production use",
+      "tags": ["jit", "production"],
+      "content": "DynASM is the codegen backbone for several production JITs:\n\n- **LuaJIT** — its original target. Mike Pall used it to write LuaJIT's interpreter (in hand-tuned assembly via DynASM's C-preprocessor mode) and the trace JIT's machine-code emission.\n- **MoarVM lego JIT** — Raku's first-generation JIT used DynASM-generated x86-64 machine code per opcode template.\n- **PHP 8 JIT** (initial version) — Stogov's first-pass tracing JIT emitted x86-64 via DynASM before the PHP 8.4 IR-based redesign.\n\nThe pattern: when a language needs JIT compilation but cannot afford the build-time, runtime, or footprint of LLVM, DynASM is one of the lightest options short of writing assembly directly. The cost is human-managed register allocation, which scales poorly to complex IR optimisation but works fine for template-based JITs that emit code per opcode or per simple traced sequence.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "LuaJIT DynASM", "url": "https://luajit.org/dynasm.html" }
+  ]
+}

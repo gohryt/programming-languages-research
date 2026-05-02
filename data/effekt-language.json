@@ -1,0 +1,53 @@
+{
+  "kind": "language",
+  "name": "Effekt — Lexical Effect Handlers with Second-Class Capabilities",
+  "aliases": ["effekt", "effekt-lang"],
+  "summary": "Brachthäuser, Schuster, Ostermann (Tübingen, 2020+): research language whose effect system is built around second-class capabilities — handlers cannot be stored in heap data, returned from functions, or escape lexically. Eliminates runtime evidence threading; compiles handler invocations to direct calls plus stack manipulation. Pairs with bidirectional effect typing and explicit subtyping over effect rows.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Brachthäuser, Schuster, Ostermann's **Effekt** (Tübingen, 2020+) is a research language whose effect system is built around **second-class capabilities**: an effect handler is a capability that can be received as an argument or be in scope, but cannot be stored in heap data structures, returned from functions, or otherwise escape its lexical introduction site. This eliminates the need for runtime evidence threading at the cost of restricting where capabilities can flow.",
+      "refs": [
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "instance-of" },
+        { "target": "koka#overview", "type": "contrasts-with" },
+        { "target": "effect-handler-lowering#overview", "type": "implements-lexical-variant" },
+        { "target": "bidirectional-typing#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Effekt language home", "url": "https://effekt-lang.org/" }
+      ]
+    },
+    {
+      "id": "lexical-vs-evidence-tradeoff",
+      "title": "Lexical scoping versus first-class evidence",
+      "tags": ["effect-system", "compiler"],
+      "content": "The trade-off vs Koka is sharp. Koka uses **first-class evidence passing**: a handler can be stored, passed in records, and returned from functions; the runtime threads evidence through every effectful operation. Effekt uses **lexical scoping**: handlers always live on the call stack at handler-installation time, so the compiler compiles handler invocations to direct calls plus stack manipulation rather than runtime evidence lookup.\n\nThe two languages span a clean spectrum of effect-system design: **Koka's runtime cost is per-effect-operation (evidence dispatch), Effekt's restriction is at the type level (capabilities cannot escape).**",
+      "sources": [
+        { "label": "Brachthäuser, Schuster, Ostermann — Effects as Capabilities (OOPSLA 2020)", "url": "https://se.cs.uni-tuebingen.de/publications/brachthaeuser20effect.pdf" },
+        { "label": "Effekt OOPSLA 2020 (ACM DL)", "url": "https://dl.acm.org/doi/10.1145/3428194" }
+      ]
+    },
+    {
+      "id": "additional-design-points",
+      "title": "Additional design points",
+      "tags": ["effect-system", "type-system"],
+      "content": "Effekt also explores three additional design points:\n\n- **Bidirectional effect typing**: effect rows participate in bidirectional inference so handlers' expected types flow into the implementations of effectful operations.\n- **Algebraic effects with explicit subtyping**: effect rows have a formal subtype lattice, so a function performing only `<exn>` can be passed where a `<exn,async>` function is expected.\n- **Capability-passing for resources** (database connections, file handles, mutex tokens): second-class semantics line up naturally with RAII-style resource management — the resource is the capability, lexical scoping bounds its lifetime, and escape is statically prevented.\n\nThe compiler targets the JVM, JavaScript, and the LLVM-backed Chez Scheme runtime; the language is implemented in Scala 3."
+    },
+    {
+      "id": "evidence-lifting-and-affine-handlers",
+      "title": "Evidence-lifting compilation and affine handlers",
+      "tags": ["compiler", "effect-system"],
+      "content": "Recent compilation work has formalised the lexical-effect-handler discipline as an *evidence-lifting* transformation that infers and inserts the minimal handler-frame metadata at compile time, enabling efficient native compilation of second-class handlers without the per-operation evidence dispatch Koka pays (Schuster et al., OOPSLA 2023).\n\nThe 2025 follow-up \"Affect: An Affine Type and Effect System\" (van Rooij, POPL 2025) investigates affine — rather than purely linear — handler resources, allowing handlers to be installed at most once but discarded without explicit close, simplifying common resource-management patterns at the cost of slightly weaker static guarantees.\n\nStatus (as of 2026-04): research-grade. Effekt is one of the cleanest examples of \"effect handlers as a primary language design choice\" rather than as an effect-row addition to an existing functional core. Combined with Koka, Flix, and Unison, the four span the dominant design space for effect-handler languages.",
+      "sources": [
+        { "label": "Schuster et al. — Enabling Efficient Compilation of Lexical Effect Handlers (OOPSLA 2023)", "url": "https://dl.acm.org/doi/10.1145/3622831" },
+        { "label": "Affect: An Affine Type and Effect System (POPL 2025)", "url": "https://iris-project.org/pdfs/2025-popl-affect.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Effekt language home", "url": "https://effekt-lang.org/" },
+    { "label": "Brachthäuser, Schuster, Ostermann — Effects as Capabilities (OOPSLA 2020)", "url": "https://se.cs.uni-tuebingen.de/publications/brachthaeuser20effect.pdf" }
+  ]
+}

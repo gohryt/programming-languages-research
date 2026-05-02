@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Register-Based vs Stack-Based Bytecode",
+  "aliases": ["bytecode VM design", "register vs stack VMs"],
+  "summary": "The two dominant bytecode designs trade code size against dispatch count. Stack-based (JVM, CPython, Wasm) keeps instructions tiny but multiplies dispatch; register-based (Lua 5, Dalvik, V8 Ignition) widens instructions but cuts ops by ~47% (Shi VEE 2008). Modern dynamic-language VMs favor register; Wasm and managed runtimes keep stack for verification compactness.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The two dominant bytecode designs make different trade-offs between code size and dispatch count.\n\n**Stack-based** (JVM, CPython, WebAssembly, CLR): operations pop operands from an implicit stack and push results. Instructions are small (often 1 byte opcode + minimal operands) because operand locations are implicit. The downside: each sub-computation requires separate push/pop instructions, inflating instruction count.\n\n**Register-based** (Lua 5, Dalvik, V8 Ignition, LuaJIT): operations reference named virtual registers. Instructions are wider (typically 3–4 bytes with opcode + operand fields), but the same computation uses far fewer instructions.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "design-axis-of" },
+        { "target": "bytecode-quickening#overview", "type": "interacts-with" }
+      ]
+    },
+    {
+      "id": "empirical-trade-offs",
+      "title": "Empirical trade-offs",
+      "tags": ["bytecode", "vm", "performance"],
+      "content": "Ierusalimschy's \"The Implementation of Lua 5.0\" (2005) reported a 50% reduction in executed instructions when Lua switched from stack to register bytecode, yielding significant interpreter speedups despite larger bytecode.\n\nShi et al. (VEE 2008, \"Virtual Machine Showdown: Stack Versus Registers\") measured the trade-off precisely: register-based VMs execute ~47% fewer VM instructions but their code is ~25% larger. On modern CPUs, dispatch cost often dominates, so many dynamic-language VMs have favored register bytecode since Lua 5 and Dalvik.\n\nWebAssembly and several managed runtimes remain important counterexamples: stack discipline can enable compact encoding, single-pass validation, and structured control flow that are worth more than dispatch reduction in their target environments.",
+      "refs": [],
+      "sources": [
+        { "label": "The Implementation of Lua 5.0", "url": "https://www.lua.org/doc/jucs05.pdf" },
+        { "label": "Virtual Machine Showdown (Shi et al., VEE 2008)", "url": "https://static.usenix.org/events/vee08/full_papers/shi/shi.pdf" }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": ["bytecode", "vm", "tradeoffs"],
+      "content": "For a dynamic-language VM optimising for interpreter throughput, register bytecode is the modern default. The wider instructions cost cache space but win in dispatch count, and modern branch predictors handle register-bytecode dispatch well.\n\nFor a verifiable bytecode (Wasm, JVM under the original verifier), stack discipline simplifies the validator: stack-effect tracking is a small state machine over each instruction, while register tracking requires more elaborate liveness reasoning. Wasm's structured control flow plus stack discipline allows single-pass validation that Wasm's design point requires.\n\nFor a JIT-only language (where bytecode is just a hand-off between frontend and JIT), the choice matters less because the bytecode is barely interpreted. JIT compile time and IR translation cost dominate.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Lua 5 implementation", "url": "https://www.lua.org/doc/jucs05.pdf" },
+    { "label": "VM Showdown Shi VEE 2008", "url": "https://static.usenix.org/events/vee08/full_papers/shi/shi.pdf" }
+  ]
+}

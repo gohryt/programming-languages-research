@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Closure Conversion",
+  "aliases": ["flat closures", "linked closures", "closure flattening"],
+  "summary": "Appel & Jim 1989: transform nested, free-variable-referencing functions into flat top-level functions that receive their environment as an explicit argument. Flat closures put all captures in a record (O(1) access); linked closures chain environment frames (cheaper allocation when nested). Foundational for functional-language compilers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Closure conversion** (Appel & Jim 1989; extensively in Appel's \"Compiling with Continuations\" 1992) transforms nested, free-variable-referencing functions into flat top-level functions that receive their environment as an explicit argument. The closure becomes a pair `(code_pointer, environment)`; calling it means loading both and invoking `code_pointer(environment, args...)`.",
+      "refs": [
+        { "target": "lambda-lifting#overview", "type": "alternative-to" },
+        { "target": "defunctionalization#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Compiling with Continuations (Appel, 1992)", "url": "https://www.cs.princeton.edu/~appel/papers/cpcps.pdf" }
+      ]
+    },
+    {
+      "id": "flat-vs-linked",
+      "title": "Flat vs linked closure environments",
+      "tags": ["compiler", "closures", "tradeoffs"],
+      "content": "Two main environment representations:\n\n**Flat closures**: environment is a record containing all captured variables. Allocation cost scales with capture count, but variable access is O(1) regardless of nesting depth. Used by OCaml, Haskell (with some adjustments for sharing), and most production functional language compilers. The flat layout admits cache-friendly access — every captured variable is at a known offset from the closure pointer.\n\n**Linked (shared) closures**: environment is a linked list of enclosing frames. Allocation is cheaper when multiple nested functions share environment, but variable access walks the chain. Used in early Scheme implementations and retained in some interactive systems where cheap closure creation matters more than fast variable access.\n\nThe practical trade-off is measured by how often closures are called versus allocated. Hot loops favor flat closures (fast access); deeply-nested definitions with rare calls favor linked (cheap allocation).",
+      "refs": []
+    },
+    {
+      "id": "implementation-details",
+      "title": "Implementation details",
+      "tags": ["compiler", "code-generation"],
+      "content": "Practical compilers add several refinements. **Self-recursive references** in a closure can avoid an extra environment slot if the calling convention supports passing the closure pointer as a hidden argument; the recursive call simply re-uses that pointer. **Mutually recursive closures** benefit from sharing one environment record across the whole recursion group, with each closure's code pointer indexing into shared captured variables.\n\n**Closure conversion as a CPS pass** (Appel's framing) makes the explicit environment a regular continuation argument; this composes cleanly with the rest of CPS-based optimisation. **Closure conversion before vs after inlining** matters: inlining a closure away avoids the allocation entirely, so most modern compilers run inliner aggressively before committing to closure layout.\n\nThe overall pipeline in production functional compilers tends to be: high-level optimisations → closure conversion → low-level optimisations on the closure-converted form → backend codegen. Closure conversion is one of the load-bearing transformations between the high-level functional view and the low-level imperative view.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Appel — Compiling with Continuations", "url": "https://www.cs.princeton.edu/~appel/papers/cpcps.pdf" }
+  ]
+}

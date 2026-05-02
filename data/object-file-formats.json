@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "Object File Formats",
+  "aliases": ["ELF", "Mach-O", "COFF", "PE"],
+  "summary": "Three dominant formats: ELF (Linux/BSD), Mach-O (macOS/iOS), COFF/PE (Windows). Sections for text, data, BSS, debug info, symbol tables, relocations; metadata for build IDs, linker hints, code signing. The format the OS loads and executes — and therefore what compilers must speak.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Three dominant formats carry compiled code:\n\n- **ELF** (Linux, BSD, Solaris): sections for text, data, BSS, debug info, symbol tables, relocations. Extended by DWARF for debug info, by `.note.*` sections for metadata.\n- **Mach-O** (macOS, iOS): similar concepts, different encoding. Adds fat binaries (multiple architectures in one file), code signing sections.\n- **COFF / PE** (Windows): sections, import/export tables, resource directories.",
+      "refs": [
+        { "target": "calling-conventions#overview", "type": "interacts-with" },
+        { "target": "tls-models#overview", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "ELF specification (refspecs.linuxfoundation.org)", "url": "https://refspecs.linuxfoundation.org/elf/elf.pdf" },
+        { "label": "Mach-O file-format reference (Aidan Steele)", "url": "https://github.com/aidansteele/osx-abi-macho-file-format-reference" }
+      ]
+    },
+    {
+      "id": "constraints-on-compilers",
+      "title": "Constraints on compilers",
+      "tags": ["compiler", "linker"],
+      "content": "For language designers, the object file format constrains what compilers can express. Stack-unwind tables (DWARF `.eh_frame`, SFrame, ORC), debug info (`.debug_*`), build IDs, symbol exports — all live in section conventions defined by the format. A compiler emitting native code must speak ELF/Mach-O/COFF or rely on a backend (LLVM, Cranelift, GCC) that does.\n\nMost compilers target LLVM (and inherit LLVM's object file support) or emit directly through an assembler. Going direct-to-object-file is only worth it for specialised runtimes (BPF JIT, custom VMs) or to avoid LLVM's compile latency.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ELF specification (refspecs.linuxfoundation.org)", "url": "https://refspecs.linuxfoundation.org/elf/elf.pdf" },
+    { "label": "Mach-O file-format reference (Aidan Steele)", "url": "https://github.com/aidansteele/osx-abi-macho-file-format-reference" }
+  ]
+}

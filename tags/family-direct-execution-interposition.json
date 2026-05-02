@@ -1,0 +1,12 @@
+{
+  "id": "family-direct-execution-interposition",
+  "tag": "family:direct-execution-interposition",
+  "name": "Direct Execution Interposition",
+  "description": "Tracing/observation mechanisms that change the code path itself: patch a site, swap in a trap, or reserve a place where control can be diverted later. Bytecode opcode patching, function-entry NOPs, USDT probes, kprobes, and compiler-inserted patchable sleds all sit here. Contrast with cooperative safepoints (the runtime arranges a handoff at safe points without trapping) and hardware tracing (CPU facilities capture data without software cooperation).",
+  "axis": "family",
+  "examples": [
+    "bytecode-and-code-patching",
+    "external-process-observation",
+    "dynamic-binary-instrumentation"
+  ]
+}

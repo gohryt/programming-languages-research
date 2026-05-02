@@ -1,0 +1,39 @@
+{
+  "kind": "language",
+  "name": "CUE",
+  "aliases": ["cuelang", "configure-unify-execute"],
+  "summary": "Marcel van Lohuizen's lattice-based configuration language descended from Google's GCL: types and values inhabit the same lattice, unification is the primary composition operator, files in the same package implicitly compose by unification, and `int & >0` is both a type and a value.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Marcel van Lohuizen's **CUE** (Configure, Unify, Execute; descended from Google's GCL) is a configuration language whose module system is unusual because **types and values inhabit the same lattice**, and unification — not assignment — is the primary composition operator.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "pkl#overview", "type": "design-counterpoint" }
+      ],
+      "sources": [
+        { "label": "CUE introduction", "url": "https://cuelang.org/docs/introduction/" }
+      ]
+    },
+    {
+      "id": "module-as-lattice-unification",
+      "title": "Module composition as lattice unification",
+      "tags": ["cue", "modules", "unification"],
+      "content": "A CUE module is a directory of `.cue` files plus a `cue.mod/module.cue` manifest; imports use Go-style paths (`import \"list\"`, `import \"encoding/json\"`); files in the same package implicitly compose by **unification**, so two files declaring `service: { name: \"foo\" }` and `service: { port: 8080 }` produce one combined `service: { name: \"foo\", port: 8080 }` without any explicit merge directive.\n\nThe module-system-relevant property is that **constraints and concrete values are the same kind of thing**. A \"type\" like `int & >0` (positive integer) is a value in the lattice; unifying it with `42` yields `42`; unifying it with `-1` yields `_|_` (bottom — unification failure). Module composition therefore enforces type-and-constraint compatibility automatically: importing a constrained schema and unifying it with concrete data either produces a more-specific value or a build-time error."
+    },
+    {
+      "id": "vs-pkl-and-jsonnet",
+      "title": "Contrast with Pkl and Jsonnet",
+      "tags": ["cue", "configuration", "comparison"],
+      "content": "Distinct from JSON/YAML schemas: CUE schemas are CUE values, so schemas can be unified with each other to produce more-specific schemas, and a value validates against a schema by being unifiable with it. Distinct from **Pkl** (Apple's typed configuration language): Pkl is more imperative with classes and inheritance; CUE is fully declarative with lattice unification as the only composition primitive.\n\nProduction: Kubernetes ecosystem (Istio configuration, kube-policy systems), Dagger CI/CD, several internal Google configuration tools, Tailscale ACLs.\n\nThe lesson generalises beyond configuration: **a module system can be a unification system if the language's types and values share a lattice**. Most general-purpose languages cannot adopt this model because their type systems are stratified — types and values are different kinds of thing — but for declarative-data languages (configuration, schemas, policy) the unification model handles composition, validation, and constraint propagation in one mechanism.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "CUE introduction", "url": "https://cuelang.org/docs/introduction/" },
+    { "label": "CUE", "url": "https://cuelang.org/" },
+    { "label": "CUE repository", "url": "https://github.com/cue-lang/cue" }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "tool",
+  "name": "snmalloc",
+  "aliases": ["Microsoft snmalloc"],
+  "summary": "Microsoft Research lock-free allocator that replaces thread-local cross-thread free caches with a Pony-derived MPSC \"return-to-owner\" message queue, flushing thousands of remote frees with a single atomic exchange.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "lock-free-allocator", "general-purpose-allocator"],
+      "content": "Microsoft Research's snmalloc is built around the observation that producer-consumer workloads punish standard thread-cache designs — the consumer thread accumulates orphaned blocks that the producer thread originally allocated, so freeing them requires expensive cross-thread synchronisation. snmalloc instead batches deallocations from foreign threads onto a lock-free MPSC queue and \"returns them to owner\" with a single atomic exchange — no CAS loop.\n\nIt is the default malloc in the Verona language runtime and the cleanest answer in the literature to producer-consumer cross-thread free patterns.",
+      "refs": [
+        { "target": "allocators#throughput-allocators", "type": "part-of" },
+        { "target": "mimalloc#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "return-to-owner",
+      "title": "Return-to-owner message passing",
+      "tags": ["lock-free", "thread-cache", "freelist"],
+      "content": "The core mechanism is borrowed from Pony's actor runtime: each thread owns its allocations and is the only thread that can put a freed block back onto its allocator's free list. When thread B frees a block originally allocated by thread A, B pushes the block onto an MPSC queue attached to A's allocator. Thread A drains the queue lazily on its own allocation slow path with a single `XCHG`. There is no per-block atomic on the cross-thread free path.\n\nA hybrid bump-pointer plus free-list scheme stores all per-slab metadata in 64 bits per 64 KiB slab. Recent versions hold metadata out-of-band behind guard pages, encode in-band metadata to detect corruption, and use a \"combining lock\" (MCS plus flat combining) to cut startup contention.",
+      "refs": [
+        { "target": "allocators#throughput-allocators", "type": "context" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "userspace"],
+      "content": "snmalloc is the default malloc in Microsoft Research's Verona language runtime. It is also available as a Rust crate and as an `LD_PRELOAD` shim for general C/C++ programs. The design biases toward producer-consumer workloads (many message-passing systems, queues, and actor runtimes) where its return-to-owner advantage compounds.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "snmalloc ISMM 2019", "url": "https://www.microsoft.com/en-us/research/publication/issm-2019-proceedings-of-the-2019-acm-sigplan-international-symposium-on-memory-management/" },
+    { "label": "snmalloc GitHub", "url": "https://github.com/microsoft/snmalloc" }
+  ]
+}

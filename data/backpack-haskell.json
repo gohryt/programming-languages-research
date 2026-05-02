@@ -1,0 +1,78 @@
+{
+  "kind": "concept",
+  "name": "Backpack",
+  "aliases": [
+    "ghc-backpack"
+  ],
+  "summary": "GHC's mixin module system (Kilpatrick, Dreyer, Peyton Jones, Marlow — POPL 2014; landed in GHC 8.2, 2017) adding indefinite modules with unfilled holes that match a signature, plus module instantiation at link time; closer to ML functors than to type classes but operating at the package layer.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Backpack** (Kilpatrick, Dreyer, Peyton Jones, Marlow — POPL 2014) is GHC's mixin module system, motivated by the longstanding limitation that Haskell cannot express \"this module depends on a module of this signature\" without either dependency-injecting through type-class dictionaries or hand-coding boilerplate.\n\nBackpack adds **indefinite modules** (modules with unfilled holes that match a signature) and **module instantiation at link time**.",
+      "refs": [
+        {
+          "target": "module-calculi#overview",
+          "type": "extends"
+        },
+        {
+          "target": "haskell#overview",
+          "type": "extends"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Backpack POPL 2014",
+          "url": "https://plv.mpi-sws.org/backpack/backpack-popl.pdf"
+        }
+      ]
+    },
+    {
+      "id": "design-pattern",
+      "title": "Design pattern — indefinite modules and link-time instantiation",
+      "tags": [
+        "backpack",
+        "haskell",
+        "module-systems"
+      ],
+      "content": "The design pattern is straightforward: a library can expose a signature `Stream` and an indefinite implementation that depends on `Stream`-matching modules. Downstream consumers instantiate the library with their preferred concrete `Stream` implementation, and the result is a fully linked module.\n\nThis is closer to ML functors than to type classes, but operating at the package layer rather than the module-language layer."
+    },
+    {
+      "id": "modest-adoption",
+      "title": "Modest adoption and the type-class competition",
+      "tags": [
+        "backpack",
+        "ecosystem",
+        "design-guidance"
+      ],
+      "content": "Backpack landed in GHC 8.2 (2017) but has seen modest adoption. The mainstream Haskell answer to \"abstraction over implementations\" remains type classes, partly because Cabal's tooling integration with Backpack remained rough for years.\n\nThe lesson: **module-level mixin linking can be a powerful alternative to type classes**, but it competes with an entrenched mechanism and needs strong tooling to win adoption. Greenfield designs without an entrenched type-class system can choose mixin modules cleanly; one that already has type classes faces an uphill migration.",
+      "refs": [
+        {
+          "target": "type-classes-traits#overview",
+          "type": "competes-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "GHC Backpack wiki",
+          "url": "https://gitlab.haskell.org/ghc/ghc/-/wikis/backpack"
+        },
+        {
+          "label": "Haskell wiki — Backpack",
+          "url": "https://wiki.haskell.org/Backpack"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Backpack POPL 2014",
+      "url": "https://plv.mpi-sws.org/backpack/backpack-popl.pdf"
+    },
+    {
+      "label": "GHC Backpack",
+      "url": "https://gitlab.haskell.org/ghc/ghc/-/wikis/backpack"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "lifetime",
+  "tag": "lifetime",
+  "name": "Lifetime",
+  "description": "Sections tagged with the Lifetime concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "lifetimes"
+  ]
+}

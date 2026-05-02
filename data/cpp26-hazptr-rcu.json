@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "C++26 Hazard Pointers and RCU",
+  "aliases": ["P2530", "P2545", "<hazard_pointer>", "C++26 RCU"],
+  "summary": "C++26 is the first ISO standard to ship lock-free safe deferred reclamation as primitive vocabulary: `<hazard_pointer>` (P2530R3, derived from Folly's production implementation in use since 2017) and RCU (P2545). HP behaves as a scalable refcount, RCU as a scalable RW-lock; mechanism details are deferred to chapter 9.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cpp", "cpp26", "iso-cpp", "hazard-pointer", "rcu", "memory-safety"],
+      "content": "C++26 is the first ISO standard to ship lock-free safe deferred reclamation as primitive vocabulary: `<hazard_pointer>` (P2530R3, derived from Folly's production implementation in use since 2017) and RCU (P2545). Both are complementary — HP behaves as a scalable refcount, RCU as a scalable RW-lock. Together they fill the \"how do I free a node that another thread might still be reading\" gap that previously required ad-hoc per-project mechanisms or external libraries (URCU, folly::HazardPointer).",
+      "refs": [
+        { "target": "hazard-pointers", "type": "related" },
+        { "target": "rcu", "type": "related" },
+        { "target": "cpp-safety-profiles-resolution", "type": "related" }
+      ]
+    },
+    {
+      "id": "scope-deferred-to-chapter-9",
+      "title": "Mechanism details deferred",
+      "tags": ["hazard-pointer", "rcu", "concurrency"],
+      "content": "Mechanism details, reader/writer cost, and retention bounds are covered under hazard pointers and RCU as concurrency-reclamation techniques; this entry only marks the C++ standardization milestone — that as of C++26, both are part of the standard library rather than third-party plumbing.",
+      "refs": [
+        { "target": "hazard-pointers", "type": "related" },
+        { "target": "rcu", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "C++26 Hazard Pointers P2530R3", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf" },
+    { "label": "C++26 RCU P2545", "url": "https://wg21.link/P2545R0" },
+    { "label": "cppreference — <hazard_pointer> header", "url": "https://en.cppreference.com/w/cpp/header/hazard_pointer.html" }
+  ]
+}

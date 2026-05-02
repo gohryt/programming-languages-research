@@ -1,0 +1,7 @@
+{
+  "id": "risc-v",
+  "tag": "risc-v",
+  "name": "RISC-V",
+  "description": "Sections concerning the RISC-V instruction set architecture or its extensions. Canonical kebab-case form; `riscv` (no hyphen) has been merged here.",
+  "aliases": ["riscv"]
+}

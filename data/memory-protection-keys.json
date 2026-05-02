@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "Memory Protection Keys — MPK / PKU / Arm POE",
+  "aliases": ["MPK", "PKU", "PKRU", "Intel MPK", "Arm POE", "Protection Keys"],
+  "summary": "4-bit (x86) or 3-bit (ARM POE) key per page table entry plus a per-thread permission register; permission changes via single user-mode instruction (~20–26 cycles), no TLB flush. Intra-process isolation without page-table modifications; per-thread view enables data-plane sandboxing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["mpk", "x86", "arm", "compartmentalisation", "production", "exploit-mitigation", "memory-safety"],
+      "content": "4-bit (x86) or 3-bit (ARM POE) key per page table entry + per-thread permission register (PKRU/POR_EL0); permission changes via single user-mode WRPKRU/MSR write (~20–26 cycles), *no TLB flush*. Intra-process isolation without page-table modifications; per-thread view enables data-plane sandboxing (libmpk, ERIM, Hodor).\n\nThe fast cross-domain switch (no TLB flush) is what makes MPK uniquely useful for in-process compartmentalisation — orthogonal to the per-pointer mechanisms (MTE, PAC, CHERI capabilities).",
+      "refs": [
+        { "target": "cheri", "type": "compared-with" },
+        { "target": "arm-mte", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "x86", "arm", "compartmentalisation"],
+      "content": "Intel Skylake-SP (2017)+ server, Tiger Lake+ client; AMD Zen 3+; ARMv8.9 FEAT_S1POE (2024+ silicon). Linux pkey APIs upstream. Used in WebAssembly sandboxes, OpenSSL key isolation, JIT W^X.\n\nMPK is the most mainstream of the in-process compartmentalisation hardware — much more deployed than CHERI capabilities, and unlike software-only tricks (separate processes, mprotect-on-context-switch) it has the cycle budget to be used per-call rather than per-syscall.",
+      "refs": [],
+      "sources": [
+        { "label": "Linux Memory Protection Keys", "url": "https://kernel.org/doc/html/latest/core-api/protection-keys.html" },
+        { "label": "Connor et al. — MPK security (USENIX Security 2020)", "url": "https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Linux Memory Protection Keys", "url": "https://kernel.org/doc/html/latest/core-api/protection-keys.html" },
+    { "label": "Connor et al. — MPK security (USENIX Security 2020)", "url": "https://www.usenix.org/system/files/sec20fall_connor_prepub.pdf" }
+  ]
+}

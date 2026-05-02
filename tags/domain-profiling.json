@@ -1,0 +1,7 @@
+{
+  "id": "domain-profiling",
+  "tag": "domain:profiling",
+  "name": "Domain: profiling",
+  "description": "Section concerns performance profiling — identifying where time/resources are spent, often via statistical sampling or instrumentation.",
+  "axis": "domain"
+}

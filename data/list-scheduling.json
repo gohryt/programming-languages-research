@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "List Scheduling",
+  "aliases": ["greedy instruction scheduling", "ready-list scheduling"],
+  "summary": "Workhorse instruction-scheduling algorithm: build dependency DAG, topologically order, at each cycle pick the 'best' ready instruction via heuristic. Greedy and provably non-optimal but near-linear time; every production backend uses a variant. Pre-RA vs post-RA scheduling are distinct trade-offs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "After instruction selection, the backend must order instructions for optimal pipeline use. **List scheduling** (Gibbons & Muchnick, Adams & Gibbons 1976 era) is the workhorse algorithm: build a dependency DAG, topologically order, and at each cycle pick the \"best\" ready instruction using a heuristic — critical path length, register pressure, resource availability.\n\nList scheduling is a greedy heuristic — provably not optimal, but runs in near-linear time and produces good schedules in practice. Every production backend (LLVM `MachineScheduler`, GCC `haifa-sched`) uses a variant with target-specific heuristics tuned per-microarchitecture (Skylake vs Zen vs Graviton).",
+      "refs": [],
+      "sources": [
+        { "label": "List Scheduling classical reference", "url": "https://dl.acm.org/doi/10.1145/502874.502884" }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "title": "Algorithm",
+      "tags": ["compiler", "scheduling"],
+      "content": "Build the dependency DAG: each instruction is a node; edges represent dependences (data, anti, output, resource). For each node, compute the *critical path* — the longest path from this node to the end of the block — typically the dominant priority heuristic.\n\nMaintain a *ready set* of instructions whose dependences are all satisfied. At each cycle, pick the highest-priority ready instruction (longest critical path, tie-broken by other heuristics like \"reduces register pressure\" or \"keeps functional unit busy\"), schedule it, and update the ready set.\n\nThe heuristic choice dominates code quality. Common heuristics include: longest-path-first, register-pressure-aware (defer instructions that would increase live values), resource-aware (prefer instructions that fill unused functional units), and microarchitecture-specific tuning (Intel scheduling differs from AMD differs from ARM).",
+      "refs": []
+    },
+    {
+      "id": "pre-ra-vs-post-ra",
+      "title": "Pre-RA vs post-RA scheduling",
+      "tags": ["compiler", "register-allocation"],
+      "content": "The structural trade-off: **pre-RA scheduling** maximises ILP but can raise register pressure, causing spills; **post-RA scheduling** respects physical registers but has less freedom. Most backends do *both* — a pre-RA pass for ILP, then a post-RA pass to clean up after allocation.\n\nPre-RA scheduling sees virtual registers and unbounded reorder freedom but has no clue how the allocator will assign physical registers. Aggressive pre-RA scheduling can spread live ranges so wide that the allocator runs out of registers and spills. Pre-RA schedulers therefore include register-pressure heuristics that bound how aggressively they reorder.\n\nPost-RA scheduling sees physical registers, so dependences include hardware-imposed pseudo-dependences (the same register can't hold two values simultaneously). The freedom is limited but the schedule is final; this is where target-specific microarchitectural tuning lives.",
+      "refs": [
+        { "target": "graph-coloring-regalloc#overview", "type": "interacts-with" },
+        { "target": "linear-scan-regalloc#overview", "type": "interacts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "List Scheduling — classical reference", "url": "https://dl.acm.org/doi/10.1145/502874.502884" }
+  ]
+}

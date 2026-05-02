@@ -1,0 +1,7 @@
+{
+  "id": "family-breakpoint-mechanism",
+  "tag": "family:breakpoint-mechanism",
+  "name": "Family: breakpoint mechanism",
+  "description": "Debugger stop primitives — INT 3, DR0–DR3, RISC-V PMP, page protection, runtime event catchpoints, semantic contract violations.",
+  "axis": "family"
+}

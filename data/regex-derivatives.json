@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Regex Derivatives",
+  "aliases": ["Brzozowski derivatives", "regular-expression derivatives"],
+  "summary": "Brzozowski 1964: given regex r and character c, compute D_c(r) — the regex matching the rest of input whose first char was c. Owens-Reppy-Turon (JFP 2009) showed similarity-based canonicalisation keeps the number of distinct derivatives bounded, making the technique practical. Used in extended regexes (intersection, complement) and parser combinators.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Brzozowski's **derivative of a regular expression** (1964) is a direct algorithm for regex matching: given regex `r` and first input character `c`, compute `D_c(r)` — the regex matching the rest of an input whose first character was `c`. Repeat for each character; if at the end the derivative accepts the empty string, the match succeeded.\n\nDerivatives languished for decades because they generate exponentially many derivative expressions in the worst case. Owens, Reppy, and Turon (\"Regular-expression derivatives reexamined\", JFP 2009) showed that with **similarity-based canonicalisation** (treating equivalent derivatives as equal via a cheap syntactic normal form), the number of distinct derivatives stays bounded — matching Brzozowski's original claim that derivatives would produce DFAs directly. The resulting DFAs are often smaller than those produced by Thompson→subset construction.",
+      "refs": [
+        { "target": "re2-rust-regex#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Owens-Reppy-Turon — Regular-expression derivatives reexamined (JFP 2009)", "url": "https://www.ccs.neu.edu/home/turon/re-deriv.pdf" }
+      ]
+    },
+    {
+      "id": "extensions-and-uses",
+      "title": "Extensions and modern uses",
+      "tags": ["regex", "research"],
+      "content": "Derivatives are now used as a building block in more advanced regex systems: they extend cleanly to extended regexes (intersection, complement), to regex types (Hosoya-Pierce), and to parser combinators. They're also the technique of choice when correctness is paramount — \"parsing with derivatives\" is the CFG analogue.\n\nThe cleanest property: derivatives compose mathematically. `D_c(r1 | r2) = D_c(r1) | D_c(r2)`, `D_c(r1 r2) = D_c(r1) r2 | (if r1 nullable then D_c(r2))`. This makes verifying derivative-based engines straightforward and supports proofs of correctness. For regex engines where soundness matters more than peak speed (security validation, formal verification toolchains), derivatives are the right tool.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Owens-Reppy-Turon", "url": "https://www.ccs.neu.edu/home/turon/re-deriv.pdf" }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "kind": "language",
+  "name": "Ada",
+  "aliases": [],
+  "summary": "1980/1983 ISO-standardised systems language with one of the first formally-specified production module systems: package specification/body split, private parts in specifications, child packages with privileged visibility, generic packages predating ML functors, and pragma-controlled package elaboration order.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ada (1980 / 1983 ISO standard, current Ada 2022) shipped one of the first formally-specified module systems in a production language, and most of its design choices are still load-bearing in safety-critical software 40+ years later. The verifier and SPARK subset live in `data/spark-ada`; this record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "spark-ada#overview", "type": "subset-of" }
+      ]
+    },
+    {
+      "id": "package-specification-body-split",
+      "title": "Package specification/body split",
+      "tags": ["ada", "module-systems", "interfaces"],
+      "content": "The unit of modularity is the **package**, declared in two parts:\n\n```ada\n-- foo.ads (specification)\npackage Foo is\n   type T is private;\n   function Make (X : Integer) return T;\n   function Value (Self : T) return Integer;\nprivate\n   type T is record\n      Val : Integer;\n   end record;\nend Foo;\n\n-- foo.adb (body)\npackage body Foo is\n   function Make (X : Integer) return T is\n   begin\n      return (Val => X);\n   end Make;\n\n   function Value (Self : T) return Integer is\n   begin\n      return Self.Val;\n   end Value;\nend Foo;\n```\n\nThe specification declares the public interface; the body contains the implementation. The two are compiled separately. This is the design that became OCaml's `.mli`/`.ml` split, ML's structures-and-signatures, and influenced Modula-2's later DEFINITION/IMPLEMENTATION split.",
+      "refs": [
+        { "target": "ocaml#overview", "type": "ancestor-of" },
+        { "target": "wirth-modules#modula-2-definition-implementation-split", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "Ada Reference Manual — packages", "url": "http://www.ada-auth.org/standards/22rm/html/RM-7.html" }
+      ]
+    },
+    {
+      "id": "private-parts-and-opaque-types",
+      "title": "Private parts and opaque types",
+      "tags": ["ada", "encapsulation", "type-abstraction"],
+      "content": "A spec can declare types as `private`, exposing the existence of the type to clients while hiding its representation. The actual representation appears in a `private` block at the end of the spec — visible to the body but conceptually hidden from clients. This is **opaque type abstraction baked into the language**, without separate signature/structure machinery."
+    },
+    {
+      "id": "child-packages-and-visibility-lattice",
+      "title": "Child packages with privileged parent visibility",
+      "tags": ["ada", "visibility", "hierarchy"],
+      "content": "**Child packages.** `Foo.Bar` is a child package of `Foo`, declared as `package Foo.Bar is ... end;`. Children have privileged visibility into their parent's private part, enabling internal hierarchy without exposing internals to unrelated clients. **Private child packages** (`private package Foo.Internal`) are visible only to other children of `Foo`, not to external clients of `Foo` — a fine-grained visibility lattice predating Rust's `pub(crate)`/`pub(super)` by decades.",
+      "refs": [
+        { "target": "visibility-and-exports#visibility-granularity", "type": "example" }
+      ]
+    },
+    {
+      "id": "generic-packages-as-functor-precursor",
+      "title": "Generic packages — production ML-functor precursor",
+      "tags": ["ada", "generics", "module-calculi"],
+      "content": "**Generic packages.** `generic type T is private; package Stack is ...` — packages parameterized over types, values, or other packages. Instantiated with `package Int_Stack is new Stack (T => Integer);`. The closest thing to ML functors in any production language outside the ML family.\n\n`with` and `use` clauses: `with Foo;` makes the package available; `use Foo;` brings its names into unqualified scope (discouraged in Ada style guides because of the visibility cost).\n\nThe `pragma Pure`, `pragma Preelaborate`, `pragma Elaborate_All` system controls package initialization order and side-effect-free guarantees — a highly explicit version of the initialization ordering that Python (`data/python`) and ESM (`data/javascript#esm`) struggle with implicitly.",
+      "refs": [
+        { "target": "module-calculi#overview", "type": "production-realisation" }
+      ],
+      "sources": [
+        { "label": "Ada Reference Manual — generics", "url": "http://www.ada-auth.org/standards/22rm/html/RM-12.html" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["ada", "design-guidance"],
+      "content": "Ada shows that **the specification/body split, opaque types, child packages, and generic packages are individually usable design points that compose without any single one becoming the \"module system.\"** Most modern language designers cherry-pick from this menu; Ada has them all and demonstrates they can coexist coherently."
+    }
+  ],
+  "sources": [
+    { "label": "Ada RM — Packages", "url": "http://www.ada-auth.org/standards/22rm/html/RM-7.html" },
+    { "label": "Ada RM — Program units", "url": "http://www.ada-auth.org/standards/22rm/html/RM-10.html" },
+    { "label": "Ada RM — Generics", "url": "http://www.ada-auth.org/standards/22rm/html/RM-12.html" },
+    { "label": "Learn AdaCore — Modular Programming", "url": "https://learn.adacore.com/courses/intro-to-ada/chapters/modular_programming.html" }
+  ]
+}

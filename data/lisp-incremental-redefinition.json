@@ -1,0 +1,28 @@
+{
+  "kind": "concept",
+  "name": "Common Lisp Incremental Redefinition",
+  "aliases": ["image-based development", "residential development", "CLOS dispatch propagation"],
+  "summary": "Common Lisp treats the live image as the primary development environment: every function, class, method, and variable can be redefined at runtime. CLOS method dispatch tables propagate changes automatically. The ancestor of Julia Revise and Smalltalk-style live coding.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Common Lisp treats the live image as the primary development environment: every function, class, method, and variable can be redefined at runtime. `(defun foo () ...)` evaluated interactively replaces the existing `foo`; future calls see the new definition. Method dispatch tables (CLOS) propagate changes automatically; global variable rebinding takes effect immediately.\n\nThe SLIME / SLY IDE environments build on this to provide \"compile-defun\" and \"compile-file\" commands that update the running image incrementally. Combined with the condition/restart system, the workflow is: run code → hit an error → the debugger pops up → edit the offending function → restart the frame → continue.",
+      "refs": [
+        { "target": "erlang-hot-reload#overview", "type": "compared-with" },
+        { "target": "julia-revise#overview", "type": "ancestor-of" }
+      ]
+    },
+    {
+      "id": "design-philosophy",
+      "title": "Image-based vs file-based",
+      "tags": ["common-lisp", "language-design"],
+      "content": "This development style — sometimes called \"image-based\" or \"residential\" — is philosophically distinct from edit-compile-run. The whole system is always live; code changes are made *to* the running system rather than to a file that will later be recompiled. Smalltalk pushed this idea further; Common Lisp established the compiled, static-type-free version that most modern interactive languages inherit.\n\nThe production lesson: image-based development requires the language and runtime to be co-designed for it. Function bindings must be rebindable, method dispatch must be late-binding, and the compiler must support recompilation of individual definitions. Languages that lock down these aspects (most static languages) cannot offer the same workflow.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Common Lisp HyperSpec — Reader glossary", "url": "http://www.lispworks.com/documentation/HyperSpec/Body/26_glo_r.htm" }
+  ]
+}

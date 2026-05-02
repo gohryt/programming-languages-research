@@ -1,0 +1,50 @@
+{
+  "kind": "runtime",
+  "name": "Project Lilliput — Compact Object Headers (JEP 519)",
+  "aliases": ["Lilliput", "Project Lilliput", "JEP 519", "Compact Object Headers"],
+  "summary": "Project Lilliput (Roman Kennke, Andrew Haley et al., OpenJDK 2021+) shrinks the JVM object header from 12–16 bytes to 8 bytes. JEP 519 shipped in JDK 25 (2025) as the default for new deployments.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "compact-object-header", "jvm", "openjdk", "production"],
+      "content": "Project Valhalla restructured *which* objects exist on the heap; **Project Lilliput** (Roman Kennke, Andrew Haley et al., OpenJDK 2021+) is the parallel effort to shrink the headers of every object that *does* exist.\n\nJEP 519 (\"Compact Object Headers\") delivered the result in JDK 25 (2025), reducing the JVM object header from 12–16 bytes to **8 bytes** for the vast majority of objects on the heap.",
+      "refs": [
+        { "target": "garbage-collection#language-design-implications", "type": "instance-of" },
+        { "target": "project-valhalla", "type": "complements" },
+        { "target": "zgc", "type": "complements" },
+        { "target": "shenandoah-gc", "type": "complements" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Header layout — 22-bit class pointer + 42-bit mark word",
+      "tags": ["compact-object-header", "jvm"],
+      "content": "The mechanism, simplified: a Java object header historically contained two words — a *mark word* (~8 bytes; lock state, identity hash, GC age, biased-locking metadata) and a *class word* (~8 bytes on 64-bit, with compressed oops; the pointer to the Klass metadata).\n\nJEP 519 rearranges this to fit *both* the mark-word state and the class pointer into a single 64-bit header by:\n\n- Compressing the class pointer to **22 bits** (sufficient for ~4M loaded classes per VM, a comfortable upper bound for almost all production deployments).\n- Stealing the remaining 42 bits for mark-word state (lock bits, identity hash, GC age, GC-specific marker bits).\n- **Eliminating biased locking entirely** — already deprecated and disabled by default since JDK 15 (JEP 374), so the change formalised a transition that had already happened operationally.\n- Using lookup tables for the rare cases where 22-bit class pointers are insufficient."
+    },
+    {
+      "id": "impact",
+      "title": "Memory-footprint impact",
+      "tags": ["garbage-collection", "low-latency-gc", "jvm"],
+      "content": "The memory-footprint impact is large for object-heavy workloads. Benchmarks reported in the JEP and in early production rollouts (Cassandra, Spark, Kafka, large-heap microservices) show **5–15% heap reduction** on typical workloads, with corresponding GC-pause and cache-locality benefits.\n\nCombined with **Project Valhalla**, the two changes attack heap pressure from opposite directions: Valhalla eliminates objects entirely where possible (value-class flattening); Lilliput shrinks the objects that remain. Together they represent the largest JVM memory-layout shift since the original 64-bit JVM port."
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs — identity hash, debugging tools",
+      "tags": ["jvm", "compact-object-header"],
+      "content": "Trade-offs are subtle but real. **Identity-hash storage moves**: an object's identity hash is now lazily materialised on first `System.identityHashCode()` call rather than always present in the header, costing a one-time atomic update per object. Locking remains correct (the locking protocol is more constrained but functionally equivalent); biased-locking removal had already happened in JDK 15.\n\nSome debugging tools (heap dumps, JVM TI agents, third-party profilers) needed updates to handle the new layout — Eclipse MAT, YourKit, JProfiler, and async-profiler released compatible versions in 2024–2025."
+    },
+    {
+      "id": "status",
+      "title": "Status — JDK 25 LTS default",
+      "tags": ["jvm", "openjdk", "production"],
+      "content": "Status (as of 2026-04): preview/optional in JDK 24 (`-XX:+UnlockExperimentalVMOptions -XX:+UseCompactObjectHeaders`); shipped in JDK 25 LTS (2025) as the default for new deployments. The JDK 25 LTS release is the canonical \"post-Valhalla, post-Lilliput\" JVM. Cross-architecture rollout (x86-64, AArch64, RISC-V) is essentially complete.\n\nFor a new language designer, **per-object metadata size deserves the same scrutiny per-allocation cost gets** — every byte of object header multiplies by every live object on the heap. Valhalla attacks the count of objects; Lilliput attacks the size of each."
+    }
+  ],
+  "sources": [
+    { "label": "JEP 519: Compact Object Headers", "url": "https://openjdk.org/jeps/519" },
+    { "label": "OpenJDK Project Lilliput wiki", "url": "https://wiki.openjdk.org/display/lilliput" },
+    { "label": "Aleksey Shipilëv — \"Java Objects Inside Out\"", "url": "https://shipilev.net/jvm/objects-inside-out/" },
+    { "label": "JEP 450: Compact Object Headers (Experimental)", "url": "https://openjdk.org/jeps/450" }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "tool",
+  "name": "langcc",
+  "aliases": [],
+  "summary": "Joe Zimmerman's parser generator that aims to make parser generation competitive again for full industrial languages; extends canonical LR with XLR (bounded nondeterministic shift/reduce), generates entire frontend skeletons (AST types, traversals, hashing, pretty-printers), and ships conflict tracing that maps LR conflicts back to confusing input pairs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Joe Zimmerman's **langcc** is one of the few serious attempts to make parser generation competitive again for full industrial languages. The interesting claim is not just \"another LR generator,\" but that it extends canonical LR with several implementation ideas — including grammar transformations, per-symbol attributes, recursive-descent actions, and **XLR**, an extension that adds bounded nondeterministic choice to shift/reduce parsing. It also generates much more than a parser: AST types, traversals, hashing, and pretty-printers.",
+      "refs": [
+        { "target": "lr-parser-generators#overview", "type": "extends" }
+      ]
+    },
+    {
+      "id": "conflict-tracing",
+      "title": "Conflict tracing — mapping LR conflicts to input pairs",
+      "tags": ["parser-generator", "diagnostics", "tooling"],
+      "content": "The really original side is the developer ergonomics around conflicts. Rather than dumping opaque shift/reduce tables, langcc includes a **conflict tracing** story that tries to map LR conflicts back to explicit confusing input pairs. That is exactly the sort of feature parser generators historically needed and mostly failed to provide.\n\nA shift/reduce conflict in classical yacc output is a list of states and rule numbers; understanding it requires reading the generated tables and reconstructing the grammar's behavior. Menhir's CC 2016 work on minimal-counterexample generation went partway there. langcc takes the next step: present the conflict as a pair of input strings the grammar parses ambiguously, so the grammar author can immediately see what real-world input would expose the issue.",
+      "refs": []
+    },
+    {
+      "id": "frontend-generation",
+      "title": "Frontend generation beyond parsing",
+      "tags": ["parser-generator", "tooling", "frontend"],
+      "content": "Beyond the parser proper, langcc generates: AST type definitions for each grammar production, traversal scaffolding (visitors, iterators), structural hashing for AST equality and memoization, and pretty-printers that round-trip from AST back to text. This is the ambition closer to language workbenches than classical yacc — the grammar becomes the source of truth for an entire frontend skeleton, not just the parser.\n\nThe trade-off is the usual one: langcc's research-tool ecosystem is far less battle-tested than Menhir, tree-sitter, or ANTLR, with fewer production case studies. langcc offers a grammar-first workflow that generates a full frontend with unusually strong performance claims and serious conflict diagnosis — but adoption depends on whether the broader tooling (formatters, linters, language servers) can plug into the generated AST, and on whether the XLR extension's correctness story holds up under more grammar shapes than the paper covers.",
+      "refs": [
+        { "target": "parser-tooling#language-workbenches", "type": "related" }
+      ],
+      "sources": [
+        { "label": "langcc paper", "url": "https://arxiv.org/abs/2209.08383" },
+        { "label": "langcc", "url": "https://langcc.io/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "langcc", "url": "https://langcc.io/" }
+  ]
+}

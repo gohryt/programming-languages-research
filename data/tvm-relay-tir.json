@@ -1,0 +1,35 @@
+{
+  "kind": "framework",
+  "name": "TVM Relay/TIR",
+  "aliases": ["apache-tvm-relay", "tvm-tir"],
+  "summary": "Apache TVM (Chen, Moreau, Jiang et al., OSDI 2018): two-level deep-learning compiler IR. Relay is high-level functional with first-class tensors; TIR is the loop-and-buffer IR with explicit memory hierarchies, suitable for hardware-target codegen via Schedule transformations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Apache TVM Relay/TIR** (Chen, Moreau, Jiang et al. — OSDI 2018) is the most-deployed open-source DL compiler IR. The two-level design splits responsibilities. **Relay** is a high-level functional IR with first-class tensors, ADTs, gradient operators, and shape polymorphism: a Relay program looks like a typed lambda calculus where every value is a tensor or a tensor-producing function. **TIR (Tensor IR)** is the low-level loop-and-buffer IR with explicit memory hierarchies, suitable for hardware-target codegen via `Schedule` transformations.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "halide#overview", "type": "inherits-from" }
+      ],
+      "sources": [
+        { "label": "Apache TVM Relay introduction", "url": "https://tvm.apache.org/docs/arch/relay_intro.html" },
+        { "label": "TVM (OSDI 2018)", "url": "https://arxiv.org/abs/1802.04799" }
+      ]
+    },
+    {
+      "id": "schedule-as-ir-transformation",
+      "title": "Schedule-as-IR-transformation",
+      "tags": ["compiler-ir", "auto-tuning", "deep-learning"],
+      "content": "The architectural lesson is **schedule-as-IR-transformation** (echoing Halide): a TIR program plus a schedule produces target-specific code, and the schedule space can be searched (AutoTVM, MetaSchedule, Ansor) for performance. TVM's Relay→TIR lowering is the canonical example of \"two-level IR with separation of algorithm and schedule\" applied to whole neural networks rather than single kernels.",
+      "refs": [
+        { "target": "halide#overview", "type": "applies-pattern-of" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Apache TVM Relay introduction", "url": "https://tvm.apache.org/docs/arch/relay_intro.html" },
+    { "label": "TVM (OSDI 2018)", "url": "https://arxiv.org/abs/1802.04799" }
+  ]
+}

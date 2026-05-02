@@ -1,0 +1,40 @@
+{
+  "kind": "runtime",
+  "name": "HVM2 and Bend",
+  "aliases": ["HVM2", "Higher-Order Virtual Machine 2", "Bend language"],
+  "summary": "Victor Taelin's interaction-combinator runtime (HVM2) and the Bend functional language compiling to it. Programs are graphs of interaction combinators (Lafont 1997); evaluation is parallel rewriting of disjoint active pairs. Implicit parallelism without programmer annotation; CUDA backend for GPU lanes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Victor Taelin's **Bend** (Higher Order Company, 2024) and its underlying runtime **HVM2 (Higher-Order Virtual Machine 2)** sit in a different corner of the parallelism design space from every other entry. Where Go, Cilk, GHC sparks, OpenMP, and TBB all multiplex *explicit* tasks/threads/work-items onto cores, HVM2 treats every program as a graph of **interaction combinators** (Lafont 1997) — small first-order rewrite rules with the property that **non-overlapping rewrites are always commutative** — and parallelises by detecting those non-overlapping reductions and executing them simultaneously across CPU cores or GPU lanes.",
+      "refs": [],
+      "sources": [
+        { "label": "HVM2 repository", "url": "https://github.com/HigherOrderCO/HVM2" },
+        { "label": "Bend repository", "url": "https://github.com/HigherOrderCO/Bend" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["parallelism", "interaction-combinators"],
+      "content": "A Bend program compiles to an HVM2 net (a graph of typed nodes with directed ports). The runtime repeatedly scans for **active pairs** (two nodes whose principal ports are connected) and rewrites each pair according to its interaction rule. Because interaction-combinator semantics guarantee that disjoint active pairs never interfere, the runtime can fire thousands of rewrites in parallel without locking, scheduling, or memory-ordering subtleties.\n\nHVM2's CUDA backend executes one rewrite per warp lane on Nvidia GPUs; the C backend uses atomics on x86-64 multicore. The published 2024 paper reports near-linear speedup with core count on benchmarks ranging from list operations to symbolic differentiation — workloads with no parallel annotations of any kind.",
+      "refs": [],
+      "sources": [
+        { "label": "HVM2 paper (Taelin)", "url": "https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/HVM2.pdf" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["parallelism", "research"],
+      "content": "The trade-off is real: interaction-net evaluation pays a constant-factor overhead vs ordinary execution (every operation is a graph rewrite, not an inline machine instruction), so a sequential Bend program is slower than a sequential C program even on one thread. The bet is that on workloads with abundant intrinsic parallelism, the GPU's thousands of lanes more than compensate.\n\nDistinct from work-stealing schedulers (which still require programmers to identify spawnable tasks); distinct from OpenMP (which requires loop-parallel annotations); distinct from data-parallel languages (Halide, Triton — which require expressing computation as parallel array kernels). HVM2's contribution is making **arbitrary higher-order functional programs** parallel without the programmer naming the parallelism.\n\nStatus (as of 2026-04): research-grade. As an existence proof that a non-explicit-parallelism programming model can scale to GPUs without programmer annotation, however, it is the most original parallel-runtime data point of the 2020s.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "HVM2 repo", "url": "https://github.com/HigherOrderCO/HVM2" },
+    { "label": "Bend repo", "url": "https://github.com/HigherOrderCO/Bend" }
+  ]
+}

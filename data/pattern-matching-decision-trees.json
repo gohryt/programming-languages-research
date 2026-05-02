@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Pattern Matching Compilation",
+  "aliases": [
+    "decision trees",
+    "Maranget compilation",
+    "pattern matrix compilation"
+  ],
+  "summary": "Compiling `match`/`case` over algebraic data types into efficient branching code. Maranget's decision-tree algorithm is the modern standard (OCaml, Rust, Swift, GHC descend from it). Backtracking automata (Augustsson, Wadler) are the historical alternative. Production compilers add matrix factoring, constructor jump tables, and guard sequencing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Compiling pattern-matching constructs (`match`/`case`/`switch` over algebraic data types) into efficient branching code is a distinct subfield within codegen. The dominant modern approach is decision-tree compilation; the historical alternative is backtracking automata. Production compilers layer matrix factoring, constructor jump tables, and guard sequencing on top to shrink the tree.\n\nExhaustiveness and reachability checking — separate static analyses also driven from the pattern matrix — are owned canonically by type-system documentation rather than this codegen-side record.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Maranget — Compiling Pattern Matching to Good Decision Trees",
+          "url": "http://moscova.inria.fr/~maranget/papers/ml05e-maranget.pdf"
+        }
+      ]
+    },
+    {
+      "id": "maranget-decision-trees",
+      "title": "Maranget decision trees",
+      "tags": [
+        "compiler",
+        "pattern-matching"
+      ],
+      "content": "Luc Maranget's \"Compiling Pattern Matching to Good Decision Trees\" (ML Workshop 2008) is the standard reference. The input is a pattern matrix (rows = clauses, columns = pattern positions); the output is a decision tree where each internal node tests one scrutinee component and each leaf is an action.\n\nThe key design decision is **column selection heuristics** — which component to test next. Maranget evaluates several (first-column, needed-column, branching-factor, arity) and shows that combined heuristics produce trees that are typically within 10% of optimal while remaining linear-time to build. Most ML-family languages (OCaml, Haskell GHC, Rust, Swift) use direct descendants of this algorithm.\n\nThe alternative, **backtracking automata** (Augustsson 1985, Wadler 1987), compiles matches into sequential case analysis with fall-through on failure. Automata are simpler to generate but can re-test the same scrutinee components repeatedly; decision trees avoid this by construction. Modern compilers almost universally use decision trees.",
+      "refs": []
+    },
+    {
+      "id": "matrix-and-nested-pattern-optimizations",
+      "title": "Matrix and nested-pattern optimisations",
+      "tags": [
+        "compiler",
+        "optimization"
+      ],
+      "content": "Beyond the basic decision-tree algorithm, production compilers apply further optimisations:\n\n- **Pattern matrix factoring**: common prefixes across clauses are shared, reducing tree size.\n- **Constructor switches**: when many patterns test distinct constructors of the same datatype, the tree is compiled to a jump table keyed on the constructor tag (O(1) dispatch instead of O(log n) binary testing).\n- **Guard sequencing**: `match x with | Pat1 when guard1 -> ... | Pat2 -> ...` must fall through to Pat2 when Pat1 matches but the guard fails. Naïve implementation duplicates the Pat2 tests; careful compilation shares them.\n- **String pattern matching** uses specialised dispatch (Aho-Corasick for multiple fixed strings, or perfect hash tables for small closed sets).\n\nThe cumulative effect: a hand-written series of `if` tests on a sum type is often *worse* than what a good pattern-match compiler produces, because the compiler applies all these optimisations uniformly.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Maranget — Compiling Pattern Matching",
+      "url": "http://moscova.inria.fr/~maranget/papers/ml05e-maranget.pdf"
+    }
+  ]
+}

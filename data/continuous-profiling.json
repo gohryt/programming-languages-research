@@ -1,0 +1,151 @@
+{
+  "kind": "concept",
+  "name": "Continuous profiling",
+  "aliases": [
+    "always-on profiling",
+    "fleet-wide profiling",
+    "Google-Wide Profiling"
+  ],
+  "summary": "Always-on, statistically-sampled, fleet-wide profiling designed to run in production indefinitely; lineage runs Google-Wide Profiling (2010) → pprof profile.proto (industry wire format) → Parca, Pyroscope, Datadog Continuous Profiler, Google Cloud Profiler.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Classical profiling is point-in-time: run `perf` on one box when it's slow, save the flame graph, close the terminal. **Continuous profiling** is the qualitatively different discipline of *always-on, statistically-sampled, fleet-wide* profiling — designed to be left running in production indefinitely, aggregating across thousands of instances, and attributing performance trends back to code changes.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:continuous-fleet-scale`, `family:visualization-trace-interchange`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-sample`\n"
+    },
+    {
+      "id": "google-wide-profiling",
+      "title": "Google-Wide Profiling — The Founding Paper",
+      "tags": [
+        "domain:profiling",
+        "family:continuous-fleet-scale",
+        "granularity:per-sample",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Ren et al.'s \"Google-Wide Profiling: A Continuous Profiling Infrastructure for Data Centers\" (IEEE Micro, 2010) is the origin paper. The design's foundational move: *randomly sample machines in the fleet each day, then randomly sample time-slices on each chosen machine* (roughly one profile sample every few seconds per chosen box, at around 19Hz internal sampling). The aggregate profile is assembled from billions of small samples across thousands of machines and stored in Dremel for SQL-style analysis.\n\nThe cost-when-on is negligible *per machine* precisely because any one machine is profiled rarely; fleet coverage comes from statistical aggregation, not from per-host density. This is qualitatively different from \"attach perf to one box when it's slow\" — and qualitatively different from instrumenting every request with a span (`data/distributed-tracing`).\n\nThe load-bearing design trick is **attribution by build ID**. Every Google binary embeds a build identifier; profiles can be re-aggregated by function × binary version, turning the profile store into a *longitudinal* performance archive. You can diff CPU cost of function `X` across last week's and this week's release, attributing regressions to commits. Without build IDs, profiles from a rolling fleet are unattributable noise. This is the same design pattern that makes source-map versioning work for JavaScript debugging, applied to profile metadata.",
+      "sources": [
+        {
+          "url": "https://research.google/pubs/google-wide-profiling-a-continuous-profiling-infrastructure-for-data-centers/"
+        },
+        {
+          "url": "https://research.google.com/pubs/archive/36575.pdf"
+        }
+      ]
+    },
+    {
+      "id": "pprof-profile-proto",
+      "title": "pprof `profile.proto` as Lingua Franca",
+      "tags": [
+        "domain:profiling",
+        "family:visualization-trace-interchange",
+        "granularity:per-sample",
+        "off-cost:always-on",
+        "on-cost:low"
+      ],
+      "content": "Go's pprof format — originally `runtime/pprof`'s output schema (`data/runtime-event-pipelines#go-runtime-trace-flight-recorder`), documented in `profile.proto` — became the *de-facto* industry wire format for profiles. Parca, Pyroscope / Grafana Phlare, Google Cloud Profiler, Polar Signals, and Datadog all ingest pprof. Status (as of 2026-04): OpenTelemetry Profiling was still in progress, and it converges on the same shape.\n\nThe format's design is deliberately profile-type-agnostic: a generic `Sample → [Location] → Mapping` graph with arbitrary `value` dimensions (so CPU, heap, goroutine, block, mutex, and custom profiles all share one schema), a string table for interning, and gzip compression. This is the profiling equivalent of what OTLP did for traces and what CTF (`data/runtime-event-pipelines#lttng-ctf`) does for event streams: one interchange format that lets producers and consumers evolve independently.\n\nFor a new language: if your runtime emits profiles, emit them in pprof. The entire observability tool ecosystem will ingest them without adapter code, and users get free compatibility with continuous-profiling backends they haven't even chosen yet.",
+      "sources": [
+        {
+          "url": "https://github.com/google/pprof/blob/main/proto/profile.proto"
+        },
+        {
+          "url": "https://github.com/google/pprof"
+        }
+      ]
+    },
+    {
+      "id": "parca-frostdb",
+      "title": "Parca — Open-Source GWP via eBPF",
+      "tags": [
+        "domain:profiling",
+        "ebpf",
+        "family:continuous-fleet-scale",
+        "granularity:per-sample",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "**Parca** (Frederic Branczyk / Polar Signals, 2021) is the open-source GWP-style system. Its distinctive choice is **whole-system profiling via eBPF** (`data/bytecode-and-code-patching#ebpf-uprobes`) without application changes: a Parca Agent attaches a CPU-sampling eBPF probe to every process on a node, walks user-space stacks via a combination of frame pointers and preprocessed unwind metadata, and ships pprof-formatted profiles to a central store.\n\nThe eBPF-side unwinder is worth naming specifically: Parca / Polar Signals preprocesses userspace unwind metadata into bounded tables that an eBPF program can consult at sample time. This lets many non-frame-pointer binaries be unwound in-kernel without interpreting arbitrary DWARF CFI bytecode inside eBPF, which would be difficult to square with verifier constraints and the complexity described in `data/sampling-profiling#dwarf-eh-frame-cfi`.\n\nThe storage layer is **FrostDB**, a columnar database designed for profile ingestion and query. Profiles are decomposed into sample-value columns (CPU time, allocated bytes, goroutine counts) and metadata columns (function name, file, line, build ID). Queries are SQL-like aggregations over the columnar layout — the pprof ecosystem's answer to Dremel.",
+      "sources": [
+        {
+          "url": "https://parca.dev/docs/concepts"
+        },
+        {
+          "url": "https://www.polarsignals.com/blog/posts/2022/11/29/dwarf-based-stack-walking-using-ebpf"
+        }
+      ]
+    },
+    {
+      "id": "grafana-pyroscope",
+      "title": "Grafana Pyroscope — Multi-Tenant Profile Aggregation",
+      "tags": [
+        "domain:profiling",
+        "family:continuous-fleet-scale",
+        "granularity:per-sample",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "**Pyroscope** (originally Pyroscope Inc., acquired by Grafana Labs in 2023, now merged with Grafana Phlare) is the multi-tenant companion. Its original storage layer predated the pprof-as-lingua-franca convergence; the modern codebase ingests pprof alongside native formats and stores profiles in a Mimir-style (Prometheus-derived) columnar layout with tenant isolation.\n\nThe distinctive feature is **deep integration with distributed tracing** (`data/distributed-tracing`): profiles are tagged with trace and span IDs, so a developer viewing an OpenTelemetry trace can jump directly to the CPU flame graph of the specific span's work. This closes the \"profile → request\" correlation loop that Dapper-style tracing left open — see a slow span, see exactly which functions consumed the time. Datadog Continuous Profiler and Google Cloud Profiler offer similar correlation in their managed forms.",
+      "sources": [
+        {
+          "url": "https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/"
+        },
+        {
+          "url": "https://grafana.com/docs/pyroscope/latest/reference-server-api"
+        }
+      ]
+    },
+    {
+      "id": "managed-continuous-profilers",
+      "title": "Managed Continuous Profilers — Datadog, Google Cloud Profiler",
+      "tags": [
+        "domain:profiling",
+        "family:continuous-fleet-scale",
+        "granularity:per-sample",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "**Google Cloud Profiler** is GWP's commercial descendant — statistical, always-on, per-agent library linked into the application. **Datadog Continuous Profiler** is the managed-service take, leaning on JFR (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`) for JVM workloads, async-profiler (`data/cooperative-safepoints#safepoint-bias-async-get-call-trace`) for sidestepping safepoint bias, and pprof for Go/Python/Ruby.\n\nThe common design across all continuous profilers: the steady-state overhead target is 1–5% CPU sustained, not 0%. This is a conscious trade — you give up a small fraction of throughput in exchange for always knowing where the other 95–99% went. Pair it with span-to-profile correlation (`data/continuous-profiling#grafana-pyroscope`) and you get per-request attribution for the spans that matter without paying per-request cost for the spans that don't.",
+      "sources": [
+        {
+          "url": "https://docs.cloud.google.com/profiler/docs/concepts-profiling"
+        },
+        {
+          "url": "https://docs.datadoghq.com/profiler/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://research.google/pubs/google-wide-profiling-a-continuous-profiling-infrastructure-for-data-centers/"
+    },
+    {
+      "url": "https://research.google.com/pubs/archive/36575.pdf"
+    },
+    {
+      "url": "https://github.com/google/pprof/blob/main/proto/profile.proto"
+    },
+    {
+      "url": "https://github.com/google/pprof"
+    },
+    {
+      "url": "https://parca.dev/docs/concepts"
+    },
+    {
+      "url": "https://www.polarsignals.com/blog/posts/2022/11/29/dwarf-based-stack-walking-using-ebpf"
+    },
+    {
+      "url": "https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/"
+    },
+    {
+      "url": "https://grafana.com/docs/pyroscope/latest/reference-server-api"
+    },
+    {
+      "url": "https://docs.cloud.google.com/profiler/docs/concepts-profiling"
+    },
+    {
+      "url": "https://docs.datadoghq.com/profiler/"
+    }
+  ]
+}

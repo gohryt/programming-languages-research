@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/research/tag.schema.json",
+  "title": "Research Tag Descriptor",
+  "description": "Optional descriptor for a tag used in section.tags arrays. Adding a file under tags/ documents the tag; tags without a descriptor still work, they just lack a description.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tag", "name"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Filename-safe id; defaults to the filename basename. Equal to `tag` with `:` replaced by `-`.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "tag": {
+      "type": "string",
+      "description": "The literal tag string used in section.tags[]. May include one optional axis prefix (axis:value).",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(:[a-z0-9]+(?:-[a-z0-9]+)*)?$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name shown on tag pages."
+    },
+    "description": {
+      "type": "string",
+      "description": "Free-form prose explaining what the tag means and when to apply it."
+    },
+    "axis": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "Optional grouping axis, e.g. 'family', 'off-cost', 'on-cost', 'granularity', 'domain'. Used by the static site to render axis-grouped comparison views. Anyone can introduce a new axis by using its name; there is no central registry."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(:[a-z0-9]+(?:-[a-z0-9]+)*)?$"
+      },
+      "uniqueItems": true,
+      "description": "Tag strings that have been merged into this canonical tag. Listed so old references and searches still resolve."
+    },
+    "parent": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(:[a-z0-9]+(?:-[a-z0-9]+)*)?$",
+      "description": "Optional parent tag for hierarchical organization. The site may render parent → children relationships."
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      },
+      "uniqueItems": true,
+      "description": "Curated record ids that exemplify this tag. Advisory only; the site renders the full tag-page listing from section.tags[]."
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url"],
+        "properties": {
+          "label": { "type": "string" },
+          "url": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

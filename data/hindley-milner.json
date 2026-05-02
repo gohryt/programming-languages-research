@@ -1,0 +1,56 @@
+{
+  "kind": "concept",
+  "name": "Hindley-Milner Inference",
+  "aliases": ["algorithm-w", "damas-milner", "hm", "let-polymorphism"],
+  "summary": "Static typing with parametric polymorphism and automatic type inference for a rank-1 polymorphic functional core. Algorithm W threads substitutions while recursively inferring expressions and unifying constraints; gives let-polymorphism, principal types, and predictable inference. The ML family popularized it; modern checkers extend it bidirectionally or constraint-based when subtyping/effects/GADTs join in.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Hindley-Milner inference provides let-polymorphism, principal types, and predictable inference for a rank-1 polymorphic functional core. Algorithm W (Damas-Milner, 1982) threads substitutions while recursively inferring expressions and unifying constraints.\n\nThe ML family popularized static typing with parametric polymorphism and automatic type inference, now commonly called Hindley-Milner. The rank-1 fragment — type abstractions only at the outermost level of let-bindings — is the largest fragment of System F that admits decidable inference without programmer-written type arguments.",
+      "refs": [
+        { "target": "unification-algorithms#overview", "type": "depends-on" },
+        { "target": "bidirectional-typing#overview", "type": "alternative-when-richer" },
+        { "target": "constraint-based-typing#overview", "type": "generalizes-to" },
+        { "target": "higher-rank-polymorphism#overview", "type": "extended-by" }
+      ],
+      "sources": [
+        { "label": "Damas and Milner — Principal type-schemes for functional programs", "url": "https://www.cs.cmu.edu/~crary/819-f09/DamasMilner82.pdf" },
+        { "label": "The History of Standard ML", "url": "https://smlfamily.github.io/history/SML-history.pdf" }
+      ]
+    },
+    {
+      "id": "historical-context",
+      "title": "Historical context — from ALGOL/Simula to ML",
+      "tags": ["type-system", "history"],
+      "content": "Hindley-Milner sits at the end of a 1960s–1970s lineage. ALGOL-era languages used types primarily as a storage and operation discipline; Simula made class-like abstractions part of the type story; the typed lambda calculus brought formal vocabulary into language implementation. ML combined static typing, parametric polymorphism, and type inference in a practical language used as the metalanguage of LCF, with System F as the underlying account of explicit type abstraction and Hindley's and Milner's independent inference results making a useful rank-1 fragment practical without explicit type arguments.\n\nA broader survey of the type-theory-and-programming-languages lineage notes how ALGOL, Simula, typed lambda calculi, polymorphism, and Curry-Howard connections shaped the modern concept of type systems. Cardelli's lecture notes are the canonical compact introduction to the type-systems vocabulary that HM presupposes.",
+      "sources": [
+        { "label": "A historical survey of type theory and programming languages (arXiv 1510.03726)", "url": "https://arxiv.org/pdf/1510.03726" },
+        { "label": "Cardelli — Type Systems", "url": "https://web.eecs.umich.edu/~weimerw/2012-4610/reading/Cardelli_TypeSystems.pdf" }
+      ]
+    },
+    {
+      "id": "strengths",
+      "title": "Strengths",
+      "tags": ["type-system", "inference"],
+      "content": "- low annotation burden;\n- principal types in the classic setting (every well-typed program has a most-general type);\n- excellent for ML-style functional cores (no subtyping, simple side-effect story);\n- conceptually small enough for an early compiler — Algorithm W is a few hundred lines of code in most implementations."
+    },
+    {
+      "id": "costs-and-when-it-breaks",
+      "title": "Costs and when HM stops being enough",
+      "tags": ["type-system", "inference", "tradeoffs"],
+      "content": "HM's predictability comes from restricting the type structure. Costs accumulate when a language wants more:\n\n- effects require value restriction or another discipline (OCaml's value restriction is the canonical pragmatic answer);\n- subtyping complicates principality — F<: loses HM-style inference; algebraic subtyping (`data/mlsub-algebraic-subtyping`) recovers it by restricting the type lattice;\n- higher-rank polymorphism requires annotations or bidirectional methods (`data/higher-rank-polymorphism`);\n- type classes, GADTs, type families, and associated types require a richer constraint solver (`data/constraint-based-typing`).\n\nFor language designers, the rule of thumb is: **start with HM if the language is functional and effect-light; switch to bidirectional + constraint-based when the type system grows beyond rank-1 polymorphism**.",
+      "refs": [
+        { "target": "mlsub-algebraic-subtyping#overview", "type": "extends-with-subtyping" },
+        { "target": "constraint-based-typing#overview", "type": "successor-architecture" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Damas and Milner — Principal type-schemes for functional programs", "url": "https://www.cs.cmu.edu/~crary/819-f09/DamasMilner82.pdf" },
+    { "label": "The History of Standard ML", "url": "https://smlfamily.github.io/history/SML-history.pdf" },
+    { "label": "A historical survey of type theory and programming languages", "url": "https://arxiv.org/pdf/1510.03726" },
+    { "label": "Cardelli — Type Systems", "url": "https://web.eecs.umich.edu/~weimerw/2012-4610/reading/Cardelli_TypeSystems.pdf" }
+  ]
+}

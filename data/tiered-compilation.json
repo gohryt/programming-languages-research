@@ -1,0 +1,64 @@
+{
+  "kind": "concept",
+  "name": "Tiered Compilation",
+  "aliases": [],
+  "summary": "Runtime architecture combining multiple execution modes (interpreter → baseline → optimizing) so cold code starts fast and hot code optimizes well. Production: V8's Ignition→Sparkplug→Maglev→TurboFan, SpiderMonkey's interpreter→Baseline→IonMonkey, HotSpot's interpreter→C1→C2.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Modern VMs typically have two or three execution tiers:\n\n1. **Interpreter**: zero compilation latency, slow execution. Good for code that runs once.\n2. **Baseline compiler**: fast compilation (~1ms), moderate execution speed. Good for warm code.\n3. **Optimizing compiler**: slow compilation (~100ms), fast execution. Good for hot loops.\n\nProduction examples: V8 (Ignition → Sparkplug → Maglev → TurboFan/Turboshaft), SpiderMonkey (interpreter → Baseline → IonMonkey), HotSpot (interpreter → C1 → C2), JavaScriptCore (LLInt → Baseline → DFG → FTL/B3).",
+      "refs": [
+        { "target": "copy-and-patch#strengths", "type": "uses" },
+        { "target": "deegen#overview", "type": "generated-by" }
+      ],
+      "sources": [
+        {
+          "label": "V8 — Launching Ignition and TurboFan",
+          "url": "https://v8.dev/blog/launching-ignition-and-turbofan"
+        }
+      ]
+    },
+    {
+      "id": "why-tiering-exists",
+      "title": "Why tiering exists",
+      "tags": ["jit", "performance"],
+      "content": "Fast startup favors cheap execution modes; hot code benefits from expensive optimization. Tiering exists because one compilation strategy rarely dominates across both cold and hot execution paths.\n\nThe interactive-language sweet spot (Jamie Brandon): for interactive languages, combined compile-time + run-time matters more than either alone. A program that compiles in 0.1s and runs in 1s is better than one that compiles in 0s and runs in 2s (interpreter) or compiles in 10s and runs in 0.5s (LLVM -O3). Tiered execution — interpreted glue code + compiled hot paths — is the practical answer for interactive languages.",
+      "refs": [
+        { "target": "cranelift#fit-for-jit-and-tiered-compilation", "type": "powers" },
+        { "target": "llvm#role-in-jit-and-tiered-systems", "type": "powers" }
+      ]
+    },
+    {
+      "id": "common-architecture-patterns",
+      "title": "Common architecture patterns",
+      "tags": ["jit", "runtime-design"],
+      "content": "Common tiered designs:\n\n- **Interpreter + optimizing JIT** (HotSpot Java pre-C1, modern Lua-on-LuaJIT-trace mode): two tiers, simpler tier-up logic.\n- **Baseline JIT + optimizing JIT** (V8 Sparkplug + TurboFan, SpiderMonkey Baseline + IonMonkey): cold paths get baseline native code; hot paths get full optimization.\n- **Multi-tier with profiling-driven promotion** (V8 four-tier, JSC four-tier): each tier collects profile data for the next; OSR (on-stack replacement) transfers running code to higher tiers without unwinding.\n\nThe number of tiers is less important than the budget split between them — what fraction of total time the runtime spends in each tier, and whether the tier-up trigger correctly picks hot code.",
+      "refs": [
+        { "target": "deegen#overview", "type": "generated-by" },
+        { "target": "copy-and-patch#strengths", "type": "powers-baseline" }
+      ]
+    },
+    {
+      "id": "mechanisms-and-costs",
+      "title": "Mechanisms and costs",
+      "tags": ["profiling", "jit", "runtime-design"],
+      "content": "Tiered systems rely on:\n\n- **Hotness tracking**: counters per call site or loop back-edge that trigger tier-up.\n- **Code promotion**: when a counter exceeds threshold, the next tier compiles the code (often on a worker thread).\n- **OSR (on-stack replacement)**: hot loop running in a lower tier transitions to the higher tier mid-execution, without waiting for the outer call to return.\n- **Deoptimization**: when a higher-tier speculation fails, execution bails to a lower tier with reconstructed program state.\n- **Code cache management**: native code from each tier needs eviction policy and memory accounting.\n\nThese mechanisms can dominate implementation complexity even when the underlying IR or backend technology is already available. Debugging across tiers remains a difficult problem: source mapping, breakpoint placement, and variable-value reconstruction must agree across tiers, or the developer experience fragments.",
+      "refs": [
+        { "target": "ssa#jit-and-runtime-relevance", "type": "uses" },
+        { "target": "sea-of-nodes#optimization-implications", "type": "powers-top-tier" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "V8 — Launching Ignition and TurboFan",
+      "url": "https://v8.dev/blog/launching-ignition-and-turbofan"
+    },
+    {
+      "label": "Brandon — Implementing Interactive Languages",
+      "url": "https://www.scattered-thoughts.net/writing/implementing-interactive-languages/"
+    }
+  ]
+}

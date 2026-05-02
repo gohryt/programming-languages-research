@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Effectful Object Calculi",
+  "aliases": ["object-calculus-with-effects"],
+  "summary": "Dagnino, Giannini, and Zucca (ECOOP 2025): studies objects in the presence of explicit effects. Method calls, object identity, field access, inheritance-like dispatch, and exception-like control all interact with type-and-effect reasoning. The lesson: effects should be designed into the object core, not only added to function types.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Dagnino, Giannini, and Zucca's **An Effectful Object Calculus** (ECOOP 2025) studies objects in the presence of explicit effects. The design point is the interaction between object-oriented constructs — method calls, object identity, field access, inheritance-like dispatch, and exception-like control — and type-and-effect reasoning.\n\nObject calculi are often used as small cores for class-based or prototype-based languages; making effects explicit in such a core gives a place to state and prove which operations may allocate, mutate, throw, perform I/O, or interact with handlers.",
+      "refs": [
+        { "target": "type-and-effect-systems#overview", "type": "specializes" }
+      ],
+      "sources": [
+        { "label": "An Effectful Object Calculus (arXiv)", "url": "https://arxiv.org/pdf/2504.15936" },
+        { "label": "An Effectful Object Calculus (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.8" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — effects in the object core",
+      "tags": ["effect-system", "object-oriented"],
+      "content": "The lesson: **effects should be designed into the object core, not only added to function types**. Languages with methods, mutable objects, and effect annotations need rules for how receiver effects, method-body effects, overridden-method effects, and object initialization effects compose.\n\nThe practical engineering implication is that **effect annotations on methods need to interact correctly with subtype polymorphism**: an overriding method must declare an effect set compatible with the overridden method, and the dispatch rule must respect the contravariant-in-argument-effects, covariant-in-result-effects discipline. Languages that retrofit effects onto an existing OO type system tend to get this wrong on first attempt; an effectful object calculus designed up front avoids the retrofit traps."
+    }
+  ],
+  "sources": [
+    { "label": "An Effectful Object Calculus (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.8" }
+  ]
+}

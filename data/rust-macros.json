@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Rust Macros",
+  "aliases": ["macro_rules!", "procedural macros", "proc macros", "Watt"],
+  "summary": "Rust has two macro systems: declarative (`macro_rules!`) for pattern-based token-tree rewriting, and procedural for arbitrary token-stream manipulation. Proc macros are compiled as separate crates loaded by the compiler — not sandboxed by default. David Tolnay's Watt sandboxes them in WebAssembly for deterministic isolation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Rust has two macro systems with very different shapes. **Declarative macros** (`macro_rules!`) do pattern-based rewriting on token trees: patterns match syntactic fragments (`$x:expr`, `$t:ty`, `$i:ident`) and templates substitute them into output tokens. They are hygienic via token-level binding tracking — names introduced in the macro do not collide with names at the call site.\n\n**Procedural macros** are arbitrary Rust code that manipulates token streams. Three flavours: function-like (`foo!(...)`), derive (`#[derive(Foo)]`), and attribute (`#[foo] fn bar() {}`). The proc macro is compiled as a separate crate and loaded by the compiler during macro expansion; the target crate's tokens become a `TokenStream` argument.",
+      "refs": [
+        { "target": "scala3-macros#overview", "type": "compared-with" },
+        { "target": "template-haskell#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Rust Macros Reference", "url": "https://doc.rust-lang.org/reference/macros.html" }
+      ]
+    },
+    {
+      "id": "declarative-vs-procedural",
+      "title": "Declarative vs procedural",
+      "tags": ["macros", "rust"],
+      "content": "Declarative macros are constrained but predictable: hygienic, no I/O, no arbitrary code at compile time, recognisable to IDEs. Most macros in production Rust use this form — `vec!`, `println!`, `assert!`, `format!`, `dbg!`, and the bulk of library macros are `macro_rules!`.\n\nProcedural macros are unconstrained but heavyweight: full Rust code runs during compilation, with access to filesystem, environment, and any library the proc macro crate depends on. Examples: `#[derive(Serialize)]` from serde inspects the target type's structure and emits a hand-quality serialiser; `#[tokio::main]` rewrites the function body to spin up a runtime; `sqlx::query!` parses an SQL string at compile time and types the result against a live database.\n\nThe trade-off is reach versus auditability. Declarative macros stay within the language's syntactic universe; procedural macros can do anything Rust can do at compile time, including non-determinism and side effects.",
+      "refs": []
+    },
+    {
+      "id": "watt-and-sandboxing",
+      "title": "Watt — proc macros sandboxed in Wasm",
+      "tags": ["macros", "sandboxing", "wasm"],
+      "content": "The architectural choice worth noting: proc macros are compiled as separate host crates and loaded by the compiler during expansion; they are not sandboxed by default. Tooling may execute them through a separate proc-macro server, and **Watt** (David Tolnay) compiles proc macros to WebAssembly for deterministic, sandboxed execution — trading a bit more latency for reproducibility and isolation.\n\nThe Watt design point is becoming more important as supply-chain concerns rise: a malicious proc macro can read filesystem, exfiltrate data, or alter generated code arbitrarily during compilation. Wasm-sandboxed proc macros bound the trust surface to the macro's declared inputs and the host's explicit grants.",
+      "refs": [],
+      "sources": [
+        { "label": "Watt — Rust proc macros in Wasm", "url": "https://github.com/dtolnay/watt" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Rust Macros Reference", "url": "https://doc.rust-lang.org/reference/macros.html" },
+    { "label": "Watt", "url": "https://github.com/dtolnay/watt" }
+  ]
+}

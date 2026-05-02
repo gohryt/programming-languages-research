@@ -1,0 +1,88 @@
+{
+  "kind": "runtime",
+  "name": "EROS — Extremely Reliable Operating System",
+  "aliases": [
+    "eros",
+    "keykos"
+  ],
+  "summary": "Jonathan Shapiro et al. (Univ. of Pennsylvania, late 1990s): academic predecessor to seL4 in the L4/KeyKOS capability-microkernel lineage. Capability-only addressing of all kernel objects; persistent capability spaces with checkpoint/restart; the 'red line' between trusted and untrusted code is drawn entirely by capability holding. Discontinued; seL4 is the verified descendant that reached production.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "eros",
+        "kernel-capability",
+        "ocap",
+        "historical",
+        "capability-confinement"
+      ],
+      "content": "**EROS** (Extremely Reliable Operating System; Jonathan Shapiro et al., University of Pennsylvania, late 1990s) is the academic predecessor in the lineage that produced seL4. EROS implements pure capability-based addressing: every kernel object — segments, processes, capabilities themselves — is named only by a capability, and there is no ambient namespace.\n\nEROS descends from **KeyKOS** (KeyLogic / Tymshare / Key Logic, 1980s+) — a commercial capability OS used in banking and timesharing — and adapts the same discipline to a research microkernel design suitable for academic study and verification. The KeyKOS / EROS / Coyotos / seL4 chain is the through-line of capability-OS research from the 1980s to the present.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "sel4",
+          "type": "predecessor-of"
+        }
+      ]
+    },
+    {
+      "id": "persistent-capabilities",
+      "title": "Persistent capabilities and the red line",
+      "tags": [
+        "eros",
+        "kernel-capability",
+        "capability",
+        "compartmentalisation"
+      ],
+      "content": "EROS's distinctive contributions:\n\n- **Single-level store with persistent capabilities**: the entire system state — including processes and their capability holdings — is checkpointed transparently to disk. Restart restores capabilities exactly as they were, so capability-based authority survives reboots; no separate filesystem-with-permissions layer is needed because *capabilities are the persistent objects*.\n- **The 'red line'** between trusted and untrusted code is drawn entirely by capability holding. EROS made this argument concretely: in a capability OS, the TCB (trusted computing base) is exactly the code that holds high-authority capabilities; everything else is provably non-privileged because it lacks the capabilities to do anything privileged.\n- **Constructor pattern**: a constructor is a capability that, when invoked, instantiates a new protected service with a known set of held capabilities. The constructor is itself non-confining (it knows what it builds) but *what it builds* can be confined — the standard ocap pattern of \"the factory is auditable, the products are bounded.\"",
+      "refs": [
+        {
+          "target": "sel4",
+          "type": "shares-discipline-with"
+        }
+      ]
+    },
+    {
+      "id": "lineage-and-status",
+      "title": "Status and the path to seL4",
+      "tags": [
+        "eros",
+        "historical",
+        "research"
+      ],
+      "content": "Status (as of 2026-04): EROS itself is **discontinued/historical**. Coyotos (Shapiro et al., 2006) was the intended successor, attempting verification with BitC; it did not reach production. The verified descendant that did reach production is **seL4** (Klein, Heiser et al., NICTA / Data61), which inherits the EROS / L4 design discipline and adds a complete formal proof of authority confinement.\n\nThe lesson EROS established for later capability OSes: **capability-only kernels are practical and the security argument is clean**, but unverified C-level implementations leave too much trust on the table. seL4's contribution was to take EROS-class design and pay the verification cost. Conversely, seL4's design only became economically attractive *because* EROS had proven the capability-only kernel design space was a winnable target.\n\nReference influence: KeyKOS / EROS lineage is acknowledged in Joe Duffy's Midori writeups, in seL4's design papers, and in the Spritely / Agoric ocap community as the operating-system pillar of the same intellectual tradition that gave us E and Newspeak at the language level.",
+      "refs": [
+        {
+          "target": "sel4",
+          "type": "succeeded-by"
+        },
+        {
+          "target": "singularity-midori",
+          "type": "shares-lineage-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "EROS: a fast capability system (SOSP 1999)",
+      "url": "https://www.eros-os.org/papers/sosp99-eros-preprint.ps"
+    },
+    {
+      "label": "EROS project page",
+      "url": "https://www.eros-os.org/"
+    },
+    {
+      "label": "Coyotos project",
+      "url": "https://www.coyotos.org/"
+    },
+    {
+      "label": "KeyKOS — Cap-lore archive",
+      "url": "https://www.cap-lore.com/CapTheory/KK/"
+    }
+  ]
+}

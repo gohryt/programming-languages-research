@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Pluggable Type Systems",
+  "aliases": ["pluggable-types", "extensible-checkers"],
+  "summary": "Treats the base type system as a foundation and lets external checkers refine it for application-specific properties. Each plugin enforces an additional discipline (nullness, units, taint, regex validity, format strings, etc.) on top of the base system. Costs: cannot share inference machinery, each checker re-runs its own analysis. Benefit: incremental adoption without language-committee buy-in.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A type system can be **fixed** (the language ships with one type discipline that is part of its semantics) or **pluggable** (additional type checkers can be loaded as compiler plug-ins, each enforcing extra invariants on top of the base type system). Most production languages take the fixed path: the type system *is* the language. The pluggable path treats the base type system as a foundation and lets external checkers refine it for application-specific properties.",
+      "refs": [
+        { "target": "checker-framework-java#overview", "type": "exemplified-by" },
+        { "target": "refinement-types#design-placement", "type": "contrasts-with" },
+        { "target": "taint-type-checking#overview", "type": "specialises" }
+      ]
+    },
+    {
+      "id": "tradeoff-with-refinement-types",
+      "title": "Architectural distinction from refinement types",
+      "tags": ["type-system", "language-design"],
+      "content": "The architectural distinction from refinement types: refinement types embed the predicate language inside the type system, requiring the language designer to commit to one discipline. Pluggable types let multiple disciplines coexist orthogonally, with each checker independently developed and deployed.\n\nThe cost is that pluggable disciplines cannot share type-inference machinery — each checker re-runs its own analysis, which can be slow if many are active at once. The benefit is **incremental adoption**: a Java codebase can adopt nullness checking today, units-of-measurement next quarter, and tainting once the threat model demands it, without changing the base language."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — fixed-coherent vs pluggable-modular",
+      "tags": ["type-system", "language-design"],
+      "content": "The lesson generalises: **a language whose type system is intentionally pluggable enables researchers and security teams to ship type disciplines without language-committee buy-in**. Status (as of 2026-04): the Checker Framework is the canonical production deployment; experimental work on partial rely-guarantee reasoning for pluggable types (UWPLSE, 2024) is exploring how pluggable disciplines compose without losing the soundness of any individual checker.\n\nFor language designers, the trade-off is between fixed-but-coherent (Rust, Haskell, OCaml) and pluggable-but-modular (Java + Checker Framework) — the right choice depends on whether the language wants the type system to be a closed semantic commitment or an open extension surface.",
+      "sources": [
+        { "label": "UWPLSE — Partial Rely-Guarantee Reasoning for Pluggable Types (2024)", "url": "https://uwplse.org/2024/06/10/rely-guarantee-for-pluggable-types.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "UWPLSE — Partial Rely-Guarantee Reasoning for Pluggable Types", "url": "https://uwplse.org/2024/06/10/rely-guarantee-for-pluggable-types.html" }
+  ]
+}

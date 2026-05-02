@@ -1,0 +1,29 @@
+{
+  "kind": "concept",
+  "name": "Interval-Based Reclamation (IBR)",
+  "aliases": ["IBR", "interval-based reclamation", "TagIBR", "2GEIBR", "POIBR"],
+  "summary": "Wen et al. (PPoPP 2018): threads reserve a finite epoch interval; blocks track birth/retire epoch; a block is freeable when no reservation interval intersects its lifetime. TagIBR / 2GEIBR / POIBR variants trade throughput for space; avoids per-dereference fence; bounded space like HP. Rochester library; basis for many subsequent SMR comparisons.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["safe-memory-reclamation", "interval-based", "epoch-based", "bounded-memory", "lock-free"],
+      "content": "Wen et al.'s **Interval-Based Reclamation** (PPoPP 2018) generalises Hazard Eras: threads reserve a finite epoch interval; blocks track birth and retire epoch; a block is freeable when no thread's reservation interval intersects the block's lifetime interval.\n\nThe paper introduces several variants — **TagIBR** (tag-and-interval), **2GEIBR** (two-generation), **POIBR** (per-object intervals) — trading throughput for space. All share two key properties: avoids the per-dereference fence required by hazard pointers, and bounds memory like HP rather than EBR.\n\nThe University of Rochester's **Interval-Based Reclamation library** is the reference implementation and has become the basis for many subsequent SMR comparisons (Hyaline, NBR, VBR all benchmark against it).",
+      "refs": [
+        { "target": "hazard-eras", "type": "successor-of" },
+        { "target": "epoch-based-reclamation", "type": "related" },
+        { "target": "hazard-pointers", "type": "related" },
+        { "target": "wait-free-eras", "type": "related" },
+        { "target": "hyaline-reclamation", "type": "related" }
+      ],
+      "sources": [
+        { "label": "IBR (PPoPP 2018)", "url": "https://www.cs.rochester.edu/u/scott/papers/2018_PPoPP_IBR.pdf" },
+        { "label": "IBR library (Rochester)", "url": "https://github.com/urcs-sync/Interval-Based-Reclamation" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "IBR paper", "url": "https://www.cs.rochester.edu/u/scott/papers/2018_PPoPP_IBR.pdf" },
+    { "label": "Rochester IBR library", "url": "https://github.com/urcs-sync/Interval-Based-Reclamation" }
+  ]
+}

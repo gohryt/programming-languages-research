@@ -1,0 +1,52 @@
+{
+  "kind": "language",
+  "name": "Scala",
+  "aliases": [],
+  "summary": "JVM/Scala-Native/Scala.js multi-paradigm language layering richer module syntax above the JVM's package model: top-level definitions in Scala 3, package objects (Scala 2), elaborate import system with renames/exclusions/given imports, and first-class export clauses for re-exporting members.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Scala (Martin Odersky, 2003+; Scala 3 / Dotty 2021+) is a multi-paradigm language combining object-oriented and functional features. Macro infrastructure lives in `data/scala3-macros`. This record covers the language-level module-system surface, which layers richer syntax on top of the JVM's package model.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "java#packages-and-the-classpath", "type": "uses" }
+      ]
+    },
+    {
+      "id": "packages-and-top-level-definitions",
+      "title": "Packages and top-level definitions",
+      "tags": ["scala", "packages", "module-systems"],
+      "content": "Scala layers package syntax on top of the JVM's package model with several additions worth naming. Source files declare `package foo.bar`, and any number of files in different directories may contribute to the same package. Scala also supports **package objects** (Scala 2) and, in Scala 3, **top-level definitions**, which let `def`, `val`, `type`, `given`, and `extension` appear directly inside a package without wrapping them in an enclosing object. This eliminates the Java pattern of \"everything must live inside a class\" and gives packages the role of being containers of definitions, not just types.",
+      "refs": [],
+      "sources": [
+        { "label": "Scala 3 — packaging and imports", "url": "https://docs.scala-lang.org/scala3/book/packaging-imports.html" }
+      ]
+    },
+    {
+      "id": "elaborate-imports",
+      "title": "Elaborate imports — renames, exclusions, given imports",
+      "tags": ["scala", "imports", "given-resolution"],
+      "content": "Scala's import system is more elaborate than Java's. Imports can rename (`import foo.{Bar => Baz}`), exclude (`import foo.{Bar => _, _}`), pick selective subsets, and — in Scala 3 — explicitly bring `given` instances into scope (`import foo.given`) separately from ordinary identifiers. This makes implicit / `given` resolution part of the import system rather than ambient, which significantly improves predictability.\n\nScala 3 also exposes `export` clauses, which re-export selected members of a delegated value as members of the enclosing definition — a first-class re-export mechanism that goes beyond what Java packages provide.\n\nCompilation-unit ordering matters less in Scala than in F# but more than in Java: implicit / `given` instances are resolved by a search procedure that depends on which definitions are in scope, and the import policy determines what is in scope at any given site. This is why Scala 3 made the `given` import explicit — it gives the compiler and the reader a single answer to \"what implicits is this method site seeing?\"",
+      "refs": [
+        { "target": "visibility-and-exports#re-exports-and-api-curation", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Scala 3 — imports", "url": "https://docs.scala-lang.org/scala3/reference/changed-features/imports.html" },
+        { "label": "Scala 3 — export clauses", "url": "https://docs.scala-lang.org/scala3/reference/other-new-features/export.html" }
+      ]
+    },
+    {
+      "id": "artifact-and-jpms-relationship",
+      "title": "Artifact level and JPMS relationship",
+      "tags": ["scala", "artifacts", "jvm"],
+      "content": "At the artifact level, Scala compiles to JVM `.class` files and inherits JPMS / classpath behavior unchanged. Scala does not declare `module-info.java`-style metadata, and ScalaJS / Scala Native have their own artifact and packaging stories that mostly bypass JPMS. The Scala-specific module-system contribution is therefore at the *source level* — richer imports, top-level definitions, `given` import scoping, and `export` clauses — not at the artifact level.\n\nFor a language designer, Scala demonstrates that **rich source-level module syntax can be layered on top of an artifact model the language doesn't fully own**. Scala doesn't attempt to redefine JPMS; it just provides better source ergonomics within the JVM's existing artifact rules."
+    }
+  ],
+  "sources": [
+    { "label": "Scala 3 — imports", "url": "https://docs.scala-lang.org/scala3/reference/changed-features/imports.html" },
+    { "label": "Scala 3 — export clauses", "url": "https://docs.scala-lang.org/scala3/reference/other-new-features/export.html" },
+    { "label": "Scala 3 — packaging and imports", "url": "https://docs.scala-lang.org/scala3/book/packaging-imports.html" }
+  ]
+}

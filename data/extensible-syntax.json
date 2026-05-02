@@ -1,0 +1,65 @@
+{
+  "kind": "concept",
+  "name": "Extensible Syntax",
+  "aliases": ["readtables", "user-extensible-grammar"],
+  "summary": "Parsers that deliberately expose the grammar to user code at compile time; production examples are Racket readtables, Lean 4's runtime-extensible production table, and Rhombus/Shrubbery's two-phase reader+enforest design.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Extensible-syntax parsers expose the grammar itself as a user-mutable artifact. Where ordinary parsers fix the grammar at compile time (yacc, ANTLR) or expose grammar as ordered choice but no rebinding (PEG), extensible-syntax languages let user code change parse behavior mid-file: redefine character meanings (Racket readtables), declare new grammar productions (Lean 4 `syntax`/`macro_rules`), or compose nested grammars (Rhombus's reader + enforest).\n\nThe shared thesis: language extension should be a user-level library concern, not a privileged compiler-authoring one. The cost is a parser that must accommodate a runtime-changing grammar, which rules out most table-driven generators.",
+      "refs": [
+        { "target": "syntax-parse#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "racket-readtables",
+      "title": "Racket — readtables and #lang",
+      "tags": ["parser", "extensibility", "racket"],
+      "content": "Racket's reader is the oldest of the family. `read-syntax` walks input character by character consulting a **readtable**: a first-class, mutable mapping from characters to reader procedures. Any character can be rebound to start a new syntactic form. `#lang` goes further, dispatching to an arbitrary user-defined reader module that can implement a whole non-s-expression surface syntax — and the result is always a syntax object carrying source locations and hygienic lexical context, suitable for macro expansion downstream.\n\nThis is the canonical \"the reader is a library, not a table of productions\" design. Racket has used it for decades to ship languages on the Racket runtime: Typed Racket, Pollen, Scribble, the Beautiful Racket teaching languages, and many domain-specific notations.",
+      "refs": [],
+      "sources": [
+        { "label": "Racket readtables", "url": "https://docs.racket-lang.org/reference/readtables.html" }
+      ]
+    },
+    {
+      "id": "lean-4-syntax-extensions",
+      "title": "Lean 4 — runtime-extensible production tables",
+      "tags": ["parser", "extensibility", "dependent-types"],
+      "content": "Lean 4 (de Moura & Ullrich, CADE 2021) takes the idea into a dependently typed prover: a lexerless, memoising combinator-style recursive descent reads a runtime-extensible production table that users grow with `syntax` and `macro_rules` forms mid-file, with per-category Pratt precedence and built-in macro hygiene.\n\nThe grammar is a first-class compiler artifact: `syntax (priority := high) \"!\" term : term` adds a new prefix operator at parse time, and `macro_rules` declares how the new syntax is rewritten into existing syntax. Because the parser is a recursive-descent combinator over the production table, adding entries is a constant-time runtime operation rather than a regenerate-and-rebuild step. This is the same design space as Racket's readtables but at a coarser granularity (production rules rather than per-character readers).",
+      "refs": [],
+      "sources": [
+        { "label": "Lean 4 paper", "url": "https://lean-lang.org/papers/lean4.pdf" }
+      ]
+    },
+    {
+      "id": "rhombus-shrubbery",
+      "title": "Rhombus / Shrubbery — two-phase parens-free",
+      "tags": ["parser", "extensibility", "racket-ecosystem"],
+      "content": "**Rhombus / Shrubbery** (Flatt et al., OOPSLA 2023) is Racket's parens-free variant. Parsing splits in two: a **shrubbery** reader produces an indentation-and-bracket tree with no knowledge of operators or precedence, and a second **enforest** pass (a Honu-style refinement) resolves operators and binding forms through user-definable macros.\n\nThis decouples the lexical/structural shape (handled by shrubbery, fixed) from the operator/binder shape (handled by enforest, extensible). The shrubbery layer means that even before any macros are defined, the source has consistent block structure; the enforest layer means that operators and forms are user-extensible without violating the shrubbery's structural assumptions.",
+      "refs": [],
+      "sources": [
+        { "label": "Rhombus / Shrubbery paper", "url": "https://users.cs.utah.edu/plt/publications/oopsla23-faadffggkkmppst.pdf" },
+        { "label": "Shrubbery notation reference", "url": "https://docs.racket-lang.org/shrubbery/index.html" }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design tradeoffs",
+      "tags": ["language-design", "extensibility", "tooling"],
+      "content": "Extensible-syntax languages buy first-class language extension at the cost of a parser that cannot be table-driven, conflict-detection that becomes a runtime concern (or absent), and tooling (language servers, formatters) that must replay the user's grammar extensions to even produce a parse tree. The Racket ecosystem solves this by making the syntax object the canonical artifact and shipping language extensions as libraries that the editor loads alongside user code.\n\nProjectional editors take a different tack: instead of letting users redefine the grammar, the editor manipulates AST nodes directly so that grammar ambiguity is avoided by construction. **JetBrains MPS** (Meta Programming System) is the longest-running production projectional editor — programmers edit a structured projection of the AST rather than text, and language composition is automatic because there is no concrete-syntax grammar to compose.\n\nFor a language that doesn't need user-defined syntax, the simpler choice (fixed grammar) avoids these costs. For a language whose value proposition includes user-extensible notation — DSLs, theorem provers, domain-specific languages embedded in source — extensible syntax is the price of admission.",
+      "refs": [],
+      "sources": [
+        { "label": "JetBrains MPS — FAQ", "url": "https://www.jetbrains.com/help/mps/mps-faq.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Racket readtables", "url": "https://docs.racket-lang.org/reference/readtables.html" },
+    { "label": "Lean 4 paper", "url": "https://lean-lang.org/papers/lean4.pdf" },
+    { "label": "Rhombus / Shrubbery paper", "url": "https://users.cs.utah.edu/plt/publications/oopsla23-faadffggkkmppst.pdf" },
+    { "label": "Shrubbery notation reference", "url": "https://docs.racket-lang.org/shrubbery/index.html" },
+    { "label": "JetBrains MPS — FAQ", "url": "https://www.jetbrains.com/help/mps/mps-faq.html" }
+  ]
+}

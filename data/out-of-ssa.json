@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "Out-of-SSA Translation",
+  "aliases": ["SSA destruction", "parallel-copy resolution"],
+  "summary": "Removing SSA before register allocation: parallel copies on incoming edges, sequentialised by Boissinot's algorithm to handle the swap problem. Boissinot 2009 showed SSA-based coalescing before destruction beats coalescing after.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "SSA must be removed before register allocation in most backends because physical registers cannot be assigned in single-assignment form. The naïve \"replace each `φ(x₁, x₂)` with copies on the incoming edges\" approach is subtly wrong — parallel copies at block boundaries can conflict (the swap problem: `x = y; y = x` requires a temporary if both copies must happen logically simultaneously).\n\nSreedhar et al. (POPL 1999) formalised out-of-SSA as a parallel-copy insertion problem on CFG edges, followed by parallel-copy sequentialisation. The sequentialisation handles cycles via a temporary register when no free register is available.",
+      "refs": [
+        { "target": "ssa#overview", "type": "removes" },
+        { "target": "graph-coloring-regalloc#overview", "type": "precedes" },
+        { "target": "linear-scan-regalloc#overview", "type": "precedes" }
+      ],
+      "sources": [
+        { "label": "Translating Out of SSA Form (Sreedhar et al., POPL 1999)", "url": "https://compilers.cs.uni-saarland.de/papers/bbhlmz13cc.pdf" }
+      ]
+    },
+    {
+      "id": "parallel-copy-problem",
+      "title": "The parallel-copy problem",
+      "tags": ["compiler", "ssa", "register-allocation"],
+      "content": "On each predecessor edge of a φ-function, the φ's incoming value for that predecessor must be copied into the φ's destination. When multiple φ-functions share a predecessor, all those copies execute *in parallel* logically — but a sequential code generator must order them.\n\nThe pathological case is a swap: φ₁ takes x in this predecessor, φ₂ takes y, and the destinations are y and x respectively. Naïve sequential copying (`y = x; x = y`) loses x. Boissinot et al. (2009) and earlier work show how to topologically sort the copy graph: copies form chains and cycles, chains sequence directly, cycles need one temporary register to break the cycle.\n\nA related issue: when a copy's source register is later in the sequence overwritten by another copy whose source is the same register, the order matters. The resolution algorithm reads from a 'before' map and writes to an 'after' map, producing a dependency DAG plus cycles, then linearises the DAG and breaks cycles with a temporary.",
+      "refs": []
+    },
+    {
+      "id": "ssa-based-coalescing",
+      "title": "SSA-based coalescing before destruction",
+      "tags": ["compiler", "register-allocation", "ssa"],
+      "content": "Boissinot, Darte, Rastello, Guillon (2009) showed that doing **SSA-based coalescing before destruction** produces better code than coalescing after. While SSA structure is still explicit, live ranges can be merged across φ-functions when the source and destination do not interfere. This eliminates copies that a post-SSA coalescer would have to reconstruct from less information.\n\nCranelift's regalloc2 integrates this insight by operating directly on SSA, doing coalescing-aware live-range splitting and parallel-move resolution at block boundaries in one pass. The combined design avoids both the worst Chaitin spill cases and the worst classical out-of-SSA copies.",
+      "refs": [
+        { "target": "linear-scan-regalloc#ssa-based-variants", "type": "fits-into" },
+        { "target": "cranelift#fit-for-jit-and-tiered-compilation", "type": "deployed-in" }
+      ],
+      "sources": [
+        { "label": "Revisiting Out-of-SSA Translation (Boissinot et al., 2009)", "url": "https://hal.inria.fr/inria-00349925v1/document" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Sreedhar et al. — Translating Out of SSA Form", "url": "https://compilers.cs.uni-saarland.de/papers/bbhlmz13cc.pdf" },
+    { "label": "Boissinot et al. — Revisiting Out-of-SSA Translation", "url": "https://hal.inria.fr/inria-00349925v1/document" }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "kind": "language",
+  "name": "Crystal",
+  "aliases": [],
+  "summary": "Statically-typed AOT-compiled language with Ruby-like syntax: require \"foo\" for textual-inclusion-style imports (idempotent via load-set), module Foo ... end declares hierarchical namespaces (Foo::Bar), Shards as the package manager.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Crystal (Ary Borenszweig and team, 2014+; v1.x stable) is a statically-typed AOT-compiled language with Ruby-inspired syntax. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "ruby#overview", "type": "syntactic-influence" }
+      ]
+    },
+    {
+      "id": "modules-and-require",
+      "title": "module Foo and require",
+      "tags": ["crystal", "modules", "imports"],
+      "content": "Crystal uses `require \"foo\"` for textual inclusion-style imports, idempotent via a load-set. Modules are declared with `module Foo ... end` and form hierarchies (`Foo::Bar`). The combination is similar to Ruby's `require` plus Ruby's modules but with **static type checking and AOT compilation**.\n\n**Shards** is the package manager. The language is small enough that the module system has not been a major design surface area; the distinctive work happens in the type inference (a global flow-sensitive type inference, not Hindley-Milner) and the LLVM-backed AOT compiler.",
+      "refs": [],
+      "sources": [
+        { "label": "Crystal — requiring files", "url": "https://crystal-lang.org/reference/syntax_and_semantics/requiring_files.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Crystal — requiring files", "url": "https://crystal-lang.org/reference/syntax_and_semantics/requiring_files.html" }
+  ]
+}

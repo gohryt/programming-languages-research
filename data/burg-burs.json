@@ -1,0 +1,50 @@
+{
+  "kind": "concept",
+  "name": "BURG / BURS Tree-Tiling Instruction Selection",
+  "aliases": ["BURG", "BURS", "tree-tiling", "bottom-up rewrite grammar"],
+  "summary": "Fraser-Hanson-Proebsting 1992: instruction selection as tree-pattern matching on IR. Grammar rules with cost annotations; dynamic-programming matcher finds minimum-cost tiling. Linear-time finite-state tree automaton. Production case: MoarVM's expression JIT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Fraser, Hanson, and Proebsting's **BURG** / **BURS** (Bottom-Up Rewrite Grammar / Bottom-Up Rewrite System, 1992) formulate instruction selection as tree-pattern matching on the IR: write instruction patterns as grammar rules with cost annotations, and a dynamic-programming matcher finds the minimum-cost tiling that covers the expression tree.\n\nA rule looks like `Reg ← ADD(Reg, Reg) \"add %0, %1, %2\" cost 1`. Multiple rules can match the same IR node, and the matcher chooses the combination that minimises total cost. The generated selector is a finite-state tree automaton that runs in linear time in the IR size.",
+      "refs": [
+        { "target": "selectiondag-globalisel#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "BURS Instruction Selection (Fraser, Hanson, Proebsting)", "url": "https://dl.acm.org/doi/10.1145/143103.143139" }
+      ]
+    },
+    {
+      "id": "tree-tiling-mechanism",
+      "title": "Tree-tiling mechanism",
+      "tags": ["compiler", "code-generation"],
+      "content": "Each grammar rule pairs an IR pattern (a tree shape) with a target instruction sequence and a cost. The matcher visits the IR tree bottom-up, computing for each node the minimum cost to reduce it to each non-terminal in the grammar. Once costs reach the root, a top-down pass extracts the cheapest cover, producing the chosen instructions.\n\nBURG generators (`iburg`, `mburg`, `lburg`) compile the grammar plus costs into a target-specific selector at compile-build time. The runtime selector is small and fast: a few table lookups per IR node. This is one of the cleanest formulations of instruction selection in the literature.",
+      "refs": []
+    },
+    {
+      "id": "limits-and-modern-replacements",
+      "title": "Limits and modern replacements",
+      "tags": ["compiler", "tradeoffs"],
+      "content": "BURG-style selection was dominant from the late 1980s through the mid-2000s. Its limitation is that it operates tree-locally — it cannot easily exploit instructions that span multiple IR nodes (like a fused multiply-add across a DAG). Modern compilers mostly moved to DAG- and CFG-level selection (LLVM's SelectionDAG, GlobalISel; Cranelift's ISLE), but tree tiling remains the clearest pedagogical model and is still used in small backends and generators like `iburg`.",
+      "refs": []
+    },
+    {
+      "id": "moarvm-expression-jit",
+      "title": "MoarVM expression JIT — production BURS",
+      "tags": ["jit", "production"],
+      "content": "Raku's MoarVM uses a BURS-derived tiler as its primary instruction selector. Textual tile definitions specify a pattern, the function implementing the tile, the resulting symbol (used to match further tiles), and a cost. A per-architecture tile-table generator written in Perl precomputes the optimal-tile lookup table from the tile definitions, so that at JIT time selecting the best tile for an IR node reduces to a table lookup.\n\nThe generated tiler feeds into a linear-scan register allocator and DynASM-based code emission. The expression IR itself is a linear array with integer indices rather than pointers, for the same cache-locality reasons modern linear IRs (V8 Turboshaft, Cranelift CLIF) adopt.",
+      "refs": [
+        { "target": "linear-scan-regalloc#production-usage", "type": "feeds-into" }
+      ],
+      "sources": [
+        { "label": "MoarVM JIT overview", "url": "https://github.com/MoarVM/MoarVM/blob/master/docs/jit/overview.org" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "BURS Instruction Selection", "url": "https://dl.acm.org/doi/10.1145/143103.143139" },
+    { "label": "MoarVM JIT overview", "url": "https://github.com/MoarVM/MoarVM/blob/master/docs/jit/overview.org" }
+  ]
+}

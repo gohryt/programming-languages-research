@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "BootSafe and Open Firmware fcode",
+  "aliases": ["BootSafe", "Open Firmware", "fcode verifier"],
+  "summary": "Open Firmware fcode (Sun OpenBoot, Apple PowerPC, OLPC XO, IBM POWER) runs before the OS with full machine access. BootSafe (Cornell ACSAC 2007) is a Java-to-fcode certifying compiler plus an ECC-style fcode verifier that runs inside the Open Firmware kernel — proof-carrying-fcode for memory-safety on loaded option-ROM drivers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "IEEE 1275 Open Firmware (Sun OpenBoot, Apple PowerPC, OLPC XO, IBM POWER) ships an fcode interpreter that runs *before* the OS, with full machine access. The fcode evaluator can mutate the device tree, persist NVRAM scripts, and bypass typical OS controls — Mudge's Phrack 53 article and the SANS GIAC \"OpenBoot Credentials Hack\" paper document concrete bypasses against Solaris.\n\nThe only serious *formal* security work is Cornell's **BootSafe** (Hunt, Erlingsson, Kozen, ACSAC 2007): a Java-to-fcode certifying compiler plus an ECC-style fcode verifier that runs inside the Open Firmware kernel — a typed-assembly-language–style proof-carrying-fcode design enforcing memory safety on loaded option-ROM drivers.",
+      "refs": [
+        { "target": "ebpf-verifier-jit#overview", "type": "shares-design-with" }
+      ],
+      "sources": [
+        { "label": "BootSafe ACSAC 2007", "url": "https://www.cs.cornell.edu/~kozen/Papers/acsac.pdf" }
+      ]
+    },
+    {
+      "id": "design-pattern",
+      "title": "Design pattern — verifier-in-the-evaluator",
+      "tags": ["forth", "verification", "security"],
+      "content": "The verifier reconstructs typing for fcode tokens before the evaluator dispatches them, rejecting drivers that fail the proof. The design pattern — verifier-in-the-evaluator, tied to a certifying compiler — is the closest Forth-ecosystem analogue to the BPF verifier or to Wasm validation, and is the rare instance of formal memory safety applied to a stack-language interpreter at the trust boundary between firmware and OS.\n\nBootSafe never shipped beyond research, and Open Firmware's broader trust surface (NVRAM scripts, password bypasses, full device-tree mutation from the `ok` prompt) limits what any in-evaluator verifier can deliver against a determined attacker. As a research data point, however, it remains the cleanest Forth-side example of formal safety enforcement. Mitch Bradley's reference Open Firmware implementation remains the canonical fcode evaluator BootSafe targets.",
+      "refs": [],
+      "sources": [
+        { "label": "OpenFirmware reference implementation (Mitch Bradley)", "url": "https://github.com/MitchBradley/openfirmware" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "BootSafe ACSAC 2007", "url": "https://www.cs.cornell.edu/~kozen/Papers/acsac.pdf" },
+    { "label": "OpenFirmware reference implementation (Mitch Bradley)", "url": "https://github.com/MitchBradley/openfirmware" }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "kind": "framework",
+  "name": "Steel — F*/Steel Separation-Logic Capabilities",
+  "aliases": [
+    "steel",
+    "steelcore",
+    "f-star-steel"
+  ],
+  "summary": "Concurrent separation logic embedded in F*. Capabilities are *separation-logic resources* (`slprop`) representing exclusive ownership of memory regions, threaded through Hoare quintuples. AC-matching tactics + SMT for frame inference; selectors abstracting resources for SMT-friendly specs; SteelCore soundness fully mechanized in F*. Production via Project Everest (HACL*, EverParse, EverCrypt).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "steel",
+        "f-star",
+        "verified",
+        "capability",
+        "language-capability"
+      ],
+      "content": "**Steel** is a concurrent separation logic embedded in F\\*; capabilities in Steel are *separation-logic resources* (`slprop`) representing exclusive ownership of memory regions, threaded through Hoare quintuples (pre, post, requires-resources, ensures-resources, return-value). It is the cleanest example of \"capabilities as separation-logic resources\" in a verified-systems language and the authority-discipline complement to the F\\* refinement-and-effects discipline.\n\nThe correspondence with object-capability ocap is exact in spirit but different in machinery: ocap holds the unforgeable token by reference identity at runtime; Steel holds the unforgeable resource by ghost ownership in the proof state at compile time. Both are unforgeable in their respective settings — at run time for ocap, in the verifier for Steel — and both make ambient authority impossible.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "fstar",
+          "type": "embedded-in"
+        },
+        {
+          "target": "verus",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Steel paper",
+          "url": "https://project-everest.github.io/assets/steel.pdf"
+        },
+        {
+          "label": "Steel repository",
+          "url": "https://github.com/FStarLang/steel"
+        }
+      ]
+    },
+    {
+      "id": "separation-logic-resources",
+      "title": "Separation-logic resources as capabilities",
+      "tags": [
+        "steel",
+        "separation-logic",
+        "capability",
+        "verified"
+      ],
+      "content": "In Steel, an `slprop` (\"separation-logic proposition\") describes a partial heap. Common forms:\n\n- `pts_to r v` — the location `r` exclusively contains value `v`. Holding this `slprop` is the capability to read or write `r`.\n- `pcm_pts_to r v` — generalised PCM-based ownership for fractional permissions, monoidal data, etc.\n- User-defined invariants and ghost resources for higher-level capabilities (e.g., \"the lock is held,\" \"the queue invariant is satisfied\").\n\nA function specification has the shape `requires (pre: slprop) ensures (post: ret -> slprop)` — the function consumes the `pre` resource and produces the `post` resource. Composing two functions sequentially requires the `post` of the first to match (or imply) the `pre` of the second, with **frame inference** (the framing rule) handling the parts of the resource the first didn't touch.\n\n**AC-matching tactics + SMT** drive frame inference: Steel's elaborator uses associative-commutative matching to align `slprop` conjuncts across function boundaries, falling back to SMT for the residual constraints. **Selectors** abstract resources for SMT-friendly specs — a selector projects a value out of an `slprop` so the SMT solver can reason about the value without unfolding the full heap.",
+      "refs": [
+        {
+          "target": "linear-affine-types",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "soundness-and-everest",
+      "title": "SteelCore soundness; Project Everest deployment",
+      "tags": [
+        "steel",
+        "verified",
+        "production",
+        "f-star"
+      ],
+      "content": "**SteelCore soundness** is fully mechanized in F\\* — the metatheory of Steel's logic is itself proved in F\\* against a small `SteelCore` calculus, and the Steel surface language is built on top of `SteelCore` by certified elaboration. This is the verified-foundations argument: Steel programs are checked by a tactic + SMT machinery, but that machinery's soundness is proved against a kernel logic.\n\n**Production via Project Everest** (Microsoft Research, INRIA, CMU): Steel is the verification framework for several production-shipping verified components.\n\n- **HACL\\*** — verified primitives (Curve25519, Poly1305, ChaCha20, etc.), shipped in Mozilla NSS, Linux kernel via Wireguard, Microsoft Azure cryptographic stacks.\n- **EverParse** — verified parser combinators for binary protocols.\n- **EverCrypt** — verified cryptographic provider.\n\nThese all use Steel's separation-logic discipline to verify low-level pointer manipulation while compiling to C with no runtime dependence on Steel itself; the authority discipline is *erased at compile time*, leaving only the verified C.\n\nStatus (as of 2026-04): production for narrow-domain verification (cryptography, parsers, kernel-level access control) via Project Everest; broader-scope Steel verification remains research-grade. The reference cite for separation-logic-as-capability in a verified-systems setting.",
+      "refs": [
+        {
+          "target": "fstar",
+          "type": "shipping-vehicle"
+        },
+        {
+          "target": "vellvm",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Steel paper",
+          "url": "https://project-everest.github.io/assets/steel.pdf"
+        },
+        {
+          "label": "Steel repository",
+          "url": "https://github.com/FStarLang/steel"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Steel paper",
+      "url": "https://project-everest.github.io/assets/steel.pdf"
+    },
+    {
+      "label": "Steel repository",
+      "url": "https://github.com/FStarLang/steel"
+    }
+  ]
+}

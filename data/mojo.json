@@ -1,0 +1,58 @@
+{
+  "kind": "language",
+  "name": "Mojo",
+  "aliases": ["mojo-lang", "modular-mojo"],
+  "summary": "Modular's Mojo grafts Rust-style ownership onto Python syntax with one distinctive twist: destruction at last use (sub-expression granularity) rather than end of scope. Argument conventions are borrowed (default, immutable shared), inout (mutable unique), and owned/var (consuming); the transfer operator ^ ends the source binding's lifetime explicitly. Mojo's origins (lifetime parameters) are tracked symbolically by the compiler; per-field destruction tracks partial moves of struct fields independently. Ownership shipped with the first public release in 2023; lifetimes/origins stabilized 2024–2026.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["mojo", "ownership", "borrowing", "value-semantics", "compile-time-safety"],
+      "content": "Modular's **Mojo** grafts Rust-style ownership onto Python syntax with one distinctive twist: destruction at *last use* (sub-expression granularity) rather than end of scope.\n\nArgument conventions are `borrowed` (default, immutable shared), `inout` (mutable unique), and `owned`/`var` (consuming); the transfer operator `^` ends the source binding's lifetime explicitly.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "mojo-parameter", "type": "related" },
+        { "target": "mojo-kgen", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Mojo ownership", "url": "https://docs.modular.com/mojo/manual/values/ownership/" },
+        { "label": "Mojo lifecycle/death", "url": "https://docs.modular.com/mojo/manual/lifecycle/death/" }
+      ]
+    },
+    {
+      "id": "asap-destruction",
+      "title": "ASAP destruction — last use, sub-expression granularity",
+      "tags": ["mojo", "ownership", "value-semantics"],
+      "content": "The lifetime checker calls `__del__` immediately after a value's last use within an expression — intermediates in `a + b + c + d` die between sub-ops — in contrast to Rust's end-of-scope drops.\n\nThis sub-expression granularity is the distinctive twist: it minimises live ranges, allows aggressive register reuse, and makes the lifetime model match the structure of the dataflow rather than the structure of the syntactic scope.",
+      "refs": [
+        { "target": "ownership", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Modular — Deep dive into ownership in Mojo", "url": "https://www.modular.com/blog/deep-dive-into-ownership-in-mojo" }
+      ]
+    },
+    {
+      "id": "origins-and-partial-moves",
+      "title": "Origins and per-field partial moves",
+      "tags": ["mojo", "lifetime", "ownership"],
+      "content": "Mojo's \"origins\" (lifetime parameters) are tracked symbolically by the compiler; per-field destruction tracks partial moves of struct fields independently — a field-granular generalisation of Rust's whole-binding move tracking.",
+      "refs": []
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["mojo"],
+      "content": "Ownership shipped with the first public release in 2023; lifetimes/origins stabilized 2024–2026. The compile-time parameter system is covered separately as `mojo-parameter`; the codegen pipeline is `mojo-kgen`.",
+      "refs": [
+        { "target": "mojo-parameter", "type": "related" },
+        { "target": "mojo-kgen", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Mojo ownership", "url": "https://docs.modular.com/mojo/manual/values/ownership/" },
+    { "label": "Mojo lifecycle/death", "url": "https://docs.modular.com/mojo/manual/lifecycle/death/" },
+    { "label": "Modular — Deep dive into ownership in Mojo", "url": "https://www.modular.com/blog/deep-dive-into-ownership-in-mojo" }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "kind": "language",
+  "name": "Codon",
+  "aliases": [],
+  "summary": "Shajii et al. (MIT/Exaloop, PLDI 2023): Python-syntax compiler producing standalone native binaries via LLVM, without CPython runtime overhead. Imposes static type inference on a Python subset, monomorphises generics, emits LLVM IR with no heap-tag dispatch on hot paths. 10–100× speedups on numeric/string workloads.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Shajii et al.'s Codon (MIT/Exaloop, PLDI 2023) is a Python-syntax compiler that produces standalone native binaries via LLVM, without CPython runtime overhead. Where Cinder/Pyston/Pyjion and the CPython JIT work *with* Python's reference-counted dynamic semantics, Codon abandons them: it imposes static type inference on a Python subset, monomorphises generic code at compile time, and emits LLVM IR with no heap-tag dispatch on hot paths.\n\nReported speedups are 10–100× on numeric and string-heavy workloads, with C-competitive performance where Codon's inferred types are tight enough.",
+      "refs": [
+        { "target": "llvm#backend-role", "type": "uses" },
+        { "target": "numba#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        {
+          "label": "Codon repository",
+          "url": "https://github.com/exaloop/codon"
+        },
+        {
+          "label": "Shajii et al. — Codon (PLDI 2023)",
+          "url": "https://dl.acm.org/doi/abs/10.1145/3578360.3580275"
+        }
+      ]
+    },
+    {
+      "id": "python-dialect-aot-compilation",
+      "title": "Python dialect and AOT compilation",
+      "tags": ["python", "aot", "compiler"],
+      "content": "The architectural choice is \"compile a Python *dialect*, not the language itself\": full CPython-extension semantics, dynamic class modification, and ad-hoc reflection are not supported. In exchange, Codon offers domain-extensibility through a plugin SDK — the same compiler infrastructure backs Seq (computational genomics) and other domain-specific Codon dialects, each adding domain-typed primitives without forking the toolchain.\n\nDistinct from Numba, which JIT-compiles selected functions inside an otherwise standard CPython process; Codon replaces CPython entirely.",
+      "refs": [
+        { "target": "numba#decorator-driven-jit", "type": "alternative-to" },
+        { "target": "tiered-compilation#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "whole-program-typing-and-monomorphization",
+      "title": "Whole-program typing and monomorphization",
+      "tags": ["compiler", "type-system", "optimization"],
+      "content": "Codon's performance comes from compile-time reasoning that dynamic Python typically does not allow: whole-program or broad-scope type understanding plus monomorphization of generic code at compile time. Each generic function is specialized at every used type instantiation; the resulting LLVM IR has no heap-tag dispatch on hot paths.\n\nThis is the same compilation strategy MLton uses for Standard ML and Roc uses for its lambda-set-driven defunctionalization — a typed Python dialect joins the whole-program-monomorphization compiler family.",
+      "refs": [
+        { "target": "high-level-ir#what-high-level-ir-adds", "type": "exemplifies" },
+        { "target": "mid-level-ir#why-this-layer-exists", "type": "exemplifies" }
+      ]
+    },
+    {
+      "id": "compatibility-tradeoffs",
+      "title": "Compatibility trade-offs",
+      "tags": ["tradeoffs", "python", "language-design"],
+      "content": "Codon makes the compatibility/performance trade-off explicit. It keeps much of Python's surface familiarity while giving up enough dynamism to support a far more aggressive compilation pipeline.\n\nStatus (as of 2026-04): production-stable; Exaloop ships Codon under a source-available license with commercial deployments in computational biology and high-frequency data processing. The lesson generalises: a typed Python dialect plus whole-program AOT is a different point in the Python-acceleration design space from any JIT, and pays off when partial Python compatibility is acceptable.",
+      "refs": [
+        { "target": "numba#typed-subset-boundary", "type": "alternative-to" },
+        { "target": "llvm#frontend-to-backend-boundary", "type": "exemplifies" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Codon repository",
+      "url": "https://github.com/exaloop/codon"
+    },
+    {
+      "label": "Shajii et al. — Codon (PLDI 2023)",
+      "url": "https://dl.acm.org/doi/abs/10.1145/3578360.3580275"
+    }
+  ]
+}

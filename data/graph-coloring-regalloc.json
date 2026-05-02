@@ -1,0 +1,41 @@
+{
+  "kind": "concept",
+  "name": "Graph-Coloring Register Allocation",
+  "aliases": ["Chaitin's algorithm", "graph coloring regalloc"],
+  "summary": "Chaitin (1981) formulated register allocation as graph coloring: nodes are live ranges, edges connect simultaneously-live ranges, K colors map to physical registers. Produces excellent code at NP-complete cost; production GCC IRA/LRA descend from this lineage.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Chaitin (1981) formulated register allocation as graph coloring: build an interference graph where nodes are live ranges and edges connect simultaneously-live ranges, then color the graph with K colors (K = number of physical registers). If a node cannot be colored, it is *spilled* to memory — its value is loaded and stored at each use, freeing the register.\n\nGraph coloring produces excellent code but is expensive: the interference graph can be quadratic in the number of live ranges, and coloring is NP-complete in general (though heuristics work well in practice). Chaitin's original algorithm and its descendants — Briggs's improvements, iterated register coalescing, optimistic coloring — set the upper bound on what register allocators can achieve.",
+      "refs": [
+        { "target": "linear-scan-regalloc#overview", "type": "contrasts-with" },
+        { "target": "ssa#overview", "type": "applies-to" }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "title": "Chaitin's algorithm",
+      "tags": ["compiler", "register-allocation"],
+      "content": "The classical formulation has four phases. **Build**: compute liveness across the program, then construct the interference graph by connecting any two live ranges whose live intervals overlap. **Coalesce**: merge live ranges connected by a copy if their interference graphs do not conflict, eliminating the copy. **Simplify and select**: repeatedly remove a node of degree less than K from the graph (it can always be colored after the rest is colored), pushing it onto a stack; pop nodes off the stack and assign each the lowest-numbered color not used by its still-present neighbors. **Spill**: if a node has degree ≥ K and cannot be simplified, choose it as a spill candidate, rebuild, and retry.\n\nBriggs's improvement is **optimistic coloring**: even nodes with degree ≥ K are pushed onto the stack with a flag, and during select they are tried for coloring; many succeed because not all neighbors actually use distinct colors. The classical Briggs spill heuristic is `cost / degree`, biasing toward cheap-to-spill, high-pressure live ranges.",
+      "refs": []
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["compiler", "production"],
+      "content": "GCC's IRA/LRA (integrated register allocator / local register allocator) lineage uses graph-coloring ideas, with substantial engineering for spill-heuristic tuning, region-based allocation to bound graph sizes, and careful handling of register classes that interfere asymmetrically (e.g., x86 partial-register stalls).\n\nLLVM's production allocators are better described as live-interval, greedy, splitting, and linear-scan-influenced rather than classical Chaitin-style graph coloring. The classical algorithm appears mostly in academic systems and a few specialized backends; the closer descendants in production are SSA-based allocators (Pereira-Palsberg, regalloc2) that exploit SSA's lifetime-splitting properties to avoid the worst Chaitin pathologies.",
+      "refs": [
+        { "target": "linear-scan-regalloc#ssa-based-variants", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs"],
+      "content": "Graph-coloring produces near-optimal allocation when the heuristics align with the workload. The cost is compile time: building the interference graph is O(n²) in the worst case, and the spill loop can iterate many times on register-pressured code. For optimising AOT compilation the trade-off is acceptable; for JIT compilation it is usually too slow.\n\nThe second cost is implementation complexity. A correct graph-coloring allocator that handles real ABIs (callee-saved registers, register classes, calling conventions, two-address instructions, register pairs) is among the hardest single passes in a backend. Most modern compilers have moved toward simpler allocators with more sophisticated live-range splitting (greedy, SSA-aware, Pereira-Palsberg).",
+      "refs": []
+    }
+  ]
+}

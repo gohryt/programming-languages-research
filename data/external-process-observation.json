@@ -1,0 +1,121 @@
+{
+  "kind": "concept",
+  "name": "External process observation",
+  "aliases": [
+    "out-of-process tracing",
+    "external sampler"
+  ],
+  "summary": "Mechanisms where the observer runs in a separate process from the target and reads memory, intercepts syscalls, or captures a post-mortem snapshot — without injecting code into the target.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mechanisms where the observer runs in a separate process from the target and reads memory, intercepts syscalls, or captures a post-mortem snapshot — rather than injecting code into the target. The engineering challenge is getting a useful signal without the overhead of full ptrace, and without having to trust the stability of the target's address space when it may be corrupted.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:direct-execution-interposition`, `family:hardware-out-of-process-observation`\n- **domain**: `domain:debugging`, `domain:profiling`, `domain:tracing`\n- **off-cost**: `off-cost:always-on`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:medium`\n- **granularity**: `granularity:per-crash`, `granularity:per-function`, `granularity:per-sample`, `granularity:per-syscall`\n"
+    },
+    {
+      "id": "py-spy-rbspy",
+      "title": "py-spy / rbspy — External Process Memory Reading",
+      "tags": [
+        "domain:profiling",
+        "family:hardware-out-of-process-observation",
+        "granularity:per-sample",
+        "off-cost:zero",
+        "on-cost:medium",
+        "python",
+        "ruby"
+      ],
+      "content": "py-spy (Python) and rbspy (Ruby) are sampling profilers that read the target process's memory from an external process using `process_vm_readv` (Linux), `vm_read` (macOS), or `ReadProcessMemory` (Windows). They do not inject any code, attach any debugger, or interrupt the target in any way.\n\nBecause interpreters like CPython and CRuby store their stack frames and thread state in process memory at known offsets, an external process can read those structures, decode the call stack, and produce a profile — all without the target knowing it is being observed. The overhead to the target is literally zero: no system calls, no signals, no ptrace attachment.\n\nThe trick only works for interpreters with predictable memory layouts. But the principle generalizes: if a VM stores its state in a known memory layout, an external observer can read it at any time without disturbing execution. Tristan Hume notes this could be extended to native programs: push context info onto a known data structure, and have an external process sample it via `process_vm_readv` or eBPF.",
+      "sources": [
+        {
+          "url": "https://github.com/benfred/py-spy"
+        },
+        {
+          "url": "https://thume.ca/2023/12/02/tracing-methods/"
+        }
+      ]
+    },
+    {
+      "id": "strace-seccomp-bpf",
+      "title": "strace + seccomp-bpf — The Paradigmatic \"Wrong Default\" Tracer",
+      "tags": [
+        "domain:tracing",
+        "family:hardware-out-of-process-observation",
+        "granularity:per-syscall",
+        "linux",
+        "off-cost:always-on",
+        "on-cost:high"
+      ],
+      "content": "`strace` is the canonical Unix syscall tracer and also the canonical example of a tracer whose default implementation has pathological overhead. It uses `ptrace(PTRACE_SYSCALL)`, which stops the tracee *twice per syscall* (entry and exit). Each stop is two context switches. The FOSDEM 2020 measurements (Syromiatnikov & Levin) show the canonical `dd`-style syscall-heavy workload at **37.37× slowdown** under plain strace.\n\nThe fix (strace 5.3+, GSoC 2018/2019 work by Paul Chaignon and others) is `--seccomp-bpf`: attach a seccomp-bpf cBPF filter that returns `SECCOMP_RET_TRACE` only for the syscalls the user asked about. Everything else runs native. The same benchmark drops to **1.475×** — a 25× reduction just from filtering in-kernel instead of in the tracer. Architectural footnote: seccomp filters are inherited by children but cannot be attached to an already-running process, so `strace -p PID --seccomp-bpf` cannot benefit — attach-to-existing still pays the double-stop.\n\nThe broader lesson is the cheap-guard / expensive-payload pattern (`data/bytecode-and-code-patching#dtrace-usdt-is-enabled-probes`) retrofitted in-kernel: strace's original design fused the two and every syscall paid the ptrace cost regardless, while seccomp-bpf evaluates the filter inline and only takes the ptrace path for matching syscalls. The measured result is a 25× win with no change in observable semantics.",
+      "sources": [
+        {
+          "url": "https://pchaigno.github.io/strace/2019/10/02/introducing-strace-seccomp-bpf.html"
+        },
+        {
+          "url": "https://archive.fosdem.org/2020/schedule/event/debugging_strace_perfotmance/"
+        }
+      ]
+    },
+    {
+      "id": "ltrace-plt-patching",
+      "title": "ltrace — PLT Patching for Library-Call Tracing",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-function",
+        "linux",
+        "off-cost:zero",
+        "on-cost:high"
+      ],
+      "content": "`ltrace` is strace's analogue for library calls. Its classic mechanism is direct: overwrite the first instruction of each recognizable PLT (Procedure Linkage Table) trampoline with `int3` using `PTRACE_POKETEXT`. When the program reaches that trampoline, it traps into ltrace, which decodes arguments per the library's ABI, rewrites the original instruction back, single-steps, and reinstalls the `int3`.\n\nThe critical prerequisite is not lazy binding alone, but dynamically linked call sites that still pass through recognizable PLT/GOT stubs ltrace can patch or intercept. Lazy binding makes first-call interception straightforward, but `BIND_NOW` by itself does not necessarily remove all PLT calls. The broader problem is modern linking and hardening: `-fno-plt`, static linking, direct binding, symbol visibility, IFUNCs, PIE/toolchain changes, and ptrace restrictions all make ltrace fragile. The modern replacement path is eBPF uprobes (`data/bytecode-and-code-patching#ebpf-uprobes`) attached to library symbols directly. This is a rare case where a classic Unix tool's mechanism became unreliable because the linking model around it changed.",
+      "sources": [
+        {
+          "url": "https://packagecloud.io/blog/how-does-ltrace-work/"
+        }
+      ]
+    },
+    {
+      "id": "breakpad-crashpad-minidumps",
+      "title": "Breakpad / Crashpad — Minidumps as the Minimal Crash Artifact",
+      "tags": [
+        "domain:debugging",
+        "family:hardware-out-of-process-observation",
+        "granularity:per-crash",
+        "off-cost:zero",
+        "on-cost:high"
+      ],
+      "content": "Every tracing mechanism in this document so far is *live*. The complementary modality is **post-mortem**: at the moment of crash, capture the minimal artifact needed to reconstruct state, and defer everything expensive to offline analysis. **Breakpad** (Google, 2007, used in Firefox, Chromium, many games) and its successor **Crashpad** (2014, now the Chromium default) embody this discipline.\n\nThe artifact is a **minidump**: register state, raw stack memory for each thread, loaded-module list, and a small number of metadata streams. No heap, no debuginfo. Everything symbolication-related happens *offline on a server* with access to separately-stored Breakpad symbol files (a line-oriented ASCII format converted from DWARF/PDB by `dump_syms`). The client-side artifact is small enough to upload from a crashed browser on a flaky network; the client-side code path stays minimal and allocation-free, which matters because the crashing process's address space may be corrupted.\n\nCrashpad's load-bearing design choice is that the dump handler runs **out of process**. The application signals a separate handler; the handler suspends the crashed process from outside, snapshots its state into a minidump file, and only then lets the OS finish killing it. In-process dumpers are a gamble — if the crash scrambled the heap, any code that allocates is likely to re-crash before the dump is written. Snapshotting from a separate, non-crashing process sidesteps this entirely.\n\nRelationship to Linux core dumps: a `core` file captures *entire* process memory (gigabytes on modern apps), has no structured metadata stream for arbitrary crash keys, and requires matching debuginfo on the analysis host. Minidumps are the opposite: application-curated \"just enough to walk the stack and categorize the crash,\" with deliberate cost/fidelity trade-offs the application owner controls. They are also a *standardized interchange format* — the same file opens in Google's `minidump_stackwalk`, Microsoft's WinDbg, and LLDB's minidump support — which makes them closer to a universal crash-trace format than core dumps have ever been.",
+      "sources": [
+        {
+          "url": "https://chromium.googlesource.com/crashpad/crashpad/+/HEAD/doc/overview_design.md"
+        },
+        {
+          "url": "https://chromium.googlesource.com/breakpad/breakpad/+/HEAD/docs/stack_walking.md"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/benfred/py-spy"
+    },
+    {
+      "url": "https://thume.ca/2023/12/02/tracing-methods/"
+    },
+    {
+      "url": "https://pchaigno.github.io/strace/2019/10/02/introducing-strace-seccomp-bpf.html"
+    },
+    {
+      "url": "https://archive.fosdem.org/2020/schedule/event/debugging_strace_perfotmance/"
+    },
+    {
+      "url": "https://packagecloud.io/blog/how-does-ltrace-work/"
+    },
+    {
+      "url": "https://chromium.googlesource.com/crashpad/crashpad/+/HEAD/doc/overview_design.md"
+    },
+    {
+      "url": "https://chromium.googlesource.com/breakpad/breakpad/+/HEAD/docs/stack_walking.md"
+    }
+  ]
+}

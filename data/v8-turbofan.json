@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "V8 TurboFan",
+  "aliases": ["turbofan"],
+  "summary": "V8's classical optimizing JIT IR — sea-of-nodes plus JS type-system specialization, inline-cache feedback embedded at call sites, and deoptimization metadata at every speculative operation. Status (as of 2026-04): being progressively replaced by Turboshaft.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "TurboFan is V8's classical optimizing JIT compiler, layered atop a sea-of-nodes IR. On top of the base SoN substrate, TurboFan adds *type system specialization* (Number vs String vs JSObject), inline-cache feedback (call sites embedded with observed types), and deoptimization metadata (every speculative operation knows how to bail to Ignition bytecode if assumptions fail).\n\nStatus (as of 2026-04): TurboFan is being progressively replaced by Turboshaft (linear SSA with side tables), an effort the V8 team began in 2022 and that has migrated most pipelines through 2024–2026.",
+      "refs": [
+        { "target": "sea-of-nodes#overview", "type": "instance-of" },
+        { "target": "v8-turboshaft#overview", "type": "succeeded-by" },
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ],
+      "sources": [
+        { "label": "V8 — Launching Ignition and TurboFan", "url": "https://v8.dev/blog/launching-ignition-and-turbofan" }
+      ]
+    },
+    {
+      "id": "specialization-and-feedback",
+      "title": "Type-system specialization and IC feedback",
+      "tags": ["jit", "speculation", "compiler-ir"],
+      "content": "TurboFan's distinctive contribution over a vanilla sea-of-nodes is the way it threads JS-runtime feedback into the IR. Inline caches at call sites record observed receiver shapes, primitive types, and method targets; TurboFan reads that feedback when constructing IR nodes, producing speculative operations that assume the observed types. Each speculative node carries a deoptimization point describing how to reconstruct interpreter state if the speculation fails.\n\nThe trade-off is steep: peak quality on long-running JS, paid for in compile time and IR-graph complexity. The same TurboFan compile that delivers near-native throughput on hot code is too expensive to invoke on transiently-warm functions, which motivated the introduction of Maglev as a mid-tier between Sparkplug and TurboFan.",
+      "refs": [
+        { "target": "v8-maglev#overview", "type": "tier-below" },
+        { "target": "polymorphic-inline-caches#overview", "type": "feeds" }
+      ]
+    },
+    {
+      "id": "migration-to-turboshaft",
+      "title": "Migration to Turboshaft",
+      "tags": ["compiler-ir", "performance", "production"],
+      "content": "The motivation for replacing TurboFan was operational, not analytical. Sea-of-nodes is elegant for global scheduling, but the per-pass cost of operating on the implicit graph dominated TurboFan's compile time on JS workloads. Turboshaft's linear-SSA-with-side-tables shape eliminates global scheduling per pass and gives pass authors predictable iteration behaviour, at parity-or-better code quality.\n\nThe lesson generalises: sea-of-nodes is an analytical luxury that JITs can outgrow. Compile-time amortisation matters more for the median JS function than peak code quality.",
+      "refs": [
+        { "target": "v8-turboshaft#overview", "type": "successor" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "V8 — Launching Ignition and TurboFan", "url": "https://v8.dev/blog/launching-ignition-and-turbofan" },
+    { "label": "V8 Turboshaft introduction", "url": "https://v8.dev/blog/turboshaft" }
+  ]
+}

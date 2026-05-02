@@ -1,0 +1,59 @@
+{
+  "kind": "tool",
+  "name": "Buck / Buck2",
+  "aliases": [
+    "buck2"
+  ],
+  "summary": "Meta's open-sourced build system descended from Google's Blaze; Buck2 (2023+, Rust rewrite of the original Java/Python Buck) is the current production version with per-target visibility, distributed remote-execution support, and BUCK files declaring build targets.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Buck** (Meta's open-sourced build system) implements per-target visibility declarations like Bazel (`data/bazel`): each target in a BUCK file has a `visibility` attribute restricting which other targets can depend on it. **Buck2** (2023+) is the Rust rewrite of the original Buck (Java/Python) and is the current production version at Meta.",
+      "refs": [
+        {
+          "target": "bazel#overview",
+          "type": "sibling"
+        },
+        {
+          "target": "package-management#overview",
+          "type": "complements"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Buck2 — visibility API",
+          "url": "https://buck2.build/docs/api/build/visibility/"
+        }
+      ]
+    },
+    {
+      "id": "buck2-rust-rewrite",
+      "title": "Buck2 — Rust rewrite and remote execution",
+      "tags": [
+        "buck",
+        "rust",
+        "remote-execution"
+      ],
+      "content": "Buck2 was open-sourced in 2023 as a complete Rust rewrite of the original Buck. The architectural emphasis is on:\n\n- **Distributed remote-execution** as a first-class concern — a single Buck2 invocation can dispatch build actions across a cluster, with content-addressed action caching per shipped artifact.\n- **Speed and incrementality** through fine-grained dependency tracking. Buck2 reports significant build-time improvements over Buck1 on large monorepos.\n- **Starlark-based BUCK files** — same configuration language as Bazel, ensuring some interoperability of build-rule patterns between the two ecosystems.\n\nProduction: Meta uses Buck2 internally for the entire monorepo; external adopters have been growing since the open-source release, though Bazel's broader ecosystem reach continues to dominate the public market."
+    },
+    {
+      "id": "vs-bazel-positioning",
+      "title": "Positioning vs Bazel",
+      "tags": [
+        "buck",
+        "bazel",
+        "comparison"
+      ],
+      "content": "Distinct from Bazel: both descend from Google's internal Blaze design vocabulary, both use Starlark for BUILD/BUCK files, both implement per-target visibility. The differences are largely organisational and incremental:\n\n- Buck2 is Rust-based with very fast incremental rebuilds; Bazel is Java-based with a larger plugin ecosystem.\n- Buck2's remote-execution model is somewhat tighter than Bazel's (designed-in rather than added-on).\n- Bazel has a larger external ecosystem (BCR, more rule sets, broader language support); Buck2 is newer in the open-source space.\n\nThe lesson generalises with Bazel's: **at sufficient scale, build-system visibility becomes the dominant abstraction** regardless of which build system enforces it.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Buck2 — visibility",
+      "url": "https://buck2.build/docs/api/build/visibility/"
+    }
+  ]
+}

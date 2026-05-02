@@ -1,0 +1,59 @@
+{
+  "kind": "concept",
+  "name": "Content-Addressed IR",
+  "aliases": ["hash-addressed-ir"],
+  "summary": "IR identity derived from content hash rather than name or filesystem position. Enables free renames, automatic deduplication, distributed compilation, and trivial cache identity. Most radical realization: Unison, where the AST hash is the canonical identity.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Content-addressed IR derives identity from structure or bytes rather than from mutable names or file positions. This makes it attractive for caching, deduplication, rename stability, and distributed or long-lived compiler state.\n\nThe canonical extreme is Unison: every term, type, and dependency is identified by a hash of its abstract syntax tree; names are metadata — a `name ↔ hash` mapping — rather than the canonical identifier. Source files are not the source of truth; a Unison codebase is a SQLite-backed database of hashed AST nodes.",
+      "refs": [
+        { "target": "persistent-ir#overview", "type": "complements" },
+        { "target": "module-identity#overview", "type": "shapes" }
+      ]
+    },
+    {
+      "id": "why-content-addressing-is-useful",
+      "title": "Why content addressing is useful",
+      "tags": ["caching", "incrementality", "identity"],
+      "content": "Content addressing gives compilers and build systems several properties for free:\n\n- **Free renames**: changing a name is a metadata-only edit; the hash is unchanged, so dependents continue to work without recompilation.\n- **Deduplication by construction**: two independent libraries that define the same `map` function produce the same hash. There is no \"version conflict\" because the function is the function.\n- **Distributed compute**: shipping a computation means shipping its bytecode tree by hash; dependencies sync on demand.\n- **Reproducible builds align naturally**: the build artifact's identity is its content, so reproducible builds require no extra discipline.",
+      "refs": [
+        { "target": "reproducible-builds#overview", "type": "supports" },
+        { "target": "persistent-ir#why-persistence-matters", "type": "complements" }
+      ]
+    },
+    {
+      "id": "representation-consequences",
+      "title": "Representation consequences",
+      "tags": ["representation", "storage", "compiler-design"],
+      "content": "Once IR identity is content-derived, compiler data structures begin to resemble a database or artifact graph. Hash boundaries, serialization stability, and dependency edges become explicit parts of the representation design rather than accidental implementation details.\n\nThe full Unison realization eliminates source files entirely — text exists only as a transient view rendered from the hashed-AST database. Less radical applications use content addressing as a cache-key mechanism on top of conventional source: Salsa-style query memoization, build-system content hashing (Bazel, Nix), and CDN-style artifact delivery (Deno's URL+hash imports).",
+      "refs": [
+        { "target": "persistent-ir#common-techniques", "type": "complements" }
+      ],
+      "sources": [
+        {
+          "label": "Unison — The Big Idea",
+          "url": "https://www.unison-lang.org/docs/the-big-idea/"
+        }
+      ]
+    },
+    {
+      "id": "trade-offs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "schema", "storage"],
+      "content": "Content-addressed IR can dramatically improve caching and stability, but it raises real costs:\n\n- **Schema evolution**: changing the AST shape changes every hash. Versioning the schema becomes a first-class concern.\n- **Tooling**: ordinary source-control workflows (git diff, blame, grep) need adaptation when source is rendered from a database.\n- **Hashing granularity**: too coarse and small edits invalidate a lot; too fine and the hash bookkeeping dominates.\n- **Dependency expression**: a hash-shaped dependency cannot easily express \"any version\" — the consumer is pinned to one hash unless an alias mapping is layered on.\n\nUnison accepts these costs to get its full benefits. Most production systems adopt content addressing more selectively, applying it where caching or reproducibility is most valuable.",
+      "refs": [
+        { "target": "persistent-ir#trade-offs", "type": "shares" },
+        { "target": "reproducible-builds#main-mechanisms", "type": "complements" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Unison — The Big Idea",
+      "url": "https://www.unison-lang.org/docs/the-big-idea/"
+    }
+  ]
+}

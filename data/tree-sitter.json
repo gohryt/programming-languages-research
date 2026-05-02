@@ -1,0 +1,94 @@
+{
+  "kind": "framework",
+  "name": "Tree-sitter",
+  "aliases": ["tree sitter"],
+  "summary": "Parser generator producing incremental GLR parsers in C, optimized for editor tooling: robustness on invalid input, parse-on-every-keystroke speed, and a ~50KB runtime.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Tree-sitter is a parser generator that produces incremental GLR parsers in C. Its design priorities, in order, are: robustness (useful results on syntactically invalid input), speed (parse on every keystroke), generality (any language), and dependency-freedom (pure C11 runtime).\n\nStatus (as of 2026-04): used in Neovim, Helix, Zed, GitHub code navigation, and many other tools, having effectively replaced regex-based syntax highlighting in modern editors.",
+      "refs": [
+        { "target": "lezer#overview", "type": "sibling" },
+        { "target": "recursive-descent#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Tree-sitter documentation", "url": "https://tree-sitter.github.io/tree-sitter" }
+      ]
+    },
+    {
+      "id": "parser-architecture",
+      "title": "Parser architecture",
+      "tags": ["parser", "algorithms", "glr"],
+      "content": "The generated parser behaves like an LR parser most of the time and invokes GLR exploration only when the grammar declares a runtime conflict. This selective generalization is what gives tree-sitter editor-grade speed: the generalized machinery is engaged on demand, not universally.\n\nThis is a meaningful contrast with always-generalized systems such as GLL or Marpa, which pay generalized cost on every input. Tree-sitter trades some theoretical uniformity for practical throughput on the common case.",
+      "refs": [
+        { "target": "deterministic-ll-lr#overview", "type": "related" },
+        { "target": "ambiguity-and-parse-forests#overview", "type": "related" },
+        { "target": "antlr4#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "grammar-authoring-model",
+      "title": "Grammar authoring model",
+      "tags": ["parser", "grammar", "tooling"],
+      "content": "Grammars are authored in a JavaScript DSL that generates C parsing tables. Conflict declarations, precedence controls, and invalid-code tolerance are normal parts of the authoring model rather than corner cases.\n\nGenerated parsers are typically 50–200KB of C code per language. The runtime library is approximately 50KB. The combined footprint is small enough to embed in any application, including IDEs, code-search backends, and command-line tools.\n\nContext-sensitive tokens (Python INDENT/DEDENT, here-docs, string interpolation, percent-strings) are handled by hand-written external scanners — a documented escape hatch when the generated lexer cannot express a token.",
+      "refs": [
+        {
+          "target": "deterministic-ll-lr#grammar-engineering-tradeoffs",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Tree-sitter grammar DSL",
+          "url": "https://tree-sitter.github.io/tree-sitter/creating-parsers/2-the-grammar-dsl.html"
+        },
+        {
+          "label": "Tree-sitter external scanners",
+          "url": "https://tree-sitter.github.io/tree-sitter/creating-parsers/4-external-scanners.html"
+        }
+      ]
+    },
+    {
+      "id": "incrementality",
+      "title": "Incremental reparsing",
+      "tags": ["incrementality", "editors", "tooling"],
+      "content": "When the source is edited, tree-sitter identifies which portions of the old syntax tree are invalidated by the edit, then reparses only those portions, reusing unchanged subtrees. The key data structure is the syntax tree itself: nodes store their byte ranges, so the parser can skip over subtrees whose ranges weren't affected by the edit.\n\nThis design makes parse-on-every-keystroke practical: most edits touch a small region, so most of the previous tree survives.",
+      "refs": [
+        { "target": "language-server#overview", "type": "related-tooling" },
+        { "target": "incremental-parsing#overview", "type": "exemplifies" }
+      ]
+    },
+    {
+      "id": "error-recovery",
+      "title": "Error recovery and invalid code",
+      "tags": ["error-recovery", "parser", "tooling"],
+      "content": "Error recovery is built into the LR automaton itself, not bolted on as a post-pass. The parser forks at error points, racing strategies in parallel: one fork inserts a missing token and proceeds, another deletes the offending token, a third wraps the surrounding region in an ERROR node so that valid sibling subtrees survive. The fork that consumes the most subsequent input wins.\n\nThe cost (multiple parallel parse attempts at error sites) buys structurally useful trees on broken input, which is what syntax highlighting and navigation need on every keystroke.",
+      "refs": [
+        {
+          "target": "language-server#design-constraints",
+          "type": "relevant-to"
+        },
+        {
+          "target": "ambiguity-and-parse-forests#engineering-costs",
+          "type": "contrasts-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Tree-sitter documentation",
+      "url": "https://tree-sitter.github.io/tree-sitter"
+    },
+    {
+      "label": "Tree-sitter grammar DSL",
+      "url": "https://tree-sitter.github.io/tree-sitter/creating-parsers/2-the-grammar-dsl.html"
+    },
+    {
+      "label": "Tree-sitter external scanners",
+      "url": "https://tree-sitter.github.io/tree-sitter/creating-parsers/4-external-scanners.html"
+    }
+  ]
+}

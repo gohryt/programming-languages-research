@@ -1,0 +1,77 @@
+{
+  "kind": "concept",
+  "name": "MoarVM Specializer (spesh)",
+  "aliases": [
+    "MoarVM spesh",
+    "spesh specializer"
+  ],
+  "summary": "MoarVM's specialisation engine: worker-thread plan-and-install, lazy stack-unwind deoptimisation, uninlining on guard failure. Specialisations arrive after a delay rather than pausing for compile. The ThreadPoolAwaiter (continuation-safe await lowering) is one of the load-bearing applications.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Spesh** is MoarVM's specialisation engine. It is the system that takes hot bytecode plus runtime profiling data and produces specialised variants — type-specialised, inlined, dispatched-and-resolved — without pausing the mutator.\n\nThe distinguishing design is **worker-thread specialisation**: spesh runs on a separate thread that observes hot frames and produces specialised plans asynchronously. The mutator never blocks waiting for compilation; specialised code becomes available the next time a hot frame is invoked, after the worker has finished its plan.",
+      "refs": [
+        {
+          "target": "moarvm-jit#overview",
+          "type": "feeds"
+        },
+        {
+          "target": "moarvm-new-disp#overview",
+          "type": "interacts-with"
+        },
+        {
+          "target": "osr-deoptimization#overview",
+          "type": "uses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "MoarVM Specializer Improvements Part 3 (jnthn, 2017)",
+          "url": "https://6guts.wordpress.com/2017/11/05/moarvm-specializer-improvements-part-3-optimizing-code/"
+        }
+      ]
+    },
+    {
+      "id": "deopt-and-uninlining",
+      "title": "Lazy unwind deopt and uninlining",
+      "tags": [
+        "moarvm",
+        "jit",
+        "deoptimization"
+      ],
+      "content": "**Lazy stack-unwind deopt**: rather than fully reconstructing interpreter state on guard failure, spesh marks the affected frames and defers full reconstruction until the frame would be unwound (returned from). Frames that would unwind anyway pay no deopt cost — the work is skipped.\n\n**Uninlining on guard failure**: when an inlined call's guard fails, spesh records enough metadata at inline time to reconstruct the pre-inlining stack. The runtime can re-materialise the inlined callee's frame as if the call had been dispatched normally, then resume execution there. This is the inlining counterpart of lazy unwind deopt.\n\nThe combination lets spesh inline aggressively without paying for guard-failure deopt on every call site. The metadata cost per inline is modest; the steady-state savings are substantial.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "MoarVM spesh deoptimization source",
+          "url": "https://github.com/MoarVM/MoarVM/blob/new-disp/src/spesh/deopt.c"
+        }
+      ]
+    },
+    {
+      "id": "threadpool-awaiter",
+      "title": "ThreadPoolAwaiter — continuation-safe await",
+      "tags": [
+        "moarvm",
+        "concurrency",
+        "spesh"
+      ],
+      "content": "The **ThreadPoolAwaiter** is one of spesh's load-bearing applications. Raku's `await` is continuation-based — when a coroutine awaits a Promise, the runtime captures a first-class continuation and resumes it when the Promise completes. The combination of continuation capture and spesh-specialised code requires careful coordination: the captured continuation must include enough metadata for spesh to specialise the resumed code correctly when the await resumes on a possibly-different thread.\n\nSpesh's design accommodates this by treating continuations as first-class spesh inputs: a continuation carries its specialisation context with it. The result is non-blocking await that composes with type-specialised JIT code, without per-await deoptimisation costs.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Rakudo ThreadPoolScheduler",
+          "url": "https://github.com/rakudo/rakudo/blob/nom/src/core/ThreadPoolScheduler.pm"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "MoarVM spesh blog series",
+      "url": "https://6guts.wordpress.com/2017/11/05/moarvm-specializer-improvements-part-3-optimizing-code/"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "kind": "tool",
+  "name": "Chalk and the Rust Next-Generation Trait Solver",
+  "aliases": ["chalk", "rust-trait-solver", "next-gen-trait-solver"],
+  "summary": "Chalk lowers Rust trait information into logical predicates and uses a Prolog-engine-style solver, embeddable in rustc and rust-analyzer. The next-generation trait solver in rustc reframes trait checking as proving goals under a parameter environment, returning success/ambiguity/error plus constraints; targeted for stabilization in 2025-2026.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Chalk lowers Rust trait information into logical predicates and uses a solver similar to a Prolog engine, while remaining embeddable in hosts such as rustc and rust-analyzer.\n\nRust's next-generation trait solver frames trait checking as proving goals under a parameter environment, returning success, ambiguity, or error plus constraints. Status (as of 2026-04): a flagship 2025–2026 Rust project goal targets stabilization of `-Znext-solver=globally`, replacing the existing trait solver implementation entirely; LWN's March 2026 coverage describes the rewrite as simplifying future trait-system changes, fixing several long-standing soundness bugs, and improving compile times on trait-heavy code.",
+      "refs": [
+        { "target": "type-classes-traits#overview", "type": "implements" },
+        { "target": "evidence-passing#overview", "type": "produces" }
+      ],
+      "sources": [
+        { "label": "Chalk book", "url": "https://rust-lang.github.io/chalk/book/" },
+        { "label": "Rustc dev guide — next-gen trait solving", "url": "https://rustc-dev-guide.rust-lang.org/solve/trait-solving.html" },
+        { "label": "LWN — Rust's next-generation trait solver (March 2026)", "url": "https://lwn.net/Articles/1063124/" }
+      ]
+    },
+    {
+      "id": "logic-programming-shape",
+      "title": "Logic-programming shape and projection equality",
+      "tags": ["trait-solving", "rust"],
+      "content": "Chalk's input language is Horn-clause-like: traits become predicates, impls become rules, where-clauses become goals. The solver answers questions like \"is `i32: Iterator`?\" by searching the rules for a derivation. Associated-type projections (`<I as Iterator>::Item`) get a normalization predicate that can be unified incrementally rather than requiring an answer up front.\n\nThis logic-programming shape is what makes Chalk extensible: new trait features (associated constants, associated types with where-clauses, GATs) plug in as additional rule schemas, without restructuring the solver itself. Rust-analyzer uses Chalk to provide hover-time trait resolution that matches what rustc produces, so editor diagnostics agree with batch compilation.",
+      "sources": [
+        { "label": "Chalk type equality and unification", "url": "https://rust-lang.github.io/chalk/book/clauses/type_equality.html" }
+      ]
+    },
+    {
+      "id": "next-gen-solver-goals",
+      "title": "Why the next-generation solver matters",
+      "tags": ["rust", "trait-solving", "soundness"],
+      "content": "The pre-Chalk rustc trait solver accumulated several long-standing soundness issues, especially around higher-ranked trait bounds, lifetime inference inside trait obligations, and projection cycles. The next-generation solver — derived from Chalk's design but written natively in rustc — was conceived to:\n\n- replace the legacy trait selector wholesale with a single canonical implementation;\n- close known soundness bugs that the legacy solver could not fix without breaking compilation;\n- improve compile times on trait-heavy crates by avoiding redundant solver invocations;\n- give future trait-system features (specialization, generic associated types, async traits) a cleaner foundation.\n\nFor language designers building trait-like systems from scratch, the lesson is that **trait-solver architecture is foundational**: a solver that grows organically around features tends to accumulate soundness debt; a solver designed up front around an extensible logic-programming abstraction stays maintainable across feature additions.",
+      "sources": [
+        { "label": "Rust Project Goals", "url": "https://rust-lang.github.io/rust-project-goals/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Chalk book", "url": "https://rust-lang.github.io/chalk/book/" },
+    { "label": "Rustc dev guide — next-generation trait solving", "url": "https://rustc-dev-guide.rust-lang.org/solve/trait-solving.html" },
+    { "label": "LWN — Rust's next-generation trait solver (March 2026)", "url": "https://lwn.net/Articles/1063124/" },
+    { "label": "Rust Project Goals", "url": "https://rust-lang.github.io/rust-project-goals/" }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "kind": "tool",
+  "name": "Stainless",
+  "aliases": ["pure-scala", "stainless-verifier"],
+  "summary": "EPFL refinement-types verifier (Viktor Kunčak): extends Scala via Pure Scala, an embedded total-functional subset; SMT-discharge architecture similar to Dafny. Lets Scala programmers verify functional invariants on a constrained subset of the language while interoperating with full Scala in unverified parts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Stainless (EPFL, Viktor Kunčak) extends Scala with refinement types via *Pure Scala*, an embedded total-functional subset; SMT-discharge architecture similar to Dafny.\n\nThe key design point is that Pure Scala is a *subset* of Scala — programmers write ordinary Scala syntax, and Stainless's checker rejects the parts of the language that cannot be verified (mutation, exceptions outside checked patterns, partial pattern matches without termination evidence). Verified Pure Scala interoperates with unverified Scala by treating the unverified boundary as `assume`-style trusted axioms.",
+      "refs": [
+        { "target": "refinement-types#overview", "type": "implements" },
+        { "target": "dafny#overview", "type": "similar-architecture" }
+      ],
+      "sources": [
+        { "label": "Stainless (EPFL)", "url": "https://stainless.epfl.ch/" }
+      ]
+    },
+    {
+      "id": "pure-scala-subset",
+      "title": "The Pure Scala subset and total functions",
+      "tags": ["scala", "verification"],
+      "content": "Pure Scala restricts Scala to a total-functional core: total pattern matches, no general `var` mutation, no exceptions, structural recursion with termination evidence. The restriction is what lets Stainless guarantee that verification implies correctness — partial functions and side effects would let an `assume false` slip in implicitly through unfinished branches.\n\nFor language designers, the lesson is that **a verifiable subset gives a clean refinement story even inside a larger language with gradual semantics**. Programmers can mark verification-critical code as Pure Scala, get refinement-type checking on it, and continue using full Scala elsewhere."
+    }
+  ],
+  "sources": [
+    { "label": "Stainless (EPFL)", "url": "https://stainless.epfl.ch/" }
+  ]
+}

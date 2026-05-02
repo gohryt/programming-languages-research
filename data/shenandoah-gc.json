@@ -1,0 +1,42 @@
+{
+  "kind": "runtime",
+  "name": "Shenandoah — Load Reference Barriers",
+  "aliases": ["Shenandoah", "Shenandoah GC"],
+  "summary": "Red Hat / OpenJDK's Shenandoah is a concurrent compacting collector that performs object relocation in parallel with the application, with pause times in low milliseconds independent of heap size. Evolved from Brooks-style forwarding-pointer indirection on every read (JDK 12) to load reference barriers (JDK 13).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "concurrent-gc", "compacting-gc", "low-latency-gc", "low-pause", "jvm", "openjdk"],
+      "content": "Red Hat / OpenJDK's **Shenandoah** is a concurrent compacting collector that performs object relocation in parallel with the application, with pause times in low milliseconds independent of heap size.",
+      "refs": [
+        { "target": "garbage-collection#low-latency-collectors", "type": "instance-of" },
+        { "target": "azul-c4", "type": "successor-of" },
+        { "target": "zgc", "type": "contrasts-with" },
+        { "target": "g1-gc", "type": "complements" }
+      ]
+    },
+    {
+      "id": "barrier-evolution",
+      "title": "Barrier evolution — Brooks pointer to load reference barrier",
+      "tags": ["read-barrier", "load-reference-barrier", "self-healing-barrier", "forwarding-pointer"],
+      "content": "Shenandoah's barrier design evolved across JDK releases:\n\n- **JDK 12**: Brooks-style **forwarding-pointer indirection** on *every read* — every object had a forwarding word, and each read followed it. High overhead on primitive-heavy workloads.\n- **JDK 13**: **Load reference barriers** that fire only at reference-load definition sites, eliminating primitive-read overhead. Crucial because most reads in Java code are primitive field accesses, not reference loads.\n- **JDK 14**: **Self-fixing barriers** — the slow path CAS-updates the field back to the to-space copy, so each location pays the slow path at most once.\n\nThe progression from Brooks pointer to load reference barrier to self-fixing barrier is the canonical example of **barrier amortisation**: each generation of the collector pushed barrier cost from per-read to per-reference-read to once-per-field-per-cycle."
+    },
+    {
+      "id": "remembered-sets",
+      "title": "Connection-matrix region tracking",
+      "tags": ["remembered-set", "regional-gc"],
+      "content": "Connection-matrix region tracking instead of card-table-style remembered sets. Each pair of regions (i,j) gets a single bit indicating whether region i contains references into region j; the matrix is updated by write barriers and read by the collector to determine cross-region root sets.\n\nSupports heaps up to ~4 TB; **generational mode** (JEP 404) introduced experimentally."
+    },
+    {
+      "id": "status",
+      "title": "Status and deployment",
+      "tags": ["production", "jvm", "openjdk", "low-latency-gc"],
+      "content": "Status (as of 2026-04): production-ready since JDK 15; default in Red Hat builds; widely used for latency-sensitive Java workloads. Notably absent from Oracle JDK by default but available via OpenJDK distributions.\n\nShenandoah and ZGC occupy adjacent niches in the JVM low-latency story: Shenandoah uses Brooks-style forwarding plus load reference barriers; ZGC uses colored pointers plus load barriers. Both are direct heirs of Azul C4."
+    }
+  ],
+  "sources": [
+    { "label": "Shenandoah load reference barriers (JDK 13)", "url": "https://developers.redhat.com/blog/2019/06/27/shenandoah-gc-in-jdk-13-part-1-load-reference-barriers" },
+    { "label": "Shenandoah self-fixing barriers (JDK 14)", "url": "https://developers.redhat.com/blog/2020/03/04/shenandoah-gc-in-jdk-14-part-1-self-fixing-barriers" }
+  ]
+}

@@ -1,0 +1,224 @@
+{
+  "kind": "concept",
+  "name": "Borrowing",
+  "aliases": [],
+  "summary": "Concept hub for the narrower memory-safety discipline of granting temporary access to owned data; collects the design axes (lexical vs flow-sensitive vs per-CFG-point lifetimes, static borrow-checking vs operational aliasing models, shared-vs-exclusive split) and indexes per-mechanism records.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Borrowing is a discipline for granting temporary access to owned data without transferring ownership permanently. It is one of the main techniques used to separate resource lifetime from short-lived read or write access, almost always living inside an ownership-oriented type system.\n\nThe canonical instance is Rust's borrow checker — every reference has a region/lifetime, `&mut T` is unique, `&T` is shared — but the design space is broader: how lifetimes are computed (lexical scopes vs. flow-sensitive liveness vs. per-CFG-point loan sets), whether the checker is static (borrow check at compile time) or operational (Stacked/Tree Borrows defining UB for `unsafe`), how partial borrows of struct fields are expressed (view types), and how address stability for self-referential state machines is encoded (Pin/Unpin).",
+      "refs": [
+        {
+          "target": "ownership#overview",
+          "type": "related"
+        },
+        {
+          "target": "rust#type-system",
+          "type": "used-by"
+        }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": [
+        "borrowing",
+        "lifetime",
+        "comparative-design"
+      ],
+      "content": "Borrowing systems vary along several axes:\n\n- **Lifetime granularity**: lexical scope (early Rust pre-NLL), flow-sensitive liveness over a CFG (NLL), per-CFG-point loan sets (Polonius), call-bounded projections (Hylo), region-parameterised pointer types (Cyclone).\n- **Static checker vs operational model**: a borrow checker rejects programs at compile time; an operational aliasing model (Stacked/Tree Borrows) defines what counts as undefined behaviour for `unsafe` code so the compiler may soundly emit `noalias` and Miri can detect violations dynamically.\n- **Shared-vs-exclusive split**: shared `&T` plus exclusive `&mut T` (Rust); shared/inout/sink/set parameter conventions (Hylo); borrowed/inout/owned (Mojo); a six-capability lattice (Pony).\n- **Partial borrows**: whole-struct borrow only (today's Rust) vs. per-field disjoint borrows (proposed view types).\n- **Annotation cost**: explicit region variables (Cyclone, ~6% of changed lines on legacy ports), function-signature lifetimes plus inference inside bodies (Rust NLL), zero surface lifetimes via call-bounded projections (Hylo).",
+      "refs": [
+        {
+          "target": "non-lexical-lifetimes",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "polonius",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "view-types",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "polonius-and-future-borrow-checking",
+      "title": "Static borrow-checking and operational aliasing models",
+      "tags": [
+        "aliasing",
+        "memory-safety",
+        "unsafe",
+        "compiler",
+        "lifetime"
+      ],
+      "content": "Two complementary jobs share the name \"borrow checking\":\n\n- A *static* borrow checker — NLL today, Polonius tomorrow, with view-types as a proposed expressivity extension — rejects safe Rust programs with conflicting borrows at compile time.\n- An *operational aliasing model* — Stacked Borrows or its Tree Borrows successor — defines the precise UB rules pointers in `unsafe` code must obey, so the compiler can emit aggressive optimization assumptions (e.g. `noalias`) and Miri can dynamically detect violations.\n\nThe two halves are independent design surfaces: Rust could keep NLL and adopt Tree Borrows, or move to Polonius while keeping Stacked Borrows. Conflating them obscures the design space.",
+      "refs": [
+        {
+          "target": "polonius",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "non-lexical-lifetimes",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "stacked-borrows",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "tree-borrows",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "shared-vs-exclusive-access",
+      "title": "Shared vs exclusive access",
+      "tags": [
+        "aliasing",
+        "memory-safety",
+        "type-system"
+      ],
+      "content": "Borrowing systems usually distinguish shared read access from exclusive mutable access. The safety value comes from preventing ambient mutable aliasing while still permitting temporary access patterns that would be too restrictive under pure ownership transfer alone. The shared/exclusive split appears in many forms — Rust's `&T`/`&mut T`, Hylo's `let`/`inout`/`set`/`sink` parameter conventions, Mojo's `borrowed`/`inout`/`owned`, Pony's six-capability lattice — but the abstract distinction is the same primitive in all of them.",
+      "refs": [
+        {
+          "target": "ownership#design-space-axes",
+          "type": "related"
+        },
+        {
+          "target": "hylo",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mojo",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "pony",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "lifetimes-and-scope",
+      "title": "Lifetimes and scope of access",
+      "tags": [
+        "lifetime",
+        "aliasing",
+        "compile-time"
+      ],
+      "content": "Borrowing depends on some notion of lifetime, region, or access scope. Designs vary across the lexical / flow-sensitive / per-point spectrum — and across whether lifetimes are explicit, inferred, or hidden behind library abstractions like Pin (which encodes \"address stability until destruction\" as a library type rather than a language feature).\n\nThe same axis appears in classical region systems: Cyclone uses explicit, lexically-scoped region variables on pointer types, while Spegion (ECOOP 2025) explicitly relaxes both implicitness and lexicality to bridge classical regions to NLL-style liveness.",
+      "refs": [
+        {
+          "target": "ownership#overview",
+          "type": "related"
+        },
+        {
+          "target": "pin-unpin",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "cyclone",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "spegion",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "region-based-memory#non-lexical-and-hybrid-region-models",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and design implications",
+      "tags": [
+        "tradeoffs",
+        "design-guidance",
+        "memory-safety"
+      ],
+      "content": "Borrowing can improve safety and eliminate runtime overhead, but it may increase API complexity and constrain some data-sharing patterns. The annotation/inference balance is the practical axis: Cyclone-style explicit regions cost ~6% of changed lines; Tofte-Talpin / MLKit cost zero annotations but hit pathological \"stuck\" regions; Rust NLL costs annotations only at function signatures; Hylo eliminates surface lifetimes by inferring projection lifetimes from call structure.\n\nFor language designers the practical questions are: (1) what should the static checker reject vs. defer to an operational model for `unsafe`? (2) does the language need partial-borrow expressivity (view types) before adopting more flexible borrowing? (3) is the language willing to surface lifetime annotations at API boundaries, or is the goal projection-style implicit lifetimes? (4) do borrows compose with concurrency boundaries (Pony's send-on-iso transfer) or stay local (Rust's `Send`/`Sync` orthogonality)?",
+      "refs": [
+        {
+          "target": "ownership#tradeoffs",
+          "type": "related"
+        },
+        {
+          "target": "garbage-collection#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "vale#region-borrowing-prototype",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "per-technology-records",
+      "title": "Per-technology records",
+      "tags": [
+        "borrowing",
+        "index",
+        "mechanisms"
+      ],
+      "content": "Mechanisms in the borrowing design space, each with its own per-technology record:\n\n- **Rust borrow-checker evolution**: non-lexical lifetimes (NLL) and the planned Polonius successor; the proposed view-types extension for partial-borrow expressivity.\n- **Operational aliasing models**: Stacked Borrows and the Tree Borrows successor that ground `unsafe` Rust's UB rules.\n- **Address-stability primitives**: the Pin/Unpin library mechanism encoding immobility for self-referential async state machines.\n- **Region-based borrowing ancestry**: Cyclone's explicit lexical region annotations and Spegion's implicit, non-lexical, sized-allocation reformulation.\n- **Cross-related concepts**: ownership as the broader discipline that contains borrowing; region-based memory as the structurally adjacent design space; Vale's region borrowing as a hybrid point.",
+      "refs": [
+        {
+          "target": "non-lexical-lifetimes",
+          "type": "per-technology"
+        },
+        {
+          "target": "polonius",
+          "type": "per-technology"
+        },
+        {
+          "target": "stacked-borrows",
+          "type": "per-technology"
+        },
+        {
+          "target": "tree-borrows",
+          "type": "per-technology"
+        },
+        {
+          "target": "pin-unpin",
+          "type": "per-technology"
+        },
+        {
+          "target": "view-types",
+          "type": "per-technology"
+        },
+        {
+          "target": "cyclone",
+          "type": "per-technology"
+        },
+        {
+          "target": "spegion",
+          "type": "per-technology"
+        },
+        {
+          "target": "ownership",
+          "type": "related-concept"
+        },
+        {
+          "target": "region-based-memory",
+          "type": "related-concept"
+        },
+        {
+          "target": "vale",
+          "type": "related-mechanism"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Rust reference",
+      "url": "https://doc.rust-lang.org/reference/"
+    }
+  ]
+}

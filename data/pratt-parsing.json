@@ -1,0 +1,58 @@
+{
+  "kind": "concept",
+  "name": "Pratt Parsing",
+  "aliases": ["top-down operator precedence"],
+  "summary": "Vaughan Pratt's 1973 expression-parsing algorithm: assign a binding power to each operator and dispatch through per-token nud/led functions. Composes naturally with recursive descent.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Vaughan Pratt's 1973 algorithm for expression parsing assigns a \"binding power\" (integer precedence) to each operator. The parser consists of two functions per token: `nud` (null denotation, for prefix position) and `led` (left denotation, for infix/postfix position). The core loop is remarkably simple:\n\n```\nfn parse(min_bp):\n    left = nud(next_token())\n    while bp(peek()) > min_bp:\n        left = led(left, next_token())\n    return left\n```\n\nThe key insight: recursive descent is natural for statements (which start with keywords), and Pratt parsing is natural for expressions (which start with operands). The two compose perfectly — use recursive descent at the statement level, Pratt parsing within expressions.",
+      "refs": [
+        { "target": "precedence-climbing#overview", "type": "sibling" },
+        { "target": "recursive-descent#overview", "type": "commonly-used-with" }
+      ],
+      "sources": [
+        {
+          "label": "Bob Nystrom — Pratt Parsers: Expression Parsing Made Easy",
+          "url": "https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/"
+        }
+      ]
+    },
+    {
+      "id": "binding-power-model",
+      "title": "Binding power model",
+      "tags": ["parser", "expressions", "algorithms"],
+      "content": "Each token carries an integer binding power and (potentially) two parse functions: `nud` for use in prefix position, `led` for use in infix or postfix position. Higher binding powers bind tighter, so the parser keeps consuming `led` operators while `bp(peek()) > min_bp`. Associativity is encoded by whether the recursive call uses `bp` (right-associative) or `bp + 1` (left-associative).\n\nNew operators integrate by adding entries to the token table — no grammar refactoring, no precedence-table cascade. This locality is what makes Pratt parsing extensible.",
+      "refs": [
+        { "target": "precedence-climbing#operator-handling", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "strengths",
+      "title": "Strengths and where it dominates",
+      "tags": ["parser", "expressions", "design-guidance"],
+      "content": "The main advantage is extensibility: adding a new operator requires only specifying its binding power and its `led` function. No grammar rewriting or precedence-table refactoring is required. This is why Pratt parsers dominate in language implementations that need to evolve their operator set — including Pratt's own original target (the CGOL language) and modern hand-written compilers across Rust, Swift, V8, and many others.\n\nBob Nystrom's explanation in \"Pratt Parsers: Expression Parsing Made Easy\" made the algorithm accessible to a much wider audience than Pratt's original paper, and is the common modern entry point.",
+      "refs": [
+        { "target": "recursive-descent#overview", "type": "composes-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["parser", "tradeoffs", "grammar-design"],
+      "content": "Pratt parsing is an expression-parsing strategy, not a full grammar architecture — it handles operator-rich expression forms but does not replace a grammar definition for the surrounding language. It is less declarative than grammar-first approaches: the parser's behavior lives in per-token functions, which can be harder to summarize for documentation or formal analysis.\n\nFor languages with a small, fixed operator set (C, C++, Rust expression position) precedence climbing is often less code; for languages that add operators late (Haskell user-defined operators, extensible-syntax systems), Pratt's per-token dispatch is more natural.",
+      "refs": [
+        { "target": "deterministic-ll-lr#overview", "type": "contrasts-with" },
+        { "target": "precedence-climbing#tradeoffs", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Bob Nystrom — Pratt Parsers: Expression Parsing Made Easy",
+      "url": "https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/"
+    }
+  ]
+}

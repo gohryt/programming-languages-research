@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Constraint-Based Type Checking",
+  "aliases": ["constraint-generation", "outsidein"],
+  "summary": "Separates walking the syntax (constraint generation) from solving the generated obligations. Useful when many features interact: subtyping, numeric literals, overloads, traits, effects, lifetimes, row variables, and local assumptions. OutsideIn(X) is the canonical modular variant, used by GHC for advanced features.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Constraint-based checkers separate walking the syntax from solving generated obligations. This is useful when many features interact: subtyping, numeric literals, overloads, traits, effects, lifetimes, row variables, and local assumptions.\n\nA typical pipeline is:\n\n1. create inference variables for unknowns;\n2. generate equality, subtyping, trait, effect, and region constraints;\n3. solve easy unifications eagerly;\n4. defer overloaded or ambiguous constraints;\n5. default literals and unresolved variables when policy allows;\n6. emit diagnostics with origin spans and explanation chains.\n\nThe main architectural advantage over direct Algorithm-W threading is that constraints are first-class data: they can be reordered, deferred, traced, and explained.",
+      "refs": [
+        { "target": "hindley-milner#overview", "type": "generalizes" },
+        { "target": "unification-algorithms#overview", "type": "uses" },
+        { "target": "type-classes-traits#overview", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "OutsideIn(X): Modular type inference with local assumptions", "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-outsidein.pdf" },
+        { "label": "OutsideIn(X) (Microsoft Research project page)", "url": "https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/" }
+      ]
+    },
+    {
+      "id": "outsidein-x",
+      "title": "OutsideIn(X) — modular constraint-based inference",
+      "tags": ["type-system", "inference", "ghc"],
+      "content": "OutsideIn(X) — where *X* is a parameter naming the underlying constraint domain (type equalities, type-class predicates, type-family axioms) — introduced a constraint-based approach to inference with local assumptions. The two-zone discipline keeps inference predictable in the presence of GADTs and type families: the *outer* zone uses ordinary unification; the *inner* zone admits local equality assumptions introduced by GADT pattern matches but does not let those assumptions leak outward and re-bind outer variables.\n\nThis is how GHC handles the interaction between rank-1 inference and the family of features that introduce *local* type knowledge: GADTs, type families, and equality superclasses. The *X* parameter is what makes the framework reusable: each constraint domain plugs in its own simplification rules without rewriting the inference engine.\n\nOutsideIn(X) is the most influential constraint-based design in production: directly used in GHC, indirectly visible in Rust's trait obligation framework, Scala 3's match-types inference, and TypeScript's conditional-type narrowing."
+    },
+    {
+      "id": "why-defer-and-default",
+      "title": "Deferred constraints and defaulting",
+      "tags": ["type-system", "inference", "tradeoffs"],
+      "content": "Some constraints cannot be solved at the point they are generated. Numeric literals are the classic case: `let x = 1 + 2` does not determine whether `x` is `Int`, `Word`, or `Float64` without further context. The choices are:\n\n- **defaulting**: when the program ends and a class of constraints remains unsolved, pick a default (Haskell's `Default` rules, Rust's `i32`/`f64` integer/float defaults).\n- **error**: refuse to compile and require an annotation (Standard ML in some flavours).\n- **deferred typing**: keep the constraint live and let later context resolve it (TypeScript inference, Scala implicit search).\n\nDefaulting is convenient for ergonomics but introduces non-locality — adding an unrelated declaration can change which default fires. The constraint-based architecture makes the choice *explicit* (\"this constraint defaulted to X because no other resolution was found\") rather than buried in the inference algorithm.",
+      "refs": [
+        { "target": "type-diagnostics#overview", "type": "interacts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "OutsideIn(X): Modular type inference with local assumptions", "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-outsidein.pdf" },
+    { "label": "OutsideIn(X) (Microsoft Research project page)", "url": "https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/" }
+  ]
+}

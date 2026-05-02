@@ -1,0 +1,39 @@
+{
+  "kind": "concept",
+  "name": "Scala 3 Macros",
+  "aliases": ["inline def", "quoted macros", "Scala 3 metaprogramming"],
+  "summary": "Scala 3 redesigned metaprogramming around `inline def` (function bodies inlined at typecheck) and quoted macros (`'{e}` quotations + `${e}` splices, MetaOCaml-inspired). Replaces Scala 2's deprecated whitebox/blackbox macros with a disciplined two-tier system.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Scala 3 redesigned metaprogramming around two primitives:\n\n- **`inline def`**: functions whose bodies are inlined at the call site during typechecking. Arguments can be marked `inline` to force compile-time evaluation. Unlike C++ `inline`, Scala's is semantic — certain operations only work on inline values (e.g., `constValue`).\n- **Quoted macros**: expression-level quotations (`'{ e }`) and splices (`${ e }`) inspired by MetaOCaml. A macro is a quoted-code-producing function run at compile time. Typed throughout — `Expr[Int]` is distinct from `Int`.\n\nThe design goal was to replace Scala 2's ad-hoc whitebox and blackbox macros (deprecated for portability reasons) with a disciplined two-tier system.",
+      "refs": [
+        { "target": "metaocaml#overview", "type": "inspired-by" },
+        { "target": "rust-macros#overview", "type": "compared-with" },
+        { "target": "template-haskell#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Scala 3 Metaprogramming", "url": "https://docs.scala-lang.org/scala3/reference/metaprogramming/index.html" }
+      ]
+    },
+    {
+      "id": "inline-vs-quoted",
+      "title": "inline vs quoted",
+      "tags": ["metaprogramming", "scala"],
+      "content": "**inline def** is the simple case. The compiler substitutes the body at the call site at typecheck time, with `inline` parameters becoming compile-time-known values. Pattern-matching on `inline` values is permitted; `compiletime.constValue[T]` retrieves a literal-typed value at compile time. This handles 80% of Scala 2's macro use cases (specialised arithmetic, type-level computation, default values) without a full macro system.\n\n**Quoted macros** handle the remaining 20%. A quoted macro is a function `def myMacro(x: Expr[Int])(using Quotes): Expr[Int]` that takes typed code and returns typed code. The `Quotes` context provides operations on the AST: pattern-matching on expressions, generating fresh symbols, calling the type checker. Output expressions are validated as part of macro execution, so generated code that doesn't type-check fails at the macro's call site rather than during a separate post-pass.",
+      "refs": []
+    },
+    {
+      "id": "scala-2-comparison",
+      "title": "Compared with Scala 2 macros",
+      "tags": ["scala", "tradeoffs"],
+      "content": "Scala 2's macro system had two flavours: **blackbox** (the macro's return type matches the declared signature) and **whitebox** (the macro's return type can differ from the signature, enabling runtime-shaped APIs). Whitebox macros were powerful but unportable across Scala versions and incompatible with much tooling.\n\nScala 3's quoted macros are blackbox by design — the return type is part of the signature. The expressivity loss versus whitebox is mostly recoverable through type-class derivation (`derives` clauses) and the inline/quote split. Early reports from libraries ported between Scala 2 and 3 suggest the new system is more predictable but somewhat more verbose.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Scala 3 Metaprogramming", "url": "https://docs.scala-lang.org/scala3/reference/metaprogramming/index.html" }
+  ]
+}

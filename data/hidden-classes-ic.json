@@ -1,0 +1,53 @@
+{
+  "kind": "concept",
+  "name": "Hidden Classes and Inline Caches",
+  "aliases": [
+    "hidden classes",
+    "shape transitions",
+    "V8 maps",
+    "inline caching"
+  ],
+  "summary": "Self-derived design where dynamically-typed object access is accelerated via compile-time-discovered 'shape' classes plus per-call-site inline caches. V8, SpiderMonkey, JavaScriptCore all use it. 60–100× faster monomorphic property access than naive dictionary lookups; megamorphic cliff when polymorphism dominates.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Hidden classes** (V8 calls them \"maps\"; SpiderMonkey calls them \"shapes\") and **inline caches** are the canonical optimisation pair for dynamically-typed object access. The technique originated in Self (David Ungar, Craig Chambers) and propagated to every modern JavaScript and Lua engine.\n\nMechanism: each object's actual layout is tracked as a hidden class (or shape). Two objects with the same property names in the same order share the same hidden class. Inline caches at property-access sites record the (hidden class, offset) pair from a previous access; on subsequent calls, the cache checks if the new object's hidden class matches; if so, the access is a direct memory load at the cached offset.",
+      "refs": [
+        {
+          "target": "polymorphic-inline-caches#overview",
+          "type": "extends"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Hidden Classes in V8",
+          "url": "https://v8.dev/docs/hidden-classes"
+        }
+      ]
+    },
+    {
+      "id": "monomorphic-vs-megamorphic",
+      "title": "Monomorphic / polymorphic / megamorphic",
+      "tags": [
+        "jit",
+        "optimization"
+      ],
+      "content": "**Monomorphic** call sites see only one hidden class — the cached fast path always hits, and access is essentially as fast as a static struct field load. 60–100× faster than naive dynamic dispatch.\n\n**Polymorphic** call sites see a small number of hidden classes (typically <10). The IC chains a few cases; a small linear search hits one. Still much faster than dynamic dispatch.\n\n**Megamorphic** call sites see many hidden classes. The IC fills, falls back to slow-path lookup. Performance drops by 10–100×. The \"megamorphic cliff\" is one of the JS performance sharp edges — code that touches objects with many distinct shapes loses the IC's benefit entirely.\n\nFor language designers: any dynamically-typed object system benefits from hidden classes plus IC. The key engineering challenge is the shape-transition graph that tracks how shapes evolve as properties are added; pre-V8 engines that didn't track this efficiently saw catastrophic shape-explosion on object construction patterns.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Mrale.ph — What's up with Monomorphism?",
+          "url": "https://mrale.ph/blog/2015/01/11/whats-up-with-monomorphism.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "V8 Hidden Classes",
+      "url": "https://v8.dev/docs/hidden-classes"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-sample",
+  "tag": "granularity:per-sample",
+  "name": "Granularity: per sample",
+  "description": "Mechanism activates at sampling cadence (timer/PMU overflow/signal). The signature granularity of statistical profilers.",
+  "axis": "granularity"
+}

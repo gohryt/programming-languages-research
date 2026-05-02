@@ -1,0 +1,80 @@
+{
+  "kind": "language",
+  "name": "Clean",
+  "aliases": [
+    "clean-lang"
+  ],
+  "summary": "Functional language (since the 1990s) with uniqueness types: *T means no other reference exists, destructive update is safe. Semantically distinct from linearity — Clean is about graphs, linearity about lambda terms; uniqueness is about the past, linearity about the future. The earliest production language to put a static aliasing discipline at the type-system level for the purpose of safe in-place mutation in a pure functional setting.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "clean",
+        "uniqueness-types",
+        "ownership",
+        "memory-safety",
+        "compile-time-safety"
+      ],
+      "content": "**Clean uniqueness types** (since the 1990s) use `*T` for \"no other reference exists, destructive update is safe.\" The annotation guarantees the type checker that a value is unaliased at the moment of use, so an in-place mutation does not violate referential transparency.\n\nSemantically distinct from linearity (Clean is about graphs, linearity about lambda terms; uniqueness is about the past, linearity about the future). Linear types restrict how a value *will* be used downstream; uniqueness types describe how a value *has* been used upstream. The two disciplines coincide on simple programs but diverge on graph-shaped data.",
+      "refs": [
+        {
+          "target": "ownership",
+          "type": "related"
+        },
+        {
+          "target": "linear-affine-types",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "haskell",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Clean language report 2.2",
+          "url": "https://wiki.clean.cs.ru.nl/download/html_report/CleanRep.2.2_11.htm"
+        }
+      ]
+    },
+    {
+      "id": "uniqueness-vs-linearity",
+      "title": "Uniqueness vs linearity",
+      "tags": [
+        "clean",
+        "uniqueness-types",
+        "linear-types",
+        "type-system"
+      ],
+      "content": "Uniqueness types attach to *types*; linear types attach to *arrows* or to *binders*. A `*T` in Clean is a type-level statement about the current reference graph: there is no other reference to this value right now. A linear binder, by contrast, is a statement about the future: this value will be used exactly once.\n\nThe practical consequence: uniqueness composes naturally with destructive update because the absence of aliases is exactly what destructive update requires. Linearity composes naturally with resource APIs because exactly-once use models opening and closing a handle. Clean's design picks the discipline appropriate for in-place mutation in a functional language; linear types as in Linear Haskell pick the discipline appropriate for general resource control.",
+      "refs": [
+        {
+          "target": "linear-haskell-ir",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "ownership",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "historical-significance",
+      "title": "Historical significance",
+      "tags": [
+        "clean",
+        "uniqueness-types",
+        "language-design"
+      ],
+      "content": "Clean is the earliest production language to put a static aliasing discipline at the type-system level for the purpose of safe in-place mutation in a pure functional setting. The uniqueness annotation `*World` threading through I/O — a *World value is consumed by every I/O action and a fresh one returned — is the historical predecessor of the explicit-state-passing style that survives today in Haskell's `IO` monad and in algebraic-effect systems' world-passing semantics.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Clean language report 2.2",
+      "url": "https://wiki.clean.cs.ru.nl/download/html_report/CleanRep.2.2_11.htm"
+    }
+  ]
+}

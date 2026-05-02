@@ -1,0 +1,58 @@
+{
+  "kind": "language",
+  "name": "D",
+  "aliases": ["d-lang", "dlang"],
+  "summary": "Niche systems language with rich access-modifier lattice (private/package/protected/public/export), package.d files as re-export hubs, version() conditional compilation as a language-level construct, and DUB package manager mapping packages one-to-one to D source-tree packages.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "D (Walter Bright, 2001+) is a systems language roughly contemporary with the rise of modern systems-programming languages but never reached mainstream traction despite mature implementations. The design choices are still worth recording. Memory-allocator concerns live in `data/d-allocator-api`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "module-declarations-and-package-d",
+      "title": "Module declarations and package.d re-export hubs",
+      "tags": ["d", "modules", "package-d"],
+      "content": "A D source file declares its module identity with a `module foo.bar;` line at the top. The dotted name maps to filesystem path `foo/bar.d`, similar to Java but enforced at the language level rather than by convention.\n\n**`package.d` files** act as re-export hubs: a file at `foo/package.d` is imported as `foo` and typically re-exports submodules with `public import foo.bar; public import foo.baz;`. This is similar to Rust's `mod.rs` (now `mod-name.rs`) but more declarative.",
+      "refs": [],
+      "sources": [
+        { "label": "D module specification", "url": "https://dlang.org/spec/module.html" }
+      ]
+    },
+    {
+      "id": "rich-access-modifier-lattice",
+      "title": "Rich access-modifier lattice including export",
+      "tags": ["d", "visibility", "abi"],
+      "content": "Access modifiers are unusually rich for a C-syntax language:\n\n- `private` — visible only within the same module.\n- `package` — visible within the same package (directory tree). Can be parameterized: `package(my.lib)` restricts visibility to a specific package.\n- `protected` — for class member access.\n- `public` — visible everywhere.\n- `export` — visible across shared library boundaries (relevant for `.dll`/`.so` symbol export).\n\nThe **`export` modifier** is unusual: it distinguishes \"visible to other modules within this binary\" (`public`) from \"visible across binary linking boundaries\" (`export`). This addresses a problem most languages punt on — ELF/PE export visibility — at the language level.\n\nThe lesson: a richer access-modifier lattice (private/package/protected/public/export) addresses real visibility distinctions — particularly the binary-export boundary that languages like Java and C# handle implicitly via reflection visibility and that C/C++ handle out-of-band via `__declspec(dllexport)` / visibility attributes. D made it a first-class language concern.",
+      "refs": [
+        { "target": "visibility-and-exports#visibility-granularity", "type": "example" }
+      ],
+      "sources": [
+        { "label": "D — visibility attributes", "url": "https://dlang.org/spec/attribute.html#visibility_attributes" }
+      ]
+    },
+    {
+      "id": "version-conditional-compilation",
+      "title": "version() conditional compilation and DUB",
+      "tags": ["d", "conditional-compilation", "packaging"],
+      "content": "**`version(IDENT) { ... }`** and **`debug { ... }`** blocks provide conditional compilation gated on identifiers defined at compile time (via `-version=Foo` flags). This is C's `#ifdef` reframed as a language-level construct rather than a preprocessor pass — version blocks respect normal module scoping rules. **`static if`** is the more general compile-time conditional, comparable to Zig's `comptime if`.\n\n**DUB** is D's package manager, with `dub.json` or `dub.sdl` manifests and the registry at code.dlang.org. DUB packages map one-to-one to D packages (directory trees), making the source/distribution alignment closer to Go than to Rust.",
+      "refs": [
+        { "target": "zig#overview", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "D — version", "url": "https://dlang.org/spec/version.html" },
+        { "label": "DUB", "url": "https://dub.pm/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "D module spec", "url": "https://dlang.org/spec/module.html" },
+    { "label": "D visibility attributes", "url": "https://dlang.org/spec/attribute.html#visibility_attributes" },
+    { "label": "D version", "url": "https://dlang.org/spec/version.html" },
+    { "label": "DUB", "url": "https://dub.pm/" }
+  ]
+}

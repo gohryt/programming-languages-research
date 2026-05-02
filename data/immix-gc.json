@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Immix — Mark-Region with Opportunistic Evacuation",
+  "aliases": ["Immix", "mark-region GC", "Immix collector"],
+  "summary": "Blackburn and McKinley's Immix (PLDI 2008) is a mark-region collector that allocates and reclaims memory in contiguous regions at coarse block grain when possible and finer line grain otherwise — defining a fourth GC family alongside semi-space, mark-sweep, and mark-compact.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "mark-region", "regional-gc"],
+      "content": "Blackburn and McKinley's **Immix** (PLDI 2008) is a mark-region collector that allocates and reclaims memory in contiguous regions at a coarse block grain when possible and finer line grain otherwise — defining a fourth GC family alongside semi-space, mark-sweep, and mark-compact. The core insight is that bump allocation, reuse, and selective compaction can coexist in one heap structure if the heap is partitioned at two levels (blocks and lines).\n\nImmix is foundational: the basis for Rust's experimental GC, Scala Native, MMTk's flagship plan, Ruby/Julia MMTk bindings, and LXR.",
+      "refs": [
+        { "target": "garbage-collection#overview", "type": "instance-of" },
+        { "target": "lxr-gc", "type": "extended-by" },
+        { "target": "mmtk", "type": "consumed-by" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Block/line hierarchy and opportunistic evacuation",
+      "tags": ["mark-region", "compacting-gc", "regional-gc"],
+      "content": "Two-level block (32 KB) / line (128 B) hierarchy enables bump-allocation into partially-free blocks. **Opportunistic evacuation** mixes copying and marking in a single pass — the collector evacuates only fragmented source blocks when target space is available, otherwise marks in place. The same allocator path serves mutator and collector, achieving 7–25% improvement over canonical collectors.\n\nThe block-and-line structure is what makes Immix attractive as a substrate for other collectors: request-private GC (Iso) uses 32 KB blocks as request-scoped reclamation units; LXR layers reference counting on top of the same hierarchy."
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment and downstream consumers",
+      "tags": ["garbage-collection", "research"],
+      "content": "Immix is the substrate for several production and research runtimes:\n\n- **MMTk** ships Immix, GenImmix, and StickyImmix as flagship plans.\n- **Ruby 3.4 Modular GC** (January 2025) ships an MMTk-based Immix experimental plan.\n- **Scala Native** uses Immix as its default collector.\n- **LXR** (PLDI 2022) layers reference counting on top of Immix.\n- **Iso** (PLDI 2025) reuses Immix's 32 KB block structure for request-private reclamation.\n\nStatus (as of 2026-04): production-ready as a GC algorithm; deployed via MMTk and language-specific ports.",
+      "refs": [
+        { "target": "mmtk", "type": "implemented-by" },
+        { "target": "iso-gc", "type": "extended-by" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Immix — Mark-Region Collector (PLDI 2008)", "url": "https://www.steveblackburn.org/pubs/papers/immix-pldi-2008.pdf" }
+  ]
+}

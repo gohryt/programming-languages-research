@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Reflections on Trusting Trust",
+  "aliases": ["Thompson trojan", "self-hosting compiler attack"],
+  "summary": "Ken Thompson's 1984 Turing Award lecture: a self-hosting compiler can contain a Trojan that reproduces itself into future versions of the compiler, with no trace in source code. The classic attack illustrates why bootstrapping chains matter — 'source available' doesn't imply 'verifiable' unless the whole chain is reproducible.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ken Thompson's Turing Award lecture (\"Reflections on Trusting Trust\", 1984) showed that a self-hosting compiler can contain a Trojan that reproduces itself into future versions of the compiler, with no trace in source code. The classic attack: modify the compiler to insert a backdoor into `login`, and *also* insert code that re-inserts the modification when compiling itself. Once the modified compiler exists, the source can be clean — but every future build is compromised.",
+      "refs": [
+        { "target": "mrustc#overview", "type": "addressed-by" },
+        { "target": "gnu-mes-stage0#overview", "type": "addressed-by" }
+      ],
+      "sources": [
+        { "label": "Reflections on Trusting Trust (Thompson, 1984)", "url": "https://www.cs.cmu.edu/~rdriley/487/papers/Thompson_1984_ReflectionsonTrustingTrust.pdf" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — bootstrapping chains matter",
+      "tags": ["security", "supply-chain"],
+      "content": "The lesson isn't just security-theoretic; it illustrates why bootstrapping chains matter. A language's trust chain reaches back to whatever compiler was used to bootstrap the first version, which was compiled by yet another tool, and so on. \"Source available\" doesn't imply \"verifiable\" unless the whole chain is reproducible.\n\nFor language designers, the practical answer is to design the bootstrap chain explicitly: a small, audit-able stage-0 compiler in a different language (mrustc-style); a fully-source-bootstrapped path (GNU Mes / stage0); or both. Self-hosting alone is insufficient for trust; the path from no-prior-binary to full-compiler must be reproducible.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Thompson 1984", "url": "https://www.cs.cmu.edu/~rdriley/487/papers/Thompson_1984_ReflectionsonTrustingTrust.pdf" }
+  ]
+}

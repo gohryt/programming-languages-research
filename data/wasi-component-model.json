@@ -1,0 +1,59 @@
+{
+  "kind": "framework",
+  "name": "WASI / Wasm Component Model",
+  "aliases": ["wasi", "wasi-preview-2", "wasip2", "component-model", "wit", "wasm-component-model"],
+  "summary": "WASI Preview 2 (launched January 2024) is built on the Wasm Component Model and the WIT IDL. Modules have *zero ambient authority*; every system resource (filesystem dirs, sockets, clocks) is received as an explicit capability handle through typed component-model `world`s. Preview 3 adds `future`/`stream` (RC September 2025). The most consequential modern industrial deployment of ocap principles.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["wasi", "wasm", "wasm-capability", "resource-handle", "no-ambient-authority", "component-model"],
+      "content": "**WASIp2** (launched January 2024) is built on the **Wasm Component Model** and the **WIT** (Wasm Interface Type) IDL. WASI modules have *zero ambient authority* and receive every system resource — filesystem directories, sockets, clocks, random sources, env vars — as an explicit capability handle passed through typed component-model `world`s.\n\nThe Component Model layers above core Wasm a typed binary-level component substrate; WIT plays the role of ML signatures or Newspeak module parameters at the artifact boundary. A component declares which capabilities it imports and which it exports; the host (Wasmtime, WAMR, Wasmer, WAVM, Jco) is responsible at instantiation for granting only the imports the component is authorised to use. This is the most consequential modern deployment of ocap principles in industry tooling.",
+      "refs": [
+        { "target": "capability-based-memory", "type": "instance-of" },
+        { "target": "webassembly", "type": "built-on" },
+        { "target": "module-systems", "type": "instance-of" },
+        { "target": "module-identity", "type": "related" }
+      ],
+      "sources": [
+        { "label": "WASI Preview 2 docs", "url": "https://github.com/WebAssembly/WASI/blob/main/docs/Preview2.md" }
+      ]
+    },
+    {
+      "id": "resource-handles",
+      "title": "Resource handles and capability discipline",
+      "tags": ["resource-handle", "unforgeable-handle", "capability-confinement", "wasm-capability"],
+      "content": "**Resource handles** in WIT are first-class typed references that owning components can transfer; the canonical ABI prohibits raw memory sharing across components. This is the binary-level analogue of E's object references: the handle is unforgeable from inside the Wasm sandbox, and authority is conveyed only by passing the handle through an exported function.\n\n**Host grants** are positive enumerations at instantiation, not ACL lookups at use: `wasmtime --dir /data::readonly` grants exactly the listed capabilities, and the runtime cannot escalate. This is the inverted-by-default discipline — the difference from POSIX is that nothing is implicitly granted.\n\n**Virtualization / polyfill**: a component implementing `wasi:filesystem` can intercept and constrain another component's file access — capabilities compose like reference attenuation in E. A fully sandboxed chroot, a read-only overlay, an audit-logging proxy, or a virtual filesystem all become components that wrap and re-export the same WIT interface, with no special framework required.",
+      "refs": [
+        { "target": "e-language", "type": "rediscovers" },
+        { "target": "import-semantics", "type": "related" },
+        { "target": "visibility-and-exports", "type": "related" }
+      ]
+    },
+    {
+      "id": "preview-3-and-async",
+      "title": "Preview 3 — futures and streams",
+      "tags": ["wasm", "component-model", "production"],
+      "content": "Status (as of 2026-04): **WASI Preview 3** is in release-candidate state (RC September 2025). The flagship additions are `future` and `stream` types in WIT — typed asynchronous values that cross component boundaries with the same capability discipline as resource handles. This brings async I/O, server-sent streams, and long-running RPC into the typed component substrate without baking host-specific async runtimes into the boundary.\n\nProduction usage as of 2026-04: serverless and edge deployments at Cloudflare Workers, Fastly Compute@Edge, and Fermyon Spin all run WASI Preview 2 components in production; multiple JS-on-Wasm story shipped on the same substrate. Cross-language polyglot composition (Rust calling Python via component imports, JS calling Go) is now economically viable because the Component Model standardises the shape of cross-language calls without C ABI shenanigans.",
+      "refs": [
+        { "target": "wamr", "type": "implementation" },
+        { "target": "wasmer", "type": "implementation" },
+        { "target": "wavm", "type": "implementation" }
+      ]
+    },
+    {
+      "id": "modular-substrate",
+      "title": "Component Model as a modern module system",
+      "tags": ["component-model", "module-systems", "wasm", "module-capability"],
+      "content": "The *module-system* angle: components are a typed binary-level module substrate, WIT is the equivalent of ML signatures at the artifact boundary, and the Component Model is the most modern realisation of capability-scoped modularity in mainstream tooling. Where Newspeak treated each top-level class as a parameterised module, the Component Model treats each component as a parameterised module — and for the same reason: instantiation is the only place where authority can be granted, so making instantiation an explicit, typed, capability-passing operation makes the whole authority graph visible to tooling.\n\nThis is also the design surface where Cap'n Proto-style typed binary IDLs are converging with module systems: WIT, Cap'n Proto schema, and Protobuf descriptors are the same artifact category — typed binary-level module signatures — and the Component Model is the most fully realised example of using such a signature as the security boundary as well as the language-interoperability boundary.",
+      "refs": [
+        { "target": "capn-proto", "type": "compared-with" },
+        { "target": "newspeak-language", "type": "rediscovers" },
+        { "target": "module-systems", "type": "modern-realisation" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "WASI Preview 2", "url": "https://github.com/WebAssembly/WASI/blob/main/docs/Preview2.md" }
+  ]
+}

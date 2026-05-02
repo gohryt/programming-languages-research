@@ -1,0 +1,59 @@
+{
+  "kind": "language",
+  "name": "C# / .NET",
+  "aliases": ["dotnet-csharp"],
+  "summary": "Microsoft's CLR language with namespaces (pure naming) plus assemblies (binary distribution and visibility boundary); InternalsVisibleTo grants friend access to a named consumer; richer visibility lattice than Java with public/internal/protected/private/protected-internal/private-protected; TypeForwardedTo enables ABI-preserving assembly splits.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "C# is the canonical CLR language; .NET is the platform. Compiler/runtime aspects live in `data/dotnet-r2r` (ahead-of-time ReadyToRun), `data/dotnet-edit-and-continue` (live code replacement). This record covers the language-level module-system surface (namespaces + assemblies).",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "java#overview", "type": "comparable-to" }
+      ]
+    },
+    {
+      "id": "namespaces-and-assemblies",
+      "title": "Namespaces and assemblies",
+      "tags": ["csharp", "dotnet", "module-systems"],
+      "content": "The CLR analogue of Java's split is **namespaces** plus **assemblies**. Namespaces (`namespace Foo.Bar { ... }` or, since C# 10, file-scoped `namespace Foo.Bar;`) are pure naming hierarchies — they do not correspond to artifacts and are not visibility boundaries beyond the conventional `internal` access level. Assemblies are the actual unit of distribution, deployment, and visibility enforcement: typically a `.dll` or `.exe` containing compiled IL, metadata, and a strong-name or version identity. The mapping between namespaces and assemblies is many-to-many. One assembly can contribute types to many namespaces; one namespace can be assembled from types in many assemblies.\n\nThe visibility levels are richer than Java's. C# offers `public`, `internal` (visible only within the assembly), `protected`, `private`, `protected internal` (the union: same assembly OR derived class in any assembly), and `private protected` (the intersection: derived class within the same assembly). The assembly is therefore the meaningful encapsulation boundary, with the namespace serving primarily as a naming concern.",
+      "refs": [
+        { "target": "visibility-and-exports#visibility-granularity", "type": "example" }
+      ],
+      "sources": [
+        { "label": "C# namespaces", "url": "https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/namespaces/" },
+        { "label": ".NET assemblies", "url": "https://learn.microsoft.com/en-us/dotnet/standard/assembly/" }
+      ]
+    },
+    {
+      "id": "internalsvisibleto-and-strong-naming",
+      "title": "InternalsVisibleTo and strong naming",
+      "tags": ["csharp", "friend-access", "assembly-identity"],
+      "content": "Two CLR-specific mechanisms shape how this plays out in practice:\n\n- **`[InternalsVisibleTo(\"OtherAssembly\")]`** — a friend assembly attribute that grants `internal` access to a specifically named consumer. This is the canonical way to expose internals to a sibling test assembly without making them public to the world. The named consumer can optionally include a public-key token, restricting friend access to strong-named callers.\n- **Strong naming and the GAC (Global Assembly Cache)** — a legacy mechanism for binding assembly identity to a cryptographic public key plus version, enabling side-by-side deployment of multiple versions. The .NET Core / .NET 5+ ecosystem has largely moved away from the GAC toward NuGet packages and per-application directories, but strong naming remains a versioning primitive in places.",
+      "refs": [],
+      "sources": [
+        { "label": "InternalsVisibleTo attribute", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.internalsvisibletoattribute" }
+      ]
+    },
+    {
+      "id": "type-forwarded-to",
+      "title": "TypeForwardedTo — assembly evolution",
+      "tags": ["csharp", "abi", "compatibility"],
+      "content": ".NET also supports **assembly-level visibility shaping** via `[assembly: TypeForwardedTo(typeof(Foo))]`, which lets one assembly redirect a type reference to another. This is how the platform splits `mscorlib.dll` into `System.Runtime.dll` and friends across .NET versions without breaking compiled binaries — the type identity migrates while consumer references continue to compile.\n\nFor a language designer, `TypeForwardedTo` is a useful production data point: it shows that **a stable type-identity model can decouple where types are physically defined from where consumers refer to them**, enabling platform refactoring without breaking the API surface."
+    },
+    {
+      "id": "design-comparison-with-jpms",
+      "title": "Design comparison with JPMS",
+      "tags": ["csharp", "design-guidance"],
+      "content": "Compared with JPMS, .NET's modularity is structurally similar (assembly ≈ module artifact, `internal` ≈ package-private) but architecturally far less ambitious. There is no language-level dependency declaration like `requires`; assembly references live in the project file (`.csproj`) and the package manager (NuGet). There is no notion analogous to qualified `exports ... to` beyond `InternalsVisibleTo`. There is no language-enforced reads-graph. The trade-off is that .NET avoided JPMS-scale ecosystem disruption, at the price of leaving the assembly-as-module abstraction quieter and more convention-shaped.\n\nThe design lesson: CLR-style \"the binary artifact is the encapsulation boundary, the source-level namespace is just naming\" is workable for decades if the language never tries to enforce more. But it leaves visibility weaker than ML or Rust, leans heavily on tooling (NuGet, MSBuild) for dependency management, and provides no built-in mechanism for the platform to evolve its internal type layout safely without `TypeForwardedTo`-style retrofits."
+    }
+  ],
+  "sources": [
+    { "label": "C# namespaces", "url": "https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/namespaces/" },
+    { "label": ".NET assemblies", "url": "https://learn.microsoft.com/en-us/dotnet/standard/assembly/" },
+    { "label": "InternalsVisibleTo", "url": "https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.internalsvisibletoattribute" },
+    { "label": "internal keyword", "url": "https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/internal" }
+  ]
+}

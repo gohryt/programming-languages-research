@@ -1,0 +1,41 @@
+{
+  "kind": "concept",
+  "name": "Forth Metacompilation",
+  "aliases": ["metacompilation", "lbForth", "Gforth cross-compiler"],
+  "summary": "A Forth system bootstrapped in two phases: a small seed metacompiler in a host language (C, Lisp) compiles a minimal Forth kernel; a Forth-written metacompiler then regenerates the full system. After phase 2, the host-language seed is no longer needed. lbForth (Lars Brinkhoff) is the canonical modern example.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Distinct from the bootstrapping coverage in `data/trusting-trust` is a pattern unique to the Forth tradition: **metacompilation**. A Forth system is bootstrapped in two phases. A \"seed\" metacompiler — typically written in a host language (C, Lisp) — first compiles a minimal Forth kernel with a handful of primitive CODE words. A *Forth-written* metacompiler then regenerates the full Forth system from source, including the metacompiler itself. After the second phase, the host-language seed is no longer needed.",
+      "refs": [
+        { "target": "trusting-trust#overview", "type": "addresses" },
+        { "target": "gnu-mes-stage0#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "lbForth (Lars Brinkhoff)", "url": "https://github.com/larsbrinkhoff/lbForth" }
+      ]
+    },
+    {
+      "id": "lbforth",
+      "title": "lbForth — the canonical example",
+      "tags": ["forth", "bootstrap"],
+      "content": "**lbForth** (Lars Brinkhoff) is the canonical modern example. The bootstrap chain is:\n\n1. **12 primitive C words** plus a small Lisp-written metacompiler (using SBCL, CLISP, CCL, or ECL) produce an initial Forth targeting C.\n2. The resulting Forth runs a *Forth-written* metacompiler that regenerates the full system.\n3. The same Forth metacompiler retargets to produce native kernels for Linux (x86), Windows, ARM, RISC-V, 68000, PDP-11, and asm.js, plus cross-compilers for 6502, 8051, AVR, Cortex-M, MSP430, PDP-8, PIC, and STM8.\n\nAll retargetability lives in a single architecture-specific file (`nucleus.fth`) plus an assembler written in Forth. Higher-level words live in portable `kernel.fth`. Adding a new architecture means writing one nucleus file and an assembler module — everything else is compiled from portable source.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — retargetable compilers in tiny code budgets",
+      "tags": ["language-design", "bootstrap"],
+      "content": "Why this is distinct from the trust-chain bootstrapping in `data/trusting-trust`: that body of work focused on breaking the Thompson trust chain (`data/mrustc`, `data/gnu-mes-stage0`). Forth metacompilation is instead about **producing retargetable compilers in very small code budgets**. The same Forth kernel compiles to dozens of architectures from a handful of target-specific files, because the compiler itself is written in the language it compiles.\n\nThe transferable pattern for multi-architecture embedded deployment is to keep target-specific code isolated to a small plug-in module, write the compiler in the source language, and bootstrap once per new target rather than reimplementing the compiler.",
+      "refs": [],
+      "sources": [
+        { "label": "Gforth Cross-Compiler Manual", "url": "https://gforth.org/manual/Cross-Compiler.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "lbForth", "url": "https://github.com/larsbrinkhoff/lbForth" }
+  ]
+}

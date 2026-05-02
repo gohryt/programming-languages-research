@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "JavaScript Source Maps",
+  "aliases": ["source maps", "ECMA-426"],
+  "summary": "ECMA-426 source-map format: VLQ delta-encoded Base64 mappings between minified/transpiled JavaScript and original source. Bidirectional lookup via binary search on sorted segments. Supports both 'jump to source' (debugger) and 'jump to generated' (breakpoint) workflows.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "JavaScript source maps (standardised as ECMA-426 in 2024) encode mappings between minified or transpiled JavaScript and its original source code. A source map is a JSON file containing a `version`, list of `sources`, optional `names`, and a `mappings` string — the dense representation that does the actual work.\n\nFor a 1 MB minified bundle, the source map is typically 200–500 KB — smaller than the original source, large compared to the bundle itself. The compactness comes from VLQ-encoded deltas; the regularity comes from the fact that minification does not deeply reorder code.",
+      "refs": [
+        { "target": "bytecode-source-tables#overview", "type": "bytecode-analogue" },
+        { "target": "dwarf-debug-info#overview", "type": "native-code-analogue" }
+      ],
+      "sources": [
+        { "label": "ECMA-426 Source Map Format", "url": "https://tc39.es/ecma426/" }
+      ]
+    },
+    {
+      "id": "vlq-delta-encoding",
+      "title": "VLQ delta encoding",
+      "tags": ["compression", "encoding"],
+      "content": "The `mappings` string is a sequence of segments separated by commas (within a generated line) and semicolons (between generated lines). Each segment encodes up to five VLQ-encoded fields: generated column delta (reset per line), source file index delta, original line delta, original column delta, and optional name index delta.\n\nVLQ (Variable Length Quantity) is a Base64 encoding where each character carries 5 payload bits plus a continuation bit. Small deltas (which dominate in practice) fit in a single character; larger deltas chain multiple characters. Each segment's deltas are relative to the previous segment, so a segment that maps to the same source file with consecutive offsets is just a few characters.\n\nThe regularity is the load-bearing property: in minified JavaScript, consecutive generated positions almost always map to consecutive original positions, because minification renames identifiers and strips whitespace but does not substantially reorder statements. Each delta is typically 0 to 2 Base64 characters, giving an effective ratio of source-map bytes to original-source bytes of around 0.2 to 0.5.",
+      "refs": []
+    },
+    {
+      "id": "bidirectional-lookup",
+      "title": "Bidirectional lookup",
+      "tags": ["debugger", "tooling"],
+      "content": "Source-map consumers need both directions: **generated→original** (\"the user clicked on this minified code, show me the original\") and **original→generated** (\"the user set a breakpoint in the original source, find the matching position in the running bundle\"). Both are implemented via binary search on the segment list, sorted by generated position for the first direction and by original position for the second.\n\nThis enables both \"jump to source\" (click on minified code, see original) and \"jump to generated\" (set breakpoint in source, find generated location). Modern browsers, source-aware bundlers (esbuild, Rolldown, swc, Turbopack), and language tools (TypeScript, Babel) all support both directions transparently.\n\nECMA-426 (ratified 2024) reduced source-map sizes by approximately 50% versus the v2 format through more aggressive delta encoding and a tighter segment layout. The format is also extensible: optional sections support function-name maps, scope maps, and source-language information for non-JavaScript inputs (TypeScript, JSX, CoffeeScript) compiled to JavaScript.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ECMA-426", "url": "https://tc39.es/ecma426/" }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Refinement Types",
+  "aliases": ["predicate-types", "smt-backed-types"],
+  "summary": "Logical predicates attached to base types: array bounds, non-empty lists, units of measure, state protocols, security properties. SMT-backed checking increases power but introduces solver performance, predictability, and diagnostic challenges. Production-viable for narrow well-specified domains; broad-domain refinement remains research-grade.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Refinement types attach logical predicates to base types. They can express array bounds, non-empty lists, units of measure, state protocols, and security properties. SMT-backed checking increases power but introduces solver performance, predictability, and diagnostic challenges.\n\nThe canonical signature `{v: Int | v > 0}` is a *positive integer* — a refinement of `Int` whose values satisfy the predicate `v > 0`. Calling a function expecting `{v: Int | v > 0}` with a regular `Int` requires a proof obligation; the refinement-type checker discharges it via the SMT solver, abstract interpretation, or programmer-provided proof.",
+      "refs": [
+        { "target": "occurrence-typing#smt-extensions", "type": "generalizes" },
+        { "target": "liquid-haskell#overview", "type": "exemplified-by" },
+        { "target": "dafny#overview", "type": "exemplified-by" },
+        { "target": "stainless#overview", "type": "exemplified-by" },
+        { "target": "flux-rust#overview", "type": "exemplified-by" },
+        { "target": "fstar#overview", "type": "exemplified-by" },
+        { "target": "whiley#overview", "type": "exemplified-by" }
+      ]
+    },
+    {
+      "id": "design-placement",
+      "title": "Design placement — optional layer or core type system",
+      "tags": ["type-system", "language-design"],
+      "content": "The main trade-off is *placement*: refinement types as an optional verification layer impose no cost on programs that ignore them; integrating them into the core type checker raises the question of decidability, timeouts, trusted axioms, and reproducible builds.\n\nProduction systems span the placement spectrum:\n\n- **Optional layer over an existing language**: LiquidHaskell (Haskell), Stainless (Scala), Flux (Rust). The base language is unchanged; the refinement checker is a separate tool that can be skipped.\n- **Core verification language**: Dafny, Whiley, F\\*. Refinement types are part of the language design; programs that pass type checking carry verification by construction.\n- **Hybrid with trusted boundary**: F\\* compiles to OCaml, F#, JavaScript, or low-level C with verified boundary contracts; the refinement-checked core is trusted, and the boundary is what client code interacts with.\n\nFor language designers, the practical question is whether refinement is *opt-in* (programmer chooses to verify a function or module) or *opt-out* (every function must be checked, with `assume` or `axiom` escape hatches for unverified code).",
+      "refs": [
+        { "target": "verification-intermediate-languages#overview", "type": "compiled-via" }
+      ]
+    },
+    {
+      "id": "production-viability",
+      "title": "Production viability — narrow domains succeed",
+      "tags": ["type-system", "verification"],
+      "content": "The 2026 design lesson: **refinement types are now production-viable for narrow well-specified domains** (cryptographic primitives, access control, parser combinators, sorting) where the refinement predicate is small, the cost of a wrong implementation is high, and the SMT solver has a fast path for the relevant theory.\n\nThe largest production deployments illustrate the pattern:\n\n- **AWS IAM policy engine** — ~10 KLOC of Dafny replacing C++; access-control predicates are linear in the number of rules and discharge cleanly via SMT.\n- **Project Everest / HACL\\*** — F\\* refinement types verifying low-level cryptographic primitives; the predicates capture buffer bounds and word-arithmetic invariants the SMT solver handles well.\n- **Cloudflare proxy authority logic** — Dafny-verified policy engine.\n- **Linux kernel verification** — increasing use of Dafny and similar tools for narrow correctness-critical kernel modules.\n\nStatus (as of 2026-04): broad-domain refinement remains research; narrow-domain refinement has shipped at significant scale.",
+      "refs": [
+        { "target": "dafny#overview", "type": "exemplifies-narrow-domain-success" },
+        { "target": "fstar#overview", "type": "exemplifies-cryptographic-domain" }
+      ]
+    }
+  ]
+}

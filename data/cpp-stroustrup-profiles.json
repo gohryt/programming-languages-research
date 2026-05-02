@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Stroustrup's Profiles Framework",
+  "aliases": ["C++ Profiles", "P3081", "P3589"],
+  "summary": "Bjarne Stroustrup's framework of opt-in, scope-applicable bundles of guarantees (bounds, type, lifetime, arithmetic) that a conforming compiler must enforce — restrictions on existing C++ rather than new syntax, with the explicit goal of fixing existing code by recompilation. Forwarded into a non-normative language safety white paper after failing to land in C++26.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cpp", "cpp-safety", "wg21", "iso-cpp", "recompile-fix"],
+      "content": "Profiles are opt-in, scope-applicable bundles of guarantees (bounds, type, lifetime, arithmetic) that a conforming compiler must enforce — restrictions on existing C++ rather than new syntax, with the explicit goal of \"fixing existing code by recompilation.\" Three retained syntactic constructs in P3589: `[[profiles::enforce(...)]]`, `[[profiles::suppress(...)]]`, and the post-Hagenberg `[[profiles::exempt]]` for whole-header opt-out. Initial profiles (P3081 R2): `std::type`, `std::bounds`, `std::lifetime`, plus aggregate `std::strict`. Each rule must be decidable at compile time (allowing injected runtime checks).",
+      "refs": [
+        { "target": "cpp-lifetime-profile", "type": "related" },
+        { "target": "cpp-hardened-stl", "type": "related" },
+        { "target": "cpp-safety-profiles-resolution", "type": "related" }
+      ]
+    },
+    {
+      "id": "framing",
+      "title": "Stroustrup's framing",
+      "tags": ["cpp-safety", "wg21", "design-guidance"],
+      "content": "Stroustrup's framing (P3651): profiles do not change valid-program semantics, are independent of new features, and trace back decades to Core Guidelines work. The position is that ambient semantics should not change for existing programs, only that conforming compilers must reject more code in scopes annotated with `[[profiles::enforce(...)]]`.\n\nThis is the philosophical inverse of Safe C++: where Safe C++ introduces a viral `safe`-mode with a parallel `std2` library and Rust-style borrow checking, Profiles claims existing C++ can be made safer through recompilation + restriction + library hardening, without aliasing-aware language extensions.",
+      "refs": [
+        { "target": "safe-cpp", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "P3651 Stroustrup — Profiles framing", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3651r0.pdf" }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["cpp-safety", "cpp26", "wg21"],
+      "content": "Status (as of 2026-04): not adopted normatively for C++26; forwarded instead into the parallel language safety white paper. Gabriel Dos Reis has an experimental implementation, and broad VS analyzer support exists for ~4 Core Guidelines profiles already. The pragmatic interim is library hardening (see hardened libc++ / MSVC STL / libstdc++) which *did* ship normatively in C++26 — that's where the actual user-facing safety improvement is shipping while Profiles wait.",
+      "refs": [
+        { "target": "cpp-hardened-stl", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "P3081 Stroustrup Profiles R2", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3081r2.pdf" },
+    { "label": "P3589 Profiles syntax", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3589r2.pdf" },
+    { "label": "P3651 Stroustrup — Profiles framing", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3651r0.pdf" }
+  ]
+}

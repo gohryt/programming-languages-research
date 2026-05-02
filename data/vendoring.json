@@ -1,0 +1,69 @@
+{
+  "kind": "concept",
+  "name": "Vendoring and Mirroring",
+  "aliases": [
+    "mirroring"
+  ],
+  "summary": "Two approaches to making package builds independent of external registry availability: vendoring commits dependency source into the project's own repository (Go's first-class go mod vendor); mirroring runs an internal copy of a public registry (Artifactory, Nexus, Verdaccio, Cloudsmith).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Vendoring** is the practice of committing copies of dependency source into the project's own repository, so builds do not depend on external registries at all. **Mirroring** is the practice of running an internal copy of a public registry, often with content auditing or version pinning. Both are responses to the same underlying observation: registry availability is a build-graph concern, and a build that depends on an external registry being reachable can fail for reasons unrelated to the project's code.",
+      "refs": [
+        {
+          "target": "package-management#overview",
+          "type": "complements"
+        },
+        {
+          "target": "registries#overview",
+          "type": "alternative-to"
+        }
+      ]
+    },
+    {
+      "id": "vendoring",
+      "title": "Vendoring",
+      "tags": [
+        "vendoring",
+        "build-systems",
+        "reproducibility"
+      ],
+      "content": "Go has the most mature vendoring story: `go mod vendor` writes all dependencies into `vendor/`, and the Go toolchain uses them transparently if present. This is the canonical \"vendoring as a first-class workflow\" model — the go tool treats `vendor/` as authoritative without requiring extra flags or build-system reconfiguration.\n\nOther ecosystems support vendoring via tooling but treat it as exceptional rather than routine. Cargo has `cargo vendor` (writes deps to `vendor/` and emits a config snippet to use them); npm/pnpm have ecosystem patterns for committing `node_modules`; PyPI has no canonical pattern (most teams use mirroring instead).",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Go vendoring reference",
+          "url": "https://go.dev/ref/mod#vendoring"
+        }
+      ]
+    },
+    {
+      "id": "mirroring",
+      "title": "Mirroring",
+      "tags": [
+        "mirroring",
+        "registries",
+        "enterprise"
+      ],
+      "content": "Artifactory, Nexus, and self-hosted Verdaccio (npm), Sonatype Nexus (Maven, npm, PyPI), and Cloudsmith are commercial or open-source registry mirrors used by enterprises that cannot allow direct registry access from build infrastructure. Mirroring centralises the failure mode (one mirror is reachable, but if it goes down, all builds depending on it fail).\n\nThe enterprise rationale is usually a combination of (a) air-gapped network requirements, (b) supply-chain auditing (block known-malicious versions before they reach developers), and (c) bandwidth/latency optimisation (single inbound connection from the registry, fan-out to internal CI).",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Sonatype Nexus Repository",
+          "url": "https://www.sonatype.com/products/sonatype-nexus-repository"
+        }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — registry availability is a build concern",
+      "tags": [
+        "design-guidance",
+        "build-systems"
+      ],
+      "content": "The design lesson is that **registry availability is a build-graph concern**. A build that depends on an external registry being reachable can fail for reasons unrelated to the project's code. Vendoring eliminates this; mirroring centralises the failure mode.\n\nAt minimum, a new package manager should support vendoring as a first-class workflow (copying dependencies into the project's own repo) so hermetic builds are achievable. Cargo's `cargo vendor`, Go's `go mod vendor`, and the broader pattern of \"point the toolchain at a local directory and stop talking to the internet\" are the production-validated answer. New ecosystems should design for this from day 1 rather than retrofit it after the first major outage."
+    }
+  ]
+}

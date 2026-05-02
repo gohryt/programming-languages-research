@@ -1,0 +1,62 @@
+{
+  "kind": "concept",
+  "name": "Module Identity",
+  "aliases": [],
+  "summary": "Determines what an import path or module name actually denotes and how stable that meaning remains across tools and environments; design choices span filesystem-path, declared-name, package-qualified, URL-shaped (Deno, Go), and content-addressed identity (Nix flakes).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Module identity is about what makes two imports refer to the same source-level unit. It matters because identity underpins caching, linking, documentation, conflict handling, and the ability of tools to build stable semantic references.\n\nWhen two pieces of code both say they import `foo.bar`, what makes that the *same* `foo.bar`? Some systems say the answer is **filesystem path**. Others say it is **declared module name**. Others say it is **package-manifest identity plus path inside the package**. Still others incorporate URLs, registry paths, or major-version suffixes into identity. Identity influences caching, dependency resolution, reproducible builds, documentation links, binary compatibility, and conflict handling between different versions of \"the same\" library.",
+      "refs": [
+        { "target": "module-systems#core-design-axes", "type": "related" },
+        {
+          "target": "package-management#module-identity-vs-package-identity",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "identity-models",
+      "title": "Identity models — Rust, Go, Deno",
+      "tags": ["modules", "identity", "comparative-design"],
+      "content": "Module identity may be tied to filesystem layout, declared names, package-qualified paths, or other naming authorities. The chosen model determines whether source structure, import syntax, and distribution structure align or diverge.\n\n**Rust** layers identity: package (Cargo) → crate (compilation unit) → module tree → declarations. The three-level layering is unusual and deliberate.\n\n**Go's Semantic Import Versioning** is a particularly strong case: package import paths are built from module path plus directory path, and *major version is baked into the path itself for v2+*. So `github.com/foo/bar/v2/baz` is a different import than `github.com/foo/bar/baz`. The upside is reproducibility and clarity; the downside is that package-manager policy leaks into source identity more directly than in Rust.\n\n**Deno** (Ryan Dahl, 2018+) takes a position no other entry takes: **module identity is an HTTPS URL, and there is no central registry**. An import statement is `import { serve } from \"https://deno.land/std@0.220.0/http/server.ts\";` — the URL is the canonical name, the version is in the path. Modules are content-addressed via SHA-256 in `deno.lock`, downloaded on first use, and cached in a per-user directory under `$DENO_DIR`. **Subresource integrity by default**: an import that resolves to bytes whose hash does not match the lock file is rejected at load. The lesson generalises: **content-addressed URLs as module identity** eliminate registry-name-squatting and registry-availability problems, at the cost of giving up centralised discovery affordances.\n\n**Nix flakes** take this further: every input is content-addressed via *narHash* (a hash of the unpacked filesystem tree, not just the tarball). Two builds against the same `flake.lock` produce identical outputs byte for byte, regardless of when or where they run.",
+      "refs": [
+        { "target": "rust#tooling", "type": "example" },
+        { "target": "go#packaging", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Deno modules", "url": "https://docs.deno.com/runtime/fundamentals/modules/" },
+        { "label": "Nix flakes", "url": "https://nixos.wiki/wiki/Flakes" }
+      ]
+    },
+    {
+      "id": "hierarchy-and-predictability",
+      "title": "Hierarchy and predictability",
+      "tags": ["namespaces", "modules", "tooling"],
+      "content": "A hierarchy is useful only if users and tools can predict which hierarchy matters. Filesystem trees, declared namespace trees, and package trees may overlap or diverge, and ambiguity between them makes navigation and tooling harder.\n\nGo enforces this strictly — package-per-directory rule means filesystem structure materially determines package identity. Rust's `mod` declarations create logical modules but the filesystem must satisfy them. Python's namespace packages (PEP 420) synthesize package structure from the search path, which is elegant in distribution terms but makes identity and resolution loader-sensitive.\n\nThe practical question for a language designer is whether the source tree shape *is* the namespace shape, or whether they're independently chosen and the toolchain mediates. The first is simpler; the second is more flexible. Most modern languages pick a position between them.",
+      "refs": [
+        { "target": "language-server#editor-features", "type": "relevant-to" },
+        {
+          "target": "visibility-and-exports#re-exports-and-api-curation",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": ["identity", "reproducibility", "design-guidance"],
+      "content": "Stable module identity improves semantic links, incremental invalidation, and documentation tooling. Weak or environment-sensitive identity models increase unpredictability and often push complexity into tooling layers that must guess what an import means.\n\nA defensible default: keep **module identity** clear and source-level; keep **package identity** explicit but not overly entangled with import syntax; keep **resolution deterministic** and friendly to tools; avoid making package metadata too loader-powerful too early; decide consciously whether version identity should ever leak into source import paths.\n\nFour broad postures emerge: **layered but explicit** (Rust), **closely aligned** (Go), **loosely coupled** (Python), **metadata-shaped resolution** (Node). Deno demonstrates a fifth: **URL-shaped identity with no central registry**. The dominant pattern in modern systems-language design favors a layered Rust-style model, but the right answer depends on whether the ecosystem prioritizes reproducibility, conceptual simplicity, runtime flexibility, or distribution flexibility.",
+      "refs": [
+        {
+          "target": "package-resolution#determinism-and-conflict-handling",
+          "type": "related"
+        },
+        { "target": "cargo#dependency-resolution", "type": "related" }
+      ]
+    }
+  ],
+  "sources": []
+}

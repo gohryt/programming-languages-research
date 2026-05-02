@@ -1,0 +1,7 @@
+{
+  "id": "family-fault-isolation",
+  "tag": "family:fault-isolation",
+  "name": "Family: automated fault isolation",
+  "description": "Search-style debugging: delta debugging, slicing, Tarantula, CBI, cause-effect chains, KLEE, fuzzer triage, Miri, Whyline, algorithmic debugging, Daikon, CBMC.",
+  "axis": "family"
+}

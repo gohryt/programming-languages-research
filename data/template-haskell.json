@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Template Haskell",
+  "aliases": ["TH", "Haskell metaprogramming"],
+  "summary": "Sheard & Peyton Jones 2002: staged metaprogramming for GHC via quotations and splices similar to MetaOCaml, plus access to GHC's internal API for compile-time reification of declarations. Powers `deriveJSON`-style code generation. Slow compile times and tight coupling to GHC are the recurring complaints.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Template Haskell (Sheard & Peyton Jones, Haskell Workshop 2002) adds staged metaprogramming to GHC via quotations and splices similar to MetaOCaml, but with access to full Haskell at compile time plus GHC's internal API (inspect types, access names, introspect declarations).\n\nTH established the pattern of \"compile-time reflection + code generation\" that most modern languages now offer in some form. Its reputation is mixed: powerful enough to solve real problems, slow enough to hurt compile times, and coupled tightly enough to GHC that portability between compiler versions is painful.",
+      "refs": [
+        { "target": "metaocaml#overview", "type": "related-to" },
+        { "target": "rust-macros#overview", "type": "compared-with" },
+        { "target": "scala3-macros#overview", "type": "compared-with" },
+        { "target": "haskell#overview", "type": "extension-of" }
+      ],
+      "sources": [
+        { "label": "Template Haskell — Sheard & Peyton Jones", "url": "https://www.microsoft.com/en-us/research/publication/template-meta-programming-for-haskell/" }
+      ]
+    },
+    {
+      "id": "reification",
+      "title": "Reification — compile-time reflection",
+      "tags": ["metaprogramming", "haskell"],
+      "content": "The critical practical feature is **reification**: at compile time, a TH program can inspect existing declarations (type constructors, class instances) and generate code based on them. This is what enables `deriveJSON`-style code generation in the `aeson` library — the macro inspects the target type and emits a handwritten-quality JSON serialiser.\n\nThe TH program's `Q` monad provides effectful operations: lookup names, ask for the kind of a type, generate fresh names, emit declarations. The output of a TH splice is an AST fragment that GHC then type-checks and compiles as if it were source.\n\nThe combination of reflection and code generation is what makes TH genuinely useful. Many Haskell libraries that would be impractical without TH (lens, aeson, persistent, servant) ship with TH-based deriving as the canonical user-facing API.",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and reputation",
+      "tags": ["tradeoffs"],
+      "content": "TH's costs are real and well-documented:\n\n- **Compile-time penalty**: a TH splice runs the meta-program, which can dominate build time for libraries with extensive deriving.\n- **GHC version coupling**: TH programs depend on GHC's internal AST API, which changes between versions; libraries often need version-specific TH code.\n- **Cross-compilation issues**: running TH on a target requires either a TH-able compiler for that target or a separate evaluator (GHC has \"-fexternal-interpreter\" for this).\n- **Diagnostic challenges**: errors in generated code show the splice's location, not the user's code that triggered it, making debugging hard.\n\nDespite all this, TH remains in production use because the alternative (manually writing serialisers, lenses, schemas, or DSL embeddings) is worse. The pattern of \"compile-time reflection + code generation\" was important enough that subsequent languages (Rust, Scala 3, Mojo) all designed their own takes on it.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Template Haskell paper", "url": "https://www.microsoft.com/en-us/research/publication/template-meta-programming-for-haskell/" }
+  ]
+}

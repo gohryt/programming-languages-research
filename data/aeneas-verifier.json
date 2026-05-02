@@ -1,0 +1,105 @@
+{
+  "kind": "tool",
+  "name": "Aeneas — LLBC to Pure Functional Programs",
+  "aliases": [
+    "aeneas-rust",
+    "llbc"
+  ],
+  "summary": "Son Ho & Protzenko's Aeneas translates a borrow-checked Rust subset (LLBC) into a pure lambda-calculus, eliminating heap reasoning so users prove properties in F* / Coq / Lean / HOL4 over functional programs. Backward functions encode mutable-borrow updates as pure function calls, sidestepping prophecies. Borrow-checker proven sound via symbolic execution (ICFP 2024 follow-up).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "formal-verification",
+        "deductive-verification",
+        "rust-verifier",
+        "proof-engineering"
+      ],
+      "content": "Son Ho & Protzenko's **Aeneas** translates a borrow-checked Rust subset (LLBC, Low-Level Borrow Calculus) into a **pure lambda-calculus**, eliminating heap reasoning so users prove properties in F\\* / Coq / Lean / HOL4 over functional programs.\n\n**LLBC + symbolic borrow semantics** gives a pure functional semantics to safe Rust, including mutable borrows. **Backward functions**: a novel encoding that turns a mutable borrow's \"give back the updated value\" into a pure function call, sidestepping prophecies. Borrow-checker proven sound via symbolic execution (ICFP 2024 follow-up). Active research toolchain; used by Microsoft (Protzenko) for crypto-adjacent verification; safe-Rust only today, with separation-logic extensions for unsafe in progress.\n\nThis is the third major axis among Rust verifiers — alongside Prusti's separation-logic-via-Viper approach and Creusot's prophecy-via-WhyML approach, Aeneas eliminates heap entirely and produces pure functional code that any standard proof assistant can reason about.",
+      "refs": [
+        {
+          "target": "fstar#overview",
+          "type": "discharges-via"
+        },
+        {
+          "target": "prusti#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "creusot#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "verus#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "rustbelt-lambda-rust#overview",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Aeneas paper (arXiv)",
+          "url": "https://arxiv.org/pdf/2206.07185"
+        },
+        {
+          "label": "Aeneas repository",
+          "url": "https://github.com/AeneasVerif/aeneas"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Backward functions and pure-functional translation",
+      "tags": [
+        "proof-engineering",
+        "deductive-verification"
+      ],
+      "content": "Aeneas's defining trick is the **backward function** encoding. Where Creusot uses prophetic variables `^x` to denote the future value of a borrow, Aeneas synthesises a separate **backward function** for each mutable borrow: a pure function that, given the borrowed value and the updated state, returns the post-borrow state of the original. A Rust function `fn f(x: &mut T) -> R` becomes a pair of functions in the target language — one returning `R` (the forward function), one returning the updated `T` (the backward function).\n\nThe net effect is that **all heap reasoning is compiled away** before the proof obligations reach the user. Specifications and proofs operate on pure values and pure functions, with no separation-logic permissions or prophecy variables. Standard induction principles work; ordinary functional-correctness proofs apply. The cost is the source language restriction: Aeneas requires that LLBC programs satisfy borrow-checker constraints stricter than full Rust, and the symbolic-execution-based soundness proof (ICFP 2024) defines what subset is admissible.",
+      "refs": []
+    },
+    {
+      "id": "target-and-backend",
+      "title": "Target backends and proof assistant choice",
+      "tags": [
+        "coq",
+        "lean4",
+        "f-star"
+      ],
+      "content": "Aeneas extracts to multiple proof assistants — F\\*, Coq, Lean 4, and HOL4 — letting the user pick whichever ecosystem suits the verification target. This is unusual among Rust verifiers; Prusti is tied to Viper/Z3, Creusot to Why3, Verus to Z3. The pure-functional output is generic enough that any proof assistant can consume it.\n\nThe Microsoft-internal use case (Protzenko, who also works on F\\* / Low\\* / KaRaMeL — see `karamel-low-star.json`) targets cryptographic primitives where Aeneas extracts Rust source to F\\* and the cryptographic correctness proof is then discharged in F\\*'s refinement-typed environment.",
+      "refs": [
+        {
+          "target": "karamel-low-star#overview",
+          "type": "complementary-pipeline"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status and unsafe-Rust extensions",
+      "tags": [
+        "research",
+        "experimental"
+      ],
+      "content": "Status (as of 2026-04): active research toolchain, open-source under AeneasVerif/aeneas. Used by Microsoft (Protzenko) for crypto-adjacent Rust verification. Safe-Rust only today; **separation-logic extensions for unsafe Rust** are in progress, which would close the gap with RefinedRust and RustBelt for verifying unsafe libraries.\n\nThe ICFP 2024 follow-up paper on symbolic-execution-based borrow-checker soundness puts Aeneas's translation on a foundational footing: not only does the tool work in practice, but the LLBC semantics is proven to faithfully model the Rust subset it consumes.",
+      "refs": [
+        {
+          "target": "refinedrust#overview",
+          "type": "compared-with-for-unsafe"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Aeneas paper (arXiv)",
+      "url": "https://arxiv.org/pdf/2206.07185"
+    },
+    {
+      "label": "Aeneas repository",
+      "url": "https://github.com/AeneasVerif/aeneas"
+    }
+  ]
+}

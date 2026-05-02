@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "GHC Cmm",
+  "aliases": ["c--", "cmm"],
+  "summary": "GHC's lowest IR before native codegen — a portable assembly language: typed (bits32, bits64, float64), with explicit calling conventions, machine word operations, and labeled blocks. Flat but target-independent; the same Cmm lowers to x86-64, ARM64, or via the LLVM backend.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "GHC's Cmm (\"C--\", or \"C minus minus\") is the lowest IR before native code generation. It is a portable assembly language: typed (`bits32`, `bits64`, `float64`), with explicit calling conventions, machine-word operations, and labelled blocks. Cmm is flat (no high-level constructs) but still target-independent — the same Cmm can lower to x86-64, ARM64, or via the LLVM backend.\n\nThe IR is the Cmm-CMM-level optimisation substrate: block layout, register allocation hints, peephole rewrites, and tail-call shaping all operate on Cmm before native codegen.",
+      "refs": [
+        { "target": "ssa#overview", "type": "lower-than" },
+        { "target": "ghc-core#overview", "type": "lowered-from" },
+        { "target": "llvm#overview", "type": "alternative-backend" }
+      ],
+      "sources": [
+        { "label": "GHC Cmm wiki", "url": "https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/cmm-type" },
+        { "label": "GHC commentary — generated code", "url": "https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/generated-code" }
+      ]
+    },
+    {
+      "id": "role-in-pipeline",
+      "title": "Role in GHC's multi-level pipeline",
+      "tags": ["compiler-ir", "pipeline", "haskell"],
+      "content": "Cmm's role in GHC's pipeline is the bottom of the cascade: Core (high-level functional, typed lambda) → STG (Spineless Tagless G-machine, operational semantics for laziness) → Cmm (portable assembly) → native or LLVM. Each level discards information the next doesn't need.\n\nCmm's specific job is to bridge STG's laziness-aware operational model and the target machine. STG describes what closures and thunks *are*; Cmm describes how to allocate, evaluate, and update them at the instruction level — but without committing to one ISA.",
+      "refs": [
+        { "target": "ghc-core#overview", "type": "upstream" }
+      ]
+    },
+    {
+      "id": "design-lessons",
+      "title": "Design lessons",
+      "tags": ["compiler-design", "tradeoffs"],
+      "content": "Cmm illustrates that a target-independent assembly-like layer is a viable alternative to going directly to LLVM. GHC has used Cmm to maintain native-codegen pipelines independent of the LLVM ecosystem, while also retaining LLVM as an alternative backend that consumes Cmm.\n\nFor a language designer, the choice between an in-house Cmm-style flat IR and a direct LLVM lowering is the same one OCaml made (Cmm-style) versus Rust (LLVM-only): an in-house IR keeps fast paths for whole-program features (register pinning, custom calling conventions, GC barriers) that LLVM optimisations would obscure, at the cost of multi-target backend maintenance.",
+      "refs": [
+        { "target": "llvm#overview", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "GHC Cmm wiki", "url": "https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/cmm-type" },
+    { "label": "GHC commentary — generated code", "url": "https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/generated-code" }
+  ]
+}

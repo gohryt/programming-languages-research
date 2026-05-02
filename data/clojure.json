@@ -1,0 +1,54 @@
+{
+  "kind": "language",
+  "name": "Clojure",
+  "aliases": [],
+  "summary": "Lisp dialect on the JVM with first-class runtime-mutable namespaces mapping symbols to Vars and Class objects; the ns macro coordinates two parallel module systems via :require (Clojure namespaces) and :import (Java classes); :as-alias enables namespace-qualified keywords without forcing source-file existence.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Clojure (Rich Hickey, 2007+) is a Lisp dialect on the JVM (and ClojureScript on JavaScript runtimes) with persistent immutable data structures and a runtime-mutable namespace system. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "common-lisp#overview", "type": "comparable-to" }
+      ]
+    },
+    {
+      "id": "first-class-namespaces",
+      "title": "First-class runtime-mutable namespaces",
+      "tags": ["clojure", "module-systems", "namespaces"],
+      "content": "Clojure's namespace model differs from every other entry in this survey in one specific way: **namespaces are runtime-mutable first-class objects**, mapping symbols to Vars (function/value bindings) and Class objects (Java classes brought in via `:import`). They can be created, removed, modified, enumerated, and inspected at runtime via `all-ns`, `find-ns`, `ns-publics`, `ns-imports`, `ns-resolve`. This is similar to Common Lisp's package model in that namespaces are first-class, but Clojure additionally tracks the JVM class space alongside the Clojure namespace space.\n\nThe dynamic-mutability is genuinely used: REPL-driven development in Clojure relies on redefining Vars in a running namespace via `def`, with the new definition taking effect immediately for unqualified callers. This is the basis for Clojure's interactive workflow — much closer to Common Lisp's image-based development than to Java's compile-and-restart model.",
+      "refs": [
+        { "target": "lisp-incremental-redefinition#overview", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "Clojure namespaces", "url": "https://clojure.org/reference/namespaces" }
+      ]
+    },
+    {
+      "id": "ns-macro-and-require-import-split",
+      "title": "ns macro and the :require / :import split",
+      "tags": ["clojure", "module-systems", "imports"],
+      "content": "The `ns` macro is the standard top-of-file declaration:\n\n```clojure\n(ns my-app.core\n  (:require [clojure.string :as str]\n            [clojure.set :refer [union intersection]]\n            [my-app.config :as-alias config])\n  (:import [java.util.concurrent ConcurrentHashMap]\n           [java.time Instant]))\n```\n\nThe interesting design choice is the **orthogonal `:require` vs `:import` split**. `:require` loads Clojure namespaces (compiles them if not yet compiled, populates the runtime namespace map), with sub-options `:as` (alias), `:refer` (selective import of named Vars), `:as-alias` (alias without loading — used for namespace-qualified keywords without forcing the namespace to exist as a source file). `:import` brings in Java classes, with no analogous `:as` or `:refer` (Java classes go into the namespace's class map, not its Var map).\n\nThe two mechanisms coexist because the JVM class loader and the Clojure runtime are different naming systems with different invalidation rules.",
+      "refs": [
+        { "target": "import-semantics#overview", "type": "example" }
+      ],
+      "sources": [
+        { "label": "ClojureDocs — ns", "url": "https://clojuredocs.org/clojure.core/ns" }
+      ]
+    },
+    {
+      "id": "as-alias-pattern",
+      "title": ":as-alias and namespace-qualified keywords",
+      "tags": ["clojure", "module-systems", "keywords"],
+      "content": "`:as-alias` is a uniquely Clojure feature worth naming: it lets you write `::config/timeout` (a namespace-qualified keyword) in code without requiring `my-app.config` to exist as a source file. The qualified keyword resolves through the alias map, not the namespace-load machinery.\n\nUsed heavily for `clojure.spec` definitions and other late-bound qualified-keyword patterns. The lesson generalises: **when a language uses qualified keywords as data identifiers, the keyword's namespace prefix needs an aliasing mechanism that doesn't require the named module to exist** — otherwise data definitions become coupled to source-file layout in ways that hurt evolution.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Clojure namespaces", "url": "https://clojure.org/reference/namespaces" },
+    { "label": "ClojureDocs — ns", "url": "https://clojuredocs.org/clojure.core/ns" },
+    { "label": "ClojureDocs — require", "url": "https://clojuredocs.org/clojure.core/require" }
+  ]
+}

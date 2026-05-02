@@ -1,0 +1,57 @@
+{
+  "kind": "language",
+  "name": "Python",
+  "aliases": ["cpython"],
+  "summary": "High-level dynamically-typed language whose import system is the clearest mainstream example of modules-as-runtime-objects: import x executes x's top-level code if not yet imported, caches the resulting module object in sys.modules, and binds names; finder/loader/path-hook machinery makes import behavior environment-dependent.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Python is a dynamically-typed multi-paradigm language with the most flexible (and most loader-shaped) import system among mainstream languages. CPython is the reference implementation; alternative implementations include PyPy, Pyston, GraalPy. Compiler/runtime aspects live in `data/cpython-bytecode`, `data/cinder`, `data/numba`, `data/pyston-pyjion`, `data/python-memory-tiering`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "import-semantics#import-time-execution", "type": "canonical-example" }
+      ]
+    },
+    {
+      "id": "modules-as-runtime-objects",
+      "title": "Modules as runtime objects",
+      "tags": ["python", "module-systems", "imports"],
+      "content": "Python's import system is the clearest mainstream example of modules as **runtime objects**. Importing performs two conceptually distinct operations — finding/loading a module and then binding it into the importing scope — but the visible effect for programmers is that `import x` executes code if `x` has not been imported yet. A Python module is therefore not just a namespace in the abstract sense; it is a cached object produced by executing top-level code.\n\nThis model extends naturally to **packages**. A regular package is typically a directory containing an `__init__.py` file, and importing the package executes that file. The package can define names, mutate `__path__`, perform setup work, or trigger further imports. Python also supports **namespace packages** (PEP 420), where `__init__.py` is absent and the import machinery synthesizes package structure from the search path. This is elegant in distribution terms, but it makes identity and resolution even more loader-sensitive.",
+      "refs": [],
+      "sources": [
+        { "label": "Python — import system reference", "url": "https://docs.python.org/3/reference/import.html" },
+        { "label": "PEP 420 — Implicit Namespace Packages", "url": "https://peps.python.org/pep-0420/" }
+      ]
+    },
+    {
+      "id": "finder-loader-importlib",
+      "title": "Finder / loader / importlib machinery",
+      "tags": ["python", "import-machinery", "extensibility"],
+      "content": "The import machinery itself is layered: fully qualified names, finder/loader protocols, `importlib`, path hooks, and module specs all participate. This gives Python enormous flexibility — embedders, zip imports, plugin systems, and custom importers are all viable — but it also means that \"what does this import mean?\" is partly answered by the runtime environment. A source file alone is not always enough.\n\n`importlib.reload(module)` re-executes a module's top-level code in place, mutating the existing module object so all callers transparently see new bindings (with caveats about already-bound references). It is the foundation for plugin-reload patterns, but production hot-reload typically prefers process recycling because reload's correctness depends on which references downstream code has cached.",
+      "refs": [
+        { "target": "julia-revise#overview", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "importlib", "url": "https://docs.python.org/3/library/importlib.html" }
+      ]
+    },
+    {
+      "id": "cycles-and-partial-initialization",
+      "title": "Cycles and partial initialization",
+      "tags": ["python", "cycles", "imports"],
+      "content": "Cyclic imports illustrate the cost of Python's loader-centric design. Since modules are created and cached before their execution finishes, one module can observe another in a **partially initialized** state. This is not merely an annoying edge case; it is an unavoidable consequence of executable imports. The programmer must understand not just the dependency graph, but the evaluation order of top-level code and when specific names become available.\n\nPython is the strongest case against casually allowing import-time execution. The model is powerful, but it moves initialization order, loader behavior, and side effects into what would otherwise be a simple structural feature. That cost propagates into tooling, testing, and architecture.",
+      "refs": [
+        { "target": "import-semantics#cycles-and-initialization", "type": "example" }
+      ],
+      "sources": [
+        { "label": "PEP 328 — Imports", "url": "https://peps.python.org/pep-0328/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Python import system", "url": "https://docs.python.org/3/reference/import.html" },
+    { "label": "importlib", "url": "https://docs.python.org/3/library/importlib.html" }
+  ]
+}

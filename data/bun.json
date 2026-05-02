@@ -1,0 +1,42 @@
+{
+  "kind": "runtime",
+  "name": "Bun",
+  "aliases": ["bun-runtime", "oven-bun"],
+  "summary": "Zig-implemented all-in-one JavaScript runtime, bundler, package manager, and test runner built on JavaScriptCore (Apple's Safari engine) rather than V8; trades V8 ecosystem for cold-start latency and unified toolchain.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Jarred Sumner / Oven's **Bun** (since 2022; v1.0 September 2023) is the production Zig data point in the JavaScript runtime space — an all-in-one runtime, bundler, package manager, and test runner implemented in approximately 700 KLOC of Zig over the **JavaScriptCore** engine (Apple's Safari engine), explicitly *not* V8. The architectural choice: pick the engine optimised for cold-start latency (JSC's interpreter-tier startup beats V8 Ignition's by a wide margin), pair it with Zig's manual memory management and zero-cost FFI, and unify what Node ships as separate tools (`npm`, `webpack`, `jest`, `tsc --watch`) into one binary with shared runtime infrastructure.",
+      "refs": [
+        { "target": "event-loop-scheduling#overview", "type": "example" },
+        { "target": "io-integration#readiness-and-completion-models", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Bun runtime home", "url": "https://bun.com/" },
+        { "label": "Bun documentation", "url": "https://bun.com/docs/runtime" }
+      ]
+    },
+    {
+      "id": "io-loop-and-zig-implementation",
+      "title": "I/O loop and Zig implementation",
+      "tags": ["concurrency", "runtime", "zig"],
+      "content": "Distinct from Node.js (V8 + libuv): Bun's I/O loop is custom-written in Zig, supports `io_uring` on Linux, and exposes Node-compatible APIs (`fs`, `http`, `child_process`, `cluster`) plus Web-standard APIs (`fetch`, `WebSocket`, `Response`) on the same runtime. The package manager is content-addressed (a global cache shared across projects), much faster than `npm install` on cold cache, and uses a binary lockfile format (`bun.lock`). The bundler is Webpack-API-compatible but written in Zig and competitive with esbuild and Rolldown.",
+      "refs": [
+        { "target": "io-integration#readiness-and-completion-models", "type": "uses" }
+      ]
+    },
+    {
+      "id": "tradeoffs-vs-node-and-deno",
+      "title": "Trade-offs vs Node and Deno",
+      "tags": ["runtime", "tradeoffs", "ecosystem"],
+      "content": "Status (as of 2026-04): production-stable; deployed at scale by Vercel (some Edge functions), Railway (default Node-replacement), several SaaS startups. Distinct from **Deno** (V8-based and capability-sandboxed): Bun targets the \"drop-in faster Node\" deployment where capability sandboxing is not the goal. Distinct from **Node.js**: JavaScriptCore-specific behaviour (different from V8's) sometimes surfaces as compatibility gaps for code that relied on V8 internals.\n\nThe lesson generalises: a unified-toolchain runtime in a systems language with manual memory management can leapfrog the Node-as-separate-tools baseline, with the catch that engine-specific behaviour sometimes surfaces as compatibility gaps. Bun is also the largest production Zig codebase to-date — an existence proof that Zig's ergonomics scale to hundreds of KLOC without imposing the C++-template debt that motivated V8's complexity."
+    }
+  ],
+  "sources": [
+    { "label": "Bun runtime home", "url": "https://bun.com/" },
+    { "label": "Bun documentation", "url": "https://bun.com/docs/runtime" },
+    { "label": "Bun repository", "url": "https://github.com/oven-sh/bun" }
+  ]
+}

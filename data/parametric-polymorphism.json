@@ -1,0 +1,27 @@
+{
+  "kind": "concept",
+  "name": "Parametric Polymorphism",
+  "aliases": ["generics", "parametric-types"],
+  "summary": "Code that works uniformly over types. A compiler can implement it via monomorphization (specialized code per instantiation), dictionary/witness passing (operations passed at runtime), uniform representation (boxing/tagging), reified generics (runtime metadata), or hybrid specialization. The choice trades binary size, runtime overhead, and reflection capability.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Parametric polymorphism lets code work uniformly over types. A compiler can implement it by:\n\n- **monomorphization**, generating specialized code per type instantiation;\n- **dictionary or witness passing**, passing operations and metadata at runtime;\n- **uniform representation**, boxing or using tagged values;\n- **reified generics**, preserving type arguments in runtime metadata;\n- **hybrid specialization**, compiling generic code but specializing hot or visible cases.\n\nThe distinguishing axis across implementations is *where the cost lives*: at compile time (monomorphization grows binary size), at runtime (dictionary passing adds indirection), or at the type system (uniform representation forces boxing).",
+      "refs": [
+        { "target": "evidence-passing#overview", "type": "implements" },
+        { "target": "type-classes-traits#overview", "type": "extends" }
+      ]
+    },
+    {
+      "id": "compilation-strategies",
+      "title": "Compilation strategies in production",
+      "tags": ["compiler", "type-system"],
+      "content": "Production languages span the implementation spectrum:\n\n- **Monomorphization**: Rust, C++ templates, Swift specialized generics, MLton whole-program. Best peak performance, large binaries, no runtime polymorphism. Compile-time cost grows with use.\n- **Dictionary passing**: Haskell type classes (compiled by GHC into dictionary records), Rust `dyn Trait`, Scala implicit parameters. Single shared object code, runtime indirection per polymorphic call. Smaller binaries, slower hot loops without specialization.\n- **Uniform representation with boxing**: classic Java generics (type erasure), Standard ML, OCaml. Single code path for all types; values must be uniform-sized (pointer or tagged word). Predictable code size, GC-allocated heap traffic for primitives.\n- **Reified generics**: C# (CLR carries type arguments at runtime), .NET. Single code with runtime type information available; runtime can specialize selectively (CLR re-JITs hot generic instantiations with primitive type arguments).\n- **Hybrid**: Swift compiles polymorphic *and* specialized variants and chooses at link or load time. GHC specializes some functions when `INLINEABLE` or `SPECIALIZE` pragmas are present.\n\nThe type checker must decide which operations are valid on a type parameter. That usually means explicit bounds, type classes, traits, protocols, concepts, or structural constraints (`data/type-classes-traits`).",
+      "refs": [
+        { "target": "evidence-passing#production-uses", "type": "exemplifies" }
+      ]
+    }
+  ]
+}

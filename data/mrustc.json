@@ -1,0 +1,46 @@
+{
+  "kind": "tool",
+  "name": "mrustc — Rust from C++",
+  "aliases": [],
+  "summary": "An alternative Rust compiler written in C++ that compiles Rust source to C source. Exists specifically to break Rust's bootstrap chain: once mrustc compiles `rustc` version N from Rust source, that `rustc` can compile any later Rust version, avoiding transitive dependence on all prior rustc binaries.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**mrustc** is an alternative Rust compiler written in C++ that compiles Rust source to C source. It exists specifically to break Rust's bootstrap chain: once mrustc compiles `rustc` version N from Rust source, that `rustc` can compile any later Rust version, avoiding the \"rustc-compiled-by-rustc-compiled-by-rustc\" transitive dependency on all prior rustc binaries.\n\nmrustc does not implement borrow checking or many modern Rust features — it only needs to compile enough Rust to build rustc. This pragmatic scope keeps mrustc tractable (tens of thousands of lines of C++ vs rustc's millions) while closing the bootstrap loop.",
+      "refs": [
+        {
+          "target": "trusting-trust#overview",
+          "type": "addresses"
+        },
+        {
+          "target": "gnu-mes-stage0#overview",
+          "type": "complementary-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "mrustc",
+          "url": "https://github.com/thepowersgang/mrustc"
+        }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — alternative-compiler bootstrap",
+      "tags": [
+        "bootstrap",
+        "security"
+      ],
+      "content": "The pattern generalises: any self-hosted language can benefit from a stripped-down \"stage-0\" compiler in a different language, specifically to audit or reproduce the build chain without dependence on a pre-existing binary. The stage-0 compiler doesn't need to support modern features or produce optimised code — it just needs to compile enough of the target language to build the official compiler from source.\n\nFor security-conscious deployments (Linux distributions, formal-verification toolchains, supply-chain-audited builds), an alternative-compiler bootstrap is one of the cleanest mitigations against Trusting Trust attacks.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "mrustc",
+      "url": "https://github.com/thepowersgang/mrustc"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "kind": "concept",
+  "name": "Generalized CFG Parsing",
+  "aliases": [
+    "gll",
+    "glr",
+    "earley"
+  ],
+  "summary": "Parsing algorithms that handle arbitrary context-free grammars without restrictions on left recursion or ambiguity; production examples are GLL (Iguana), Tomita GLR (SGLR, Lezer optional), Earley + Leo (Lark, Marpa), CYK/Valiant (theoretical anchors), and parsing with derivatives.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Generalized CFG parsers handle arbitrary context-free grammars — ambiguous, non-deterministic, with arbitrary recursion — typically in O(n³) worst case and O(n) on deterministic subsets. The shared substrate is the **graph-structured stack (GSS)** for parser state and the **Shared Packed Parse Forest (SPPF)** for output. They are the structurally-correct alternative to grammar restrictions (LL/LR families) at the cost of higher per-parse work.",
+      "refs": [
+        {
+          "target": "ambiguity-and-parse-forests#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "gll-and-glr",
+      "title": "GLL and Tomita GLR",
+      "tags": [
+        "parsing-algorithm",
+        "general-cfg",
+        "gss"
+      ],
+      "content": "**GLL (Generalized LL)** parsing, described by Scott and Johnstone (2010), extends recursive descent to handle all context-free grammars, including left-recursive and ambiguous grammars. When the parser reaches a point where multiple alternatives could apply, it forks, exploring all possibilities in parallel. The two data structures that make this practical are the **graph-structured stack** (GSS) and the **Shared Packed Parse Forest** (SPPF). The GSS replaces the exponential forest of independent parser stacks with a DAG: stack tops that share a common prefix collapse into a single node. The SPPF is the dual idea on the output side — common subtrees are shared and ambiguous alternatives are stored as packed nodes, keeping the forest polynomial.\n\nGLL retains the structure of recursive descent — each grammar rule maps directly to a parsing function — while removing all restrictions on the grammar. Afroozeh and Izmaylova (2015) demonstrated practical GLL with speedups of 1.5–5.2x over the original algorithm on Java, C#, and OCaml grammars. **Iguana** implements optimized GLL.\n\n**Masaru Tomita's Generalized LR (GLR)** (1985–1987) is the bottom-up sibling: an LR automaton that, when its parsing table has a shift-reduce or reduce-reduce conflict, forks and explores all viable actions in parallel. Reuses the same GSS-plus-SPPF substrate. With Rekers's 1992 SPPF integration, GLR handles arbitrary CFGs in cubic time worst case and linear time on the LR-deterministic parts. **RNGLR** (Scott & Johnstone, TOPLAS 2006) fixes the original algorithm's correctness hole on hidden-left-recursive grammars; **BRNGLR** (2007) achieves cubic worst-case bounds. Tomita's original motivation was natural-language parsing for CMU's machine-translation work, which is why the algorithm accepted ambiguity as a first-class output rather than an error.\n\nGLR is the direct ancestor of the incremental and scannerless systems: tree-sitter uses GLR exploration at declared conflicts, Lezer offers opt-in GLR, SGLR pairs scannerless grammars with GLR.",
+      "refs": [
+        {
+          "target": "tree-sitter#overview",
+          "type": "uses"
+        },
+        {
+          "target": "lezer#overview",
+          "type": "uses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "GLL paper",
+          "url": "https://pure.royalholloway.ac.uk/en/publications/purely-functional-gll-parsing"
+        },
+        {
+          "label": "Tomita GLR (1987)",
+          "url": "https://aclanthology.org/J87-1004.pdf"
+        }
+      ]
+    },
+    {
+      "id": "earley-and-leo",
+      "title": "Earley parsing and Leo's optimization",
+      "tags": [
+        "parsing-algorithm",
+        "general-cfg"
+      ],
+      "content": "Jay Earley's 1970 algorithm parses arbitrary context-free grammars by maintaining, at each input position, a set of \"Earley items\" — dotted productions tagged with the position where the matching began. The algorithm runs in **O(n³)** worst case, **O(n²)** for unambiguous grammars, and **O(n)** for LR-compatible grammars, without any grammar restrictions or left-recursion elimination.\n\nThe classic weakness is right recursion: the original Earley algorithm is quadratic on right-recursive rules because it builds O(n) items per position that all complete at the end. **Joop Leo's 1991 improvement** avoids this by recognising right-recursion patterns and collapsing their Earley sets via \"deterministic reduction paths,\" restoring linear time on every LR(k) grammar. Earley + Leo is the foundation of Marpa.\n\n**Lark** (Python) is the pragmatic modern Earley implementation: it ships both Earley (with SPPF output for ambiguous grammars) and LALR(1) backends, and it layers an Earley-on-top-of-a-chart parser that consumes regex matches rather than single characters, giving real-world-usable speed while keeping full CFG expressiveness.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Earley parsing",
+          "url": "https://en.wikipedia.org/wiki/Earley_parser"
+        },
+        {
+          "label": "Lark",
+          "url": "https://github.com/lark-parser/lark"
+        }
+      ]
+    },
+    {
+      "id": "cyk-valiant-and-derivatives",
+      "title": "CYK, Valiant's reduction, and parsing with derivatives",
+      "tags": [
+        "parsing-algorithm",
+        "theoretical"
+      ],
+      "content": "The **Cocke–Younger–Kasami** algorithm (independently rediscovered in the 1960s) is a bottom-up dynamic-programming recogniser for context-free grammars in Chomsky Normal Form. It fills an n × n triangular table bottom-up; cell (i, j) holds the set of non-terminals deriving the substring of length *j* starting at position *i*. Every cell takes O(n) work, for O(n³) total. CYK is the canonical textbook introduction and still the basis of many NLP and ambiguity-aware tools, but the CNF requirement and the cubic constant make it rare in production language implementations.\n\n**Valiant's 1975 reduction** showed that CFG recognition can be reduced to Boolean matrix multiplication of n × n matrices — so any faster matrix multiplication algorithm immediately gives a faster CFG parser. Using Strassen's method yields **O(n^2.81)**. Lee (2002) later proved the reduction goes both ways: fast CFG parsing requires fast Boolean matrix multiplication.\n\n**Parsing with derivatives** (Matt Might et al.) extends Brzozowski's derivative for regular expressions to arbitrary CFGs. A parser evaluates the \"derivative\" of a grammar with respect to the first token of input, returning a new grammar that matches the remainder. While its naive implementation can suffer from exponential blowup, with appropriate memoization, laziness, and fixed-point operations, it translates into concise, purely functional code that can parse ambiguous and left-recursive grammars. Later optimizations (Zippy LL(1) Parsing with Derivatives) have reduced its time complexity to linear for restricted grammars.\n\nNeither CYK nor Valiant is used in production compilers — constants are too large, and real grammars either admit LL/LR linearity or have structural constraints that Earley/GLL exploit better.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "CYK algorithm",
+          "url": "https://en.wikipedia.org/wiki/CYK_algorithm"
+        },
+        {
+          "label": "Parsing with derivatives",
+          "url": "https://matt.might.net/papers/might2011derivatives.pdf"
+        }
+      ]
+    },
+    {
+      "id": "beyond-cfg",
+      "title": "Beyond-CFG formalisms — TAG, MCFG, Boolean grammars",
+      "tags": [
+        "parsing-algorithm",
+        "research"
+      ],
+      "content": "Most programming-language parsers live in the regular + CFG + context-sensitive-escape-hatch world: regular lexers, CFG-ish syntax, and semantic checks after parsing. Research parsing goes further. **Tree-Adjoining Grammars** (TAG), **Multiple Context-Free Grammars** (MCFG), **Linear Context-Free Rewriting Systems** (LCFRS), and **Range Concatenation Grammars** (RCG) capture mildly context-sensitive patterns important in natural language. **Conjunctive** and **Boolean grammars** extend CFGs with intersection and negation. **Visibly pushdown languages** sit between regular and deterministic context-free languages and model nested calls/returns while retaining strong automata properties.\n\nFor ordinary programming-language implementations, these are rarely the baseline. They matter as boundary markers: if a syntax feature seems to require cross-serial dependencies, arbitrary indentation constraints, macro-time grammar mutation, or semantic feedback during parsing, it may be outside ordinary CFG parsing. At that point the implementation choice is usually not \"use TAG\" but \"move the constraint to a later semantic phase, redesign the syntax, or use a specialised parser with explicit context.\"",
+      "refs": []
+    }
+  ],
+  "sources": []
+}

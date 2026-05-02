@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Hazard Eras",
+  "aliases": [
+    "HE"
+  ],
+  "summary": "Ramalhete & Correia (SPAA 2017) combine hazard-pointer-style explicit reservations with EBR-style epoch ranges — each protected pointer carries a birth/retire era interval matched against a per-thread reserved era. Reserves an interval, not an individual pointer, so one slot covers many sequential dereferences. Bounded memory like HP but ~6x faster.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "safe-memory-reclamation",
+        "era-based",
+        "lock-free",
+        "hazard-pointer",
+        "epoch-based"
+      ],
+      "content": "Ramalhete & Correia's **Hazard Eras** (SPAA 2017) combine hazard-pointer-style explicit reservations with EBR-style epoch ranges. Each protected pointer carries a *birth/retire era* interval matched against a per-thread reserved era. Instead of reserving a single pointer (HP) or a single epoch (EBR), threads reserve an *interval* of eras — so one reservation slot covers many sequential dereferences within the reserved range.\n\nResult: bounded memory like hazard pointers (a thread can only block reclamation of objects whose birth-era is in its reserved interval), but ~6x faster in benchmark mixes than classical HPs. Lock-free.",
+      "refs": [
+        {
+          "target": "hazard-pointers",
+          "type": "successor-of"
+        },
+        {
+          "target": "epoch-based-reclamation",
+          "type": "related"
+        },
+        {
+          "target": "interval-based-reclamation",
+          "type": "related"
+        },
+        {
+          "target": "wait-free-eras",
+          "type": "predecessor-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Hazard Eras (SPAA 2017)",
+          "url": "https://github.com/pramalhe/ConcurrencyFreaks/blob/master/papers/hazarderas-2017.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Hazard Eras paper",
+      "url": "https://github.com/pramalhe/ConcurrencyFreaks/blob/master/papers/hazarderas-2017.pdf"
+    }
+  ]
+}

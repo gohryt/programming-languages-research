@@ -1,0 +1,55 @@
+{
+  "kind": "concept",
+  "name": "Linear-Scan Register Allocation",
+  "aliases": ["linear scan regalloc", "Poletto-Sarkar"],
+  "summary": "Poletto and Sarkar (1999): number all instructions, compute live intervals [start, end] for each variable, scan intervals left-to-right assigning registers greedily, spill the interval with the farthest endpoint when registers run out. O(N log N); 15–68× faster compilation than graph coloring at 1–5% more spills. Default for baseline JITs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Poletto and Sarkar (1999) proposed linear scan: number all instructions, compute live intervals `[start, end]` for each variable, then scan intervals left-to-right, assigning registers greedily. When all registers are occupied, spill the interval with the farthest endpoint — reasoning that a long-lived value blocking a short-lived one is the worst trade-off available.\n\nLinear scan is O(N log N) — vastly faster than graph coloring's NP-complete worst case. The code quality is slightly worse (typically 1–5% more spills), but the compilation time reduction is dramatic: 15–68× faster than graph coloring in the original Extended Linear Scan comparison.",
+      "refs": [
+        { "target": "graph-coloring-regalloc#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Linear Scan Register Allocation (Poletto-Sarkar)", "url": "https://web.cs.ucla.edu/~palsberg/course/cs132/linearscan.pdf" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["compiler", "register-allocation"],
+      "content": "After SSA destruction (or directly on a numbered intermediate representation), compute each variable's live interval as the range from its first definition to its last use. Intervals are sorted by start point. Walk the sorted list: at each interval, free any register whose interval has expired (i.e., whose end is before the current start), then either assign a free register to the current interval or, if all registers are occupied, choose the active interval with the farthest end and spill either it or the current interval (whichever has the further endpoint).\n\nVariants add splitting: when a long-lived value blocks register use, split its interval into multiple shorter intervals with explicit reload/store at the split points. Lifetime-hole linear scan further refines this by treating each hole in a live range as an independent interval, recovering some of graph coloring's benefit while keeping linear-scan's compile speed.",
+      "refs": []
+    },
+    {
+      "id": "ssa-based-variants",
+      "title": "SSA-based variants",
+      "tags": ["compiler", "ssa"],
+      "content": "A middle-ground lineage worth naming: SSA-based register allocation operates directly on SSA form, exploiting the fact that SSA's lifetime intervals are easier to split cleanly and avoiding the need to destruct SSA before allocation. Pereira and Palsberg's puzzle-solving allocator and the Das-Ayers \"Efficient Global Register Allocation\" line treat allocation as a per-block puzzle, then stitch blocks at boundaries.\n\nCranelift's regalloc2 (Chris Fallin, 2022) is the production example: combines linear-scan ideas with SSA-aware splitting, parallel-move resolution at block boundaries, and a fast greedy core. Reported 20% faster compilation than Cranelift's predecessor with 10–20% better code quality on register-pressure-heavy benchmarks.",
+      "refs": [
+        { "target": "cranelift#fit-for-jit-and-tiered-compilation", "type": "deployed-in" },
+        { "target": "ssa#overview", "type": "operates-on" }
+      ],
+      "sources": [
+        { "label": "Cranelift regalloc2 (Chris Fallin)", "url": "https://cfallin.org/blog/2022/06/09/cranelift-regalloc2/" },
+        { "label": "Efficient Global Register Allocation", "url": "https://arxiv.org/pdf/2011.05608" }
+      ]
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["compiler", "jit", "production"],
+      "content": "Every tier-1 (baseline) JIT uses linear scan or a variant: V8's Liftoff, SpiderMonkey's baseline compiler, HotSpot's C1, JavaScriptCore's baseline tier. The choice is forced — baseline compilation has milliseconds to spend, and graph coloring's compile time is unaffordable.\n\nOptimising tiers use more sophisticated allocators — graph-coloring, backtracking, greedy/live-interval, or SSA-aware splitting allocators — to trade more compile time for better code. The two families serve different points on the compile-time-vs-code-quality trade-off, and most modern compilers ship both: linear scan for the baseline tier, a heavier allocator for the optimising tier.",
+      "refs": [
+        { "target": "tiered-compilation#why-tiering-exists", "type": "fits-into" },
+        { "target": "copy-and-patch#strengths", "type": "alternative-baseline-strategy" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Linear Scan Register Allocation", "url": "https://web.cs.ucla.edu/~palsberg/course/cs132/linearscan.pdf" },
+    { "label": "Efficient Global Register Allocation", "url": "https://arxiv.org/pdf/2011.05608" }
+  ]
+}

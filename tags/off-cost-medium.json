@@ -1,0 +1,7 @@
+{
+  "id": "off-cost-medium",
+  "tag": "off-cost:medium",
+  "name": "Cost when off: medium",
+  "description": "Persistent steady-state tax: 1–3% runtime overhead, a kilobyte of unwind metadata per build, a per-page protection bit, or other measurable but bounded fixed cost.",
+  "axis": "off-cost"
+}

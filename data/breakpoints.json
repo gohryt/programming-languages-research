@@ -1,0 +1,196 @@
+{
+  "kind": "concept",
+  "name": "Breakpoints",
+  "aliases": [
+    "breakpoint mechanisms",
+    "watchpoints",
+    "catchpoints"
+  ],
+  "summary": "Debugger stop mechanisms that suspend execution when a code location, memory access, runtime event, or semantic predicate is reached; the design space spans physical (INT 3, hardware DR registers) to logical (event catchpoints, contracts).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A breakpoint mechanism stops execution at a target condition and reliably resumes afterward — often on code that other threads are executing concurrently. Entries in this chapter differ on *where the stop condition lives*: patched into the instruction stream (`INT 3`, compiled conditional), wired into the CPU's memory-access pipeline (hardware debug registers), repurposed from a protection-boundary feature (RISC-V PMP, page-table permissions), built on the runtime's own event taxonomy (exceptions, syscalls, library loads, allocator events), or expressed as language-level invariants (assertions, contracts, semantic preconditions). The progression is from physical to logical: lower entries cost a CPU trap; higher entries cost a runtime-managed predicate evaluation.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:breakpoint-mechanism`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`\n"
+    },
+    {
+      "id": "gdb-int3-displaced-stepping",
+      "title": "GDB — INT 3 and Displaced Stepping",
+      "tags": [
+        "domain:debugging",
+        "family:breakpoint-mechanism",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:medium"
+      ],
+      "content": "GDB sets breakpoints by overwriting the first byte of the target instruction with `0xCC` (INT 3). When the CPU executes it, a trap fires, transferring control to the debugger. The original byte is saved and restored when resuming.\n\nTo resume past a breakpoint without removing it (which would be racy in multithreaded programs), GDB uses \"displaced stepping\": it copies the original instruction to an out-of-line scratch area, executes it there, then adjusts the PC. This avoids the classic remove-step-reinsert race.\n\nThe simplest breakpoint mechanism is also the most universal. Every CPU architecture has a trap instruction. The out-of-line execution trick avoids races that simpler schemes cannot handle.",
+      "sources": [
+        {
+          "url": "https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints"
+        },
+        {
+          "url": "https://devblogs.microsoft.com/oldnewthing/20241111-00/?p=110503"
+        }
+      ]
+    },
+    {
+      "id": "wellons-int3-nop-conditional",
+      "title": "Chris Wellons — INT3;NOP as Fast Conditional Breakpoint",
+      "tags": [
+        "domain:debugging",
+        "family:breakpoint-mechanism",
+        "granularity:per-instruction",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Chris Wellons (nullprogram.com) observed that GDB's conditional breakpoints are unusably slow because GDB stops the process, evaluates the condition in the debugger, and resumes — on every hit. For a breakpoint inside a tight loop with a rare condition, this means millions of stop/evaluate/resume cycles per second.\n\nHis alternative: compile the condition directly into the code:\n\n```c\n#define breakpoint() asm (\"int3; nop\")\n\nif (rare_condition) breakpoint();\n```\n\nThe `nop` after `int3` is essential because `int3` leaves the instruction pointer on the *next* instruction, confusing GDB about the current scope. The `nop` gives GDB something to \"land on\" within the correct scope.\n\nThis transforms a conditional breakpoint from a debugger-evaluated expression (thousands of context switches per second) into a single compiled branch (zero cost until the condition is true). The fastest debugger interaction is one that doesn't involve the debugger at all.\n\nHe also describes \"named positions\" using C labels or assembly labels as stable breakpoint targets that survive code edits — a clever alternative to line-number breakpoints that drift when the source changes.",
+      "sources": [
+        {
+          "url": "https://nullprogram.com/blog/2024/01/28/"
+        }
+      ]
+    },
+    {
+      "id": "x86-hardware-debug-registers",
+      "title": "x86 Hardware Debug Registers (DR0–DR3)",
+      "tags": [
+        "domain:debugging",
+        "family:breakpoint-mechanism",
+        "granularity:per-instruction",
+        "intel",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "x86 processors provide four hardware debug registers (DR0–DR3) that can trigger a debug exception when a specific memory address is read, written, or executed. The addresses are configured via DR7 (the debug control register). When a watched address is accessed, the CPU raises a #DB exception.\n\nThe remarkable property: hardware watchpoints add **zero overhead** to instructions that don't touch the watched address. There is no polling, no flag check, no NOP — the watch is implemented in the memory access pipeline itself. The only cost is the trap handling when the watchpoint fires (~3μs on Linux via perf).\n\nThe limitation: only 4 watchpoints, each watching at most 8 bytes. For debugging a specific variable or memory location this is ideal. For broader tracing it is insufficient. GDB uses hardware watchpoints when available and falls back to single-stepping (vastly slower) when you exceed 4.\n\nLinux exposes this via `perf_event_open` and `ptrace(PTRACE_POKEUSER)`. Jane Street's `perftrace` tool wraps this in a Python library that records timestamps and register values when watchpoints fire, enabling trace-style analysis of specific memory locations.",
+      "sources": [
+        {
+          "url": "https://thume.ca/2023/12/02/tracing-methods/",
+          "label": "\"Hardware breakpoints\" section."
+        }
+      ]
+    },
+    {
+      "id": "raven-riscv-pmp",
+      "title": "Raven — RISC-V Physical Memory Protection (PMP) as a Debugging Primitive",
+      "tags": [
+        "domain:debugging",
+        "embedded",
+        "family:breakpoint-mechanism",
+        "granularity:per-instruction",
+        "off-cost:medium",
+        "on-cost:high",
+        "risc-v"
+      ],
+      "content": "Because bare-metal RISC-V often lacks standardized external debugging hardware, researchers from SUSTech designed \"Raven\". Instead of relying on JTAG or dedicated debug modules, Raven creatively repurposes the RISC-V Physical Memory Protection (PMP) security feature into a debugging primitive. By restricting access to specific memory regions, they trigger PMP faults that act as extremely lightweight, zero-modification watchpoints and breakpoints. This allows full kernel debugging capabilities (stepping, introspection) on completely bare-metal embedded targets with near-zero idle overhead.",
+      "sources": [
+        {
+          "url": "https://fengweiz.github.io/paper/raven-dac22.pdf (DAC '22)"
+        },
+        {
+          "label": "Raven (DAC 2022)",
+          "url": "https://fengweiz.github.io/paper/raven-dac22.pdf"
+        }
+      ]
+    },
+    {
+      "id": "page-protection-watchpoints",
+      "title": "Page-Protection Watchpoints and Guard Pages",
+      "tags": [
+        "domain:debugging",
+        "family:breakpoint-mechanism",
+        "granularity:per-frame",
+        "off-cost:medium",
+        "on-cost:high"
+      ],
+      "content": "As discussed in `data/breakpoints#x86-hardware-debug-registers`, hardware DR registers are limited to four addresses; a scalable alternative is page permissions. Mark a page `PROT_NONE` with `mprotect()` or `PAGE_GUARD` / `VirtualProtect()` on Windows; when the target reads or writes that page, the CPU raises a page fault and the debugger decides whether the access is interesting.\n\nThe trade-off is precision versus scale. Page watchpoints can cover kilobytes or megabytes and can be created in large numbers, but they trigger on every access to the protected page, not only the watched object. Debuggers and runtimes can reduce false positives by isolating selected objects onto their own pages, using guard pages around stacks or heap allocations, or combining page faults with single-step/reprotect logic.\n\nThe language-design lesson: **allocator cooperation turns crude page faults into useful object watchpoints**. A runtime that can place one object, arena, stack segment, or actor heap on a protected page can offer data breakpoints that are far larger than hardware DR registers allow.",
+      "sources": [
+        {
+          "url": "https://man7.org/linux/man-pages/man2/mprotect.2.html"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages"
+        }
+      ]
+    },
+    {
+      "id": "event-breakpoints-catchpoints",
+      "title": "Event Breakpoints / Catchpoints",
+      "tags": [
+        "domain:debugging",
+        "family:breakpoint-mechanism",
+        "granularity:per-event"
+      ],
+      "content": "Line breakpoints answer \"stop here.\" Event breakpoints answer \"stop when this kind of thing happens anywhere.\" Mature debuggers expose catchpoints for exceptions, signals, syscalls, process creation, thread creation, library loading, allocation, panic, and language-specific runtime events.\n\nGDB's `catch throw`, `catch syscall`, `catch fork`, `catch exec`, and shared-library catchpoints are the native model. Java debuggers expose caught/uncaught exception breakpoints through JPDA/JDWP. Chrome DevTools has \"pause on caught exceptions\" and \"pause on uncaught exceptions.\" A language runtime can generalize this to actor message sends, task spawns, cancellation, effect invocation, allocation classes, or contract violations.\n\nThe language-design lesson: **make runtime events first-class debugger stop reasons**. If the runtime already classifies events for exceptions, panics, tasks, actors, effects, or allocators, expose those same event IDs to the debugger instead of forcing users to guess implementation functions to break on.",
+      "sources": [
+        {
+          "url": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html"
+        },
+        {
+          "url": "https://chromedevtools.github.io/devtools-protocol/tot/Debugger/"
+        }
+      ]
+    },
+    {
+      "id": "assertions-contracts-semantic-breakpoints",
+      "title": "Assertions, Contracts, and Semantic Breakpoints",
+      "tags": [
+        "domain:debugging",
+        "family:breakpoint-mechanism",
+        "granularity:per-event",
+        "on-cost:low"
+      ],
+      "content": "Assertions and contracts are executable claims about program state: preconditions, postconditions, invariants, representation checks, and internal sanity checks. They are usually treated as testing or verification tools, but they are also debugger hooks. A contract violation is a semantically meaningful breakpoint: the program can stop exactly where an assumption first becomes false, with the violated predicate, source location, values, and call stack preserved.\n\nEiffel made Design by Contract central to the language. Racket contracts enforce boundaries between components. Ada/SPARK contracts connect runtime checking and formal proof. Rust separates always-on `assert!` from debug-only `debug_assert!`. Status (C++26 working draft): contract assertions add language-level `pre`, `post`, and `contract_assert` forms with different evaluation modes. Swift distinguishes `assert`, `precondition`, and unconditional traps.\n\nThe language-design lesson: **contracts should have debugger semantics**. A new language can define whether contract failures terminate, throw, invoke restarts, enter the debugger, continue in observe mode, log telemetry, or become catchable semantic breakpoints. This gives users a precise spectrum from zero-overhead release builds to invariant-rich debug builds.",
+      "sources": [
+        {
+          "url": "https://docs.racket-lang.org/guide/contracts.html"
+        },
+        {
+          "url": "https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions"
+        },
+        {
+          "url": "https://cppreference.dev/w/cpp/language/contracts"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints"
+    },
+    {
+      "url": "https://devblogs.microsoft.com/oldnewthing/20241111-00/?p=110503"
+    },
+    {
+      "url": "https://nullprogram.com/blog/2024/01/28/"
+    },
+    {
+      "url": "https://thume.ca/2023/12/02/tracing-methods/",
+      "label": "\"Hardware breakpoints\" section."
+    },
+    {
+      "url": "https://fengweiz.github.io/paper/raven-dac22.pdf (DAC '22)"
+    },
+    {
+      "url": "https://man7.org/linux/man-pages/man2/mprotect.2.html"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages"
+    },
+    {
+      "url": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Catchpoints.html"
+    },
+    {
+      "url": "https://chromedevtools.github.io/devtools-protocol/tot/Debugger/"
+    },
+    {
+      "url": "https://docs.racket-lang.org/guide/contracts.html"
+    },
+    {
+      "url": "https://www.eiffel.org/doc/eiffel/ET-_Design_by_Contract_%28tm%29%2C_Assertions_and_Exceptions"
+    },
+    {
+      "url": "https://cppreference.dev/w/cpp/language/contracts"
+    }
+  ]
+}

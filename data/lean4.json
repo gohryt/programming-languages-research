@@ -1,0 +1,80 @@
+{
+  "kind": "language",
+  "name": "Lean 4",
+  "aliases": [
+    "lean"
+  ],
+  "summary": "Theorem prover and dependently-typed programming language with conventional file-as-module imports (Foo.Bar.lean ↔ Foo.Bar), namespace/section/open/export keywords, and the load-bearing property that imports scope typeclass instance resolution and macro visibility — but without Racket's phase tower.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lean 4 (Leonardo de Moura et al., 2021+) is a theorem prover and dependently-typed programming language. Memory aspects live in `data/lean4-persistent-arrays`, `data/lean4-rc`. This record covers the language-level module-system surface.",
+      "refs": [
+        {
+          "target": "module-systems#overview",
+          "type": "instance-of"
+        }
+      ]
+    },
+    {
+      "id": "imports-namespaces-sections-and-open",
+      "title": "import, namespace, section, open, export",
+      "tags": [
+        "lean4",
+        "modules",
+        "namespaces"
+      ],
+      "content": "Lean 4's module surface is conventional: `import Foo.Bar` loads another file-shaped module, `namespace Foo ... end Foo` opens a hierarchical naming scope, `section ... end` provides a non-namespace scope for `variable` declarations, `open Foo` brings unqualified access, and `export Foo (a b c)` re-exports specific names. Imports are transitive. Modules are file-shaped (`Foo/Bar.lean` ↔ `Foo.Bar`).\n\nLean deliberately *did not* inherit Racket's phase tower despite a Racket-influenced macro elaborator (`data/extensible-syntax`).",
+      "refs": [
+        {
+          "target": "racket#phase-aware-imports",
+          "type": "deliberately-rejected"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Lean 4 setup",
+          "url": "https://lean-lang.org/lean4/doc/setup.html"
+        }
+      ]
+    },
+    {
+      "id": "imports-as-instance-and-macro-scoping",
+      "title": "Imports as instance and macro scoping",
+      "tags": [
+        "lean4",
+        "imports",
+        "type-classes"
+      ],
+      "content": "The module-relevant design point is that **Lean modules participate in instance resolution**: an `instance : Add Nat where ...` declared in module `Foo` is only visible to clients that `import Foo`, so the import graph determines the visible instance set. Instance scoping is closer to Rust's coherence-by-orphan-rule than to Haskell's open-world assumption.\n\nMacro visibility follows the same pattern — a `macro_rules` declaration is visible where its namespace is `open`'d. Typeclass coherence semantics, the broader instance-resolution rules, and dispatch behavior are owned by `data/type-classes-traits`; the module-system claim here is that imports are the scoping primitive, not type-system internals.\n\nLake (`lakefile.lean` / `lakefile.toml`) is the package manager; Mathlib is the dominant single-package Lean ecosystem with hundreds of namespaces.\n\nThe lesson: **a conventional namespace-import module system can be made semantically load-bearing for instance and macro scoping without adopting Racket-style phase machinery** — a viable middle ground.",
+      "refs": [
+        {
+          "target": "type-classes-traits#overview",
+          "type": "scoped-by"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Lean 4 — theorem proving",
+          "url": "https://lean-lang.org/theorem_proving_in_lean4/interacting_with_lean.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Lean 4 setup",
+      "url": "https://lean-lang.org/lean4/doc/setup.html"
+    },
+    {
+      "label": "Theorem Proving in Lean 4",
+      "url": "https://lean-lang.org/theorem_proving_in_lean4/interacting_with_lean.html"
+    },
+    {
+      "label": "Mathlib",
+      "url": "https://leanprover-community.github.io/"
+    }
+  ]
+}

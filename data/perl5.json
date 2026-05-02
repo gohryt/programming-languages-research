@@ -1,0 +1,49 @@
+{
+  "kind": "language",
+  "name": "Perl 5",
+  "aliases": ["perl"],
+  "summary": "Symbol-table-based module system where package Foo declares a %Foo:: hash of names and `use Module` desugars to `BEGIN { require Module; Module->import(LIST); }`; visibility is convention via the Exporter module rather than language-enforced. The historical predecessor that Raku reacts against.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Perl 5 is the historical predecessor that Raku reacts against (`data/raku`), and a useful contrast against the more elaborate runtime-import systems. A Perl package is declared with `package Foo;` and creates a symbol table named `%Foo::`. Subroutines, variables, and other names live in that hash, with no language-level visibility distinction — `our $x` is package-scoped, `my $x` is lexically-scoped, but neither restricts cross-package access. Any code can read `$Foo::x` from anywhere.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "raku#overview", "type": "predecessor-of" }
+      ]
+    },
+    {
+      "id": "use-and-require",
+      "title": "use vs require — compile-time vs runtime",
+      "tags": ["perl", "module-systems", "imports"],
+      "content": "`use Module;` desugars exactly to `BEGIN { require Module; Module->import(LIST); }` — the `BEGIN` block forces compile-time execution. `require` is the lower primitive: it loads a `.pm` file by searching `@INC` (the module search path, populated from compiled-in defaults plus `PERL5LIB` and `-I` flags), then executes the file. `import` is just a method call that the convention `Exporter` module standardizes — `@EXPORT` names are imported by default, `@EXPORT_OK` are imported on request, `%EXPORT_TAGS` groups them by tag. None of this is enforced by the language; it's all convention layered on top of \"modules are symbol tables\" and \"`use` calls `import`.\"\n\nThe split between `use` (compile-time) and `require` (runtime) is the direct ancestor of Raku's `use`/`need`/`require` three-way split, and CPAN is the ecosystem Raku's fez/zef explicitly replaces.",
+      "refs": [
+        { "target": "import-semantics#static-imports", "type": "example" }
+      ],
+      "sources": [
+        { "label": "perldoc use", "url": "https://perldoc.perl.org/functions/use" },
+        { "label": "perldoc require", "url": "https://perldoc.perl.org/functions/require" },
+        { "label": "perldoc Exporter", "url": "https://perldoc.perl.org/Exporter" }
+      ]
+    },
+    {
+      "id": "no-identity-and-supply-chain",
+      "title": "No identity beyond filename — and the CPAN supply-chain consequence",
+      "tags": ["perl", "module-identity", "supply-chain"],
+      "content": "The contrast with Raku clarifies what Raku's ambitious identity model actually buys: Perl modules have *no* identity beyond filesystem path and package name, which is why CPAN suffered the supply-chain attacks that fez/zef was designed to close.\n\nFor a language designer, Perl 5 is a useful counterexample to the \"just use a filesystem hash and let convention handle it\" approach: the convention is genuinely productive in the small but degrades at ecosystem scale, where multiple distributions of the same name from different authors must coexist and cannot when identity is just a string.",
+      "refs": [
+        { "target": "raku#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "perldoc perlmod", "url": "https://perldoc.perl.org/perlmod" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "perldoc use", "url": "https://perldoc.perl.org/functions/use" },
+    { "label": "perldoc require", "url": "https://perldoc.perl.org/functions/require" },
+    { "label": "perldoc Exporter", "url": "https://perldoc.perl.org/Exporter" }
+  ]
+}

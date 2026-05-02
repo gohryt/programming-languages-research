@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-syscall",
+  "tag": "granularity:per-syscall",
+  "name": "Granularity: per syscall",
+  "description": "Mechanism fires at the user/kernel boundary. strace, eBPF tracepoints on syscalls, Sysdig capture.",
+  "axis": "granularity"
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "concept",
+  "name": "Ownership and Borrowing as Type Constraints",
+  "aliases": ["borrow-checker-architecture", "ownership-checker", "lifetime-as-constraint"],
+  "summary": "From the type checker's side, ownership and borrowing reduce to a constraint domain: resource variables with use counts, lifetime regions with subsumption rules, obligations attached to references. Memory-safety semantics live in `data/ownership` and `data/borrowing`; this record covers checker mechanics: resource variables, use counts, lifetime regions, effectful drops, and the diagnostics they produce.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "From the type checker's side, ownership and borrowing reduce to a constraint domain: resource variables with use counts, lifetime regions with subsumption rules, and obligations attached to references.\n\nThe semantic-policy questions — what counts as a move, how partial moves and reborrows compose, how aliasing relates to mutability, when destructors run — are owned by memory-discipline records `data/ownership` and `data/borrowing`. This record cares only about the checker architecture: resource variables, use counts, lifetime regions, effectful drops, and the diagnostics they produce.",
+      "refs": [
+        { "target": "linear-affine-types#overview", "type": "specialised-form" },
+        { "target": "rust#type-system", "type": "exemplifies" },
+        { "target": "rustbelt-lambda-rust#overview", "type": "formalised-by" }
+      ]
+    },
+    {
+      "id": "checker-architecture",
+      "title": "Checker architecture",
+      "tags": ["type-system", "ownership"],
+      "content": "A borrow checker is built around three constraint domains:\n\n- **resource variables** representing values whose ownership is being tracked. Each resource variable has a use count (how many times the value has been moved or copied).\n- **lifetime variables** representing scopes during which a borrow is valid. Lifetimes form a partial order (`'a: 'b` means `'a` outlives `'b`); the checker derives obligations from this order.\n- **borrow obligations** attaching reference types to lifetime constraints — a `&'a T` reference is valid only within `'a`'s scope, and the operations performed through it must respect the read-vs-write distinction.\n\nrustc's MIR pass (`data/rust-hir-thir-mir`) is the canonical implementation reference: ownership-as-constraint is solved on the CFG-form IR after type checking, with NLL (non-lexical lifetimes) and Polonius as successive refinements of the constraint solver.\n\nThe diagnostics challenge is making these constraints legible to programmers. \"`x` is borrowed here\" needs to point at both the borrow site and the prior move site; \"`'a` does not outlive `'b`\" needs to render lifetimes as source-relevant entities (\"the borrow lasts until end of function, but `x` is dropped at end of inner block\")."
+    }
+  ]
+}

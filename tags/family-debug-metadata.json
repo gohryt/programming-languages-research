@@ -1,0 +1,7 @@
+{
+  "id": "family-debug-metadata",
+  "tag": "family:debug-metadata",
+  "name": "Family: debug metadata",
+  "description": "Debug-info correctness, location lists, cross-tier mapping, build-ID symbol distribution — DWARF, debuginfod, JVM source maps.",
+  "axis": "family"
+}

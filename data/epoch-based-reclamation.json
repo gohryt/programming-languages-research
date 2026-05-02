@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Epoch-Based Reclamation (EBR)",
+  "aliases": ["EBR", "epoch-based reclamation", "Crossbeam epoch", "Fraser EBR"],
+  "summary": "Keir Fraser's EBR (2003): a global epoch counter advances when all threads in critical sections have observed the current epoch; objects retired in epoch e freed once all threads reach e+2. Library-encapsulated, transparent to data-structure code. Cheap readers (one acquire load + relaxed store per pin) but unbounded retention under stalls. Crossbeam (Rust) adapts EBR to the affine type system, making safety a borrow-check obligation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["safe-memory-reclamation", "epoch-based", "lock-free", "non-blocking"],
+      "content": "Keir Fraser's **EBR** (Cambridge thesis, 2003): a global epoch counter advances when all threads in critical sections have observed the current epoch; objects retired in epoch *e* are freed once all threads reach *e+2*. Library-encapsulated and transparent to data-structure code — readers simply pin/unpin around access without naming the specific pointers being protected.\n\nOnly three epoch values are needed (mod-3 invariant). Batched deferred destruction amortises the scan across many retires.",
+      "refs": [
+        { "target": "hazard-pointers", "type": "contrasts-with" },
+        { "target": "rcu", "type": "related" },
+        { "target": "qsbr", "type": "related" },
+        { "target": "hazard-eras", "type": "predecessor-of" },
+        { "target": "interval-based-reclamation", "type": "predecessor-of" }
+      ],
+      "sources": [
+        { "label": "Fraser EBR thesis (UCAM-CL-TR-579)", "url": "http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-579.html" }
+      ]
+    },
+    {
+      "id": "cost-model",
+      "title": "Cost model and trade-offs",
+      "tags": ["reader-overhead", "unbounded-memory-bound"],
+      "content": "Cost: reader one acquire load + relaxed store per pin; SeqCst fence on first pin to publish. Substantially cheaper per-access than hazard pointers, which is the main reason EBR dominates in practice for general-purpose lock-free libraries.\n\nWorst-case retention: unbounded — a single stalled or preempted thread holding a pin freezes reclamation globally. This is the canonical EBR weakness and the reason most schemes from Hazard Eras onward (`data/hazard-eras`, `data/interval-based-reclamation`, `data/hyaline-reclamation`, `data/wait-free-eras`, `data/vbr-reclamation`, `data/nbr-reclamation`) try to combine EBR-grade throughput with HP-grade bounds.\n\nIn practice EBR is fine because preemption stalls are rare and short, but for hard-real-time or adversarial-scheduling systems the bound matters and HP/IBR/Hyaline are preferred.",
+      "refs": [
+        { "target": "hazard-pointers#cost-model", "type": "contrasts-with" },
+        { "target": "wait-free-eras", "type": "related" },
+        { "target": "stamp-it", "type": "related" }
+      ]
+    },
+    {
+      "id": "crossbeam-rust",
+      "title": "Crossbeam — EBR in Rust",
+      "tags": ["rust", "crossbeam", "production", "lock-free-data-structures"],
+      "content": "**Crossbeam** (Rust) adapts EBR to Rust's affine type system: a `Guard` RAII pin plus `Atomic<T>` / `Shared<'g, T>` whose lifetime is bounded by the guard, statically preventing use-after-pin. Lifetime-parameterised shared pointers convert reclamation safety into a borrow-check obligation — the same machinery that prevents dangling references in safe Rust now prevents premature reclamation in lock-free code.\n\n**GhostCell** composes with crossbeam to give zero-cost branded interior mutability for graph-shaped lock-free structures: a brand `'id` token authorises mutation through any cell carrying that brand, avoiding per-field locks while remaining safe.\n\nCrossbeam is the foundation of most Rust lock-free libraries: `crossbeam-deque`, `crossbeam-queue`, `crossbeam-skiplist`, `flurry` (Java ConcurrentHashMap port), and the work-stealing schedulers in Tokio and Rayon all build on crossbeam-epoch.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" }
+      ],
+      "sources": [
+        { "label": "crossbeam-epoch docs", "url": "https://docs.rs/crossbeam-epoch/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Fraser EBR thesis", "url": "http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-579.html" },
+    { "label": "crossbeam-epoch", "url": "https://docs.rs/crossbeam-epoch/" }
+  ]
+}

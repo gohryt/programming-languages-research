@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Defunctionalization",
+  "aliases": ["defunctionalisation", "Reynolds defunctionalization"],
+  "summary": "Reynolds 1972: replace higher-order functions with first-order datatypes — every lambda becomes a constructor of a sum type, and function application becomes a `match` over the sum. Whole-program transformation; eliminates closures entirely. Powers Roc lambda sets, MLton, some Idris backends, GPU compilers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Reynolds's **defunctionalization** (1972, \"Definitional Interpreters for Higher-Order Programming Languages\") replaces higher-order functions with first-order datatypes: every lambda in the program becomes a constructor of a sum type, and function application becomes a `match` over the sum.\n\nFor a program with finitely many syntactic lambdas (which is any closed program), defunctionalization is a whole-program transformation that eliminates closures entirely, producing first-order code that is trivially amenable to C-style compilation. The sum type of \"all possible function values\" plus the global dispatch `apply` function replace the dynamic closure machinery.",
+      "refs": [
+        { "target": "closure-conversion#overview", "type": "alternative-to" },
+        { "target": "lambda-lifting#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Reynolds — Definitional Interpreters", "url": "https://dl.acm.org/doi/10.1145/800194.805852" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["compiler", "functional-languages"],
+      "content": "Collect every lambda in the program — including those produced by partial application or eta-expanded operators. Each lambda becomes a constructor of a global sum type `Closure`, with the constructor's fields being the captured variables. Every function call site that invokes a closure becomes a call to a generated dispatcher function `apply(closure, arg)` that pattern-matches on the constructor and runs the appropriate body.\n\nThe transformation is whole-program because the sum type must enumerate every lambda. A closed program has finitely many syntactic lambdas (the defunctionalisation theorem), so the sum is well-defined. Library code linked from outside breaks the assumption — the linker would need to know all lambdas in all clients to extend the sum.\n\nAfter defunctionalisation, no first-class functions remain: the program is straightforwardly first-order and compiles via standard C-style codegen with no runtime closure allocation.",
+      "refs": []
+    },
+    {
+      "id": "production-deployments",
+      "title": "Production deployments",
+      "tags": ["compiler", "production"],
+      "content": "Defunctionalisation is the theoretical backbone of:\n\n- **Roc's lambda sets** — surgical defunctionalisation, where the compiler tracks the *exact* set of lambdas that can flow to each call site, then specialises the dispatcher per call site rather than maintaining a global sum type.\n- **MLton** — whole-program SML compiler, defunctionalises plus monomorphises plus contifies as core passes.\n- **Some Idris backends** — when targeting C or other separately-compilation-hostile environments.\n- **GPU compilers** — closures cannot be allocated at runtime on most GPU programming models, so any higher-order user code must be defunctionalised before reaching the device.\n\nThe cost is losing separate compilation — defunctionalisation is fundamentally whole-program, so library-level code must either be generic over a closure type or pre-committed to the full set of callers.",
+      "refs": [],
+      "sources": [
+        { "label": "Danvy-Nielsen — Functional Correspondence Between Defunctionalization and CPS", "url": "https://www.cs.ru.nl/~jhh/publications/danvy-nielsen-cc.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Reynolds — Definitional Interpreters", "url": "https://dl.acm.org/doi/10.1145/800194.805852" },
+    { "label": "Danvy-Nielsen — Defunctionalization and CPS", "url": "https://www.cs.ru.nl/~jhh/publications/danvy-nielsen-cc.pdf" }
+  ]
+}

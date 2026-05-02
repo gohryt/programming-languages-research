@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Modular Implicits",
+  "aliases": ["ocaml-modular-implicits"],
+  "summary": "White, Bour, and Yallop's research proposal (ML Workshop 2014) extending OCaml with implicit functor application, similar to how Haskell elaborates type-class instances; demonstrates that type classes and ML modules are duals — type classes are dictionaries-passed-implicitly, ML modules are dictionaries-passed-explicitly.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "White, Bour, and Yallop's **Modular Implicits** (ML Workshop 2014) propose extending OCaml with a mechanism for *implicitly* applying functors to their argument structures, similar to how Haskell elaborates type-class instances. The user writes `show 42` and the elaborator searches the visible scope for a structure matching `SHOW with type t = int`, applying the appropriate functor automatically.",
+      "refs": [
+        { "target": "module-calculi#first-class-modules", "type": "extends" },
+        { "target": "type-classes-traits#overview", "type": "dual-of" }
+      ],
+      "sources": [
+        { "label": "Modular Implicits paper", "url": "https://arxiv.org/abs/1512.01895" }
+      ]
+    },
+    {
+      "id": "duality-with-type-classes",
+      "title": "Duality with type classes",
+      "tags": ["modular-implicits", "type-classes", "design-space"],
+      "content": "This is conceptually significant because it shows that **type classes and module systems are duals** in a precise sense. Type classes are dictionaries-passed-implicitly; ML modules are dictionaries-passed-explicitly. Modular implicits make ML modules participate in implicit elaboration, recovering type-class ergonomics without abandoning the module-calculus foundation.\n\nScala's implicits (Scala 2) and `given`/`using` (Scala 3) are independent designs in the same conceptual space; Rust's traits are another point. The four — Haskell type classes, Scala implicits, Rust traits, and modular implicits — span the design space of \"how does the language handle the dictionary-passing problem?\"",
+      "refs": [
+        { "target": "scala#elaborate-imports", "type": "comparable-to" }
+      ]
+    },
+    {
+      "id": "non-adoption",
+      "title": "Non-adoption and design space",
+      "tags": ["modular-implicits", "ocaml"],
+      "content": "The proposal has not landed in mainline OCaml, partly because the elaboration semantics interact subtly with OCaml's existing type inference and module language. The design space remains open: OCaml's existing first-class modules cover some of the use cases, and the community has debated whether implicit modules add enough value to justify the language complexity.\n\nThe lesson generalises: **adding implicit elaboration to an existing module system is feasible but expensive**. Languages designing from scratch should pick one of (a) implicit type classes Haskell-style, (b) explicit functors ML-style, (c) implicit functors Scala-style, or (d) traits Rust-style — and commit; mixing them tends to produce confusing elaboration semantics.",
+      "refs": [],
+      "sources": [
+        { "label": "Modular Implicits draft (Yallop)", "url": "https://www.cl.cam.ac.uk/~jdy22/papers/modular-implicits.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Modular Implicits paper", "url": "https://arxiv.org/abs/1512.01895" },
+    { "label": "Modular Implicits draft (Yallop)", "url": "https://www.cl.cam.ac.uk/~jdy22/papers/modular-implicits.pdf" },
+    { "label": "Leo White's homepage", "url": "https://www.lpw25.net/" }
+  ]
+}

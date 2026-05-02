@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Zig comptime",
+  "aliases": ["compile-time evaluation", "Zig compile-time"],
+  "summary": "Zig's `comptime` keyword: any expression prefixed with `comptime` is evaluated during compilation; any function parameter marked `comptime` must be known at compile time and the function specialises per distinct value. Generics, conditional compilation, and reflection all unify into one mechanism — no separate macro system.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Zig's **`comptime`** is the most distinctive modern take on compile-time evaluation. Any expression prefixed with `comptime` is evaluated during compilation; any function parameter marked `comptime` must be known at compile time and the function is specialised for each distinct value.\n\nWhat makes it original is the uniformity. Generics are `comptime` parameters to functions that return types. Conditional compilation is `comptime if` branching. Reflection over types and values happens through ordinary compile-time execution. Zig deliberately does **not** have a macro system in the AST-rewriting sense: `comptime` functions compute values, types, and specialised declarations, but they do not receive and return arbitrary syntax trees.",
+      "refs": [
+        { "target": "compile-time-function-evaluation#overview", "type": "compared-with" },
+        { "target": "mojo-parameter#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Zig comptime documentation", "url": "https://ziglang.org/documentation/master/#comptime" }
+      ]
+    },
+    {
+      "id": "generics-as-comptime-functions",
+      "title": "Generics as comptime functions",
+      "tags": ["generics", "compile-time"],
+      "content": "Zig generics use no special template syntax. A generic data structure is an ordinary function that takes a type parameter at compile time and returns a struct type:\n\n```zig\nfn List(comptime T: type) type {\n    return struct {\n        items: []T,\n        // ...\n    };\n}\n```\n\nHere `List` is a regular function that runs at compile time, takes a type, and returns a type. Calling `List(u32)` produces a new struct type — the same machinery as generic specialisation in C++ or Rust, but expressed without special syntax. Conditional compilation falls out the same way: `comptime if (target == .windows)` is just an `if` evaluated at compile time, and the not-taken branch never reaches codegen.",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "language-design"],
+      "content": "The cost is compile-time performance: `comptime` evaluation runs the same machinery as the main compiler, and unboundedly large comptime programs can exhaust resources. Zig addresses this pragmatically with evaluation quotas rather than formal termination guarantees.\n\nThe trade-off versus AST-rewriting macros: Zig cannot produce arbitrary syntactic forms (no DSLs that introduce new keywords or operators), but it also has no macro hygiene problems, no separate macro language to learn, and IDE tooling sees compile-time code as ordinary code. For systems-language scope where generics, reflection, and conditional compilation cover most metaprogramming needs, this is a clean trade.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Zig comptime documentation", "url": "https://ziglang.org/documentation/master/#comptime" }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "kind": "concept",
+  "name": "PEG Parsing",
+  "aliases": ["parsing-expression-grammars", "packrat-parsing"],
+  "summary": "Parsing Expression Grammars (Bryan Ford, 2004) define syntax in terms of ordered-choice recognition. Naturally recursive descent; pairs with packrat memoization for guaranteed linear time at O(input × rules) memory cost.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Parsing Expression Grammars (Bryan Ford, 2004) define syntax in terms of recognition rather than generation. The choice operator is ordered: `A / B` tries `A` first, and only tries `B` if `A` fails. This eliminates ambiguity by construction — every valid input has exactly one parse tree.\n\nPEG parsers are naturally recursive descent, with one function per grammar rule. Status (as of 2026-04): CPython has shipped `pegen`, its PEG parser generator, as the default parser since 3.9 (PEP 617); the old LL(1) parser was removed in 3.10. The PEG approach is the established CPython parser architecture, not an experimental side path.",
+      "refs": [
+        { "target": "recursive-descent#overview", "type": "uses" },
+        { "target": "deterministic-ll-lr#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        {
+          "label": "PEP 617 — New PEG parser for CPython",
+          "url": "https://peps.python.org/pep-0617/"
+        }
+      ]
+    },
+    {
+      "id": "ordered-choice-and-recognition",
+      "title": "Ordered choice and recognition",
+      "tags": ["parser", "grammar", "algorithms"],
+      "content": "In PEG, earlier alternatives win: `A / B` succeeds with whichever of A or B matches first, and never reconsiders. This is recognition-based: the grammar describes how to recognise input, not how to generate strings. Ambiguity disappears — there is at most one parse — at the cost of making choice order semantically significant. A grammar author who reorders alternatives can change which inputs the grammar accepts.\n\nThis is a sharp contrast with CFG-based approaches that separate grammar description from parser conflict handling. PEGs bake disambiguation into the grammar itself.",
+      "refs": [
+        { "target": "deterministic-ll-lr#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "packrat-parsing",
+      "title": "Packrat memoization",
+      "tags": ["parser", "memoization", "performance"],
+      "content": "Naive PEG parsers can hit exponential time because backtracking re-explores the same input under multiple rules. Packrat parsing fixes this by memoizing every rule's result at every input position, guaranteeing linear time at the cost of O(input × rules) memory.\n\nThe practical limitation is the memo table: for a 1MB source file with 100 grammar rules, the memoization table is approximately 100MB. Various strategies exist (lazy memoization, bounded tables, selective memoization), but the space-time trade-off is fundamental.\n\nRecent research extends packrat in two directions that matter for language tooling. One line handles left recursion through cycle detection and fixed-point iteration, removing the old rule that PEG grammars must be manually rewritten to remove left-recursive expression forms. Another line makes packrat memo tables incremental by storing parse results in edit-aware interval structures, so typical small edits avoid rebuilding the whole memo table.",
+      "refs": [
+        { "target": "incremental-parsing#overview", "type": "related" },
+        { "target": "parser-combinators#tradeoffs", "type": "related" }
+      ],
+      "sources": [
+        {
+          "label": "Warth, Douglass, Millstein — Packrat Parsers Can Support Left Recursion (PEPM 2008)",
+          "url": "https://web.cs.ucla.edu/~todd/research/pub.php?id=pepm08"
+        },
+        {
+          "label": "Yedidia & Chong — Incremental packrat parsing (2021)",
+          "url": "https://arxiv.org/abs/2104.11050"
+        }
+      ]
+    },
+    {
+      "id": "strengths-and-tradeoffs",
+      "title": "Strengths and trade-offs",
+      "tags": ["parser", "tradeoffs", "grammar-design"],
+      "content": "PEGs give grammar authors direct control over ambiguity resolution: there is no separate conflict-resolution phase, no need to engineer an LR table around shift/reduce conflicts. The grammar is the parser. This is appealing for languages where grammar evolution is constant and conflict diagnostics from generators (yacc, ANTLR) are hard to interpret.\n\nThe cost: choice order encodes meaning. A grammar author who reorders alternatives can silently change accepted language. Ordered-choice grammars are also less amenable to error recovery and ambiguity reporting than CFG-based engines, because the parser stops at the first matching alternative rather than enumerating all possible parses.",
+      "refs": [
+        { "target": "tree-sitter#parser-architecture", "type": "contrasts-with" },
+        { "target": "parser-combinators#overview", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "pegen — PEG parser generator (CPython)",
+      "url": "https://we-like-parsers.github.io/pegen/peg_parsers.html"
+    },
+    {
+      "label": "PEP 617 — New PEG parser for CPython",
+      "url": "https://peps.python.org/pep-0617/"
+    },
+    {
+      "label": "Warth, Douglass, Millstein — Packrat Parsers Can Support Left Recursion (PEPM 2008)",
+      "url": "https://web.cs.ucla.edu/~todd/research/pub.php?id=pepm08"
+    },
+    {
+      "label": "Yedidia & Chong — Incremental packrat parsing (2021)",
+      "url": "https://arxiv.org/abs/2104.11050"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "language",
+  "name": "Monte — Modern Object-Capability Language",
+  "aliases": ["monte", "monte-lang"],
+  "summary": "Modern object-capability language directly descended from E. Python-flavored syntax, standalone runtime, full ocap discipline (sealer/unsealer pairs, eventual sends, vats, CapTP). The cleanest contemporary example of 'E semantics with familiar syntax.' Status (as of 2026-04): dormant.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["monte", "ocap", "object-capability", "language-capability", "no-ambient-authority"],
+      "content": "**Monte** is a modern object-capability language directly descended from E. Where E used a Java-influenced syntax that aged poorly, Monte adopts a Python-flavored surface — significant indentation, familiar method-call notation, modern lexical structure — while preserving E's complete ocap semantics: sealer/unsealer pairs, eventual sends, vats, the Granovetter introduction discipline, and CapTP for cross-vat capability transfer.\n\nMonte is the cleanest contemporary demonstration that ocap discipline is **not tied to any particular surface syntax**: the language design is E with a different skin. This makes it useful as a teaching example — programmers familiar with Python can read Monte without learning new syntactic conventions, but the underlying authority discipline is fully E-class.",
+      "refs": [
+        { "target": "capability-based-memory", "type": "instance-of" },
+        { "target": "e-language", "type": "descended-from" }
+      ]
+    },
+    {
+      "id": "design-points",
+      "title": "Design points",
+      "tags": ["monte", "ocap", "vats"],
+      "content": "Distinctive Monte design points:\n\n- **Standalone runtime** — Monte ships its own VM (the canonical implementation is in RPython, like PyPy), so it does not depend on a host language's runtime. This is the contrast with `spritely-goblins`, which is a library inside Racket / Guile. Standalone-runtime ocap means the entire language semantics — including the ocap-relevant restrictions on global state, reflection, and IO — is enforced by the VM, not by host-language conventions.\n- **Auditable code** — Monte explicitly supports **auditors**, meta-programmatic objects that examine source at compile time and certify properties (e.g., \"this expression is determined entirely by its arguments, and therefore safe to evaluate inside a sealed context\"). Auditors are E's mechanism for proving local properties without static type-system support; Monte preserves and extends them.\n- **Optional gradual typing** — Monte includes a gradual type system; types are optional but, when supplied, participate in the ocap discipline (e.g., refining a capability's interface to a more restricted view).\n- **CapTP networking** — interoperates with the broader OCapN ecosystem, including Spritely Goblins.",
+      "refs": [
+        { "target": "spritely-goblins", "type": "compared-with" },
+        { "target": "capn-proto", "type": "compatible-with" }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["monte", "research", "historical"],
+      "content": "Status (as of 2026-04): **Monte is dormant**. The repository has been mostly inactive since approximately 2018-2020; the canonical RPython-based implementation has fallen behind contemporary RPython, and there is no current funded development.\n\nThe reference value remains: Monte is cited as the example showing that the ocap discipline survives a syntactic re-skinning, and the explicit auditor mechanism is a useful design pattern for languages that want compile-time-checked capability properties without a heavyweight type system. Where Spritely Goblins is the actively developed modern E-derivative for the Scheme ecosystem, Monte played the same role for the Python-syntax ecosystem before going quiet.",
+      "refs": [
+        { "target": "spritely-goblins", "type": "active-counterpart" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Spritely Goblins (Monte's active sibling)", "url": "https://spritely.institute/goblins/" }
+  ]
+}

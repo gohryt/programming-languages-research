@@ -1,0 +1,7 @@
+{
+  "id": "family-record-replay",
+  "tag": "family:record-replay",
+  "name": "Family: record and replay",
+  "description": "Mechanisms that turn execution into a replayable artifact: rr, Pernosco, WinDbg TTD, UndoDB, QEMU icount, CRIU, ocamldebug, TotalView.",
+  "axis": "family"
+}

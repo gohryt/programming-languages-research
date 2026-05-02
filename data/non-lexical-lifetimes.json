@@ -1,0 +1,88 @@
+{
+  "kind": "concept",
+  "name": "Non-Lexical Lifetimes (NLL)",
+  "aliases": [
+    "NLL",
+    "Rust NLL"
+  ],
+  "summary": "Rust's reformulation of borrow-scope analysis from lexical block boundaries to liveness over the MIR control-flow graph. Stable in Rust 1.31 (December 2018); on-by-default for all editions in Rust 1.63 (August 2022). A borrow ends at its last use, not at the closing brace.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "nll",
+        "borrowing",
+        "rust",
+        "lifetime",
+        "compile-time-safety"
+      ],
+      "content": "Rust's defining mechanism is the borrow checker: every reference has a region/lifetime, and the type system enforces that `&mut T` is unique while `&T` is shared. NLL reformulated borrow scopes from the lexical block boundary to *liveness over the MIR control-flow graph*. A borrow ends at its last *use*, not at the closing brace.\n\nNLL stabilized in Rust 1.31 (December 2018) and became on-by-default for all editions in Rust 1.63 (August 2022).",
+      "refs": [
+        {
+          "target": "borrowing",
+          "type": "related"
+        },
+        {
+          "target": "ownership",
+          "type": "related"
+        },
+        {
+          "target": "rust",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "polonius",
+          "type": "predecessor-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "NLL by default (Rust 1.63 announcement)",
+          "url": "https://blog.rust-lang.org/2022/08/05/nll-by-default.html"
+        },
+        {
+          "label": "NLL RFC 2025",
+          "url": "https://rust-lang.github.io/rfcs/2025-nll.html"
+        }
+      ]
+    },
+    {
+      "id": "technical-advances",
+      "title": "Technical advances shipped with NLL",
+      "tags": [
+        "nll",
+        "borrowing",
+        "compiler",
+        "static-analysis"
+      ],
+      "content": "NLL ships three load-bearing technical advances:\n\n1. **MIR-based dataflow** computes \"loans live at point P\" via constraint propagation over the MIR control-flow graph rather than over the syntactic block structure.\n2. **Two-phase borrows** split a `&mut` into a reservation phase (read-only) and an activation phase, enabling patterns like `vec.push(vec.len())` that would otherwise alias.\n3. **Reborrowing rules** let `&mut *p` produce a fresh inner borrow, re-enabling `p` after the inner borrow ends.",
+      "refs": [
+        {
+          "target": "borrowing",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Two-phase borrows (Matsakis)",
+          "url": "https://smallcultfollowing.com/babysteps/blog/2017/03/01/nested-method-calls-via-two-phase-borrowing/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "NLL by default (Rust 1.63 announcement)",
+      "url": "https://blog.rust-lang.org/2022/08/05/nll-by-default.html"
+    },
+    {
+      "label": "NLL RFC 2025",
+      "url": "https://rust-lang.github.io/rfcs/2025-nll.html"
+    },
+    {
+      "label": "Two-phase borrows (Matsakis)",
+      "url": "https://smallcultfollowing.com/babysteps/blog/2017/03/01/nested-method-calls-via-two-phase-borrowing/"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "JVM Bytecode",
+  "aliases": ["java-bytecode"],
+  "summary": "Stack-based, typed, verifiable bytecode for the Java Virtual Machine since 1995. 1-byte opcodes plus optional operands, average 1–4 bytes per instruction. Pre-execution verification ensures stack and type safety; long-term execution depends on JIT to remove dispatch overhead.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "JVM bytecode is stack-based: operations pop operands from an implicit operand stack and push results. Instructions are 1-byte opcodes plus optional operands; a typical class file averages 1–4 bytes per instruction. The bytecode is *typed* — `iload` loads an int, `aload` loads a reference, `i2l` converts int to long — and JVM verification before execution ensures stack and type safety.\n\nJVM bytecode's longevity (since 1995) reflects its design strengths: small, portable, verifiable, and JIT-friendly.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "register-vs-stack-bytecode#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "Java Virtual Machine Specification", "url": "https://docs.oracle.com/javase/specs/jvms/se21/html/" }
+      ]
+    },
+    {
+      "id": "stack-vs-register-cost",
+      "title": "Stack-based dispatch cost",
+      "tags": ["bytecode", "performance"],
+      "content": "Stack-based dispatch is slower than register-based — Shi et al. (VEE 2008) measured ~47% more dispatched instructions for stack VMs vs equivalent register VMs. This is why HotSpot's JIT compiles bytecode away rather than interpreting it long-term: the verifiable, portable surface is preserved at a higher level, and the per-instruction cost is amortised by JIT-compiled native code.\n\nThe trade-off is deliberate: JVM bytecode optimises for *correctness, portability, and load-time verifiability* over interpretation throughput.",
+      "refs": [
+        { "target": "register-vs-stack-bytecode#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "verification-model",
+      "title": "Verifier model",
+      "tags": ["bytecode", "verification", "security"],
+      "content": "Before execution, the JVM verifier walks every method, statically tracks the operand-stack types and local-variable types at each program point, and rejects any program that could violate type safety, jump out of method bounds, or leave the stack in an inconsistent state. Stackmap frames (introduced in Java 6) provide pre-computed type information at branch targets so verification stays linear-time.\n\nThis substrate is what makes JVM bytecode safe to load from untrusted sources, and what makes the JIT free to assume type safety without re-checking. The same pattern reappears in Wasm validation (single-pass) and Move's mandatory bytecode verifier.",
+      "refs": [
+        { "target": "webassembly#overview", "type": "shares-pattern-with" },
+        { "target": "move-bytecode-verifier#overview", "type": "shares-pattern-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Java Virtual Machine Specification", "url": "https://docs.oracle.com/javase/specs/jvms/se21/html/" }
+  ]
+}

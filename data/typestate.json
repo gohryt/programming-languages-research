@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Typestate and Protocol Checking",
+  "aliases": [
+    "protocol-types",
+    "state-machine-types"
+  ],
+  "summary": "Tracks state transitions in the type of a value: open versus closed file, initialized versus uninitialized object, authenticated versus anonymous connection. Can be encoded with linear types, phantom types, session types, or dependent indices. Choice: library pattern (low cost, less uniform diagnostics) or first-class checker feature (uniform errors, stronger guarantees, more complexity).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Typestate tracks state transitions in the type of a value: open versus closed file, initialized versus uninitialized object, authenticated versus anonymous connection. It can be encoded with linear types, phantom types, session types, or dependent indices.\n\nThe distinguishing axis across designs is whether typestate lives as a *library pattern* (low implementation cost, less uniform diagnostics) or as a *first-class checker feature* (more uniform error messages and stronger guarantees, but additional checker complexity and surface syntax).",
+      "refs": [
+        {
+          "target": "linear-affine-types#overview",
+          "type": "encoded-via"
+        },
+        {
+          "target": "session-types#distinct-from-typestate-and-effects",
+          "type": "contrasted-with"
+        },
+        {
+          "target": "dependent-types#overview",
+          "type": "encoded-via"
+        }
+      ]
+    },
+    {
+      "id": "encoding-strategies",
+      "title": "Encoding strategies",
+      "tags": [
+        "type-system",
+        "typestate"
+      ],
+      "content": "Typestate can be expressed in multiple ways:\n\n- **Linear types with state-tagged wrappers**: a `File<Open>` becomes a `File<Closed>` after `close()`. The linear discipline ensures the old `File<Open>` cannot be reused after the transition.\n- **Phantom types over a non-linear value**: an immutable `File<S>` where `S` is a phantom-type marker; transitions return a new value with a different `S`. Works without linearity but requires programmer discipline to avoid using stale handles.\n- **Session types with dual endpoints**: each side of a communication channel carries a session-typed handle that advances through the protocol's states (`data/session-types`).\n- **Dependent indices**: the file value is indexed by its current state, and operations carry pre/post-condition annotations. Idris and similar languages express this directly with QTT (`data/idris2-qtt-ir`).\n\nThe lesson is that typestate is *design-shape independent*: any of these encodings works given the right host-language features. The choice depends on what the language already provides."
+    }
+  ]
+}

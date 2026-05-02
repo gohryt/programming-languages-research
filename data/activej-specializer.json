@@ -1,0 +1,60 @@
+{
+  "kind": "library",
+  "name": "ActiveJ Specializer",
+  "aliases": [
+    "instance-to-static-class rewriting"
+  ],
+  "summary": "ASM-driven runtime specialisation: takes an instance with predictable state, rewrites it as a static class with all field accesses inlined as constants. ~7× speedup recovering manual-code performance. JVM-only. The concept generalises: when an object's state is effectively immutable, specialise it as code.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ActiveJ Specializer is a runtime instance-specialisation library: it takes an instance whose fields are effectively immutable (configuration objects, dependency-injection-bound services), generates a new class via ASM where the field values are inlined as constants, and replaces the original instance with one of the generated class.\n\nThe payoff: every `instance.someField` access in user code becomes a constant load (or, after JIT, simply a constant in the generated machine code). For configuration-heavy code paths (frameworks, DI containers, query engines), this can be substantial.",
+      "refs": [
+        {
+          "target": "activej-codegen#overview",
+          "type": "uses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "ActiveJ Specializer",
+          "url": "https://activej.io/specializer"
+        },
+        {
+          "label": "ActiveJ Specializer examples",
+          "url": "https://activej.io/specializer/examples"
+        },
+        {
+          "label": "ActiveJ Inject — speeding up injection",
+          "url": "https://activej.io/inject/speeding-up-injection"
+        }
+      ]
+    },
+    {
+      "id": "design-pattern",
+      "title": "Design pattern — runtime specialisation as library",
+      "tags": [
+        "jvm",
+        "specialisation"
+      ],
+      "content": "Reported speedup of ~7× on the benchmark workloads ActiveJ uses internally for dependency injection bootstrap and query-engine setup. The trade-off is JVM-only and requires the instance state to be predictable (changing field values during the program's run breaks the specialisation invariant).\n\nThe broader pattern — \"when an object's effective state is fixed, specialise it as static code\" — appears in other forms across the industry: V8's hidden-class transitions specialise on object shape; LLVM's interprocedural constant propagation specialises functions on constant arguments. ActiveJ Specializer makes the technique explicit and accessible as a library on the JVM.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "ActiveJ Specializer",
+      "url": "https://activej.io/specializer"
+    },
+    {
+      "label": "ActiveJ Specializer examples",
+      "url": "https://activej.io/specializer/examples"
+    },
+    {
+      "label": "ActiveJ Inject — speeding up injection",
+      "url": "https://activej.io/inject/speeding-up-injection"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "kind": "tool",
+  "name": "Pydrofoil — Sail ISA Specifications as Compilable Simulator IR",
+  "aliases": [
+    "Sail-to-simulator compiler"
+  ],
+  "summary": "ECOOP 2025: treats Sail ISA specifications as a source representation for generating fast instruction-set simulators. Specialise the Sail semantics into an executable simulator with substantially less interpretive overhead than directly executing the Sail model. Generated simulators are competitive with hand-written ones.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Pydrofoil** (ECOOP 2025) treats Sail ISA specifications as a source representation for generating fast instruction-set simulators. Sail already acts as a formal ISA IR for symbolic execution and verification; Pydrofoil adds the compiler-engineering path: specialise the Sail semantics into an executable simulator with substantially less interpretive overhead than directly executing the model.\n\nThe pipeline: take a Sail specification of an ISA (RISC-V, ARMv8-A, CHERI), compile it to optimised Python via the RPython meta-tracing framework, and produce a JIT-compiled simulator that runs the spec's semantics natively rather than interpretively.",
+      "refs": [
+        {
+          "target": "metatracing-frameworks#overview",
+          "type": "uses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Pydrofoil paper",
+          "url": "https://arxiv.org/abs/2503.04389"
+        }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": [
+        "compiler",
+        "verification",
+        "research"
+      ],
+      "content": "The representation lesson is that a formal specification can be more than documentation or proof input. If it is executable and typed enough, it can become the canonical representation from which emulators, tests, and analysis tools are generated.\n\nFor a language designer: a typed semantics specification, kept in sync with the implementation through executable extraction (Pydrofoil-style) or directly authored in an executable form (Sail itself), gives the project simultaneously a verification target, a reference simulator, and a documentation source. The cost is the discipline of keeping the spec rigorous; the benefit is a single source of truth.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Pydrofoil repository",
+          "url": "https://github.com/pydrofoil/pydrofoil"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Pydrofoil arXiv",
+      "url": "https://arxiv.org/abs/2503.04389"
+    },
+    {
+      "label": "Pydrofoil repo",
+      "url": "https://github.com/pydrofoil/pydrofoil"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "kind": "language",
+  "name": "Pony",
+  "aliases": ["pony-lang", "ponylang"],
+  "summary": "Sylvan Clebsch's Pony has six per-reference capabilities — iso, trn, ref, val, box, tag — that form a 3×3 matrix on (deny global aliases) × (deny local aliases). The sendable subset (iso, val, tag) is the diagonal: only those can cross actor boundaries. Static foundation for data-race freedom by construction, proven in Deny Capabilities for Safe, Fast Actors (Clebsch et al., AGERE 2015). consume and recover blocks let capability-changing assignments happen safely. The same mechanism doubles as object-capability authority — Pony is the cleanest example of one mechanism doing both ownership and ocap work.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["pony", "reference-capability", "ownership", "data-race-freedom", "memory-safety"],
+      "content": "Sylvan Clebsch's **Pony** has six per-reference capabilities — `iso` (read/write unique), `trn` (write-unique with `box` aliases allowed), `ref` (mutable, actor-local), `val` (deeply immutable, sendable), `box` (read-only view abstracting `ref`/`val`/`trn`), `tag` (identity-only, sendable) — that form a 3×3 matrix on (deny global aliases) × (deny local aliases).\n\nThe **sendable subset** is the diagonal (`iso`, `val`, `tag`): only those can cross actor boundaries because their local and global guarantees coincide. This is the static foundation for data-race freedom *by construction*, proven in \"Deny Capabilities for Safe, Fast Actors\" (Clebsch et al., AGERE 2015).",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "actors", "type": "related" },
+        { "target": "capability-based-memory", "type": "related" },
+        { "target": "sendability", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Pony reference capabilities", "url": "https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html" },
+        { "label": "Pony Deny Capabilities for Safe, Fast Actors", "url": "https://www.ponylang.io/media/papers/fast-cheap.pdf" }
+      ]
+    },
+    {
+      "id": "consume-and-recover",
+      "title": "consume and recover blocks",
+      "tags": ["pony", "reference-capability", "ownership"],
+      "content": "`consume` and `recover` blocks let capability-changing assignments happen safely:\n\n- `consume` ends an alias to allow reassignment.\n- `recover` lifts the capability of objects constructed inside it, so a freshly built `ref` graph can become `iso` if the recover block could only see sendable inputs.\n\nThese forms preserve the sendable-subset invariant while letting programs build mutable structures locally and then ship them across an actor boundary.",
+      "refs": [],
+      "sources": [
+        { "label": "Pony capability matrix", "url": "https://tutorial.ponylang.io/reference-capabilities/capability-matrix.html" }
+      ]
+    },
+    {
+      "id": "authority-angle",
+      "title": "The authority angle — capabilities as ocap",
+      "tags": ["pony", "reference-capability", "capability-based-memory"],
+      "content": "From the *authority* angle, Pony's six rcaps double as object capabilities. `tag` (opaque, identity-only) is exactly an actor reference under ocap discipline, and the sendable subset `{iso, val, tag}` is the static foundation for object-capability message passing — only sendable references cross actor boundaries, so data-race freedom and capability transfer fall out of the same type-system rule.\n\nPony is the cleanest example of one mechanism doing both ownership and ocap work: the same per-reference capability lattice that prevents data races also prevents ambient authority, because the only way to acquire a reference into another actor's heap is to be sent one.",
+      "refs": [
+        { "target": "capability-based-memory", "type": "related" },
+        { "target": "actors", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Pony reference capabilities", "url": "https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html" },
+    { "label": "Pony capability matrix", "url": "https://tutorial.ponylang.io/reference-capabilities/capability-matrix.html" },
+    { "label": "Pony Deny Capabilities for Safe, Fast Actors", "url": "https://www.ponylang.io/media/papers/fast-cheap.pdf" }
+  ]
+}

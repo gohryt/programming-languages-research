@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "LuaJIT Bytecode",
+  "aliases": ["luajit-bc"],
+  "summary": "LuaJIT's register-based bytecode with 32-bit instruction words (8-bit opcode, 8-bit destination register, 16-bit operand fields). Tuned for trace-JIT ergonomics and a hand-tuned interpreter; within 2× of native code on many benchmarks before the JIT fires.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "LuaJIT's bytecode is register-based with 32-bit instruction words: 8-bit opcode, 8-bit destination register, 16-bit operand fields. It's slightly different from standard Lua 5.x bytecode — LuaJIT tunes its instructions for trace-JIT ergonomics, with operations like `MOV` and arithmetic ops sized to fit interpreter dispatch into a tight loop.\n\nThe interpreter is written in hand-tuned assembly per architecture; the bytecode hits the cache predictably because the encoding is fixed-width.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "luajit-ir#overview", "type": "lowers-to" }
+      ],
+      "sources": [
+        { "label": "LuaJIT Bytecode 2.0", "url": "http://wiki.luajit.org/Bytecode-2.0" }
+      ]
+    },
+    {
+      "id": "interpreter-throughput",
+      "title": "Interpreter throughput",
+      "tags": ["bytecode", "performance", "interpreter"],
+      "content": "LuaJIT's interpreter is one of the fastest interpreters ever built — within 2× of native code on many benchmarks before the JIT even fires. The bytecode design is a major reason: simple, predictable, dispatch-friendly. Fixed-width 32-bit instructions, dense operand encoding, and tight per-architecture assembly dispatch all compose into an interpreter whose per-instruction cost is dominated by the actual operation rather than dispatch overhead.\n\nThe lesson: a bytecode designed in coordination with its interpreter implementation is consistently faster than one designed against a generic dispatch model.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "LuaJIT Bytecode 2.0", "url": "http://wiki.luajit.org/Bytecode-2.0" }
+  ]
+}

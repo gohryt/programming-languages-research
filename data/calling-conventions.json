@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "Calling Conventions",
+  "aliases": ["ABI", "System V AMD64", "Windows x64", "AAPCS"],
+  "summary": "Three dominant ABIs that differ in detail but share structure: System V AMD64 (Linux/macOS/BSD x86-64), Windows x64, and AAPCS (ARM). Argument register sets, return registers, callee-saved sets, stack alignment all differ. FFI requires the right convention; intra-module calls can use a custom convention.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The three dominant calling conventions differ in detail but share structure:\n\n- **System V AMD64 ABI** (Linux, macOS, BSD on x86-64): first six integer arguments in `rdi, rsi, rdx, rcx, r8, r9`; first eight float arguments in `xmm0-7`; return in `rax` / `rdx` (or `xmm0`); callee-saved `rbx, rbp, r12-r15`.\n- **Windows x64**: first four arguments (any type) in `rcx, rdx, r8, r9`; return in `rax`; callee-saved includes the high xmm registers. Shadow space (32 bytes) reserved on stack by caller.\n- **AAPCS** (ARM): similar shape, with `r0-r3` or `x0-x7` for arguments and `r0` / `x0` for return.",
+      "refs": [
+        { "target": "name-mangling#overview", "type": "interacts-with" },
+        { "target": "object-file-formats#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "System V AMD64 ABI", "url": "https://gitlab.com/x86-psABIs/x86-64-ABI" },
+        { "label": "Windows x64 Calling Convention", "url": "https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention" }
+      ]
+    },
+    {
+      "id": "ffi-implications",
+      "title": "FFI implications",
+      "tags": ["abi", "ffi"],
+      "content": "The differences matter for FFI: a function compiled for one ABI cannot be called via the other. Cross-compiling or targeting multiple platforms requires the backend to emit the correct convention per target.\n\nA language's own functions don't need to follow any specific ABI internally — many compilers use a custom, more efficient convention for intra-module calls (more argument registers, no callee-save bloat, register-based tail calls). But the boundary to `extern \"C\"` must respect the platform ABI exactly.\n\nThe trade-off: custom internal calling conventions buy performance for intra-module work but require careful FFI shim layers. Most production languages (Rust, Swift, Go) use platform conventions for FFI and custom conventions internally; the dual-mode is invisible at the language level but real in the compiler.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "System V x86-64 ABI", "url": "https://gitlab.com/x86-psABIs/x86-64-ABI" },
+    { "label": "Windows x64 Calling Convention", "url": "https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention" }
+  ]
+}

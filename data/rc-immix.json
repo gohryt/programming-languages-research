@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "RC-Immix — Region Coloring for Reference-Counting Allocators",
+  "aliases": ["rcix", "rc-immix-region-coloring"],
+  "summary": "Shahriyar, Blackburn, Yang, McKinley (OOPSLA 2013) marry reference counting with Immix's mark-region heap (lines + blocks) for high-throughput RC. Per-line live-object counts (a coarse 'region color') let the collector reclaim whole lines when the line count hits zero, avoiding free-list fragmentation. Region granularity is independent of language-level region semantics — purely a layout/locality optimization. LXR extends this lineage with low-latency region-coloured RC.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["mark-region", "reference-counting", "region-coloring"],
+      "content": "Not a region *language* feature but a *runtime* layout technique. Shahriyar, Blackburn, Yang, McKinley (OOPSLA 2013) marry reference counting with **Immix's mark-region heap** (lines + blocks) for high-throughput RC. **Per-line live-object counts** (a coarse \"region color\") let the collector reclaim whole lines when the line count hits zero, avoiding free-list fragmentation.\n\nRegion granularity is independent of language-level region semantics — purely a **layout/locality optimization**. The lesson is that the same word \"region\" means two different things across this chapter and the chapter on tracing GC architectures: programmer-visible regions vs. allocator-internal regions.",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "related" },
+        { "target": "reference-counting#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "RC-Immix (OOPSLA 2013)", "url": "https://www.steveblackburn.org/pubs/papers/rcix-oopsla-2013.pdf" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Line-granular reclamation and copying",
+      "tags": ["mark-region", "reference-counting", "region-coloring"],
+      "content": "Immix divides the heap into 32 KiB **blocks**, each containing 256-byte **lines**. RC-Immix tracks a per-line live-object count: incremented when an object is allocated into the line, decremented when the object's RC reaches zero. When a line's count hits zero the entire line is reclaimable as one unit — no free-list traversal, no per-object work.\n\nProactive + reactive copying integrated with RC eliminates fragmentation; backup tracing handles cycles. The result is RC throughput competitive with tracing GC on heap-intensive workloads, with the per-line region as the load-bearing data structure.",
+      "refs": []
+    },
+    {
+      "id": "lxr-successor",
+      "title": "LXR — low-latency region-coloured RC",
+      "tags": ["mark-region", "reference-counting", "region-coloring"],
+      "content": "**LXR** extends this lineage with low-latency region-coloured RC, targeting modern multicore latency budgets. The same line-as-region primitive is retained, but the collector's coordination protocol is reworked to keep mutator pause times short under high allocation rates.\n\nLXR is documented in detail in the tracing-GC chapter; this entry only marks the link from the original RC-Immix work to its successor. For a language runtime designer choosing a high-throughput RC collector in 2026, LXR is the modern reference and RC-Immix is the foundational paper.",
+      "refs": [],
+      "sources": [
+        { "label": "LXR arXiv preprint (region-coloured RC)", "url": "http://arxiv.org/pdf/2210.17175v1" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "RC-Immix (OOPSLA 2013)", "url": "https://www.steveblackburn.org/pubs/papers/rcix-oopsla-2013.pdf" },
+    { "label": "LXR arXiv preprint (region-coloured RC)", "url": "http://arxiv.org/pdf/2210.17175v1" }
+  ]
+}

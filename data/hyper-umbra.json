@@ -1,0 +1,36 @@
+{
+  "kind": "tool",
+  "name": "HyPer and Umbra — Produce/Consume SQL Compilation",
+  "aliases": ["HyPer", "Umbra", "Neumann produce-consume"],
+  "summary": "Thomas Neumann's HyPer (SIGMOD 2011) introduced produce/consume codegen: compile a SQL query plan into a single fused tight loop. 10× over iterator-model interpreters. Umbra (CIDR 2020) replaced LLVM with a custom backend to cut compile time at the cost of 10–30% worse code quality.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Thomas Neumann's **HyPer** (SIGMOD 2011, \"Efficiently Compiling Efficient Query Plans for Modern Hardware\") introduced the produce/consume model for SQL compilation. A query plan is a tree of operators (scan, filter, join, aggregate); instead of each operator iterating over tuples from below (the classical iterator model, \"volcano style\"), the compiler generates a single fused loop where each operator's `produce` method generates code that calls the parent's `consume` method.\n\nThe result is a query compiled to one tight loop over the input rows with no virtual dispatch, no per-tuple function calls, and no materialisation of intermediate results. Performance gains are dramatic — 10× or more over iterator-model interpreters on analytical queries.",
+      "refs": [
+        { "target": "duckdb#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "HyPer paper (Neumann, SIGMOD 2011)", "url": "https://15721.courses.cs.cmu.edu/spring2017/papers/03-compilation/p539-neumann.pdf" }
+      ]
+    },
+    {
+      "id": "umbra",
+      "title": "Umbra — successor with custom backend",
+      "tags": ["database", "compiler"],
+      "content": "**Umbra** (Neumann et al., CIDR 2020) is HyPer's successor, incorporating lessons from a decade of production use. Key evolution: Umbra uses a custom low-level IR and a fast backend instead of LLVM, because LLVM compilation time became the bottleneck for short analytical queries. The trade-off is 10–30% slower generated code for 5–10× faster compilation — the right choice when the query runs once and the plan is large.\n\nThe broader lesson: **for short-running queries, JIT compile time competes directly with execution time**. Umbra's custom backend is the analytical-database equivalent of Cranelift's compile-speed-over-quality choice for Wasm.",
+      "refs": [
+        { "target": "cranelift#overview", "type": "shares-design-rationale-with" }
+      ],
+      "sources": [
+        { "label": "Umbra (Neumann et al., CIDR 2020)", "url": "https://db.in.tum.de/~neumann/papers/umbra.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "HyPer", "url": "https://15721.courses.cs.cmu.edu/spring2017/papers/03-compilation/p539-neumann.pdf" },
+    { "label": "Umbra", "url": "https://db.in.tum.de/~neumann/papers/umbra.pdf" }
+  ]
+}

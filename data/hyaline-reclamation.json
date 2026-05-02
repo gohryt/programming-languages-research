@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Hyaline / Hyaline-1",
+  "aliases": ["Hyaline", "Hyaline-1", "Hyaline-S"],
+  "summary": "Nikolaev & Ravindran (PODC 2019 / PLDI 2021) apply distributed reference counting only at reclamation time (not on access), with retired objects threaded into a shared list whose handle pointers carry per-thread reference counts. Reclamation workload self-balances across threads; snapshot-free and transparent — no thread (un)registration. Hyaline-S delivers HP-grade memory bounds with EBR-grade throughput.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["safe-memory-reclamation", "concurrent-reclamation", "lock-free", "bounded-memory"],
+      "content": "Nikolaev & Ravindran's **Hyaline** (PODC 2019 / PLDI 2021) applies distributed reference counting only at *reclamation time* (not on access). Retired objects are threaded into a shared list whose handle pointers carry the per-thread reference counts; readers do not pay any per-access bookkeeping cost.\n\nReclamation workload **self-balances across threads** — any thread may free, so a slow thread does not starve fast threads of memory. The scheme is *snapshot-free* and *transparent*: no thread (un)registration is required, which makes it well-suited to dynamically-spawned threads (signal handlers, GC mutators, etc.) that conventional EBR/HP cannot easily accommodate.\n\n**Hyaline-S** delivers HP-grade memory bounds with EBR-grade throughput — closing the gap that motivated the entire post-2017 era/interval line. Works on x86, ARM, PPC, MIPS using LL/SC or DWCAS where available.",
+      "refs": [
+        { "target": "hazard-pointers", "type": "compared-with" },
+        { "target": "epoch-based-reclamation", "type": "compared-with" },
+        { "target": "interval-based-reclamation", "type": "related" },
+        { "target": "wait-free-eras", "type": "related" },
+        { "target": "stamp-it", "type": "related" },
+        { "target": "rrr-smr", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Hyaline (arXiv)", "url": "https://arxiv.org/pdf/1905.07903" },
+        { "label": "lfsmr reference impl", "url": "https://github.com/rusnikola/lfsmr" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Hyaline arXiv", "url": "https://arxiv.org/pdf/1905.07903" },
+    { "label": "lfsmr", "url": "https://github.com/rusnikola/lfsmr" }
+  ]
+}

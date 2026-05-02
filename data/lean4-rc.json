@@ -1,0 +1,114 @@
+{
+  "kind": "concept",
+  "name": "Lean 4 Reference Counting — Atomic-vs-Persistent Sentinels",
+  "aliases": [
+    "lean4-reference-counting"
+  ],
+  "summary": "Ullrich & de Moura's Lean 4 compiler (2019+) inserts explicit `inc`/`dec`/`reset`/`reuse` ops in IR (Perceus-like, predates Perceus formalisation). Distinctive low-level trick: `m_rc == 0` as a persistent sentinel + sign-bit for thread-shared. `isExclusive`-guarded primitives test RC == 1 and mutate in place. Cycles banned by language.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "reference-counting",
+        "compile-time-rc",
+        "lean4",
+        "production"
+      ],
+      "content": "Ullrich & de Moura's Lean 4 compiler (2019+) inserts explicit `inc`/`dec`/`reset`/`reuse` ops in IR — Perceus-like in spirit, but predates the Perceus formalisation. Reuse analysis enables in-place mutation of unique arrays/strings.\n\nCycles are banned by language: pure Lean values cannot form mutable cycles, so no cycle collector is required. Comparable performance to OCaml in functional code; matches imperative when reuse fires. The combination — compile-time RC + reuse + cycle-free-by-construction — makes Lean 4 a particularly clean point in the design space, with the engineering trick described in the next section keeping the runtime cost low.\n\nStatus (as of 2026-04): production for several years; underpins the entire Lean 4 elaborator and tactic engine.",
+      "refs": [
+        {
+          "target": "reference-counting#runtime-vs-compile-time-rc",
+          "type": "instance-of"
+        },
+        {
+          "target": "perceus#overview",
+          "type": "related"
+        },
+        {
+          "target": "lean4-persistent-arrays#overview",
+          "type": "enables"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Lean 4 reference counting",
+          "url": "https://lean-lang.org/doc/reference/latest/Run-Time-Code/Reference-Counting/"
+        },
+        {
+          "label": "Lean lean.h",
+          "url": "https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h"
+        }
+      ]
+    },
+    {
+      "id": "atomic-vs-persistent-sentinels",
+      "title": "Atomic-vs-persistent RC sentinels",
+      "tags": [
+        "atomic-rc",
+        "non-atomic-rc",
+        "actor-local-rc",
+        "lean4",
+        "compile-time-rc"
+      ],
+      "content": "The distinctive low-level trick is encoding three RC modes in one machine word: `m_rc == 0` as a persistent sentinel + sign-bit for thread-shared. Concretely:\n\n- **Positive RC** — single-threaded fast path. `inc`/`dec` use plain non-atomic loads/stores. The vast majority of objects in idiomatic Lean code stay here.\n- **Negative RC** — thread-shared. `inc`/`dec` use atomic operations. Once an object escapes to another thread, its sign flips permanently and it pays the atomic cost from then on.\n- **Zero RC** — persistent / compact-region object. No RC traffic at all; the object lives in a region whose lifetime is managed independently (interned constants, compacted modules).\n\nAll defined in `lean.h`. The branch on the sign bit is one machine instruction and predicts well — the common case (positive RC) compiles to the same non-atomic increment a hand-written C program would emit. Compared to Swift (always atomic on bridged objects, sometimes non-atomic on Swift-native), Lean 4's discipline is more aggressive: a Lean object stays non-atomic until it provably escapes to another thread, at which point it pays the cost forever.",
+      "refs": [
+        {
+          "target": "reference-counting#runtime-vs-compile-time-rc",
+          "type": "elaborates"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Lean lean.h",
+          "url": "https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h"
+        }
+      ]
+    },
+    {
+      "id": "is-exclusive-and-ffi",
+      "title": "isExclusive-guarded mutation and FFI considerations",
+      "tags": [
+        "in-place-update",
+        "frame-limited-reuse",
+        "reuse-analysis",
+        "lean4"
+      ],
+      "content": "`isExclusive`-guarded primitives — `Array.set`, `Array.swap`, persistent-array updates — test RC == 1 and mutate in place, else copy, giving pure functional semantics with imperative speed. `dbgTraceIfShared` helps locate accidental sharing during performance debugging. Persistent arrays (HAMT-style trie with a tail buffer mutated in place under unique RC, covered separately in `data/lean4-persistent-arrays`) are used pervasively in Lean's elaborator/tactic state — making RC a first-class enabler of an entire compiler architecture.\n\nFFI considerations: Lean exposes `lean_object*` to C with explicit `lean_inc` / `lean_dec` / `lean_is_exclusive` functions. C code calling into Lean must respect the sign-bit convention — calling `lean_inc` on a thread-shared object must use the atomic path, on a thread-local one the non-atomic path. The convention matches the runtime helpers, but the FFI surface is the place where mistakes show up: a C extension that increments without checking the sign bit can either crash with a torn count under contention or silently undercount and cause use-after-free on the next decrement. The Lean documentation makes this explicit; production use is robust.",
+      "refs": [
+        {
+          "target": "reference-counting#optimization-and-uniqueness",
+          "type": "elaborates"
+        },
+        {
+          "target": "lean4-persistent-arrays#overview",
+          "type": "complemented-by"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Lean 4 reference counting",
+          "url": "https://lean-lang.org/doc/reference/latest/Run-Time-Code/Reference-Counting/"
+        },
+        {
+          "label": "Functional Programming in Lean — Insertion Sort and Array Mutation",
+          "url": "https://docs.lean-lang.org/functional_programming_in_lean/Programming___-Proving___-and-Performance/Insertion-Sort-and-Array-Mutation/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Lean 4 reference counting",
+      "url": "https://lean-lang.org/doc/reference/latest/Run-Time-Code/Reference-Counting/"
+    },
+    {
+      "label": "Lean lean.h",
+      "url": "https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h"
+    },
+    {
+      "label": "Functional Programming in Lean — Insertion Sort and Array Mutation",
+      "url": "https://docs.lean-lang.org/functional_programming_in_lean/Programming___-Proving___-and-Performance/Insertion-Sort-and-Array-Mutation/"
+    }
+  ]
+}

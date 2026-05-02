@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-line",
+  "tag": "granularity:per-line",
+  "name": "Granularity: per line",
+  "description": "Mechanism reasons about source-level lines or progress points (not raw instructions). Causal profiling, Tarantula, line-coverage fault localization.",
+  "axis": "granularity"
+}

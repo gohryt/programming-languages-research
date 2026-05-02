@@ -1,0 +1,47 @@
+{
+  "kind": "concept",
+  "name": "Core Type Representation",
+  "aliases": ["type-objects", "type-interning"],
+  "summary": "Internal data structures a type checker uses for types: the split between source-syntax annotations and canonical type objects, interning/hash-consing/arenas to keep equality cheap, and explicit error types that contain poisoned diagnostics without cascading.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A type checker needs an internal representation of types that is both fast to compare and rich enough to support diagnostics. The distinguishing axis across implementations is the split between source-syntax type annotations (which diagnostics point at) and canonical type objects (which the solver compares). Production checkers add interning or hash-consing on top of canonical forms so equality checks are pointer comparisons, and they add explicit error types so an unresolved name does not cascade into hundreds of unrelated type errors.\n\nThe shape of the representation is one of the most consequential early decisions in a compiler frontend: it determines what unification looks like, how much memory normalization costs, how diagnostics render, and how reusable the type checker is from a language server."
+    },
+    {
+      "id": "type-syntax-vs-canonical-objects",
+      "title": "Type syntax versus canonical type objects",
+      "tags": ["type-system", "compiler-architecture"],
+      "content": "Source type annotations should be parsed as syntax first, then resolved into canonical type objects. This separation lets diagnostics point at source syntax while the solver compares normalized internal forms.\n\nInternal type objects commonly include:\n\n- primitive types;\n- nominal type constructors;\n- type variables and inference variables;\n- function types;\n- tuples and records;\n- variants and unions;\n- references, pointers, and capabilities;\n- type applications;\n- associated type projections;\n- type aliases and opaque types;\n- recursive types;\n- universal and existential quantifiers;\n- effect rows or capability sets;\n- error types that permit recovery.\n\nScala 3's compiler is a useful reference because it represents many type forms directly — term references, type references, singleton types, refined types, union/intersection types, match types, method types, polymorphic types, and type bounds — making the form the canonical comparison unit.",
+      "sources": [
+        { "label": "Scala 3 type-system internals", "url": "https://dotty.epfl.ch/docs/internals/type-system.html" }
+      ]
+    },
+    {
+      "id": "interning-hash-consing-arenas",
+      "title": "Interning, hash-consing, and arenas",
+      "tags": ["compiler-architecture", "memory-layout"],
+      "content": "Type checking creates many equivalent type structures. Interning or hash-consing can make equality cheap and improve cache locality. Arena allocation can simplify lifetime management of semantic objects. These implementation techniques are adjacent to compiler-internal arenas and content-addressed IRs, but type checkers place special pressure on them because unification and normalization may allocate heavily.\n\nThe practical engineering choice is often whether to intern eagerly (every constructed type goes through a hash table) or lazily (only the forms that participate in equality comparisons are canonicalized). Eager interning is simpler and gives O(1) equality everywhere; lazy interning saves allocation when many intermediate forms are never compared.",
+      "refs": [
+        { "target": "arena-allocation#overview", "type": "uses" },
+        { "target": "hash-consing#overview", "type": "uses" },
+        { "target": "content-addressed-ir#overview", "type": "related" },
+        { "target": "persistent-ir#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "error-types-poison-containment",
+      "title": "Error types and poison containment",
+      "tags": ["type-system", "diagnostics"],
+      "content": "A practical type checker should use explicit error types to continue checking after an error. The key is to avoid cascades: an unresolved name should not produce hundreds of unrelated type errors. Many compilers treat error types as compatible with anything for recovery, but diagnostics should remember the originating error so secondary messages can be suppressed or marked dependent.\n\nError types are the type-checker counterpart to error-tolerant parsing — both exist so the user sees one root cause, not a downstream avalanche.",
+      "refs": [
+        { "target": "error-recovery#overview", "type": "analogous-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Scala 3 type-system internals", "url": "https://dotty.epfl.ch/docs/internals/type-system.html" }
+  ]
+}

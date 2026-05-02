@@ -1,0 +1,7 @@
+{
+  "id": "domain-observability",
+  "tag": "domain:observability",
+  "name": "Domain: observability",
+  "description": "Section concerns production observability — fleet-wide telemetry, distributed tracing, continuous profiling, and operator-facing diagnostics.",
+  "axis": "domain"
+}

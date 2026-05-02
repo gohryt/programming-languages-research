@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "Coverage-guided fuzzing",
+  "aliases": [
+    "fuzzing",
+    "AFL",
+    "libFuzzer"
+  ],
+  "summary": "Automated bug-finding that combines random input mutation with code-coverage feedback (compile-time bitmaps, sanitizer callbacks) to systematically explore program behavior; the same instrumentation surface that powers tracing also drives the search.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Not tracing in the observability sense, but close cousins: the instrumentation primitives are the same compile-time coverage bitmaps and sanitizer callbacks that the rest of this document describes, and the technique composes with `data/shadow-state-and-checks` shadow state to systematically explore input space until a crash is observed. Worth naming as a mechanism family because it illustrates how the same instrumentation surface can drive very different workflows — observation in §`data/bytecode-and-code-patching`–8, search in `data/coverage-guided-fuzzing`, causal attribution in `data/causal-profiling`.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:heavyweight-instrumentation`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:medium`\n- **on-cost**: `on-cost:dominant`\n- **granularity**: `granularity:per-edge`\n"
+    },
+    {
+      "id": "afl-libfuzzer",
+      "title": "AFL / libFuzzer — Mutation + Coverage Feedback",
+      "tags": [
+        "domain:debugging",
+        "family:heavyweight-instrumentation",
+        "granularity:per-edge",
+        "off-cost:medium",
+        "on-cost:dominant"
+      ],
+      "content": "Coverage-guided fuzzing combines random input mutation with code coverage feedback to systematically explore program behavior. The fuzzer maintains a corpus of inputs and repeatedly:\n\n1. Picks an input from the corpus.\n2. Mutates it (bit flips, byte insertions, dictionary-based substitutions, splice with another input).\n3. Runs the target program with the mutated input.\n4. Measures code coverage (which basic blocks/edges were executed).\n5. If the mutated input discovered new coverage, adds it to the corpus.\n\n**AFL** (Zalewski, 2013) pioneered this approach using compile-time instrumentation that updates a shared-memory coverage bitmap (64KB) at each branch. The bitmap hashes `(prev_block ^ curr_block)` to record edge transitions. AFL can process thousands of executions per second and has found thousands of security vulnerabilities in real-world software.\n\n**libFuzzer** (LLVM) takes an in-process approach: the fuzzer and target run in the same process, avoiding the `fork()/exec()` overhead of AFL. This enables millions of executions per second for small targets. libFuzzer uses LLVM's SanitizerCoverage instrumentation for feedback.\n\nThe combination of fuzzing + sanitizers is transformative: fuzzing generates inputs that explore new code paths, and sanitizers detect subtle bugs (buffer overflows, use-after-free, data races) that would otherwise produce no observable symptom. Google's OSS-Fuzz runs continuous fuzzing on 1,000+ open-source projects, finding 10,000+ bugs.\n\nA compiler that can instrument code for coverage feedback (as LLVM's SanitizerCoverage does) gives fuzzing support for free. A language runtime with built-in coverage tracking enables fuzzing without compiler modifications.",
+      "sources": [
+        {
+          "url": "https://llvm.org/docs/LibFuzzer.html"
+        },
+        {
+          "url": "https://lcamtuf.coredump.cx/afl/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://llvm.org/docs/LibFuzzer.html"
+    },
+    {
+      "url": "https://lcamtuf.coredump.cx/afl/"
+    }
+  ]
+}

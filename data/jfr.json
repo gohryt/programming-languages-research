@@ -1,0 +1,78 @@
+{
+  "kind": "tool",
+  "name": "JFR",
+  "aliases": ["java-flight-recorder", "jdk-flight-recorder"],
+  "summary": "OpenJDK's low-overhead JVM event recording system; thread-local + global circular buffer architecture; JEP 328 success metric is ≤1% out-of-the-box overhead on SPECjbb2015; designed for after-the-fact incident analysis without predicting the failure point.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "JFR, or Java Flight Recorder, is a low-overhead event recording system built into the JVM. It is one of the strongest practical examples of a runtime-native instrumentation surface designed explicitly for production diagnostics.\n\nIt is one of the cleanest examples of a production tracing system designed from the start around the \"flight recorder\" metaphor: keep a rolling history with low enough overhead that it can stay available in real systems. JFR is explicitly designed so that you can leave it off, turn it on selectively, or keep a rolling buffer and dump the recent past when operations detect a problem. This is closer in spirit to an aircraft flight recorder than to a classic profiler session.",
+      "refs": [
+        {
+          "target": "instrumentation#runtime-native-instrumentation-surfaces",
+          "type": "example"
+        },
+        { "target": "continuous-profiling#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "runtime-native-event-pipeline",
+      "title": "Runtime-native event pipeline",
+      "tags": ["runtime", "tracing", "tooling"],
+      "content": "JFR records events directly from the runtime, including GC, scheduling, allocation, and many runtime-specific state changes. This makes it fundamentally different from source-only instrumentation or external binary observation, because the event vocabulary already matches the runtime's own semantics.\n\nThe OpenJDK design writes events lock-free to **thread-local buffers**; when those fill, they are promoted into a **global in-memory circular buffer** that keeps the most recent history. Depending on configuration, the oldest data is either discarded or flushed to disk as a `.jfr` recording. The event model: events are typed, self-describing, and can come from the JVM, JDK libraries, the OS, and user code via `jdk.jfr.Event`.\n\n**JEP 509 \"JFR CPU-Time Profiling\" (JDK 25, 2025)** added a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers — OpenJDK's supported path toward reducing reliance on async-profiler's unsupported AGCT internals. Status (JDK 25, 2025): experimental and Linux-focused, not a universal replacement for every AGCT use case. Reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased.",
+      "refs": [
+        {
+          "target": "instrumentation#runtime-native-instrumentation-surfaces",
+          "type": "related"
+        },
+        {
+          "target": "garbage-collection#runtime-interaction-with-concurrency",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        { "label": "JEP 328 — JFR", "url": "https://openjdk.org/jeps/328" }
+      ]
+    },
+    {
+      "id": "low-overhead-production-use",
+      "title": "Low-overhead production use",
+      "tags": ["profiling", "production", "observability"],
+      "content": "JFR is especially important because it is built for always-available or production-friendly recording rather than only lab debugging. It is therefore a strong example of instrumentation designed with disabled and enabled cost models in mind from the start.\n\n**JEP 328 set explicit success metrics**: at most 1% out-of-the-box overhead on SPECjbb2015 and no measurable overhead when not enabled. That is an unusually concrete performance target for a tracing facility. Many continuous-profiling backends (Datadog, Grafana Phlare via JFR ingest) use JFR as their primary input on JVM workloads, taking advantage of the low overhead and runtime-semantic events.",
+      "refs": [
+        {
+          "target": "continuous-profiling#google-wide-profiling",
+          "type": "related"
+        },
+        {
+          "target": "sampling-profiling#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "why-jfr-matters",
+      "title": "Why JFR matters",
+      "tags": ["tooling", "runtime-design", "observability"],
+      "content": "JFR matters as a model of what a mature runtime can provide when tracing is designed in, rather than retrofitted later. It is a concrete answer to the repository-wide question of what first-class runtime observability can look like.\n\nThe trade-off is scope. JFR is excellent for JVM-centric troubleshooting, but it is not a source-level debugger, and it does not give you arbitrary native process introspection the way OS-level tracing or DBI tools do. For a new language: design the event pipeline up front. JFR shows what's possible when you commit to lock-free buffer discipline + typed self-describing events + a session model from day one.",
+      "refs": [
+        {
+          "target": "compiler-inserted-tracing#overview",
+          "type": "related"
+        },
+        {
+          "target": "trace-storage-and-visualization#overview",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "JFR runtime guide",
+      "url": "https://docs.oracle.com/javacomponents/jmc-5-5/jfr-runtime-guide/about.htm"
+    }
+  ]
+}

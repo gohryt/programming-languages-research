@@ -1,0 +1,55 @@
+{
+  "kind": "library",
+  "name": "ActiveJ Codegen",
+  "aliases": [
+    "ASM expression DSL"
+  ],
+  "summary": "Productivity layer over ObjectWeb ASM for runtime JVM bytecode generation. Replaces ASM's verbose visitor API with an expression-based fluent DSL modelled on a Lisp-like AST. Auto stack-frame accounting, type inference, and verifier-correctness; supports records, control flow, and relational-algebra-shaped operations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ActiveJ Codegen (SoftIndex Lab) is a productivity layer over **ObjectWeb ASM** for runtime bytecode generation on the JVM. ASM is the canonical low-level bytecode-manipulation library, but its visitor-based API (`MethodVisitor.visitInsn`, `MethodVisitor.visitVarInsn`, manual stack-frame accounting) is verbose and error-prone for anything beyond simple class transformation.\n\nCodegen replaces this with an **expression-based fluent DSL** modelled on a Lisp-like AST: `call(staticField(System.class, \"out\"), \"println\", value(\"Hello world\"))` produces the bytecode for `System.out.println(\"Hello world\")`, with stack-frame accounting, type inference, and verifier-correctness handled automatically.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "ActiveJ Codegen",
+          "url": "https://activej.io/codegen"
+        }
+      ]
+    },
+    {
+      "id": "expression-vocabulary",
+      "title": "Expression vocabulary",
+      "tags": [
+        "jvm",
+        "code-generation"
+      ],
+      "content": "The expression vocabulary covers:\n\n- Arithmetic (`add`, `sub`, `mul`, `div`, `mod`, `neg`), bitwise, and comparison ops with automatic type promotion.\n- Field/method access (`property`, `call`, `staticCall`, `constructor`).\n- Control flow (`ifThenElse`, `loop`, `forEach`, `switch`, `tryCatch`).\n- Local variables (`let`, `set`).\n- Relational-algebra-shaped operations on iterables (filter, map, reduce, group-by, sort) — useful for query-engine codegen.\n- Records (heterogeneous data containers) — the Java-21 `record` keyword as a Codegen primitive.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "ActiveJ Codegen examples",
+          "url": "https://activej.io/codegen/examples"
+        }
+      ]
+    },
+    {
+      "id": "design-implication",
+      "title": "Design implication",
+      "tags": [
+        "jvm",
+        "library"
+      ],
+      "content": "The Codegen design \"drops the floor of should-I-codegen\" for managed-runtime applications: if generating bytecode at runtime is no harder than writing a fluent expression tree, more applications generate code than would tolerate ASM's visitor verbosity. ActiveJ uses Codegen pervasively for its Specializer (instance-to-static-class rewriting), serialisation, query engine, and dependency injection container.\n\nFor a language designer working on the JVM (Kotlin Multiplatform, JVM-targeted DSLs), the lesson is that runtime codegen ergonomics matter as much as ASM bytecode-level capability. A high-level expression DSL on top of ASM is one of the cheapest improvements available.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "ActiveJ Codegen",
+      "url": "https://activej.io/codegen"
+    }
+  ]
+}

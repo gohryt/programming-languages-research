@@ -1,0 +1,59 @@
+{
+  "kind": "library",
+  "name": "PyO3 + maturin",
+  "aliases": ["pyo3", "maturin", "rust-python-bindings"],
+  "summary": "Cross-language packaging stack: PyO3 (David Hewitt et al., since 2017) is the canonical Rust crate for writing Python extension modules via #[pyclass]/#[pymethods]/#[pyfunction] macros; maturin (Konstantin Stadler, since 2018) is the build tool that packages PyO3-based crates into Python wheels following PEP 517/518. Together they shifted Python's extension language from C/C++ to Rust within five years.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**PyO3** (David Hewitt et al.; ecosystem maintained collaboratively, since 2017) is the canonical Rust crate for writing Python extension modules; **maturin** (Konstantin Stadler, since 2018) is the build tool that packages PyO3-based crates into Python wheels (`.whl`) following PEP 517/518. Together they make Rust the primary language for new performance-critical Python extensions, displacing the historical C/C++ + setuptools stack.",
+      "refs": [
+        { "target": "python#overview", "type": "extends" },
+        { "target": "rust#overview", "type": "uses" },
+        { "target": "package-management#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "PyO3", "url": "https://pyo3.rs/" },
+        { "label": "maturin", "url": "https://www.maturin.rs/" }
+      ]
+    },
+    {
+      "id": "pyo3-macro-surface",
+      "title": "PyO3 macro surface and ABI3",
+      "tags": ["pyo3", "ffi", "rust"],
+      "content": "**PyO3 macro surface** — `#[pyclass]` annotates a Rust struct as a Python class; `#[pymethods]` annotates an `impl` block as a Python method table; `#[pyfunction]` exposes a Rust function to Python. The macros emit FFI glue against Python's C API at compile time.\n\n**ABI3 mode** (`abi3-py38` feature) targets the stable Python ABI so a single wheel works for Python 3.8+ across CPython versions. Without ABI3, a wheel is bound to a specific CPython minor version (`cp310` only works on Python 3.10); with ABI3, one `.whl` covers Python 3.8 through 3.12+ on the same platform."
+    },
+    {
+      "id": "maturin-build-modes",
+      "title": "maturin build modes and wheel distribution",
+      "tags": ["maturin", "wheels", "packaging"],
+      "content": "**maturin build modes** — `develop` for in-place editable installs during development; `build` for wheel production; `publish` for uploading to PyPI; `sdist` for source-distribution archives. Cross-compilation to Linux/macOS/Windows via `maturin build --target` and `--release` flags.\n\n**PyPI distribution** — wheels built by maturin are statically-compiled native extensions; users `pip install` them and the binary runs without a Rust toolchain on the consumer's machine. The wheel naming (`mypackage-0.1.0-cp310-cp310-linux_x86_64.whl`) encodes the Python version + ABI + platform so pip selects the right wheel automatically."
+    },
+    {
+      "id": "ecosystem-reach",
+      "title": "Ecosystem reach",
+      "tags": ["pyo3", "production", "ecosystem"],
+      "content": "The ecosystem reach is significant. Major Python packages with PyO3-based Rust extensions include:\n\n- **Polars** — DataFrame library, faster than pandas for large datasets.\n- **Pydantic v2** — validation core rewritten from Cython to Rust.\n- **cryptography** — the canonical Python cryptography library, mostly Rust as of 2022.\n- **tokenizers** — Hugging Face tokenisation library.\n- **ruff** — Python linter rewriting flake8+isort+pyupgrade in Rust.\n- **uv** — Astral's pip+venv replacement.\n- **orjson** — fast JSON serialisation.\n\nPyPI ships hundreds of millions of PyO3-based wheel downloads per month."
+    },
+    {
+      "id": "vs-older-extension-toolchains",
+      "title": "Distinct from Cython, cffi, pybind11",
+      "tags": ["pyo3", "comparison", "ffi"],
+      "content": "Distinct from older C-extension toolchains (`Cython`, `cffi`, `pybind11` for C++): PyO3 + maturin make the *cross-language packaging* concern transparent. A Python user `pip install`s a package without knowing Rust is involved, and wheel selection automatically picks the native binary for the user's platform.\n\nThe cost is that source distributions require a Rust toolchain to build, which can complicate hermetic-build pipelines (`data/nix-flakes`, `data/guix`); maturin's wheel-only distribution mitigates this for most consumers."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — cross-language extension packaging",
+      "tags": ["design-guidance", "ffi"],
+      "content": "The lesson generalises: **a high-quality cross-language packaging toolchain can shift an ecosystem's \"extension language\" choice within a few years**. Python's extension language was C/C++ for 30 years; PyO3 + maturin shifted it to Rust within five.\n\nThe success conditions are:\n\n1. The systems language has a stable C ABI to target.\n2. The build tool fits the host language's existing packaging conventions (PEP 517/518 in this case).\n3. The new extensions ship binary distributions so end users don't need the new toolchain.\n\nFor language designers building a host language with C-ABI-compatible FFI, this is the cleanest production template for cross-language extension packaging."
+    }
+  ],
+  "sources": [
+    { "label": "PyO3", "url": "https://pyo3.rs/" },
+    { "label": "PyO3 repository", "url": "https://github.com/PyO3/pyo3" },
+    { "label": "maturin", "url": "https://www.maturin.rs/" },
+    { "label": "maturin repository", "url": "https://github.com/PyO3/maturin" }
+  ]
+}

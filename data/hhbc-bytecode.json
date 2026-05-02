@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "HHBC",
+  "aliases": ["hhvm-bytecode", "hiphop-bytecode"],
+  "summary": "HHVM's HipHop Bytecode for Hack and PHP. Hybrid register/stack — some operands ride a small operand stack, some name registers — with PHP-specific ops for dynamic dispatch, weak typing, magic methods, and reference semantics. Encodes type observations inline so the JIT starts warm.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "HHVM's HHBC (HipHop Bytecode) is the bytecode for Hack and PHP. It's hybrid register/stack — some operands ride a small operand stack, some name registers — with PHP-specific ops for dynamic dispatch, weak typing, magic methods, and reference semantics. HHBC is what the interpreter (LLInt) and baseline JIT execute; HHIR is the higher-level IR for the optimising JIT.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "hhvm-hhir#overview", "type": "lowered-to" },
+        { "target": "register-vs-stack-bytecode#overview", "type": "hybrid-form" }
+      ],
+      "sources": [
+        { "label": "HHBC specification", "url": "https://github.com/facebook/hhvm/blob/master/hphp/doc/bytecode.specification" }
+      ]
+    },
+    {
+      "id": "inline-type-observations",
+      "title": "Inline type observations",
+      "tags": ["bytecode", "jit", "speculation"],
+      "content": "The notable feature is that HHBC encodes *type observations* inline (which call sites saw which types). The JIT can speculate from the bytecode without re-collecting observations, letting it start \"warm.\"\n\nThis is unusual: most bytecode formats are static schedules of operations and rely on a separate profiling pass to feed the JIT. HHBC builds the speculation substrate into the bytecode itself, reducing JIT warm-up cost on long-running PHP server workloads.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "HHBC specification", "url": "https://github.com/facebook/hhvm/blob/master/hphp/doc/bytecode.specification" }
+  ]
+}

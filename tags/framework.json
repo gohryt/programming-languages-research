@@ -1,0 +1,9 @@
+{
+  "id": "framework",
+  "tag": "framework",
+  "name": "Framework",
+  "description": "Sections tagged with the Framework concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "frameworks"
+  ]
+}

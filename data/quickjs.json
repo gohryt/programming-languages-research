@@ -1,0 +1,78 @@
+{
+  "kind": "runtime",
+  "name": "QuickJS",
+  "aliases": [
+    "QuickJS-NG",
+    "Bellard QuickJS"
+  ],
+  "summary": "Fabrice Bellard's tiny embeddable JavaScript engine (~210 KB). NaN-boxed reference-counted objects with a cycle collector. Interpreter-only — no JIT — making it suitable for environments with kilobyte-budget RAM constraints. Active fork QuickJS-NG continues development.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**QuickJS** (Fabrice Bellard) is a tiny embeddable JavaScript engine designed for small footprint and easy embedding. The compiled engine is approximately 210 KB; it can run within tens of KB of RAM after stripping. The runtime supports the ES2020 spec almost completely, with module loading, async/await, generators, BigInt, and modern syntax.\n\nQuickJS uses a NaN-boxed reference-counted object model with a Bacon-style cycle collector for cyclic structures. Memory management is precise (RC-based) rather than tracing, fitting the embedded-and-edge target where unpredictable GC pauses are unwelcome.",
+      "refs": [
+        {
+          "target": "nan-boxing#overview",
+          "type": "uses"
+        },
+        {
+          "target": "reference-counting#overview",
+          "type": "uses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "QuickJS",
+          "url": "https://bellard.org/quickjs/"
+        },
+        {
+          "label": "QuickJS overview (bellard.org)",
+          "url": "https://bellard.org/quickjs/quickjs.html"
+        }
+      ]
+    },
+    {
+      "id": "no-jit",
+      "title": "Interpreter-only design",
+      "tags": [
+        "javascript",
+        "embedded",
+        "tradeoffs"
+      ],
+      "content": "QuickJS is interpreter-only — no JIT. The trade-off is deliberate: a JIT would dramatically increase the binary size (LLVM JIT alone exceeds the entire QuickJS footprint) and would require RWX memory permissions that many embedded environments forbid. Performance is therefore well below V8 or JavaScriptCore on long-running workloads, but cold-start latency is excellent and footprint matches the target.\n\nThe niche is real: embedded scripting in firmware, edge computing, sandboxed user scripts in larger applications. QuickJS is the JavaScript engine of choice when V8 is too heavy and an interpreter loop is acceptable.",
+      "refs": []
+    },
+    {
+      "id": "quickjs-ng",
+      "title": "QuickJS-NG fork",
+      "tags": [
+        "javascript",
+        "production"
+      ],
+      "content": "**QuickJS-NG** is an active community fork that continues development with bug fixes, modern ECMAScript feature support, and platform improvements. Bellard's original repo updates infrequently; QuickJS-NG took over for the substantial population of users who depend on QuickJS in shipping products.\n\nProduction users of QuickJS or QuickJS-NG include several IoT firmware vendors, the txiki.js runtime, the Smart.js platform, and a number of game engines using QuickJS as the gameplay scripting language.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "QuickJS-NG",
+          "url": "https://github.com/quickjs-ng/quickjs"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "QuickJS",
+      "url": "https://bellard.org/quickjs/"
+    },
+    {
+      "label": "QuickJS overview (bellard.org)",
+      "url": "https://bellard.org/quickjs/quickjs.html"
+    },
+    {
+      "label": "QuickJS-NG",
+      "url": "https://github.com/quickjs-ng/quickjs"
+    }
+  ]
+}

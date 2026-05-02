@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Trace-Based JIT Compilation",
+  "aliases": ["tracing JIT", "LuaJIT trace JIT", "PyPy meta-tracing"],
+  "summary": "Record a linear sequence of operations executed through one iteration of a hot loop (including inlined calls), guard every speculation, install the trace as fast-path native code. Failed guards exit to interpreter at side exits. The intellectual descendant of Fisher's trace scheduling.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Trace-based JIT compilers record the linear sequence of operations executed through one iteration of a hot loop, including inlined function calls. Guards check that every speculation (type, branch, allocation) holds; if a guard fails, execution falls back to the interpreter at a side exit, which may start recording a new trace.\n\nTrace JITs trade method-level scope for path-level focus: they compile only the actually-hot path through a function, not the function as a whole. Cold branches stay in the interpreter; the JIT spends compile budget only on what executes.",
+      "refs": [
+        { "target": "trace-scheduling#overview", "type": "descendant-of" },
+        { "target": "osr-deoptimization#overview", "type": "uses" },
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ],
+      "sources": [
+        { "label": "Musings on Tracing in PyPy (Bolz-Tereick, 2025)", "url": "https://pypy.org/posts/2025/01/musings-tracing.html" }
+      ]
+    },
+    {
+      "id": "production",
+      "title": "LuaJIT, PyPy, and the trace-JIT lineage",
+      "tags": ["jit", "production"],
+      "content": "**LuaJIT** (Mike Pall) is the cleanest production trace JIT. The trace IR is dense, with carefully-tuned representation: each op is a fixed-size record, with operands as small indices into the trace buffer. Allocation sinking, store forwarding, and constant folding all operate on the trace as a linear sequence. LuaJIT's trace compiler is the cleanest demonstration that an SSA IR can be maximally compact when scoped to a single hot path.\n\n**PyPy** uses meta-tracing — the trace is recorded over the *interpreter's* execution, not directly over the user program. The interpreter is the thing being JITted; user code becomes specialised through partial evaluation against the interpreter trace. This is Futamura's first projection in production, and it's why PyPy can apply the same JIT infrastructure to multiple languages (Python, Squeak, Prolog) without rewriting the JIT each time.",
+      "refs": [
+        { "target": "futamura-projections#truffle-graal-realisation", "type": "shares-design-space-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs vs method-based JITs",
+      "tags": ["tradeoffs", "jit"],
+      "content": "Strengths: trace JITs auto-inline aggressively because trace recording flows through call boundaries; cold code never gets compiled; specialisation per path is more aggressive than per-function specialisation. Weaknesses: code with many short-running paths produces many traces (\"trace explosion\"); side-exit handling adds complexity; cold-path performance never improves because cold paths never get JITted.\n\nMethod-based JITs (V8 TurboFan, Cinder, JavaScriptCore FTL) avoid trace explosion but inline less aggressively and compile cold code that may never run. Modern engines often combine both: tracing for innermost loops, method JIT for entire hot functions.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "PyPy musings on tracing", "url": "https://pypy.org/posts/2025/01/musings-tracing.html" },
+    { "label": "How JIT Compilers are Implemented and Fast", "url": "https://kipp.ly/jits-impls/" }
+  ]
+}

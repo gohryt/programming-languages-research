@@ -1,0 +1,37 @@
+{
+  "kind": "framework",
+  "name": "OpenJDK Project Leyden — AOT Caching",
+  "aliases": ["Project Leyden", "AOT cache", "JDK 25 AOT"],
+  "summary": "OpenJDK's second AOT-and-JIT coexistence attempt after the deprecated jaotc. Primary deliverable is AOT caching (per-method ahead-of-time-compiled code stored in a per-application cache the JVM consults on startup) rather than full ahead-of-time native images. Generated from a 'training run'. JDK 25 (Oct 2025) shipped first wave.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Project Leyden** (OpenJDK, since 2020 with deliveries beginning JDK 25, 2025) is the second OpenJDK attempt at AOT-and-JIT coexistence after `jaotc`. The architectural difference: Leyden's primary deliverable is **AOT caching** (per-method ahead-of-time compiled code stored in a per-application cache that the JVM consults on startup) rather than full ahead-of-time native images.\n\nThe cache is generated from a \"training run\" — an instrumented run of the application that records which methods are hot, profile data, and observed types — and the JVM's HotSpot JIT remains the runtime authority for re-compilation, deoptimisation, and tier-up. AOT cache hits replace first-call JIT compilation; misses fall through to ordinary tiered compilation.",
+      "refs": [
+        { "target": "dotnet-r2r#overview", "type": "compared-with" },
+        { "target": "project-crac#overview", "type": "complementary-to" },
+        { "target": "graalvm-native-image#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "OpenJDK Project Leyden", "url": "https://openjdk.org/projects/leyden/" },
+        { "label": "SoftwareMill — Project Leyden and JDK 26", "url": "https://softwaremill.com/project-leyden-and-jdk-26-bringing-aot-caching-to-zgc/" },
+        { "label": "Quarkus blog — Leyden 2", "url": "https://quarkus.io/blog/leyden-2/" }
+      ]
+    },
+    {
+      "id": "design-pieces",
+      "title": "Design pieces",
+      "tags": ["jdk", "aot"],
+      "content": "The mechanical pieces are:\n\n- **AppCDS extension**: the existing Class Data Sharing format gains AOT-compiled-method slots, so the same archive that loads classes also primes the JIT cache.\n- **Profile-data reuse**: training-run profiles persist into the cache so AOT-compiled methods can be re-JITed with profile feedback even on first run.\n- **`jcmd`-driven training** plus build-time training tools (Maven/Gradle plugins, Spring Boot integration via `spring-boot-maven-plugin process-aot`) produce the cache as a build artifact rather than a per-deployment training step.\n\nStatus (as of 2026-04): JDK 25 (LTS, October 2025) shipped Leyden's first wave (`-XX:CacheDataStore=` plus AOT-class-loading). JDK 26 adds AOT-cache support for ZGC. Spring Boot 4 integrated Leyden alongside its existing GraalVM Native Image support.\n\nThe architectural takeaway: Leyden picks a middle point — AOT only what training data justifies, fall back to JIT for everything else, preserve all runtime dynamism (reflection, dynamic class loading, agents, redefinition).",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Project Leyden", "url": "https://openjdk.org/projects/leyden/" },
+    { "label": "IBM Developer — Project Leyden", "url": "https://developer.ibm.com/articles/java-project-leyden/" },
+    { "label": "SoftwareMill — Project Leyden and JDK 26", "url": "https://softwaremill.com/project-leyden-and-jdk-26-bringing-aot-caching-to-zgc/" },
+    { "label": "Quarkus blog — Leyden 2", "url": "https://quarkus.io/blog/leyden-2/" }
+  ]
+}

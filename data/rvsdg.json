@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "RVSDG",
+  "aliases": ["region-value-state-dependence-graph"],
+  "summary": "Reissmann, Meyer, Bahmann, Själander (2020): SSA alternative. Where SSA represents control via CFG basic blocks and φ-functions, RVSDG represents control via regions (nestable subgraphs) and dataflow via dependency edges.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Reissmann, Meyer, Bahmann, Själander (2020) propose RVSDG as an SSA alternative. Where SSA represents control flow via CFG basic blocks and φ-functions, RVSDG represents control via *regions* (nestable subgraphs) and dataflow via dependency edges. Loops, conditionals, and tail-recursive functions all become region nodes with explicit input/output ports.",
+      "refs": [
+        { "target": "ssa#overview", "type": "alternative-to" },
+        { "target": "sea-of-nodes#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "RVSDG paper (Reissmann et al., 2020)", "url": "https://dl.acm.org/doi/10.1145/3391902" }
+      ]
+    },
+    {
+      "id": "regions-vs-cfg",
+      "title": "Regions vs CFG",
+      "tags": ["compiler-ir", "dataflow"],
+      "content": "RVSDG's pitch: many optimizations (loop-invariant code motion, partial redundancy elimination, dead-code elimination) become structural graph transformations on RVSDG, simpler than their SSA equivalents. Hugin and JLM are research compilers built on RVSDG.\n\nThe form is not yet in production (LLVM, GCC, Cranelift all use SSA), but appears in compiler-research papers and in some experimental MLIR dialects. Its persistent attraction is that nested regions match the lexical structure programmers actually write, while CFG-shape SSA forces the compiler to recover that structure post-hoc.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "RVSDG (Reissmann et al., 2020)", "url": "https://dl.acm.org/doi/10.1145/3391902" }
+  ]
+}

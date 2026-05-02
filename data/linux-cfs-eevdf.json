@@ -1,0 +1,48 @@
+{
+  "kind": "tool",
+  "name": "Linux CFS / EEVDF Scheduler",
+  "aliases": ["cfs", "eevdf", "linux-scheduler"],
+  "summary": "The Linux kernel scheduler that every M:N language runtime competes with and depends on; CFS (Molnár 2007) used a red-black tree of vruntime-ordered tasks for greedy fairness, EEVDF (Zijlstra Linux 6.6, Oct 2023) replaced it with deadline-driven fairness for better latency on short-running interactive tasks.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The Linux kernel scheduler is the OS-level scheduling context every M:N language runtime competes with and depends on. Two generations are worth recording: **CFS** (Completely Fair Scheduler, Linux 2.6.23, 2007) and **EEVDF** (Earliest Eligible Virtual Deadline First, Linux 6.6, October 2023).",
+      "refs": [
+        { "target": "virtual-threads#mn-scheduling-model", "type": "underlies" },
+        { "target": "work-stealing#fairness-and-locality-tradeoffs", "type": "underlies" }
+      ],
+      "sources": [
+        { "label": "Linux kernel — CFS Design", "url": "https://docs.kernel.org/scheduler/sched-design-CFS.html" },
+        { "label": "LWN — \"An EEVDF CPU scheduler for Linux\"", "url": "https://lwn.net/Articles/925371/" }
+      ]
+    },
+    {
+      "id": "cfs-completely-fair-scheduler",
+      "title": "CFS — Completely Fair Scheduler (2007–2023)",
+      "tags": ["scheduling", "kernel", "fairness"],
+      "content": "**CFS** by Ingo Molnár replaced the O(1) scheduler with a fairness-first design. Each task accumulates **vruntime** (virtual runtime) at a rate inversely proportional to its weight (priority). The scheduler picks the task with the lowest vruntime, runs it for a slice, updates its vruntime, and re-inserts it into a red-black tree keyed by vruntime. The result is \"perfectly fair\" CPU time distribution among ready tasks: every task gets approximately `1/N` of CPU regardless of how many tasks exist or in what order they arrived.\n\nMechanical primitives:\n\n- **Red-black tree per CPU runqueue**, keyed by vruntime, with O(log N) insert/remove and O(1) leftmost-task lookup.\n- **`sched_latency` target**: the wall-clock period in which every task runs at least once (default ~6 ms on busy systems, scaled down with task count).\n- **Group scheduling** (cgroups CPU controller): nested CFS instances let a control group's tasks share a vruntime budget, used heavily by container runtimes (Docker, Kubernetes pod CPU limits).\n- **Load balancing** across CPU runqueues via periodic and idle-triggered task migration."
+    },
+    {
+      "id": "eevdf-earliest-eligible-virtual-deadline-first",
+      "title": "EEVDF — Earliest Eligible Virtual Deadline First (2023+)",
+      "tags": ["scheduling", "kernel", "latency"],
+      "content": "**EEVDF** by Peter Zijlstra (Linux 6.6, October 2023) replaced CFS as the default scheduler. The change is conceptually significant: CFS picks the *minimum vruntime* (greedy fairness); EEVDF picks the task with the **earliest virtual deadline** among **eligible** tasks (deadline-driven fairness). Each task has a *request size* (effectively its time slice) and a *deadline* equal to \"now + request / weight\". The scheduler picks the task with the earliest deadline whose vruntime is at most the average vruntime — guaranteeing both fairness and predictable latency.\n\nThe trade-off vs CFS: EEVDF gives **better latency for short-running interactive tasks** at minor cost to long-batch fairness. The deadline mechanism is also a natural primitive for soft real-time scheduling, which CFS approximated with `nice` and `cpu.shares` but did not directly support.\n\nStatus (as of 2026-04): EEVDF is default on Linux 6.6+; the transition is essentially complete in modern distributions (Fedora 39+, Ubuntu 24.04+, RHEL 10+).",
+      "sources": [
+        { "label": "Linux kernel — EEVDF scheduler documentation", "url": "https://www.kernel.org/doc/html/v6.6/scheduler/sched-eevdf.html" }
+      ]
+    },
+    {
+      "id": "language-runtime-implications",
+      "title": "Implications for language runtimes",
+      "tags": ["scheduling", "runtime", "design-guidance"],
+      "content": "All M:N language runtimes ride on this scheduler. Go's `GOMAXPROCS` workers, Java virtual-thread carriers, Tokio worker threads, and BEAM scheduler threads are all CFS/EEVDF tasks underneath. Their fairness and latency properties depend on the kernel scheduler's choices: a tight-loop goroutine cannot starve other goroutines on the same Go process, but it *can* starve other Linux processes if the runtime's worker count exceeds available CPUs and `cpu.shares` aren't tuned.\n\nThe runtime-design lesson: designing language schedulers that are *aware of CFS/EEVDF semantics* — particularly `sched_yield` cost, cgroup CPU limits, and the interaction with per-CPU work-stealing — is what separates well-behaved language runtimes from ones that fight the kernel."
+    }
+  ],
+  "sources": [
+    { "label": "Linux kernel — CFS Design", "url": "https://docs.kernel.org/scheduler/sched-design-CFS.html" },
+    { "label": "LWN — EEVDF CPU scheduler for Linux", "url": "https://lwn.net/Articles/925371/" },
+    { "label": "Linux kernel — EEVDF documentation", "url": "https://www.kernel.org/doc/html/v6.6/scheduler/sched-eevdf.html" }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "kind": "framework",
+  "name": "Project Panama and the Foreign Function & Memory API",
+  "aliases": ["FFM API", "Project Panama", "JEP 454"],
+  "summary": "Java's pure-Java FFI without JNI per-call overhead. `MemorySegment` (typed off-heap region with spatial+temporal bounds), `Arena` (lifetime owner), `Linker` (produces JIT-compileable `MethodHandle` for native functions), `jextract` (auto-bind C headers). Finalised in JDK 22 (March 2024).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The Java equivalent of native interop has historically been **JNI**: write a `native` method declaration in Java, write a hand-rolled C/C++ glue function with the `JNIEXPORT JNICALL` calling convention, compile it into a shared library, and load the library at runtime. JNI is verbose, requires a separate build pipeline for the C side, mishandles memory by default (every off-heap pointer is a `jlong` that the caller must validate), and forces the JVM into an opaque-call mode that disables many optimisations.\n\n**Project Panama** (OpenJDK, since ~2014) and its first finalized deliverable, the **Foreign Function & Memory (FFM) API** (JEP 454, finalised in **JDK 22, March 2024**), replace this entire stack.",
+      "refs": [
+        { "target": "calling-conventions#overview", "type": "respects" }
+      ],
+      "sources": [
+        { "label": "JEP 454: Foreign Function & Memory API", "url": "https://openjdk.org/jeps/454" },
+        { "label": "Oracle JDK 25 FFM API documentation", "url": "https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html" }
+      ]
+    },
+    {
+      "id": "mechanical-pieces",
+      "title": "Mechanical pieces",
+      "tags": ["jvm", "ffi"],
+      "content": "- **`MemorySegment`** — a typed view over a contiguous off-heap memory region. Distinct from `ByteBuffer` (now considered legacy): `MemorySegment` carries a *spatial bound* (the segment's length) and a *temporal bound* (its `Arena` lifetime), so out-of-bounds and use-after-free are detected at runtime rather than producing UB.\n- **`Arena`** — the lifetime owner. `Arena.ofConfined()` is single-thread, deterministic-cleanup; `Arena.ofShared()` is multi-thread; `Arena.ofAuto()` defers cleanup to the GC; `Arena.global()` is the never-freed root. Closing an arena invalidates every segment derived from it, and subsequent access throws — Rust-borrow-checker-class spatial+temporal safety expressed as a runtime contract.\n- **`Linker`** — `Linker.nativeLinker()` returns the platform-specific linker; `linker.downcallHandle(symbolAddress, FunctionDescriptor)` produces a `MethodHandle` that invokes the native function directly with no intermediate C glue. The downcall handle is JIT-compileable and inlinable in HotSpot.\n- **`jextract`** — command-line tool that reads C header files and emits Java source binding the declared functions, types, and constants. Eliminates the manual `FunctionDescriptor` writing for libraries with stable headers.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — managed-runtime FFI without per-call C glue",
+      "tags": ["language-design", "ffi"],
+      "content": "The lesson generalises: **a managed-runtime language can adopt a borrow-checker-class temporal+spatial discipline for native memory** (via Arena-bounded MemorySegments) without forcing that discipline on its own GC'd heap. The FFM API is the cleanest production example of a hybrid model — GC for managed objects, explicit-arena ownership for foreign memory — and the design pattern transfers directly to other managed runtimes (CLR, BEAM, V8) considering FFI redesigns.\n\nStatus (as of 2026-04): production in JDK 22+. **JEP 472** (\"Prepare to Restrict the Use of JNI\") signals JNI is being deprecated in favour of FFM.",
+      "refs": [],
+      "sources": [
+        { "label": "OpenJDK Project Panama", "url": "https://openjdk.org/projects/panama/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "JEP 454", "url": "https://openjdk.org/jeps/454" },
+    { "label": "Project Panama", "url": "https://openjdk.org/projects/panama/" },
+    { "label": "Oracle JDK 25 FFM API documentation", "url": "https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html" }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Mojo @parameter and Three-Stage Pipeline",
+  "aliases": ["@parameter", "Mojo metaprogramming", "Mojo comptime"],
+  "summary": "Mojo formalises what Zig's `comptime` leaves implicit: a distinct named compile-time stage with parser → interpreter → elaborator phases. Parameters in `[]`, arguments in `()`. Compile-time code reads as regular Mojo because it *is* regular Mojo, evaluated earlier in the pipeline.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mojo's metaprogramming formalises what Zig `comptime` leaves implicit: a distinct, named compile-time stage with well-defined inputs and outputs. The compiler pipeline is:\n\n1. **Parser** — produces IR (over the POP dialect) and performs type checking. Simple `comptime` expressions like `2 + 3` get constant-folded here.\n2. **Interpreter** — runs compile-time code. Any remaining `comptime` expression that cannot be constant-folded is executed by an interpreter over Mojo's frontend, operating on compile-time values and producing compile-time values.\n3. **Elaborator** — substitutes concrete parameter values into parametric declarations and produces concrete specialised functions and structs. Parametric IR becomes concrete IR here.",
+      "refs": [
+        { "target": "zig-comptime#overview", "type": "compared-with" },
+        { "target": "compile-time-function-evaluation#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Mojo Compile-Time Evaluation", "url": "https://docs.modular.com/stable/mojo/manual/metaprogramming/comptime-evaluation/" }
+      ]
+    },
+    {
+      "id": "syntax",
+      "title": "Syntax — parameters in [], arguments in ()",
+      "tags": ["mojo", "syntax"],
+      "content": "The syntactic design exposes the stages cleanly:\n\n- **Parameters in `[]`, arguments in `()`.** A function `fn repeat[count: Int](msg: String)` takes `count` at compile time and `msg` at runtime. Calling `repeat[3](\"hi\")` specialises the function for `count=3` during elaboration.\n- **`comptime` keyword** for values and control flow that must run at compile time: `comptime let N = compute_size()`, `comptime if CONDITION: ...`, `comptime for i in range(N): ...`.\n- **`@parameter` decorator** for functions, loops, and conditionals that should execute at compile time. `@parameter for` unrolls the loop at compile time; `@parameter if` compiles only the taken branch.\n\nThe payoff: metaprogramming reads like regular Mojo because it *is* regular Mojo — just evaluated earlier in the pipeline.",
+      "refs": [],
+      "sources": [
+        { "label": "Mojo Parameterization", "url": "https://docs.modular.com/stable/mojo/manual/parameters/" }
+      ]
+    },
+    {
+      "id": "comparison-with-other-systems",
+      "title": "Comparison with other metaprogramming systems",
+      "tags": ["language-design", "tradeoffs"],
+      "content": "The distinctive contribution is that the compile-time stage is an *MLIR pass pipeline* with a named elaborator step rather than a pre-pass or syntactic expander, so compile-time code benefits from the same optimisation infrastructure as runtime code.\n\nCompared to Zig `comptime`: Zig leaves the compile-time stage implicit; Mojo names parser/interpreter/elaborator as distinct phases with explicit data flow between them. Compared to Template Haskell: TH operates on Haskell ASTs at compile time but is a separate macro phase; Mojo's compile-time evaluation is the same compile pipeline running earlier. Compared to Scala 3 inline + quoted: Scala 3 has a similar two-tier inline-vs-quoted model; Mojo's parametric-IR layer between interpretation and elaboration is the distinct axis.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Mojo Compile-Time Evaluation", "url": "https://docs.modular.com/stable/mojo/manual/metaprogramming/comptime-evaluation/" },
+    { "label": "Mojo Parameterization", "url": "https://docs.modular.com/stable/mojo/manual/parameters/" }
+  ]
+}

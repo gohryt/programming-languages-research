@@ -1,0 +1,35 @@
+{
+  "kind": "tool",
+  "name": "TypeScript Incremental Compilation",
+  "aliases": ["tsc --incremental", "TypeScript project references", ".tsbuildinfo"],
+  "summary": "TypeScript's incremental story has two pieces: project references (TS 3.0, 2018) split a codebase into multiple compilation units with explicit dependencies, and `--incremental` (TS 3.4, 2019) writes per-file hash and dependency information into `.tsbuildinfo`. Sub-second rebuild on multi-million-line monorepos.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "TypeScript's incremental compilation has two pieces. **Project references** (TypeScript 3.0, 2018) let a large codebase be split into multiple compilation units with explicit dependencies between them. Each project compiles independently; downstream projects depend on the upstream's emitted declaration files (`.d.ts`) plus a manifest.\n\n**`--incremental`** (TypeScript 3.4, 2019) writes per-file hash and dependency information into `.tsbuildinfo`. On rebuild, files whose hash hasn't changed and whose dependencies haven't changed are skipped. This applies within a single project; combined with project references, it gives sub-second rebuild on multi-million-line monorepos.",
+      "refs": [
+        { "target": "salsa-incremental#overview", "type": "compared-with" },
+        { "target": "incremental-type-checking#overview", "type": "implements" }
+      ],
+      "sources": [
+        { "label": "TypeScript Project References", "url": "https://www.typescriptlang.org/docs/handbook/project-references.html" }
+      ]
+    },
+    {
+      "id": "limits",
+      "title": "Limits and trade-offs",
+      "tags": ["typescript", "incremental"],
+      "content": "The granularity is per-file, not per-symbol. A change to a single function in a 10K-line file invalidates the whole file's compilation; downstream files that depend on the file's `.d.ts` only re-check if the `.d.ts` changes. This is coarser than Salsa-style query-graph invalidation but dramatically simpler to implement.\n\nFor TypeScript's design constraints (decade-old codebase, JS-source compilation, browser-target builds), this trade-off is the right one. A query-graph rewrite would be a much larger engineering effort and might not pay off for the typical TypeScript build pattern (build once, run; rebuild on file save). The simpler `.tsbuildinfo` approach captures most of the benefit at much lower cost.",
+      "refs": [],
+      "sources": [
+        { "label": "TypeScript 3.0 release notes", "url": "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-0.html" },
+        { "label": "TypeScript 3.4 --incremental", "url": "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-4.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "TS Project References", "url": "https://www.typescriptlang.org/docs/handbook/project-references.html" }
+  ]
+}

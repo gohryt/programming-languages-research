@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Nim Macros",
+  "aliases": ["Nim metaprogramming", "templates and typed macros"],
+  "summary": "Multi-phase metaprogramming spanning templates, untyped macros, and typed macros. Macro authors choose which phase they need: template substitution before semantic analysis, untyped AST manipulation early, or typed AST inspection with resolved symbols and types. Powerful but phase-complex.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Nim's macro system is notable for exposing the compiler's AST to user code while still being integrated with semantic analysis. Macros can operate on untyped syntax trees, typed syntax trees, or both depending on how their parameters are declared. This gives Nim a spectrum: templates perform hygienic-ish syntactic substitution before full semantic checking, untyped macros can introduce new syntax-shaped code early, and typed macros can inspect resolved symbols and type information.",
+      "refs": [
+        { "target": "rust-macros#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Nim Macros", "url": "https://nim-lang.org/docs/macros.html" }
+      ]
+    },
+    {
+      "id": "phase-spectrum",
+      "title": "Phase spectrum",
+      "tags": ["macros", "metaprogramming"],
+      "content": "**Templates** are the simplest case: parameter substitution before semantic analysis. Roughly hygienic but lighter weight than full macros. Templates run at the syntactic level, so they cannot inspect types or symbols.\n\n**Untyped macros** receive the AST before semantic analysis. They can introduce new identifiers, generate declarations that subsequent phases will resolve, and rearrange code structurally. Most useful for DSLs and code generation that doesn't need type information.\n\n**Typed macros** receive the AST after semantic analysis. They see resolved symbols, full type information, and can produce diagnostics with type-aware error messages. Useful for serialisation derivation, enum reflection, and similar reflective patterns.\n\nThe advantage: macro authors can choose the phase they need. A typed macro can produce diagnostics with type information intact, while an untyped macro or template can generate declarations and bindings that become visible to later semantic analysis. This is more flexible than Rust proc macros over token streams, but less isolated from compiler internals.",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "complexity"],
+      "content": "The cost is phase complexity. Because Nim exposes several expansion modes, users must understand when names are resolved, when generated declarations become visible, and which AST shape a macro receives. The design is powerful, but it is not simply \"macros over an already-type-checked AST\"; it is a multi-phase metaprogramming system spanning templates, untyped macros, and typed macros.\n\nFor a language designer, Nim is the cautionary example of \"more phases are more powerful but harder to learn\". Each phase has its own contract about what the macro can see and do, and library authors have to pick the right phase for each macro they write.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Nim Macros docs", "url": "https://nim-lang.org/docs/macros.html" }
+  ]
+}

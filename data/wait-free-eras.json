@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Wait-Free Eras",
+  "aliases": [
+    "WFE"
+  ],
+  "summary": "Nikolaev & Ravindran (PPoPP 2020) extend Hazard Eras to fully wait-free progress for arbitrary wait-free data structures, guaranteeing bounded reclamation work per operation. First universal wait-free SMR; helping mechanism on era publication; near-EBR throughput with strict bounds.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "safe-memory-reclamation",
+        "era-based",
+        "wait-free",
+        "bounded-memory"
+      ],
+      "content": "Nikolaev & Ravindran's **Wait-Free Eras** (PPoPP 2020) extend Hazard Eras to fully wait-free progress for arbitrary wait-free data structures by guaranteeing bounded reclamation work per operation. The key contribution is the first *universal* wait-free SMR scheme — any wait-free data structure can be paired with WFE and remain wait-free including reclamation.\n\nThe mechanism uses a **helping mechanism on era publication**: when a thread publishes its reserved era, other threads cooperate to ensure the publication completes in bounded steps even if the publishing thread is preempted. Achieves near-EBR throughput with strict per-operation bounds — important for hard-real-time and adversarial-scheduling settings where EBR's unbounded retention is unacceptable.",
+      "refs": [
+        {
+          "target": "hazard-eras",
+          "type": "successor-of"
+        },
+        {
+          "target": "epoch-based-reclamation",
+          "type": "compared-with"
+        },
+        {
+          "target": "interval-based-reclamation",
+          "type": "related"
+        },
+        {
+          "target": "hyaline-reclamation",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Wait-Free Eras (PPoPP 2020)",
+          "url": "https://www.ssrg.ece.vt.edu/papers/ppopp20.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "WFE paper",
+      "url": "https://www.ssrg.ece.vt.edu/papers/ppopp20.pdf"
+    }
+  ]
+}

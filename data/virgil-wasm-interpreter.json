@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Virgil Sidetable-Driven In-Place Wasm Interpreter",
+  "aliases": ["wizard interpreter", "in-place Wasm interpreter"],
+  "summary": "Titzer's PLDI 2022 wizard engine for Virgil: a compact sidetable generated as a side-effect of Wasm validation lets the interpreter execute the original module bytes directly, without rewriting to an internal format. Order-of-magnitude memory savings vs rewriting interpreters, dispatch comparable to well-tuned ones.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Standard Wasm interpreters come in two flavours: **rewriting interpreters** that translate Wasm bytecode to an internal format (faster dispatch, slower startup, more memory) or **JITs** that compile to machine code (fastest steady-state, even slower startup). There was no third option for fast startup without rewriting — until Titzer's 2022 PLDI paper on the **wizard** engine used by Virgil.",
+      "refs": [
+        { "target": "wasm-streaming-compile#overview", "type": "alternative-to" },
+        { "target": "virgil-aeneas#overview", "type": "complementary-to" }
+      ],
+      "sources": [
+        { "label": "A Fast In-Place Interpreter for WebAssembly (Titzer, PLDI 2022)", "url": "https://www.cs.tufts.edu/~nr/cs257/archive/ben-titzer/wasm-interp.pdf" }
+      ]
+    },
+    {
+      "id": "technique",
+      "title": "Sidetable-from-validation technique",
+      "tags": ["wasm", "interpreter"],
+      "content": "The technique:\n\n- Wasm validation already walks every instruction, tracking a type stack and verifying structured control flow. This walk produces enough information to execute the bytecode correctly — if you save it.\n- Save it as a **compact sidetable**: a small auxiliary structure indexed by instruction offset, storing per-instruction metadata (operand stack depth, branch targets, block types). The sidetable is generated as a side-effect of validation, with no extra pass.\n- At interpretation time, the interpreter reads the original Wasm bytes and consults the sidetable at each instruction for the context needed to execute. No rewriting, no internal format, just original bytes + sidetable.\n\nResults reported in the paper: order-of-magnitude improvements in memory consumption and processing time over rewriting Wasm interpreters, with dispatch performance comparable to well-tuned rewriting interpreters.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — sidetable from validation",
+      "tags": ["compiler-architecture", "interpreter"],
+      "content": "Why this matters beyond Virgil: the design pattern — *compact sidetable generated as a by-product of validation, enabling in-place interpretation of the original bytes* — is broadly applicable. Any bytecode format whose validation produces enough structural information can use this technique to avoid the rewriting step.\n\nThe relevant design question for a bytecode format is whether its validator can emit a sidetable, because that unlocks a fast-startup interpretation tier without the memory cost of internal-format conversion.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Titzer wizard interpreter PLDI 2022", "url": "https://www.cs.tufts.edu/~nr/cs257/archive/ben-titzer/wasm-interp.pdf" }
+  ]
+}

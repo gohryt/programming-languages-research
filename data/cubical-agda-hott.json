@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "Cubical Agda and Homotopy Type Theory — Computable Univalence",
+  "aliases": ["cubical-agda", "hott", "homotopy-type-theory", "univalence", "higher-inductive-types"],
+  "summary": "Univalent Foundations (Voevodsky and the HoTT Book authors, 2010s): equality is a path in a higher-dimensional structure; univalence (equivalent types are equal) becomes a primitive rather than a postulated axiom. Cubical Agda (Vezzosi, Mörtberg, Abel — POPL 2021) is the production-grade implementation: univalence is computable, paths are first-class terms, and higher inductive types are first-class.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Univalent Foundations / Homotopy Type Theory (Voevodsky and the HoTT Book authors, 2010s) reframes equality in dependent types: instead of propositional equality decided by definitional reduction, equality is a *path* in a higher-dimensional structure, and **univalence** (equivalent types are equal) becomes a primitive rather than a postulated axiom.\n\n**Cubical Agda** (Vezzosi, Mörtberg, Abel — POPL 2021) is the production-grade implementation of this idea: an Agda flavour where univalence is *computable* rather than assumed, paths are first-class terms, and **higher inductive types** (HITs) — types defined by both points and paths between them — are first-class.",
+      "refs": [
+        { "target": "dependent-types#overview", "type": "advanced-form" }
+      ],
+      "sources": [
+        { "label": "Cubical Agda documentation", "url": "https://agda.readthedocs.io/en/latest/language/cubical.html" },
+        { "label": "Homotopy Type Theory book", "url": "https://homotopytypetheory.org/book/" },
+        { "label": "Vezzosi, Mörtberg, Abel — Cubical Agda (POPL 2021)", "url": "https://dl.acm.org/doi/10.1145/3434283" }
+      ]
+    },
+    {
+      "id": "practical-consequence",
+      "title": "Practical consequence — quotients and HITs become first-class",
+      "tags": ["dependent-types", "verification"],
+      "content": "The practical consequence is that quotient types (sets modulo equivalence relations), set-truncated universes, and computational interpretations of category-theoretic constructions all become directly expressible. This is a strict superset of ordinary dependent typing: every Agda proof works in Cubical Agda, plus proofs that require univalence or HITs become tractable rather than blocked.\n\nDistinct from Lean, Coq, and Idris 2: those are based on intensional type theory with propositional equality; Cubical reformulates the kernel itself, building on the cubical type theory of Cohen, Coquand, Huber, and Mörtberg (2015). The kernel cost is significantly more sophisticated — interval pretypes, partial elements, glue types, transport along paths — but the user-visible benefit is that proofs about quotient structures (equivalence classes, syntactic-equality-mod-renaming, abstract data types modulo their representation) become much shorter and computational rather than axiomatic."
+    },
+    {
+      "id": "status-and-design-implication",
+      "title": "Status and design implication",
+      "tags": ["verification", "language-design"],
+      "content": "Status (as of 2026-04): research-grade. Mainstream proof assistants (Lean, Coq) have not adopted univalence as primitive; Cubical Agda is the production implementation, with **Cubical-Coq** (an experimental plugin) and **agda-unimath** (a large univalent-mathematics library) as complementary efforts.\n\nFor language-design purposes, Cubical Agda matters as an **upper bound on dependent-type expressivity** — the design point at which equality itself becomes a first-class computational object. Languages designing for verification at this expressivity level should expect kernel complexity and tooling cost; languages targeting narrower verification domains can stay with intensional dependent types and avoid the cubical machinery.",
+      "sources": [
+        { "label": "agda-unimath univalent-mathematics library", "url": "https://unimath.github.io/agda-unimath/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Cubical Agda documentation", "url": "https://agda.readthedocs.io/en/latest/language/cubical.html" },
+    { "label": "Homotopy Type Theory book", "url": "https://homotopytypetheory.org/book/" },
+    { "label": "Vezzosi, Mörtberg, Abel — Cubical Agda (POPL 2021)", "url": "https://dl.acm.org/doi/10.1145/3434283" },
+    { "label": "agda-unimath", "url": "https://unimath.github.io/agda-unimath/" }
+  ]
+}

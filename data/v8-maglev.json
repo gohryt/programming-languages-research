@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "V8 Maglev",
+  "aliases": ["maglev-ir"],
+  "summary": "V8's mid-tier JIT IR: single-level SSA with dense indexed operands, fewer node kinds than TurboFan's sea-of-nodes, explicit deopt info inline at each speculative op. Trades top-tier expressiveness for compile speed; bails to Sparkplug rather than to the interpreter.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Maglev's IR is single-level SSA with dense indexed operands, fewer node kinds than TurboFan's sea-of-nodes, and explicit deopt info inline at each speculative op. The data model is intentionally less expressive than TurboFan; the trade-off favours compile speed over peak quality.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "v8-turbofan#overview", "type": "tier-below" }
+      ],
+      "sources": [
+        { "label": "V8 Maglev introduction", "url": "https://v8.dev/blog/maglev" }
+      ]
+    },
+    {
+      "id": "tier-below-turbofan",
+      "title": "Mid-tier between Sparkplug and TurboFan",
+      "tags": ["jit", "tiered-compilation"],
+      "content": "Failed speculations in Maglev bail to Sparkplug (V8's baseline JIT) rather than to the interpreter, which is why Maglev's deopt metadata records *baseline-frame* state rather than full bytecode-pointer state — the deopt layout is co-designed with the tier directly below it.\n\nThe single-level shape (no separate LIR) and the linear node table both reflect the same priority: keep the IR small enough that compile time fits between a function getting hot and the user noticing latency.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ]
+    },
+    {
+      "id": "design-position",
+      "title": "Design position in V8's tier ladder",
+      "tags": ["jit", "v8"],
+      "content": "Maglev's place in V8's tier pipeline (between Sparkplug and TurboFan/Turboshaft) is a deliberate response to two forces: TurboFan's compile time is too high for transiently-hot code, while Sparkplug's template-JIT output is too slow for sustained throughput. Maglev sits in the middle — fast enough to compile aggressively, good enough to run reasonably warm code without invoking the top tier.\n\nThis tier-stacking pattern (interpreter → baseline → mid-tier → top-tier) has converged across modern JIT engines (V8 Maglev/TurboFan/Turboshaft, JavaScriptCore Baseline/DFG/FTL, HotSpot C1/C2). Maglev is V8's specific answer to the mid-tier slot.",
+      "refs": [
+        { "target": "v8-turboshaft#overview", "type": "tier-above" },
+        { "target": "jsc-dfg#overview", "type": "analogous-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "V8 Maglev introduction", "url": "https://v8.dev/blog/maglev" }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "kind": "language",
+  "name": "Haskell",
+  "aliases": ["ghc", "haskell-lang"],
+  "summary": "Lazy purely-functional language; the strongest production example of advanced type-system features (type classes, multi-parameter classes, functional dependencies, GADTs, kind polymorphism, type families, arbitrary-rank polymorphism, roles, linear types) accumulating over decades without collapsing into a new language. GHC is the reference implementation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Haskell (specifically GHC) is the strongest production example of a language where advanced type-system features accumulate over decades without collapsing into a new language: type classes, multi-parameter classes, functional dependencies, GADTs, kind polymorphism, type families, arbitrary-rank polymorphism, roles, and linear types all coexist.\n\nThe architectural lesson is that an extension-oriented type checker needs stable mechanisms for adding new forms of evidence, local assumptions, and defaulting restrictions without breaking existing code; type classes scale into a design space of resolution rules and defaulting; GADTs feed equalities back into pattern-match checking but require rigidity restrictions; type families give open type-level computation; linear types live in `data/linear-haskell-ir`.",
+      "refs": [
+        { "target": "type-classes-traits#overview", "type": "exemplifies" },
+        { "target": "gadts#production-uses", "type": "exemplifies" },
+        { "target": "constraint-based-typing#outsidein-x", "type": "implements" },
+        { "target": "evidence-passing#production-uses", "type": "exemplifies" },
+        { "target": "linear-haskell-ir#overview", "type": "extends-with" },
+        { "target": "template-haskell#overview", "type": "ecosystem-extension" }
+      ],
+      "sources": [
+        { "label": "GHC type classes", "url": "https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/typeclasses.html" },
+        { "label": "GHC type extensions overview", "url": "https://www.haskell.org/ghc/docs/latest/html/users_guide/exts/types.html" }
+      ]
+    },
+    {
+      "id": "type-system-features",
+      "title": "Accumulated type-system features",
+      "tags": ["type-system", "haskell"],
+      "content": "GHC has accumulated decades of type-system extensions:\n\n- **type classes** (Haskell 98) — bounded polymorphism via dictionary passing.\n- **multi-parameter type classes** and **functional dependencies** — express relations between type parameters.\n- **GADTs** — constructors that refine type parameters; pattern matching introduces local equalities.\n- **type families** — type-level functions (open or closed) that compute types from types.\n- **kind polymorphism** — types and kinds share inference machinery.\n- **arbitrary-rank polymorphism** — `forall` at any position with bidirectional checking.\n- **roles** — control which type-class instances may be derived through `newtype`.\n- **linear types** (GHC 9.0+) — multiplicities on function arrows (`data/linear-haskell-ir`).\n- **dependent Haskell** — long-running effort to lift the term/type distinction.\n\nThe combined feature set is what makes GHC the longest-running stress test of type-checker architecture: every feature must compose with every other one, with diagnostics and inference still recognisable to programmers.",
+      "sources": [
+        { "label": "GHC GADTs", "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/gadt.html" },
+        { "label": "GHC type families", "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/type_families.html" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — extension-oriented type-checker architecture",
+      "tags": ["type-system", "language-design"],
+      "content": "Haskell's lesson for new languages is **architectural**: the type checker has to be designed for extension. OutsideIn(X) (`data/constraint-based-typing#outsidein-x`) was designed in the abstract — `X` is a parameter — precisely so that GHC could add type families, type-class equality, and similar features without rewriting the inference engine.\n\nFor language designers, the practical guidance:\n\n- **Plan for extension**: any non-trivial type system will accumulate features over its lifetime; a constraint-based architecture is more accommodating than a substitution-threading Algorithm-W.\n- **Coherence first, soundness second, ergonomics third**: Haskell's coherence rules (orphan rules, instance overlap restrictions) are conservative; relaxing them later is harder than starting strict.\n- **Document feature interactions**: every type-system feature interacts with every other feature; the GHC documentation is itself a corpus on how language features compose.\n- **Invest in typed elaboration**: Core (`data/ghc-core`) is the IR everything elaborates to; surface features may change but Core stays stable, so the optimiser does not need to re-learn each new surface feature."
+    }
+  ],
+  "sources": [
+    { "label": "GHC type classes", "url": "https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/typeclasses.html" },
+    { "label": "GHC GADTs", "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/gadt.html" },
+    { "label": "GHC type families", "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/type_families.html" }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "kind": "language",
+  "name": "Wirth Modules — Modula-2 / Modula-3 / Oberon",
+  "aliases": ["wirth-lineage", "modula-2", "modula-3", "oberon"],
+  "summary": "Niklaus Wirth's three Pascal successors that defined the design vocabulary inherited by ML modules, OCaml's .mli/.ml split, and most typed-module-system literature: Modula-2 (1978) introduced DEFINITION/IMPLEMENTATION split, Modula-3 (1989, with DEC SRC) added formal opaque-type matching and generic interfaces, Oberon (1986) replaced the separate definition file with inline export markers (asterisks).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Niklaus Wirth's three successors to Pascal — **Modula-2** (1978), **Oberon** (1986), and (with DEC SRC) **Modula-3** (1989) — collectively defined the design vocabulary that ML modules, OCaml's `.mli`/`.ml` split, and most of the typed-module-system literature inherit. None is in heavy current production use; their importance is foundational.",
+      "refs": [
+        { "target": "module-calculi#overview", "type": "foundation-for" },
+        { "target": "ocaml#overview", "type": "ancestor-of" }
+      ],
+      "sources": [
+        { "label": "Modula-2 reference", "url": "https://www.modula2.org/reference/" }
+      ]
+    },
+    {
+      "id": "modula-2-definition-implementation-split",
+      "title": "Modula-2 — DEFINITION / IMPLEMENTATION split",
+      "tags": ["modula-2", "module-systems", "interfaces"],
+      "content": "**Modula-2** introduced the `DEFINITION MODULE Foo` / `IMPLEMENTATION MODULE Foo` split:\n\n```modula-2\nDEFINITION MODULE Stack;\nTYPE Stack;  (* opaque *)\nPROCEDURE Create() : Stack;\nPROCEDURE Push(s : Stack; v : INTEGER);\nPROCEDURE Pop(s : Stack) : INTEGER;\nEND Stack.\n\nIMPLEMENTATION MODULE Stack;\nTYPE Stack = POINTER TO StackRec;\nTYPE StackRec = RECORD ... END;\nPROCEDURE Create() : Stack;\nBEGIN\n  ...\nEND Create;\nEND Stack.\n```\n\nThe definition file declares an opaque type `Stack` with no visible representation; the implementation supplies the representation. This is the **direct ancestor of OCaml's `.mli`/`.ml` split** and conceptually identical to ML signatures + structures, except that Modula-2 made it *the* module mechanism (no anonymous structures, no functors, no first-class modules)."
+    },
+    {
+      "id": "modula-3-formal-semantics",
+      "title": "Modula-3 — formal opaque-type matching and generic interfaces",
+      "tags": ["modula-3", "module-systems", "generics"],
+      "content": "**Modula-3** extended the Modula-2 split with **opaque type matching across module boundaries**, generic interfaces and modules (`INTERFACE List(T) ... END;` instantiated as `MODULE IntList = List(INTEGER) ...`), and the most rigorous formal module semantics of any production language at that time.\n\nThe Modula-3 type system was the substrate for several formal module-calculus papers in the 1990s (Cardelli, Leroy, Harper-Lillibridge), making it the bridge between Wirth-style production modules and the ML/SML formal calculi.",
+      "refs": [
+        { "target": "module-calculi#applicative-vs-generative-functors", "type": "underlies" }
+      ],
+      "sources": [
+        { "label": "Modula-3 reference (Purdue)", "url": "https://www.cs.purdue.edu/homes/hosking/m3/reference/syntax.html" }
+      ]
+    },
+    {
+      "id": "oberon-inline-export-markers",
+      "title": "Oberon — inline export markers",
+      "tags": ["oberon", "module-systems", "exports"],
+      "content": "**Oberon** simplified Modula-2 dramatically by replacing the separate definition file with **inline export markers**: a single asterisk after a declared identifier marks it as exported.\n\n```oberon\nMODULE Stack;\n  TYPE Stack* = POINTER TO StackRec;  (* exported *)\n  TYPE StackRec = RECORD ... END;     (* not exported — implementation detail *)\n  PROCEDURE Create*() : Stack; ...    (* exported *)\nEND Stack.\n```\n\nThis is the design Nim later adopted (`data/nim`). Oberon also introduced **`*` for read-only export** and **`-` for read-write export of variables** — finer-grained than Nim's single-marker scheme.\n\nThe lesson: per-declaration export markers eliminate the need for separate interface files but require every public name to carry the syntactic noise.",
+      "refs": [
+        { "target": "nim#overview", "type": "inspired" }
+      ],
+      "sources": [
+        { "label": "Project Oberon", "url": "http://www.projectoberon.com/" }
+      ]
+    },
+    {
+      "id": "design-lessons",
+      "title": "Design lessons across the Wirth lineage",
+      "tags": ["design-guidance", "module-systems"],
+      "content": "Across the three: Wirth's lineage shows that **opacity, hierarchy, and selective export are independent design dimensions** that can be combined or separated. Modern languages cherry-pick — Rust took selective export (`pub`), OCaml took the spec/body split (`.mli`/`.ml`), Nim took inline export markers — but rarely combine all three.\n\nThe specification/body split (Modula-2) and inline export markers (Oberon) represent two distinct production-validated answers to the visibility-and-encapsulation problem. Both can work; the choice is more about syntactic taste and toolchain considerations than about expressive power."
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "kind": "concept",
+  "name": "Sigstore + SLSA + cosign",
+  "aliases": ["sigstore", "slsa", "cosign", "supply-chain-provenance"],
+  "summary": "Cryptographic build-provenance trio: Sigstore provides keyless OIDC-bound short-lived signing certificates plus a public Rekor transparency log; SLSA (Supply-chain Levels for Software Artifacts) specifies what build provenance must include via in-toto v1.0 attestations with Levels 1–4; cosign is the canonical CLI tying signatures and attestations together.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Sigstore + SLSA + cosign** make the build process itself verifiable through cryptographic signatures and structured attestations. Where OSS Rebuild (`data/oss-rebuild`) answers \"does this artifact match the public source?\" by re-running the build, Sigstore/SLSA answers \"did this artifact come from a specified, attested build process?\" via signatures plus a public transparency log.\n\nThe two compose well: a lockfile entry pins resolved bytes (`data/lockfiles`), Sigstore proves who built them, SLSA describes how, and OSS Rebuild can independently confirm the build is reproducible.",
+      "refs": [
+        { "target": "oss-rebuild#overview", "type": "complements" },
+        { "target": "lockfiles#overview", "type": "complements" },
+        { "target": "reproducible-builds#overview", "type": "extends" }
+      ]
+    },
+    {
+      "id": "sigstore-keyless-signing",
+      "title": "Sigstore — keyless signing via short-lived OIDC certificates",
+      "tags": ["sigstore", "signing", "transparency-log"],
+      "content": "**Sigstore** (OpenSSF, 2021+) is the cryptographic substrate. Its design point is **keyless signing via short-lived OIDC-bound certificates** issued by the **Fulcio** certificate authority and recorded in the **Rekor** transparency log.\n\nA CI job (GitHub Actions, GitLab CI, Buildkite) presents an OIDC identity token to Fulcio, receives a code-signing certificate valid for ~10 minutes, signs the artifact, and submits the signature plus certificate to Rekor. The certificate then expires; later verifiers consult Rekor (an append-only Merkle log) to confirm the signature was logged before its expiry.\n\nThis eliminates long-lived signing keys and the associated key-rotation/key-loss problems that plagued earlier signing systems (PGP, traditional code signing). The trust root is the OIDC identity (a GitHub Actions workflow, an authenticated GitLab pipeline, a Google Cloud service account) plus the public transparency log, not a per-developer keypair.",
+      "refs": [],
+      "sources": [
+        { "label": "Sigstore project", "url": "https://www.sigstore.dev/" }
+      ]
+    },
+    {
+      "id": "slsa-levels-and-in-toto",
+      "title": "SLSA — Levels 1–4 and in-toto attestations",
+      "tags": ["slsa", "provenance", "in-toto"],
+      "content": "**SLSA (Supply-chain Levels for Software Artifacts)** is the framework specifying *what* build provenance must include — build-system identity, source revision, dependencies, isolation properties, parameters — and assigning **Levels 1–4** corresponding to increasingly strong tamper-resistance guarantees:\n\n- **L1**: documented build process.\n- **L2**: version-controlled source + hosted build.\n- **L3**: isolated, hermetic, signed provenance from a hardened build platform.\n- **L4**: two-party review + reproducibility.\n\nThe provenance format itself is **in-toto v1.0** attestations carrying SLSA-shaped predicates. An in-toto attestation is a signed JSON document declaring \"this artifact (identified by hash) was produced by this build (identified by builder, source, parameters)\" — a typed, machine-verifiable record of the build conditions.",
+      "refs": [],
+      "sources": [
+        { "label": "SLSA framework", "url": "https://slsa.dev/" }
+      ]
+    },
+    {
+      "id": "cosign-and-ecosystem-status",
+      "title": "cosign and ecosystem status",
+      "tags": ["cosign", "production", "ecosystem"],
+      "content": "**cosign** is the canonical CLI tying the two together: `cosign sign-blob` produces a Sigstore-backed signature with an in-toto SLSA provenance attestation; `cosign verify` checks the signature against Rekor and validates the attestation against a policy.\n\nStatus (as of 2026-04): GitHub Actions emits SLSA Level 3 build provenance via `actions/attest-build-provenance` (using GitHub-hosted Fulcio); npm enforces Sigstore-signed publishing for trusted packages since 2024; PyPI Trusted Publishing uses the same OIDC-to-Sigstore flow; container registries (GCR, ECR, ACR, GitHub Container Registry, Quay) accept and verify cosign-signed images; Kubernetes admission controllers (Kyverno, sigstore-policy-controller) gate deployments on signature/attestation policies.",
+      "refs": [],
+      "sources": [
+        { "label": "cosign repository", "url": "https://github.com/sigstore/cosign" },
+        { "label": "GitHub Artifact Attestations", "url": "https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — three composing trust layers",
+      "tags": ["design-guidance", "supply-chain"],
+      "content": "The design lesson generalises: **content-addressed lockfiles prove what bytes were resolved, but Sigstore-style provenance proves the bytes came from an authorised build, and SLSA describes how authorised that build was**. The three layers attack the supply-chain problem at different points and compose end-to-end:\n\n- A consumer pins a content-hashed dependency (`data/lockfiles`).\n- Verifies the publisher's identity from its Sigstore signature.\n- Inspects the SLSA attestation to confirm hermetic build conditions.\n- And (with `data/oss-rebuild`) independently re-derives the artifact.\n\nFor a new package ecosystem, designing a registry so that all three are emitted by default — rather than retrofitted later under incident pressure — is dramatically cheaper than the npm/PyPI experience of bolting them on after years of typo-squatting and account-compromise incidents.",
+      "refs": [],
+      "sources": [
+        { "label": "OpenSSF blog — Where Does Your Software Really Come From?", "url": "https://openssf.org/blog/2024/05/17/where-does-your-software-really-come-from/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Sigstore", "url": "https://www.sigstore.dev/" },
+    { "label": "SLSA", "url": "https://slsa.dev/" },
+    { "label": "cosign", "url": "https://github.com/sigstore/cosign" }
+  ]
+}

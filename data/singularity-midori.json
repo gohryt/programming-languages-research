@@ -1,0 +1,51 @@
+{
+  "kind": "runtime",
+  "name": "Singularity / Midori — Software-Isolated Processes",
+  "aliases": ["singularity", "midori", "sing-sharp", "sing#", "sips"],
+  "summary": "Microsoft Research's Singularity (2003+) introduced Software-Isolated Processes (SIPs) — type-safe-language isolation replaces hardware MMU. Midori (2008-2015) extended this with *objects-as-capabilities* (Joe Duffy): no `DateTime.Now`, no `File.Open` — to read time you must hold a `Clock`. Sing# channel contracts statically verify message-passing protocols. Discontinued 2015; ideas seeded C# nullable refs, async, and Project Verona.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["singularity", "midori", "ocap", "language-capability", "no-ambient-authority", "compartmentalisation"],
+      "content": "Microsoft Research's **Singularity** (2003+) introduced **Software-Isolated Processes (SIPs)**: type-safe-language isolation replaces the hardware MMU. Each SIP is a region of trusted bytecode the kernel can prove cannot escape its address space, so the OS does not need separate virtual address spaces or MMU page-table flips for IPC. The implementation language is Sing#, a Spec#-extended C#.\n\n**Midori** (2008-2015) was the production-track successor: a full operating system in a managed language with *objects-as-capabilities* (Joe Duffy). There is no `DateTime.Now`, no `File.Open` — to read the wall-clock time you must hold a `Clock` object that was passed into your component at construction. Eliminated ambient authority at the language level: a static no-IO function is automatically pure and memoizable, aligning security with effect tracking.",
+      "refs": [
+        { "target": "capability-based-memory", "type": "instance-of" },
+        { "target": "newspeak-language", "type": "shares-discipline-with" },
+        { "target": "e-language", "type": "shares-discipline-with" }
+      ],
+      "sources": [
+        { "label": "Joe Duffy — Objects as Secure Capabilities", "url": "https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/" },
+        { "label": "Singularity project", "url": "https://www.microsoft.com/en-us/research/project/singularity/" }
+      ]
+    },
+    {
+      "id": "sing-sharp-channel-contracts",
+      "title": "Sing# channel contracts",
+      "tags": ["singularity", "midori", "channels", "compartmentalisation"],
+      "content": "**Sing# channel contracts** statically verify message-passing protocols between SIPs. A channel is described by a state machine (the contract); the type checker proves that both endpoints agree on the protocol — a server cannot send a `Reply` before receiving a `Request`, a client cannot send `Done` before completing initialisation.\n\nOwnership transfer of exchange-heap objects rides the same channel mechanism: a message moves a value from sender to receiver, and the type system enforces that the sender no longer references it. This is the same idea as Pony's `iso` reference capability and Rust's `Send` discipline, but expressed at the IPC layer rather than the function-call layer.\n\nThe combination — typed protocols + ownership-transferred messages + ocap addresses — is the cleanest demonstration of \"the kernel API *is* the type system,\" with no ambient kernel calls anywhere in the language.",
+      "refs": [
+        { "target": "actors", "type": "related" },
+        { "target": "ownership", "type": "related" }
+      ]
+    },
+    {
+      "id": "lineage-and-influence",
+      "title": "Lineage and influence",
+      "tags": ["singularity", "midori", "historical", "research"],
+      "content": "Lineage: KeyKOS / EROS / Coyotos provided the capability-OS heritage; Singularity / Midori adapt it to a managed type-safe language environment. Sing# borrowed liberally from Spec# (refinement-typed C#); Midori's effects-as-capabilities discipline echoes Newspeak's modules-as-objects and E's authority-by-reference.\n\nStatus (as of 2026-04): Singularity and Midori are **discontinued** (Midori was cancelled in 2015 after seven years of development). Their **influence is large**: Joe Duffy's retrospective blog series (2015) is one of the most-cited modern arguments for ocap; ideas from Midori seeded **C# nullable references**, the **async/await** model, and **Project Verona** (Microsoft Research's modern Rust-class language with regions and behaviour-oriented concurrency).\n\nThe lesson Duffy emphasises: ocap discipline pays off most when the language and the OS are co-designed. A no-ambient-authority C# subset bolted onto Win32 cannot achieve what Midori did, because the Win32 surface *is* ambient authority. The same pattern is now playing out in WASI components: the host substrate has to be designed for ocap from the beginning, or the discipline leaks.",
+      "refs": [
+        { "target": "eros-os", "type": "lineage-of" },
+        { "target": "sel4", "type": "shares-discipline-with" },
+        { "target": "wasi-component-model", "type": "rediscovered-by" }
+      ],
+      "sources": [
+        { "label": "Joe Duffy — Objects as Secure Capabilities", "url": "https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Joe Duffy — Objects as Secure Capabilities", "url": "https://joeduffyblog.com/2015/11/10/objects-as-secure-capabilities/" },
+    { "label": "Singularity project", "url": "https://www.microsoft.com/en-us/research/project/singularity/" }
+  ]
+}

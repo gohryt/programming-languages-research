@@ -1,0 +1,40 @@
+{
+  "kind": "tool",
+  "name": "Scudo",
+  "aliases": ["Scudo Hardened Allocator", "LLVM Scudo"],
+  "summary": "LLVM's hardened `malloc` derived from the Sanitizers' CombinedAllocator, designed around practical-exploit mitigation (not bug detection) with first-class ARM MTE integration. Default allocator in Android 11+ and Fuchsia.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "hardened-allocator", "production", "android"],
+      "content": "LLVM's Scudo is a hardened `malloc` derived from LLVM Sanitizers' `CombinedAllocator`, designed around practical-exploit mitigation rather than bug detection. The framing matters: Scudo aims to make bugs unexploitable, not visible. It is the default allocator in Android 11+ (non-Svelte) and Fuchsia, and the production deployment vehicle for ARM MTE.\n\nFor the underlying MTE hardware mechanism see the chapter 5 record on ARM MTE; Scudo is the userspace allocator that turns MTE hardware tags into use-after-free and linear-overflow detection.",
+      "refs": [
+        { "target": "allocators#hardened-allocators", "type": "part-of" },
+        { "target": "arm-mte#overview", "type": "uses" },
+        { "target": "hardened-malloc#overview", "type": "compared-with" },
+        { "target": "partitionalloc#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Primary/secondary split and MTE integration",
+      "tags": ["size-class", "guard-page", "mte-integrated", "tag-randomisation", "delayed-free"],
+      "content": "Primary/secondary split: the *primary* services blocks of identical size from per-size-class regions with randomized base addresses; the *secondary* uses `mmap` plus guard pages for large allocations, so a linear overflow on a large allocation traps before it reaches anything sensitive.\n\nWith ARM MTE enabled, Scudo assigns a 4-bit random tag per 16-byte granule with exclusion masks (no adjacent-tag collisions, so a one-step linear overflow always traps deterministically); chunks are retagged on free for probabilistic UAF detection. Per-block chunk headers carry a checksum that traps corruption, and thread-cache assignment is randomized so attackers cannot predict which thread will service their next allocation.",
+      "refs": [
+        { "target": "arm-mte#overview", "type": "uses" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "android", "mte-integrated"],
+      "content": "Status (as of 2026-04): default allocator in Android 11+ (non-Svelte) and Fuchsia. The hardening, not detection, framing distinguishes Scudo from sanitizer allocators: it is shipped to end users on hundreds of millions of devices and runs continuously, not only during testing.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Scudo docs", "url": "https://llvm.org/docs/ScudoHardenedAllocator.html" },
+    { "label": "Scudo standalone source", "url": "https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/scudo/standalone" }
+  ]
+}

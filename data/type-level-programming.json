@@ -1,0 +1,47 @@
+{
+  "kind": "concept",
+  "name": "Variadic Generics, Const Generics, and Type-Level Computation",
+  "aliases": ["parameter-packs", "const-generics", "match-types", "conditional-types"],
+  "summary": "Modern generic systems include parameter packs, const or integer generics, type-level functions, conditional types, match types, and compile-time evaluation. These features blur the boundary between type checking and compile-time computation, scaling from TypeScript's conditional types to Swift's parameter packs and noncopyable types.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Modern generic systems increasingly include parameter packs, const or integer generics, type-level functions, conditional types, match types, and compile-time evaluation. These features blur the boundary between type checking and compile-time computation.\n\nThe distinguishing axis across designs is *how much computation is allowed at the type level*: from no computation (Java generics), through limited type-level recursion (Haskell type families, Scala match types), to full term-level evaluation lifted to types (Idris 2, Lean, Agda). Each step trades expressive power for inference predictability and diagnostic quality.",
+      "refs": [
+        { "target": "type-classes-traits#overview", "type": "extends" },
+        { "target": "dependent-types#overview", "type": "ultimate-form-of" },
+        { "target": "compile-time-function-evaluation#overview", "type": "complementary-mechanism" }
+      ]
+    },
+    {
+      "id": "typescript-conditional-types",
+      "title": "TypeScript conditional types and inference",
+      "tags": ["type-system", "typescript"],
+      "content": "TypeScript conditional types select types based on assignability tests and can infer type variables within the checked type. The shape `T extends U ? X : Y` evaluates to `X` if `T` is assignable to `U`, else `Y`; `infer` clauses bind type variables based on pattern matching against `T`.\n\nThe combination is Turing-equivalent at the type level — programmers have built parsers, JSON schemas, and SQL DSLs entirely in TypeScript types. The cost is diagnostic quality: when conditional-type evaluation produces an unexpected type, the error message often shows the deeply-nested intermediate form rather than the original program intent. Status (as of 2026-04): TypeScript continues expanding type-level programming through conditional types, inference in conditional types, and control-flow analysis.",
+      "sources": [
+        { "label": "TypeScript conditional types", "url": "https://www.typescriptlang.org/docs/handbook/2/conditional-types.html" }
+      ]
+    },
+    {
+      "id": "swift-parameter-packs-and-const-generics",
+      "title": "Swift parameter packs and integer generic parameters",
+      "tags": ["type-system", "swift"],
+      "content": "Swift's generics documentation tracks features such as parameter packs, noncopyable types, nonescapable types, and integer generic parameters. Parameter packs let a function take a heterogeneous tuple of arguments and process them generically (`func zip<each T>(_ values: repeat each T) -> ...`). Integer generic parameters let arrays carry their length in the type (`Array<Int, 16>`), enabling fixed-size buffers and stack-allocated collections.\n\nStatus (Swift 6.2 materials): the design space is an active area of evolution; noncopyable types interact with parameter packs in ways the compiler still iterates on.",
+      "sources": [
+        { "label": "Swift generics documentation", "url": "https://download.swift.org/docs/assets/generics.pdf" }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design trade-offs",
+      "tags": ["type-system", "language-design"],
+      "content": "Type-level computation is genuinely powerful — it lets a library author express invariants the type system would otherwise miss — but the costs are:\n\n- **diagnostic noise**: error messages may include normalized type expressions whose connection to the source is hard to trace.\n- **compile-time cost**: rich type-level computation can dominate compile times.\n- **inference predictability**: type variables that participate in computation become harder to infer; programmers may need to annotate more.\n- **soundness perimeter**: type-level loops, GADT pattern matches, and effect-row reductions are common bug sources in advanced systems.\n\nFor language designers, the practical guidance is to **tier the type-level features**: cheap, predictable computation by default; opt-in for richer programming. C++ concepts, Rust trait bounds, Haskell type families with `UndecidableInstances` all follow this tiering philosophy."
+    }
+  ],
+  "sources": [
+    { "label": "TypeScript conditional types", "url": "https://www.typescriptlang.org/docs/handbook/2/conditional-types.html" },
+    { "label": "Swift generics documentation", "url": "https://download.swift.org/docs/assets/generics.pdf" }
+  ]
+}

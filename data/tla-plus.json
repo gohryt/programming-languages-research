@@ -1,0 +1,44 @@
+{
+  "kind": "language",
+  "name": "TLA+ Specifications as IRs",
+  "aliases": [
+    "tlaplus"
+  ],
+  "summary": "TLA+ is a specification language describing concurrent and distributed system semantics. Specifications are state machines with explicit invariants, expressed in mathematical logic, queryable by the TLC model checker. Counterexample traces become navigable artifacts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "TLA+ is a *specification language*, not an IR proper — it describes concurrent and distributed system semantics for human and tool reasoning, not for compilation. It is included here because the specifications themselves are representations: state machines with explicit invariants, expressed in mathematical logic, queryable by the TLC model checker.",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#overview",
+          "type": "compares-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "TLA+ home (Lamport)",
+          "url": "https://lamport.azurewebsites.net/tla/tla.html"
+        }
+      ]
+    },
+    {
+      "id": "as-queryable-representation",
+      "title": "Specifications as queryable artifacts",
+      "tags": [
+        "specification",
+        "model-checking"
+      ],
+      "content": "The connection to IRs: TLC produces a finite-state model from the spec, and its outputs (state graphs, counterexample traces) are themselves representations the user navigates. TLA+ Toolbox's Trace Explorer treats counterexamples as interactive debuggable artifacts.\n\nThe lesson: a specification language can play an IR-like role for verification tools. The downstream consumers of a TLA+ spec — TLC, TLAPS, the Trace Explorer — all treat the spec as a structured representation rather than as documentation, and operate on it the same way a compiler operates on a CFG or AST.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "TLA+ home (Lamport)",
+      "url": "https://lamport.azurewebsites.net/tla/tla.html"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "kind": "language",
+  "name": "Lua",
+  "aliases": [],
+  "summary": "Embeddable scripting language whose modules are simply tables returned by executed files; the language imposes minimal structure and leaves loading policy to the host or application — a stripped-down version of the runtime-import model focused on embeddability.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lua (Roberto Ierusalimschy et al., 1993+) is a small embeddable scripting language; its module system is one of the lightest in mainstream production. Bytecode and JIT concerns live in `data/luajit-bytecode`, `data/luajit-ir`, `data/lua-generational-gc`, `data/luau-native`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "modules-as-tables",
+      "title": "Modules as tables returned by files",
+      "tags": ["lua", "module-systems", "tables"],
+      "content": "Lua traditionally treats modules as **tables returned by executed files**. `require 'foo'` searches for `foo.lua` (or a compiled binary module) along the configured paths, executes it, captures the returned value (typically a table), caches it in `package.loaded`, and returns it.\n\nThis is in some ways an even more stripped-down version of Python's loader idea: a module is whatever namespace-like object the file computes and returns. There is no language-level `module` keyword, no enforced encapsulation, no built-in distinction between public and private members of the module table.",
+      "refs": [
+        { "target": "ruby#require-load-and-soft-boundaries", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "Lua 5.4 reference manual — modules", "url": "https://www.lua.org/manual/5.4/manual.html#6.3" },
+        { "label": "Programming in Lua — modules", "url": "https://www.lua.org/pil/8.html" }
+      ]
+    },
+    {
+      "id": "embeddability-as-design-priority",
+      "title": "Embeddability as a design priority",
+      "tags": ["lua", "embedding", "design-guidance"],
+      "content": "For embeddable systems, Lua's minimal module discipline is excellent — the language imposes little structure and leaves policy to the host or the application. Game engines, configuration scripting, plugin systems, and embedded-device runtimes can all impose their own loading and visibility conventions on top of the bare `require`/`package.loaded` mechanism.\n\nThe cost is that modularity becomes a **convention, not a strong semantic substrate**. For a language whose primary use case is embedding, this is the right trade-off: a language designed to live inside other systems should not impose strong opinions about what counts as a module. For a stand-alone application language, the lack of structure is more often a liability than an asset."
+    }
+  ],
+  "sources": [
+    { "label": "Lua 5.4 reference manual — modules", "url": "https://www.lua.org/manual/5.4/manual.html#6.3" }
+  ]
+}

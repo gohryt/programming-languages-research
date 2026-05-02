@@ -1,0 +1,24 @@
+{
+  "kind": "concept",
+  "name": "SPARC ADI — Application Data Integrity",
+  "aliases": ["ADI", "SPARC ADI", "Application Data Integrity"],
+  "summary": "Direct conceptual ancestor of ARM MTE: 4-bit tag per 64-byte granule encoded in SPARC pointer top bits; hardware checks on load/store. Shipped on SPARC M7 (2015) through M8/T8; Solaris adiheap/adistack/libadimalloc/KADI. Effectively legacy as Oracle has wound down SPARC; the idea won via MTE.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["memory-tag", "pointer-tagging", "sparc", "tag-mismatch-trap", "memory-safety", "exploit-mitigation"],
+      "content": "**SPARC ADI (Application Data Integrity)** is the direct conceptual ancestor of ARM MTE: 4-bit tag per 64-byte granule encoded in SPARC pointer top bits; hardware checks on load/store. Shipped on SPARC M7 (2015) through M8/T8; Solaris `adiheap`, `adistack`, `libadimalloc`, KADI for kernel.\n\nADI was effectively the prototype hardware demonstration that per-allocation memory tagging works in production silicon — at a coarser granule (64-byte vs MTE's 16-byte) but with the same fundamental mechanism. Effectively legacy as Oracle has wound down SPARC; the *idea* won via MTE.",
+      "refs": [
+        { "target": "arm-mte", "type": "predecessor-of" },
+        { "target": "intel-mpx", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "SPARC ADI Solaris docs", "url": "https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-application-data-integrity-adi.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "SPARC ADI Solaris docs", "url": "https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-application-data-integrity-adi.html" }
+  ]
+}

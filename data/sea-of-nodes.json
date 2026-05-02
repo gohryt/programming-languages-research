@@ -1,0 +1,54 @@
+{
+  "kind": "concept",
+  "name": "Sea of Nodes",
+  "aliases": ["son", "sea-of-node-ir"],
+  "summary": "Cliff Click's IR (1995): instructions are nodes in a graph where data and control flow are both edges; basic blocks are not first-class. Maximum global-scheduling freedom, at the cost of compile-time and debuggability. Used in HotSpot C2, V8 TurboFan, Graal.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Sea-of-nodes is Cliff Click's IR (originally for HotSpot C2, 1995): a graph where both data flow and control flow are edges, and basic blocks are not first-class. Instructions are ordered only by their data dependencies — any instruction can move anywhere its dependencies allow, and global instruction scheduling falls out as a consequence of the IR shape.\n\nSea-of-nodes is closely associated with aggressive optimizing JIT compilers and speculative optimization pipelines. The same IR style appears in HotSpot C2 (server-tier JIT), V8 TurboFan, and Graal — all server-tier JITs that prioritize peak throughput.",
+      "refs": [
+        { "target": "ssa#overview", "type": "alternative-graph-shape" },
+        { "target": "tiered-compilation#overview", "type": "powers" }
+      ]
+    },
+    {
+      "id": "structure-and-semantics",
+      "title": "Structure and semantics",
+      "tags": ["compiler-ir", "dataflow"],
+      "content": "In a sea-of-nodes IR, nodes represent computations and dependencies directly. Edges encode three kinds of dependency:\n\n- **Data edges**: producer → consumer of values.\n- **Control edges**: predecessor → successor of execution; needed to constrain ordering when pure data dependencies are insufficient.\n- **Effect edges**: order memory and side effects relative to each other.\n\nBecause basic blocks are not first-class, the optimizer never has to commit to a schedule until extraction. This gives maximum freedom but also requires every pass to handle the looser invariant: there is no \"current block\", only dependency reachability.\n\nV8 TurboFan extends the base SoN with type-system specialization (Number vs String vs JSObject), inline-cache feedback embedded at call sites, and deoptimization metadata at every speculative operation.",
+      "refs": [
+        { "target": "ssa#core-mechanics", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "optimization-implications",
+      "title": "Optimization implications",
+      "tags": ["optimization", "jit", "compiler-ir"],
+      "content": "Sea-of-nodes IRs enable broad code motion, speculation, and dependency-sensitive optimization. Loop-invariant code motion, partial redundancy elimination, and global value numbering all fall out of \"move every node as far up as its dependencies allow.\"\n\nThe power comes with engineering burden. The IR is harder to print, debug, and reason about than linear SSA. Every pass operates on a graph with looser invariants. Status (as of 2026-04): V8 TurboFan is being progressively replaced by Turboshaft (linear SSA with side tables), an effort the V8 team began in 2022 — motivated specifically by SoN compile-time cost on JS workloads. The migration illustrates that sea-of-nodes is analytically elegant but operationally expensive at JIT scale.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "informs" },
+        { "target": "deegen#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "comparison-points",
+      "title": "Comparison points",
+      "tags": ["compiler-design", "tradeoffs"],
+      "content": "Sea-of-nodes is a useful comparison point against:\n\n- **LLVM-style linear SSA**: linear blocks give cache locality and compile-time predictability; SoN gives scheduling freedom. LLVM IR has dominated AOT compilation; the JIT world is increasingly migrating away from SoN for compile-time reasons (Turboshaft).\n- **Cranelift CLIF**: dense linear SSA designed for compile speed; minimum graph machinery.\n- **E-graph rewriting**: e-graphs preserve all rewrite alternatives for later extraction; SoN preserves only one program but allows scheduling freedom over it.\n- **RVSDG (Region-Based Value State Dependence Graph)**: research alternative that represents control via nested regions rather than control edges.\n\nThe practical question across these choices is whether peak throughput on long-running code (SoN's strength) outweighs predictable compile time (linear SSA's strength) for the workload.",
+      "refs": [
+        { "target": "llvm#ir", "type": "contrasts-with" },
+        { "target": "cranelift#overview", "type": "contrasts-with" },
+        { "target": "e-graphs#why-they-matter", "type": "alternative-approach" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Sea of Nodes (Click 1995, original paper context)",
+      "url": "https://www.oracle.com/technical-resources/articles/java/architect-evans-pt1.html"
+    }
+  ]
+}

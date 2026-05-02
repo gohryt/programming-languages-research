@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": "Julia Revise.jl",
+  "aliases": ["Revise.jl", "Tim Holy Revise"],
+  "summary": "Library for hot code update during interactive Julia development. When source files change on disk, Revise re-parses, incrementally updates the method table (adds/replaces/edits methods), and invalidates compilation caches for affected methods. The next call to a changed method triggers recompilation. Method tables are first-class runtime objects — that's why this works.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Julia's **Revise.jl** (Tim Holy) is a library, not a language feature, that provides hot code update during interactive development. When source files change on disk, Revise re-parses, incrementally updates the method table (adding new methods, replacing edited ones), and invalidates compilation caches for affected methods. The next call to a changed method triggers recompilation.",
+      "refs": [
+        { "target": "erlang-hot-reload#overview", "type": "compared-with" },
+        { "target": "lisp-incremental-redefinition#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Julia Revise.jl", "url": "https://timholy.github.io/Revise.jl/stable/" }
+      ]
+    },
+    {
+      "id": "how-it-works",
+      "title": "How it works",
+      "tags": ["julia", "interactive-development"],
+      "content": "The trick that makes this work is Julia's method table being a first-class runtime object — methods are values that can be added, removed, or replaced. Combined with Julia's JIT, this means the running program always executes whatever the latest source says, without a restart.\n\nRevise is the central tool of Julia's interactive development workflow: open a REPL, edit code, see changes immediately. The analogous design in Common Lisp is the ancestor; Julia proves the pattern works in a modern language with aggressive compilation.\n\nThe limitation is the same one Common Lisp faces: existing references to method-defined values continue to point at the *old* objects, while new lookups find the *new* ones. For short-lived interactive sessions this is rarely a problem; for long-running services with hot reload as a deployment mechanism, more discipline is needed.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Revise.jl", "url": "https://timholy.github.io/Revise.jl/stable/" }
+  ]
+}

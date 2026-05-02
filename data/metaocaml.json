@@ -1,0 +1,39 @@
+{
+  "kind": "language",
+  "name": "MetaOCaml",
+  "aliases": ["multi-stage programming", "MSP"],
+  "summary": "Taha & Sheard 2000 (Kiselyov current): adds three constructs to OCaml — `.< e >.` quotes code, `.~ e` splices a quoted fragment, `.! e` runs a quoted code value. The type system tracks stages, so `int code` is distinct from `int`. The theoretical framework underlying Truffle JIT specialisation and Lean tactic elaboration.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**MetaOCaml** (Taha & Sheard 2000; Kiselyov's current implementation) adds three constructs to OCaml: `.< e >.` quotes code, `.~ e` splices a quoted fragment into a larger quote, and `.! e` runs a quoted code value. These enable **multi-stage programming (MSP)**: writing programs that generate and then execute programs, with full type safety across stages.",
+      "refs": [
+        { "target": "terra#overview", "type": "compared-with" },
+        { "target": "template-haskell#overview", "type": "related-to" },
+        { "target": "ocaml#overview", "type": "extension-of" }
+      ],
+      "sources": [
+        { "label": "MetaOCaml — Kiselyov", "url": "https://okmij.org/ftp/ML/MetaOCaml.html" }
+      ]
+    },
+    {
+      "id": "staged-types",
+      "title": "Stage-tracked types",
+      "tags": ["type-system", "staged-programming"],
+      "content": "```ocaml\nlet rec power n x =\n  if n = 0 then .<1>.\n  else .< .~x * .~(power (n-1) x) >.\n;;\n(* power 3 generates: .< x * x * x * 1 >. *)\n```\n\nThe type system tracks stages: `int code` is a quoted int-producing expression, distinct from `int`. Running a quoted value (`.! e`) is explicit. This makes MSP safer than text-template generation (Terra, C++ templates) at the cost of being restricted to the ML-family type discipline.\n\nQuoted expressions are first-class values that can be composed, passed as arguments, and stored in data structures. The cross-stage type checking ensures that a generated program is well-typed before it is run, so generated code cannot have type errors that the meta-program failed to anticipate.",
+      "refs": []
+    },
+    {
+      "id": "influence",
+      "title": "Influence beyond MetaOCaml",
+      "tags": ["staged-programming", "research"],
+      "content": "MSP is the theoretical framework behind JIT specialisation in Truffle (the partial-evaluator-based JIT generator) and the correctness underpinning of Lean's tactic elaboration. Most practical languages do not expose MSP directly, but their internal compilation pipelines embody its principles.\n\nThe production gap is real: MetaOCaml itself remains a research-grade dialect, with a small user community. The ideas, however, are widely applied — every staged compiler, every JIT specialiser that generates code at runtime, every macro system that produces typed code shares the staged-programming intuition that MetaOCaml made formal.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "MetaOCaml", "url": "https://okmij.org/ftp/ML/MetaOCaml.html" }
+  ]
+}

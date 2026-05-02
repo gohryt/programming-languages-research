@@ -1,0 +1,34 @@
+{
+  "kind": "language",
+  "name": "Factor",
+  "aliases": ["Factor language", "concatenative compiler"],
+  "summary": "Self-hosting optimising compiler for a stack-based concatenative language. Lowers stack code into SSA-based IR, runs type inference, SCCP, generic-dispatch elimination, escape analysis, scalar replacement, value numbering, representation selection, instruction scheduling, and linear-scan regalloc. The strongest counterexample to 'concatenative languages can't optimise'.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Factor** is one of the best counterexamples to the idea that concatenative languages must choose between elegance and serious compilation. The compiler is written in Factor, lowers stack code into SSA-based IR, and then applies a very recognisable optimising pipeline: type inference, sparse conditional constant propagation, generic-dispatch elimination, escape analysis, scalar replacement, value numbering, representation selection, instruction scheduling, and linear-scan register allocation.\n\nWhat makes Factor especially worth recording is that it shows how a compiler can start from a stack-effect language and still end up with a modern register-oriented optimiser without pretending the source language was expression-oriented all along. The **stack checker** is also part of the compiler story: abstract interpretation of stack effects is doing real frontend work, not just linting.",
+      "refs": [
+        { "target": "ssa#overview", "type": "uses" },
+        { "target": "linear-scan-regalloc#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Factor: a dynamic stack-based language", "url": "https://factorcode.org/slava/dls.pdf" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["concatenative", "compiler"],
+      "content": "Factor demonstrates a self-hosting, strongly optimising compiler with industrial architecture for a concatenative language — the cost is a niche ecosystem of little relevance to readers focused on conventional syntax.\n\nFor language designers, the lesson is that concatenative source need not constrain the optimiser pipeline. The frontend has to handle stack-effect inference well; everything below that can be standard SSA-form optimisation. The Factor codebase is also instructive as an example of a small (~200K line) production compiler self-hosted in its own language, with a fast, capable optimiser implemented in a non-traditional source language.",
+      "refs": [],
+      "sources": [
+        { "label": "Factor optimising compiler overview", "url": "https://concatenative.org/wiki/view/Factor/Optimizing%20compiler" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Factor DLS paper", "url": "https://factorcode.org/slava/dls.pdf" }
+  ]
+}

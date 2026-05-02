@@ -1,0 +1,112 @@
+{
+  "kind": "tool",
+  "name": "Prusti — Auto-Active Rust Verifier via Viper",
+  "aliases": [],
+  "summary": "ETH Zurich's Prusti is an auto-active deductive verifier for Rust that translates programs to Viper and uses Viper's permission-based reasoning + Z3. Derives the separation-logic permission framing automatically from Rust's borrow-checker output, so users write only functional pre/postconditions. Default panic-freedom mode verifies absence of overflows, OOB, unwrap panics with no annotations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "formal-verification",
+        "auto-active-verifier",
+        "deductive-verification",
+        "rust-verifier"
+      ],
+      "content": "ETH Zurich's **Prusti** is an auto-active deductive verifier for Rust that translates programs to Viper (intermediate verification language; see `data/verification-intermediate-languages` for the broader verification-IL family Viper belongs to) and uses Viper's permission-based reasoning + Z3.\n\n**Ownership-to-separation lift**: derives the separation-logic permission framing automatically from Rust's borrow-checker output, so users write only functional pre/postconditions. **Pledges**: specification mechanism for reasoning about borrow-expirations (final values after the lifetime ends). **Default panic-freedom**: verifies absence of overflows / array OOB / unwrap panics with no annotations. Open-source, available as VSCode extension (Prusti Assistant); restricted to safe Rust subset; used in industrial pilots and academic teaching but no major production code base verified.",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#viper",
+          "type": "compiles-to"
+        },
+        {
+          "target": "rustbelt-lambda-rust#overview",
+          "type": "related"
+        },
+        {
+          "target": "verus#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "creusot#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Prusti page (ETH Zurich)",
+          "url": "https://www.pm.inf.ethz.ch/research/prusti.html"
+        },
+        {
+          "label": "Prusti dev repository",
+          "url": "https://github.com/viperproject/prusti-dev"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Ownership-to-separation translation",
+      "tags": [
+        "separation-logic",
+        "permission-logic",
+        "borrowing"
+      ],
+      "content": "Prusti's distinctive contribution is **automatically deriving the separation-logic permission frame from Rust's borrow checker**. In ordinary Viper verification, the user writes `acc(x.f, write)` to claim write permission to a field; in Prusti, the Rust compiler's existing borrow-checker analysis tells Prusti which references hold which permissions, and Prusti emits the corresponding Viper assertions automatically. The user writes only functional pre- and post-conditions in `#[requires]` / `#[ensures]` annotations.\n\n**Pledges** (`#[after_expiry]`) handle the awkward case of mutable borrows: a function returning `&mut T` may transfer ownership to the caller, but the borrowed reference will eventually expire. Prusti's pledge mechanism lets the specification describe the final value of the borrow after expiry — a specification facility absent from Rust itself.\n\n**Default panic-freedom mode** verifies absence of arithmetic overflow, array out-of-bounds access, and `unwrap`-on-`None`/`Err` panics with no user annotations. This is the entry point for many adopters: turn Prusti on, get \"this function never panics\" as a free side effect of the borrow-checker analysis.",
+      "refs": [
+        {
+          "target": "borrowing#overview",
+          "type": "leverages"
+        },
+        {
+          "target": "ownership-as-type-constraint#overview",
+          "type": "leverages"
+        }
+      ]
+    },
+    {
+      "id": "target-and-backend",
+      "title": "Viper backend and Z3 dispatch",
+      "tags": [
+        "viper",
+        "z3",
+        "smt-based"
+      ],
+      "content": "Prusti compiles Rust MIR (mid-level IR) to Viper (Silver), the separation-logic VIL maintained at ETH Zurich. Viper's verification condition generator emits Z3 queries; Prusti's overall pipeline is Rust source → MIR → Viper → SMT.\n\nThe choice of Viper rather than Boogie or WhyML reflects Prusti's design priority: separation logic primitives (permission accounting, fractional ownership, predicate folding) belong in the IL itself, not the frontend encoding. This contrasts with **Creusot** (`creusot.json`), which compiles Rust to **WhyML** with a prophetic encoding of mutable borrows in a purely functional logic. The two tools target the same source language with very different proof models.",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#viper",
+          "type": "compiles-to"
+        },
+        {
+          "target": "creusot#target-and-backend",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status and deployment",
+      "tags": [
+        "research",
+        "experimental"
+      ],
+      "content": "Status (as of 2026-04): open-source under viperproject/prusti-dev, available as a VSCode extension (Prusti Assistant). Restricted to safe Rust today; unsafe Rust verification is the domain of RustBelt/RefinedRust. Used in **industrial pilots and academic teaching** but no major production codebase verified end-to-end with Prusti. Compared to Verus (which targets unsafe Rust and has Google/Amazon production deployments), Prusti's niche is teaching auto-active verification and verifying safe-Rust libraries with low annotation burden.",
+      "refs": [
+        {
+          "target": "verus#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Prusti page (ETH Zurich)",
+      "url": "https://www.pm.inf.ethz.ch/research/prusti.html"
+    },
+    {
+      "label": "Prusti dev repository",
+      "url": "https://github.com/viperproject/prusti-dev"
+    }
+  ]
+}

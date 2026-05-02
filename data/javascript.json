@@ -1,0 +1,63 @@
+{
+  "kind": "language",
+  "name": "JavaScript",
+  "aliases": ["ecmascript", "js"],
+  "summary": "Dynamic, prototype-based language standardised as ECMAScript; its module-system surface is split between modern ECMAScript Modules (ESM) with static import/export syntax and live bindings, and the older Node.js CommonJS loader-centric model with require/module.exports — both coexist in the Node ecosystem with elaborate interop rules.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "JavaScript / ECMAScript is the language behind every browser plus a substantial portion of server-side runtimes (Node, Deno, Bun, Cloudflare Workers). Two distinct module systems coexist in production: **ECMAScript Modules (ESM)** — the language-standard form with static syntax — and **CommonJS** — the older Node-specific loader-centric form. Both are described below as primary sections of this record.\n\nRuntime aspects (V8 / JavaScriptCore engines, async/await, etc.) live in `data/v8-turbofan`, `data/v8-turboshaft`, `data/quickjs`, `data/bun`, `data/async-await`. The language-level module-system surface is the focus here.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "bun#overview", "type": "runtime-of" }
+      ]
+    },
+    {
+      "id": "esm",
+      "title": "ESM — static syntax, live bindings, runtime evaluation",
+      "tags": ["javascript", "esm", "module-systems"],
+      "content": "ECMAScript modules occupy a hybrid position. Their **syntax is static** — `import` and `export` forms are known to the parser and usable by bundlers and compilers — but module loading, instantiation, and evaluation are still runtime semantics. This gives ESM much more static analyzability than Python or CommonJS, while still retaining the notion of a runtime module instance.\n\nOne of ESM's most important design choices is **live bindings**. An importer does not receive a copy of an exported value; it receives access to the exporter's binding slot. This is a significant semantic difference from object-copy or mutable-export models and is one reason ESM cycles can sometimes work where CommonJS-style cycles fail. The binding exists before evaluation completes, but its value may remain uninitialized until the exporter runs.\n\nThat leads directly to ESM's **cycle semantics**. Cycles are tolerated, but they are not free. If two modules depend on one another and access each other's bindings only after both have completed the relevant initialization, execution can succeed. If one accesses a still-uninitialized binding too early, evaluation fails.\n\nThe design lesson: **static syntax does not automatically imply static semantics**. A language can have parse-time-known imports and still inherit complex runtime initialization, cycle, and environment-resolution behavior.",
+      "refs": [
+        { "target": "import-semantics#static-imports", "type": "example" },
+        { "target": "import-semantics#cycles-and-initialization", "type": "example" }
+      ],
+      "sources": [
+        { "label": "TC39 — Modules", "url": "https://tc39.es/ecma262/#sec-modules" },
+        { "label": "Node.js ESM", "url": "https://nodejs.org/api/esm.html" }
+      ]
+    },
+    {
+      "id": "commonjs",
+      "title": "CommonJS — require, mutable exports, loader-centric semantics",
+      "tags": ["javascript", "commonjs", "nodejs"],
+      "content": "CommonJS is the older Node.js module model and represents a different point in the design space from ESM. Here, the primary abstraction is not live bindings between declared exports, but a **loader function**: `require(...)` executes the target module the first time, caches the resulting module object, and returns its exports.\n\nThis makes CommonJS straightforward and dynamic, but much less statically transparent than ESM. Because `require` is an ordinary function call, it can be conditional, data-driven, or path-manipulated. This flexibility was historically useful, but it means the import graph is not as directly visible to the parser or build tools. Bundlers and analyzers can often recover most of it, but only by applying heuristics or conventions.\n\nThe export model is also different. CommonJS modules typically fill out a mutable `module.exports` object. Consumers receive that object rather than a set of live binding slots. This makes interop intuitive for some dynamic programming patterns, but it weakens the connection between declared module surface and the compiler-visible namespace structure. It also means cycles behave differently from ESM cycles: what another module sees depends heavily on exactly when `module.exports` has been populated.\n\nCommonJS demonstrates what happens when the loader becomes the semantic center of modularity. The system becomes flexible and easy to extend locally, but the graph becomes less explicit and less compiler-friendly. ESM was, in part, a reaction to these limits.",
+      "refs": [
+        { "target": "import-semantics#import-time-execution", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Node.js — modules (CommonJS)", "url": "https://nodejs.org/api/modules.html" },
+        { "label": "Node.js — packages", "url": "https://nodejs.org/api/packages.html" }
+      ]
+    },
+    {
+      "id": "dynamic-import-and-federation",
+      "title": "Dynamic import() and Module Federation",
+      "tags": ["javascript", "esm", "dynamic-loading"],
+      "content": "**Dynamic `import()`** is an ESM expression that returns a Promise resolving to the imported module — the runtime equivalent of CommonJS `require()` but ESM-native. It enables code-splitting (the bundler can emit separate chunks loaded only when needed), conditional imports based on runtime values, and lazy initialization of expensive modules.\n\n**Module Federation** (introduced by webpack 5, adopted by Rspack and others) lets one running application load remote modules at runtime from another application, with shared dependency deduplication. The remote module can be deployed independently and updated without redeploying the consumer. This is a federation of independently-deployed bundles linked by URL plus a shared chunk graph negotiated at load time. The mechanism is bundler-level rather than language-level — TC39 has not standardised it — but it has become the canonical answer to micro-frontend composition.",
+      "refs": [
+        { "target": "hot-module-replacement#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "node-resolution-and-package-exports",
+      "title": "Node resolution and package exports",
+      "tags": ["javascript", "nodejs", "package-resolution"],
+      "content": "Node adds a layer over both ESM and CommonJS: the same ESM semantics live inside a platform-specific resolution and format-selection system. The `\"type\": \"module\"` field in `package.json`, the `.mjs` / `.cjs` extensions, URL-based resolution, and the **`exports` map** (which lets a package declare distinct entry points for different conditions — `import` vs `require`, `node` vs `browser`, `development` vs `production`) all participate in how a module specifier becomes a concrete module record.\n\nThis is not a language-level module system in isolation; it is a language-plus-runtime-plus-package-metadata system. The `exports` map in particular is the most consequential 2020s addition: it lets package authors hide internal files from consumers (older Node would let any `require('lodash/internal/foo')` work), declare per-condition entry points, and migrate gradually from CommonJS to ESM.",
+      "refs": [
+        { "target": "package-resolution#resolution-models", "type": "example" }
+      ]
+    }
+  ]
+}

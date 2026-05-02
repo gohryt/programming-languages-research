@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "CPS and ANF Intermediate Representations",
+  "aliases": ["continuation-passing style", "CPS", "A-normal form", "ANF"],
+  "summary": "Two functional-language IR forms making control flow explicit at the term level. CPS (Steele 1978, Appel 1992) gives every call an explicit continuation; ANF (Flanagan et al. 1993) names every intermediate result with let-bindings. Kelsey 1995 showed CPS and SSA correspond. GHC Core, OCaml Flambda, Roc, and Koka all use ANF or ANF-like forms.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Functional-language compilers historically chose IRs that make control flow explicit at the term level rather than encoding it in a CFG. **Continuation-Passing Style (CPS)** gives every function call an explicit continuation argument; **A-Normal Form (ANF)** names every intermediate result with let-bindings and requires every function argument to be trivial.\n\nKelsey (1995) showed CPS and SSA correspond formally — SSA's φ-functions correspond to CPS's continuation parameters, and SSA's basic blocks correspond to CPS's continuation lambdas. Most modern functional compilers use ANF or an ANF-like form rather than full CPS, trading expressive power for syntactic simplicity.",
+      "refs": [
+        { "target": "ssa#overview", "type": "corresponds-to" }
+      ],
+      "sources": [
+        { "label": "CPS-SSA Correspondence (Kelsey, 1995)", "url": "https://bernsteinbear.com/assets/img/kelsey-ssa-cps.pdf" }
+      ]
+    },
+    {
+      "id": "cps",
+      "title": "Continuation-Passing Style",
+      "tags": ["compiler", "functional-languages"],
+      "content": "CPS represents every function call as taking an explicit continuation: instead of returning a value, a function invokes its continuation with the value. Function calls never return; they tail-call into continuations. Steele's Rabbit compiler for Scheme (1978) and Appel's SML/NJ (1992) are the canonical implementations.\n\nCPS makes all control flow explicit at the term level: non-local returns, exceptions, coroutines, async/await, and effect handlers all express naturally as continuation manipulation. The cost is that the IR has many more lambda terms than the source — every operation introduces a continuation parameter. For optimisers, this can be either a feature (uniform structure) or a bug (more nodes to process).",
+      "refs": [],
+      "sources": [
+        { "label": "Compiling with Continuations (Appel, 1992)", "url": "https://www.cs.princeton.edu/~appel/papers/cpcps.pdf" }
+      ]
+    },
+    {
+      "id": "anf",
+      "title": "A-Normal Form",
+      "tags": ["compiler", "functional-languages"],
+      "content": "Flanagan, Sabry, Duba, Felleisen (1993) introduced ANF as a simpler alternative to CPS. In ANF, every intermediate result is named (`let x = e in ...`) and every function argument is *trivial* (a variable or a constant — never a complex expression). ANF captures the same sequencing guarantees as CPS but without explicit continuation arguments.\n\nANF's appeal: it's more readable than CPS, easier to map back to source for debugging, and most optimisations (β-reduction, dead-let elimination, common subexpression elimination) have natural ANF formulations. Most modern functional compilers use ANF or ANF-like forms — GHC's Core in let-normal form, OCaml's Flambda, Roc, Koka before its CPS-based effect handlers.",
+      "refs": [
+        { "target": "ghc-core#overview", "type": "instance" },
+        { "target": "ocaml-flambda#overview", "type": "instance" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Kelsey CPS-SSA correspondence", "url": "https://bernsteinbear.com/assets/img/kelsey-ssa-cps.pdf" },
+    { "label": "Compiling with Continuations", "url": "https://www.cs.princeton.edu/~appel/papers/cpcps.pdf" }
+  ]
+}

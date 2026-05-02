@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Effect Handler Lowering",
+  "aliases": ["selective CPS", "evidence-threaded effects", "effect compilation"],
+  "summary": "Compiling typed effect handlers into executable code: selective CPS transformation for the parts that need continuation capture, direct-style evidence threading for tail-resumptive handlers. Koka, OCaml 5, Effekt all take different points on the spectrum.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Effect handlers (algebraic effects) generalise exceptions: an effect-performing operation suspends; a handler higher in the call stack receives the operation, runs handler code, and may resume the suspended computation with a value. Compiling this efficiently is non-trivial — every effect operation potentially captures the continuation.\n\nProduction approaches range across a spectrum:\n\n- **Selective CPS** (Koka): the compiler analyses which functions can perform effects; those become CPS-transformed, while purely-functional code stays direct-style. Effect operations capture continuations only where needed.\n- **Direct-style evidence passing** (Effekt's lexical handlers): when handlers are lexically scoped (cannot escape their introduction), the compiler can compile handler invocations as direct calls plus stack manipulation, with no runtime evidence dispatch.\n- **Stack switching** (OCaml 5, WasmFX): the runtime supports first-class continuations via stack manipulation primitives; effect operations become calls to runtime stack-switching routines.",
+      "refs": [
+        { "target": "evidence-passing#overview", "type": "uses" },
+        { "target": "cps-anf#overview", "type": "uses" },
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "lowering-target-of" },
+        { "target": "koka#selective-cps-compilation", "type": "instance" },
+        { "target": "effekt-language#evidence-lifting-and-affine-handlers", "type": "instance" }
+      ],
+      "sources": [
+        { "label": "Generalized Evidence Passing for Effect Handlers (Xie & Leijen, ICFP 2021)", "url": "https://xnning.github.io/papers/multip.pdf" },
+        { "label": "Algebraic Effects and Handlers Go Mainstream (Microsoft Research)", "url": "https://www.microsoft.com/en-us/research/publication/algebraic-effects-handlers-go-mainstream/" }
+      ]
+    },
+    {
+      "id": "ocaml-5-runtime-effects",
+      "title": "OCaml 5 — runtime effect handlers without static effect typing",
+      "tags": ["compiler", "effects", "ocaml"],
+      "content": "Status (OCaml 5.2): the runtime-level `Effect` module exposes effect handlers without static effect safety; from a type-rule perspective, this means OCaml's effects are *unchecked at the type level* even when handled at runtime. The runtime supports first-class continuations via stack-switching primitives; effect operations become calls to runtime stack-switching routines.\n\nFor language designers, OCaml 5 is the data point that **effect handlers can ship as a runtime feature ahead of a type-system commitment**. The type-system question (which effect rows, what subtyping, what inference) can be deferred to a later language version while the runtime mechanism stabilises. The trade-off is that programs using effects pay no type-checking cost but also receive no static safety: an unhandled effect raises at runtime rather than failing to compile.",
+      "refs": [
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "OCaml 5 effect handlers manual", "url": "https://ocaml.org/manual/5.2/effects.html" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs across approaches",
+      "tags": ["compiler", "effects"],
+      "content": "The trade-offs are real: selective CPS keeps the language semantics simple but pays per-operation overhead even for tail-resumptive handlers (the common case). Lexical evidence passing avoids that overhead but restricts handlers from escaping their lexical scope. Stack switching is the most general but requires runtime support.\n\nFor language designers: the choice depends on how dynamically effect handlers will be used. Languages where handlers are mostly local (logging, exception-like patterns) benefit from lexical compilation. Languages where handlers escape (concurrency, generators, async) need full continuation support, either via CPS or via stack switching. Most production effect-handler languages have settled on a mix: lexical-fast-path for the common case, full continuation capture as a fallback when escapes are detected.",
+      "refs": [],
+      "sources": [
+        { "label": "OCaml 5 effect handlers manual", "url": "https://ocaml.org/manual/5.2/effects.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Xie-Leijen evidence passing", "url": "https://xnning.github.io/papers/multip.pdf" },
+    { "label": "OCaml 5 effects", "url": "https://ocaml.org/manual/5.2/effects.html" },
+    { "label": "Algebraic Effects and Handlers Go Mainstream (Microsoft Research)", "url": "https://www.microsoft.com/en-us/research/publication/algebraic-effects-handlers-go-mainstream/" }
+  ]
+}

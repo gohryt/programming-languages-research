@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Zig ZIR and AIR",
+  "aliases": ["zig-zir", "zig-air"],
+  "summary": "Zig's two-stage frontend IR: ZIR (untyped, comptime-evaluable) is generated from the AST and feeds semantic analysis. AIR (analyzed) is what ZIR becomes after types are resolved, comptime evaluated, generic functions instantiated, and dead branches removed.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Zig has a two-IR frontend. **ZIR** (Zig Intermediate Representation) is generated from the AST and fed to semantic analysis. The defining design choice: ZIR encodes *unanalyzed* code — types are not yet resolved, comptime evaluation has not yet run, generic instantiation has not happened. Each ZIR instruction stores `node_offset` relative to its parent declaration, so source-position metadata is compact and survives source-buffer freeing.\n\n**AIR** is what ZIR becomes after semantic analysis: types resolved, comptime evaluated, generic functions instantiated, dead branches removed. AIR is lower-level than ZIR — closer to a typed CFG with explicit operands — and is the input to Zig's LLVM backend (or its self-hosted backends targeting WebAssembly, x86_64, or aarch64).",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "flat-ast-representations#overview", "type": "lowered-from" }
+      ],
+      "sources": [
+        { "label": "Zig ZIR source", "url": "https://github.com/ziglang/zig/blob/master/src/Zir.zig" },
+        { "label": "Zig AIR source", "url": "https://github.com/ziglang/zig/blob/master/src/Air.zig" }
+      ]
+    },
+    {
+      "id": "two-stage-rationale",
+      "title": "Why two stages exist",
+      "tags": ["compiler-ir", "comptime", "zig"],
+      "content": "The two-IR architecture exists because comptime evaluation needs to operate on un-analyzed code (ZIR) while codegen needs analyzed code (AIR). A single IR could carry both, but at the cost of either making comptime see analyzed code (impossible, since comptime drives instantiation) or making codegen consume un-analyzed code (impractical for an LLVM backend that needs concrete types).\n\nZIR is also the substrate for Zig's `comptime`: comptime evaluation is interpretation of ZIR with the analyzer choosing instantiation values. Once analysis completes, ZIR is lowered to AIR.",
+      "refs": [
+        { "target": "compile-time-function-evaluation#overview", "type": "powers" },
+        { "target": "zig-comptime#overview", "type": "underlies" }
+      ]
+    },
+    {
+      "id": "lowering-and-backends",
+      "title": "Lowering and self-hosted backends",
+      "tags": ["compiler-ir", "backend", "zig"],
+      "content": "AIR feeds either LLVM (the historical primary backend) or Zig's own self-hosted backends targeting x86_64, aarch64, RISC-V, and WebAssembly. The self-hosted backends are what allow Zig to bootstrap without LLVM in some configurations and to ship faster compile times for development builds.\n\nThe two-stage design also makes incremental compilation more tractable: ZIR for a function only needs to be regenerated when the AST changes, and AIR only when types change. This is part of how Zig hopes to deliver fast incremental rebuilds at scale.",
+      "refs": [
+        { "target": "llvm#overview", "type": "primary-backend" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Zig ZIR source", "url": "https://github.com/ziglang/zig/blob/master/src/Zir.zig" },
+    { "label": "Zig AIR source", "url": "https://github.com/ziglang/zig/blob/master/src/Air.zig" }
+  ]
+}

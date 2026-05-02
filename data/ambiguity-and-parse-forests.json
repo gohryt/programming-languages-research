@@ -1,0 +1,57 @@
+{
+  "kind": "concept",
+  "name": "Ambiguity and Parse Forests",
+  "aliases": ["sppf", "shared-packed-parse-forest"],
+  "summary": "Generalized parsers don't make ambiguity disappear — they make it explicit. The Shared Packed Parse Forest (SPPF) keeps multiple parses polynomial by sharing common subtrees and storing alternatives as packed nodes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Generalized parsers do not make ambiguity disappear; they make it explicit. When GLR, GLL, Earley, or CYK finds multiple parses, the practical output is usually a Shared Packed Parse Forest (SPPF): common subtrees are shared, and ambiguous alternatives are stored as packed nodes. This keeps the representation polynomial rather than exploding into every full parse tree.",
+      "refs": [
+        { "target": "scannerless-parsing#costs-and-ambiguity", "type": "produced-by" },
+        { "target": "tree-sitter#parser-architecture", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "shared-packed-parse-forests",
+      "title": "Shared Packed Parse Forests",
+      "tags": ["parser", "ambiguity", "parse-forest"],
+      "content": "An SPPF represents multiple parse alternatives compactly by sharing common subtrees and storing alternative parents at \"packed\" nodes. Two parses that agree on a subtree share the same node; two parses that disagree at a higher node have a packed node listing the alternatives.\n\nThis is the Tomita / Rekers integration that makes GLR practical: cubic-time parsing with polynomial-sized output, even on ambiguous grammars.",
+      "refs": [
+        { "target": "incremental-parsing#overview", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "disambiguation-strategies",
+      "title": "Disambiguation strategies",
+      "tags": ["parser", "ambiguity", "tradeoffs"],
+      "content": "Ambiguity management is a separate design problem from parsing. Common strategies:\n\n- grammar refactoring to remove the ambiguity\n- precedence and associativity filters\n- longest-match token policies\n- priority annotations\n- \"prefer shift\" or \"prefer earlier rule\" defaults\n- semantic filters after parsing\n- explicit ambiguity nodes exposed to later phases\n\nThe choice depends on where complexity should live: in the grammar, in the parser configuration, or in the consuming pass.",
+      "refs": [
+        { "target": "deterministic-ll-lr#grammar-engineering-tradeoffs", "type": "alternative-to" },
+        { "target": "peg-parsing#ordered-choice-and-recognition", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "engineering-costs",
+      "title": "Engineering costs",
+      "tags": ["parser", "tradeoffs", "tooling"],
+      "content": "The engineering lesson is that \"accepts all CFGs\" is not the same as \"gives the tree you wanted.\" For programming languages, a parser that frequently produces ambiguity forests pushes complexity downstream into name resolution, macro expansion, or type checking.\n\nTree-sitter and Lezer mostly avoid this by asking grammar authors to declare conflicts and by resolving common precedence cases in the grammar. Lark's Earley backend exposes SPPF for cases where ambiguity is intentionally preserved (natural-language fragments, query DSLs, schema systems).",
+      "refs": [
+        { "target": "tree-sitter#parser-architecture", "type": "alternative-to" },
+        { "target": "language-server#design-constraints", "type": "relevant-to" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Lark parser algorithms",
+      "url": "https://lark-parser.readthedocs.io/en/stable/parsers.html"
+    },
+    {
+      "label": "Tree-sitter — writing the grammar (conflicts)",
+      "url": "https://tree-sitter.github.io/tree-sitter/creating-parsers/3-writing-the-grammar.html"
+    }
+  ]
+}

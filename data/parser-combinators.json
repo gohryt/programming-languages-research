@@ -1,0 +1,88 @@
+{
+  "kind": "concept",
+  "name": "Parser Combinators",
+  "aliases": [],
+  "summary": "Parsers as ordinary host-language values composed via higher-order functions. Daan Leijen and Erik Meijer's Parsec (2001) is the landmark; modern descendants include Megaparsec, nom, winnow, and chumsky.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Parser combinators treat parsers as ordinary values in the host language and build larger parsers by composing smaller ones through higher-order functions. Daan Leijen and Erik Meijer's Parsec (2001) is the landmark design: monadic combinators in Haskell that produce precise error locations and the set of legal productions at the failure point, with heuristics to avoid naive space leaks.\n\nMegaparsec (Mark Karpov) is the current industrial-strength Haskell descendant — an MTL-style monad transformer with better error quality and documented performance characteristics comparable to Attoparsec when combinators are used carefully.",
+      "refs": [
+        { "target": "tree-sitter#parser-architecture", "type": "contrasts-with" },
+        { "target": "recursive-descent#overview", "type": "related" }
+      ],
+      "sources": [
+        {
+          "label": "Leijen & Meijer — Parsec: Direct Style Monadic Parser Combinators",
+          "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/parsec-paper-letter.pdf"
+        }
+      ]
+    },
+    {
+      "id": "rust-lineage",
+      "title": "Rust lineage: nom, winnow, chumsky",
+      "tags": ["parser", "combinators", "rust"],
+      "content": "The Rust lineage spans nom (zero-copy, byte-oriented; popular for binary protocols), its 2023 fork winnow (mutable-input, tooling-oriented redesign), and chumsky, which foregrounds error recovery: it reports multiple errors, recovers into a consistent state, emits partial ASTs, supports context-sensitive grammars, and ships a `chumsky::pratt` module unifying Pratt's per-operator extensibility with combinator typing — features normally seen in hand-written compiler front-ends.",
+      "refs": [
+        { "target": "pratt-parsing#overview", "type": "compositional-with" }
+      ],
+      "sources": [
+        { "label": "nom (Rust)", "url": "https://github.com/rust-bakery/nom" },
+        { "label": "winnow (Rust)", "url": "https://github.com/winnow-rs/winnow" },
+        { "label": "chumsky (Rust)", "url": "https://github.com/zesterer/chumsky" }
+      ]
+    },
+    {
+      "id": "host-language-integration",
+      "title": "Host-language integration",
+      "tags": ["parser", "combinators", "dsl"],
+      "content": "Parser combinators are deeply shaped by the host language they live in. They give a parser that is type-checked by the host language, composable at runtime, and free of a separate build step. This makes them attractive in DSLs, macro systems, embedded syntactic tools, and any setting where parsing should behave like an ordinary library.",
+      "refs": []
+    },
+    {
+      "id": "expression-parsing-strategies",
+      "title": "Expression parsing strategies",
+      "tags": ["parser", "expressions", "precedence"],
+      "content": "Combinator libraries still need a strategy for operator precedence and associativity. In practice, Pratt parsing and precedence climbing are common complements when elegant composition alone becomes awkward for expression grammars. Chumsky's `chumsky::pratt` module is the cleanest example of bringing per-operator dispatch into a combinator-typed library.",
+      "refs": [
+        { "target": "pratt-parsing#overview", "type": "complements" },
+        { "target": "precedence-climbing#overview", "type": "complements" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["parser", "tradeoffs", "tooling"],
+      "content": "Combinators typically run slower than a well-tuned LR or hand-written RD parser, offer weaker grammar introspection (no explicit grammar object to inspect for conflicts or first-sets), and shift responsibility for left-recursion elimination and precedence to the author. Most production compilers that start with combinators eventually migrate to hand-written code as the language matures and tooling demands grow — Ruff (Python linter) is a recent canonical case.\n\nIn editor-resilience comparisons, naive combinators lose to tree-sitter's parallel-strategies recovery, though chumsky narrows the gap.",
+      "refs": [
+        { "target": "tree-sitter#incrementality", "type": "contrasts-with" },
+        { "target": "recursive-descent#strengths", "type": "contrasts-with" },
+        { "target": "language-server#design-constraints", "type": "relevant-to" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Leijen & Meijer — Parsec: Direct Style Monadic Parser Combinators",
+      "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/parsec-paper-letter.pdf"
+    },
+    {
+      "label": "Megaparsec (Haskell)",
+      "url": "https://github.com/mrkkrp/megaparsec"
+    },
+    {
+      "label": "nom (Rust)",
+      "url": "https://github.com/rust-bakery/nom"
+    },
+    {
+      "label": "winnow (Rust)",
+      "url": "https://github.com/winnow-rs/winnow"
+    },
+    {
+      "label": "chumsky (Rust)",
+      "url": "https://github.com/zesterer/chumsky"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "kind": "concept",
+  "name": "Scalar Replacement of Aggregates",
+  "aliases": [
+    "mem2reg",
+    "scalar replacement"
+  ],
+  "summary": "Breaks structs and small arrays apart into individual scalar values, so the optimiser can reason about each field independently. After SROA, a local struct that is only accessed field-by-field becomes independent SSA values eligible for register allocation, GVN, and constant folding.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "SROA breaks structs and small arrays apart into individual scalar values, so the optimiser can reason about each field independently. After SROA, a local struct `{int x, int y}` that is only accessed field-by-field becomes two independent SSA values — eligible for register allocation, GVN, and constant folding as individual scalars.\n\nThe effect is transformative: languages that allocate small structs frequently (Rust tuples, Go value types, C++ `std::pair`) depend on SROA to produce code competitive with hand-written scalar C. Without SROA, every field access would remain a load/store through memory.",
+      "refs": [
+        {
+          "target": "ssa#overview",
+          "type": "operates-on"
+        }
+      ],
+      "sources": [
+        {
+          "label": "LLVM SROA pass reference",
+          "url": "https://llvm.org/docs/Passes.html#sroa-scalar-replacement-of-aggregates"
+        }
+      ]
+    },
+    {
+      "id": "mem2reg-and-sroa",
+      "title": "mem2reg and SROA",
+      "tags": [
+        "compiler",
+        "ssa"
+      ],
+      "content": "Two related passes work together. **mem2reg** converts `alloca`-based local variables into SSA registers when the alloca is only accessed by direct loads and stores (no escape, no pointer arithmetic). After mem2reg, what was a stack-allocated variable becomes an SSA value with explicit φ-functions at join points.\n\n**SROA** extends mem2reg to aggregate types. An alloca of a struct is split into one alloca per field if the field accesses are statically determinable; each field-alloca is then promoted by mem2reg. SROA also handles array allocas with constant indices, splitting the array into independent slot allocas.\n\nLLVM's SROA pass is one of the first passes run on any optimised module. It is the transition from \"naïve lowering that allocates everything on the stack\" to \"optimised SSA with values in registers\". Without it, a function that puts a temporary `Pair` on the stack would pay two loads and two stores per use; after SROA, the pair lives in two registers.",
+      "refs": []
+    },
+    {
+      "id": "limits",
+      "title": "Limits and design implications",
+      "tags": [
+        "compiler",
+        "tradeoffs"
+      ],
+      "content": "SROA cannot run when the aggregate escapes (its address is taken and passed to opaque code) or when it is accessed via dynamic indices (`arr[i]` where `i` is unknown). Both cases force the aggregate to live in memory, defeating SROA.\n\nThe design implication for source languages: small aggregates that are only used locally and never escape should be cheap to produce by the compiler. Patterns like \"return multiple values\" via a small struct, \"pass options as a struct\", or \"local vector of three floats\" all rely on SROA to compile down to scalar code with no allocation. Languages that produce non-SROA-friendly IR (lots of escapes, lots of dynamic indexing on small aggregates) leave performance on the table.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "LLVM SROA",
+      "url": "https://llvm.org/docs/Passes.html#sroa-scalar-replacement-of-aggregates"
+    }
+  ]
+}

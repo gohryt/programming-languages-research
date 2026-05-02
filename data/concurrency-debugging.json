@@ -1,0 +1,109 @@
+{
+  "kind": "concept",
+  "name": "Concurrency-aware debuggers",
+  "aliases": [
+    "race detector",
+    "ThreadSanitizer",
+    "schedule exploration",
+    "deadlock debugging"
+  ],
+  "summary": "Debugging races, deadlocks, scheduling, and the challenge of presenting many interacting execution contexts coherently; production tools include ThreadSanitizer (hybrid happens-before + lockset), CHESS / loom / FoundationDB (systematic schedule exploration), and runtime wait-graph reasoning.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Concurrency bugs evade step-through debugging. Data races disappear when the scheduler is slowed, deadlocks manifest only under load, and a stop-the-world breakpoint changes the very timing relationships being investigated. The tools in this chapter instrument synchronization semantics instead of stopping execution — they *observe* concurrency rather than pause it. Entries split along three orthogonal questions: **did a race happen on this run?** (`data/concurrency-debugging#threadsanitizer-debugger-use` ThreadSanitizer's hybrid happens-before + lockset), **what schedules could have happened that we haven't tried?** (`data/concurrency-debugging#systematic-schedule-exploration` systematic schedule exploration via CHESS / loom / FoundationDB), and **why is nothing making progress?** (`data/concurrency-debugging#deadlock-liveness-debugging` deadlock/liveness wait-graph reasoning). They sit between the omniscient debuggers of `data/time-travel-debugging` (which could in principle see races but rarely do at runtime resolution) and the always-on tracers of `data/runtime-event-pipelines` and `data/sampling-profiling` (which record events but don't reason about happens-before).\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:concurrency-aware`\n- **domain**: `domain:debugging`\n- **on-cost**: `on-cost:high`\n"
+    },
+    {
+      "id": "threadsanitizer-debugger-use",
+      "title": "ThreadSanitizer v2 — Hybrid Happens-Before + Lockset",
+      "tags": [
+        "domain:debugging",
+        "family:concurrency-aware",
+        "on-cost:high"
+      ],
+      "content": "ThreadSanitizer (Clang/GCC `-fsanitize=thread`) is the canonical dynamic data-race detector. From the debugger's side, the workflow is: build with `-fsanitize=thread`, run the failing test, and on a detected race the runtime prints both stack traces, both thread IDs, and the held-mutex list — a debugger-grade artifact suitable for triage without requiring a paused process. The Go race detector (`go build -race`) ships the same runtime with Go-specific happens-before rules for channels and `sync` primitives. A dynamic annotations API (`ANNOTATE_HAPPENS_BEFORE` / `_AFTER`) and per-issue suppression files let projects teach the detector about custom synchronization or mask known-benign reports.\n\nThe mechanism details (compiler-inserted shadow memory, hybrid happens-before + lockset algorithm, ~5–15× slowdown, lock-order-inversion and signal-handler-unsafety detection) are owned by `data/shadow-state-and-checks`; the safety-model framing is owned by `data/` records (e.g. `data/ownership`, `data/borrowing`). This section covers only the debugger-use surface — race reports as triage input — and the design lesson that if the runtime owns its synchronization primitives, the debugger sees an exhaustive happens-before lattice for free.",
+      "sources": [
+        {
+          "url": "https://research.google.com/pubs/archive/35604.pdf"
+        },
+        {
+          "url": "https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs"
+        }
+      ]
+    },
+    {
+      "id": "systematic-schedule-exploration",
+      "title": "Systematic Concurrency Schedule Exploration",
+      "tags": [
+        "domain:debugging",
+        "family:concurrency-aware"
+      ],
+      "content": "Race detectors find races that happened in one execution. Systematic concurrency testing tries to *make* rare schedules happen. The runtime replaces the normal scheduler with a controlled scheduler, explores task interleavings, injects yields at synchronization points, records schedules, and replays failing schedules deterministically.\n\nMicrosoft CHESS pioneered this for threaded programs using schedule bounding and partial-order reduction. Rust's `loom` explores possible interleavings of atomics, mutexes, and threads by replacing synchronization primitives with instrumented models. FoundationDB's deterministic simulation runs distributed-system components under a deterministic event loop with randomized faults, delays, and schedules, making entire cluster failures reproducible.\n\nThe language-design lesson: **if the language owns tasks, channels, actors, or effects, it can own the scheduler in tests**. A debugger can then show \"the schedule that caused the bug\" as a first-class artifact, not just a stack trace. Pairs naturally with the happens-before tracking of `data/concurrency-debugging#threadsanitizer-debugger-use` — schedule exploration finds the schedule, sanitizers diagnose what happens on it.",
+      "sources": [
+        {
+          "url": "https://www.microsoft.com/en-us/research/project/chess/"
+        },
+        {
+          "url": "https://github.com/tokio-rs/loom"
+        },
+        {
+          "url": "https://apple.github.io/foundationdb/testing.html"
+        }
+      ]
+    },
+    {
+      "id": "deadlock-liveness-debugging",
+      "title": "Deadlock and Liveness Debugging",
+      "tags": [
+        "domain:debugging",
+        "family:concurrency-aware"
+      ],
+      "content": "Data races are not the only concurrency bugs. Programs also hang: locks form cycles, tasks wait on futures that will never complete, actors starve in mailboxes, channels have no receiver, and thread pools exhaust themselves. The debugger question is not \"who wrote this memory?\" but \"why is nothing making progress?\"\n\nClassic thread dumps expose blocked threads, owned locks, and wait stacks; JVM tools can detect monitor deadlocks from a wait-for graph. Go goroutine dumps show goroutines blocked on channels, mutexes, syscalls, and timers. Linux `lockdep` validates lock ordering in the kernel. Async runtimes such as Tokio can expose task graphs and resource wait states through tools like `tokio-console`.\n\nThe language-design lesson: **debug wait relationships explicitly**. If the runtime has structured concurrency, channels, actors, promises, mutexes, and cancellation, it can maintain a wait-for graph: task A awaits future B, B waits for timer C, actor D waits for mailbox message E. A debugger can then answer \"why is this task stuck?\" directly.",
+      "sources": [
+        {
+          "url": "https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html"
+        },
+        {
+          "url": "https://go.dev/doc/diagnostics"
+        },
+        {
+          "url": "https://docs.kernel.org/locking/lockdep-design.html"
+        },
+        {
+          "url": "https://github.com/tokio-rs/console"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://research.google.com/pubs/archive/35604.pdf"
+    },
+    {
+      "url": "https://github.com/google/sanitizers/wiki/ThreadSanitizerDetectableBugs"
+    },
+    {
+      "url": "https://www.microsoft.com/en-us/research/project/chess/"
+    },
+    {
+      "url": "https://github.com/tokio-rs/loom"
+    },
+    {
+      "url": "https://apple.github.io/foundationdb/testing.html"
+    },
+    {
+      "url": "https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/tooldescr034.html"
+    },
+    {
+      "url": "https://go.dev/doc/diagnostics"
+    },
+    {
+      "url": "https://docs.kernel.org/locking/lockdep-design.html"
+    },
+    {
+      "url": "https://github.com/tokio-rs/console"
+    }
+  ]
+}

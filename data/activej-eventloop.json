@@ -1,0 +1,54 @@
+{
+  "kind": "framework",
+  "name": "ActiveJ Eventloop",
+  "aliases": ["activej-eventloop-workers", "activej-reactor"],
+  "summary": "Primary/worker reactor topology on the JVM combining a single-threaded NIO event loop (Eventloop class) with a multi-reactor balancing scheme: a Primary Reactor accepts connections and hands them off to N Worker Reactors, each running its own independent Eventloop with no shared mutable state.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ActiveJ (SoftIndex Lab; current v6.0-rc2) takes a Node.js-shaped single-threaded event-loop reactor and combines it with a **multi-reactor balancing topology** that sits between pure event-loop schedulers and full M:N goroutine runtimes. The `Eventloop` class is a single-threaded NIO reactor with a tick loop, a task queue, scheduled-task heap, and `Selector.select()` as the only blocking call — structurally identical to Node.js's libuv loop or a single-threaded Tokio runtime. What's distinctive is the topology layered above.",
+      "refs": [
+        { "target": "event-loop-scheduling#overview", "type": "instance-of" },
+        { "target": "actors#overview", "type": "contrasts-with" },
+        { "target": "activej-codegen#overview", "type": "complements" },
+        { "target": "activej-specializer#overview", "type": "complements" }
+      ],
+      "sources": [
+        { "label": "ActiveJ Eventloop", "url": "https://activej.io/async-io/eventloop" },
+        { "label": "ActiveJ Workers (boot)", "url": "https://activej.io/boot/workers" }
+      ]
+    },
+    {
+      "id": "primary-and-worker-reactors",
+      "title": "Primary and Worker reactors",
+      "tags": ["concurrency", "topology", "jvm"],
+      "content": "The **Workers + WorkerPoolModule** mechanism splits an application into a **Primary Reactor** thread and N **Worker Reactor** threads. The Primary accepts incoming connections on listen sockets via `PrimaryServer`, then redistributes each accepted socket to a worker via thread-safe handoff; each Worker runs its own independent `Eventloop` in its own OS thread, processes the I/O for the connections it owns, and never shares mutable state with other workers.\n\nCross-worker communication is by message passing (`Reactor.submit()` posts a task to another reactor's queue) plus thread-safe singleton services injected via the DI graph. Because workers don't share heap state, there is no per-request synchronisation; because each worker runs a single thread, there is no within-worker concurrency to coordinate.",
+      "refs": []
+    },
+    {
+      "id": "design-position",
+      "title": "Architectural position vs neighbouring designs",
+      "tags": ["concurrency", "comparison", "design-space"],
+      "content": "The architectural contribution is a *clean middle point* between four neighboring designs:\n\n- **Single eventloop**: one thread, one loop, one core. Node.js, single-threaded Tokio. ActiveJ is one-step richer: many independent eventloops, one per worker, balanced by a primary.\n- **M:N goroutines**: many goroutines multiplexed across worker threads, but with a *shared heap* and runtime-stolen work. ActiveJ rejects the shared heap and the work-stealing scheduler.\n- **Akka actors** (`data/akka`): many actors, each single-threaded internally, message-passing. ActiveJ's workers behave identically *at the worker boundary*, but each worker is an Eventloop with arbitrary code rather than an actor with a mailbox.\n- **Erlang/BEAM**: many isolated lightweight processes per scheduler. ActiveJ has fewer, heavier units (one per OS thread) but the same isolation guarantee.\n\nThe trade-off: ActiveJ commits to **per-worker single-threaded code with no within-worker concurrency**, in exchange for **cross-worker isolation without runtime overhead**. The Primary Reactor handles connection-level load balancing; each Worker handles its connections with the latency and predictability of a single-threaded Node.js process; multi-core scaling comes from running N workers, not from concurrent execution within one worker.",
+      "refs": [
+        { "target": "akka#overview", "type": "contrasts-with" },
+        { "target": "glommio#vs-tokio-shared-scheduler", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "production-and-status",
+      "title": "Production and status",
+      "tags": ["production", "jvm"],
+      "content": "Status (as of 2026-04): production-stable; v6.0-rc2 ships under Apache 2.0 from io.activej Maven coordinates. Used inside SoftIndex Lab products and a small population of external Java teams that have adopted the framework over Spring/Vert.x. The benchmark claim \"millions of HTTP requests per second per server\" matches this topology — N workers each running a single-threaded eventloop scale linearly with cores up to roughly the number of cores on the box.\n\nThe compiler-side techniques that make ActiveJ's hot paths competitive — runtime bytecode generation (`data/activej-codegen`) and instance-to-static-class rewriting (`data/activej-specializer`) — are independent: a language designer could adopt the primary/worker topology without the codegen + specializer stack, or vice versa.\n\nThe lesson generalises: **for I/O-bound services where per-request isolation is the dominant correctness concern**, the primary/worker topology over isolated single-threaded reactors is a viable alternative to both shared-heap M:N runtimes (Go, Tokio multi-thread) and full actor systems (Akka, BEAM). The framework gets multi-core scaling from horizontal worker replication rather than from intra-worker concurrency, eliminating an entire class of races and synchronisation bugs in exchange for slightly higher coordination cost when work *must* cross worker boundaries.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ActiveJ Eventloop", "url": "https://activej.io/async-io/eventloop" },
+    { "label": "ActiveJ Workers", "url": "https://activej.io/boot/workers" },
+    { "label": "ActiveJ home", "url": "https://activej.io/" },
+    { "label": "ActiveJ repository", "url": "https://github.com/activej/activej" }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "kind": "tool",
+  "name": "LLVM",
+  "aliases": ["llvm-project"],
+  "summary": "Industry-standard compiler infrastructure: typed linear SSA IR, retargetable codegen, 30+ years of optimization passes. Backend for Clang, Rust, Swift, Julia, Kotlin Native, Zig, and most modern AOT compilers. Increasingly criticized for compile-time cost in JIT settings, motivating Cranelift and Turboshaft.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "LLVM is a compiler infrastructure ecosystem built around reusable intermediate representations, optimization passes, and retargetable code generation. It acts as one of the main anchor examples for how adopting a backend infrastructure shapes compiler architecture upstream as well as code generation downstream.\n\nThe canonical pipeline: a frontend produces LLVM IR (textual `.ll` or binary bitcode); LLVM runs the optimization pipeline; a target-specific backend lowers to assembly or object files. Every major frontend (Clang, Rust, Swift, Julia, Kotlin Native, Zig) targets LLVM IR; the surrounding ecosystem (LLVMlite, MLIR, LLD, sanitizers, libc++, openmp) is unmatched.",
+      "refs": [
+        { "target": "rust#overview", "type": "used-by" },
+        { "target": "mlir#overview", "type": "extended-by" },
+        { "target": "ssa#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        {
+          "label": "LLVM Language Reference",
+          "url": "https://llvm.org/docs/LangRef.html"
+        }
+      ]
+    },
+    {
+      "id": "ir",
+      "title": "Intermediate representation",
+      "tags": ["representation", "compiler", "ssa"],
+      "content": "LLVM IR is the de-facto industry-standard SSA IR for ahead-of-time compilation: typed (every value carries an `i32`/`i64`/`<n x T>` type), linear (basic blocks contain instructions in source order, terminators are explicit branches), and platform-independent (the same IR can target x86, ARM, RISC-V, PowerPC, WebAssembly, NVPTX). Its textual `.ll` form is human-readable and serializable; its bitcode form is compact and hashable.\n\nThe IR uses explicit phi instructions at control-flow merges, type-checked operands at every instruction, and rich metadata via `!dbg` and friends to thread debug info across optimization passes.\n\nLLVM's lower-level **Machine IR (MIR)** sits between LLVM IR and machine code: a textual representation of the post-instruction-selection form that target-specific passes (register allocation, scheduling, frame lowering) operate on. MIR is exposed as a serialisable form for testing and debugging the backend.",
+      "refs": [
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "mid-level-ir#typical-structure", "type": "production-instance-of" }
+      ],
+      "sources": [
+        { "label": "LLVM Machine IR Language Reference", "url": "https://llvm.org/docs/MIRLangRef.html" }
+      ]
+    },
+    {
+      "id": "frontend-to-backend-boundary",
+      "title": "Frontend to backend boundary",
+      "tags": ["compiler-design", "lowering", "backend"],
+      "content": "Lowering into LLVM is not only a code generation choice but also an architectural boundary: source-specific structure, richer semantic identity, and some runtime abstractions are typically compressed or transformed before LLVM ever sees them.\n\nThis is why Swift, Rust, and Julia all maintain their own higher-level IRs (SIL, MIR/THIR, Julia IR) above LLVM IR: language-specific optimizations (devirtualization, ARC elision, escape analysis, borrow checking) run on richer representations before lowering. LLVM IR is the common denominator; everything language-specific lives above.",
+      "refs": [
+        { "target": "high-level-ir#boundary-with-lower-ir", "type": "boundary-of" },
+        { "target": "mid-level-ir#boundary-with-backend-forms", "type": "boundary-of" }
+      ]
+    },
+    {
+      "id": "optimization",
+      "title": "Optimization model",
+      "tags": ["optimization", "compiler"],
+      "content": "LLVM provides a large ecosystem of optimization passes, analyses, and lowering stages. Strengths include maturity (30+ years of passes), retargetability (every major architecture), breadth (all major frontends share the optimizer investment), and integration with MLIR for staged lowering.\n\nThe canonical optimization pipeline runs in passes: function-level optimization (inlining, GVN, LICM, SROA, mem2reg, DCE, instruction combining), then target-independent vectorization (LoopVectorize, SLPVectorize), then target-specific lowering through SelectionDAG or GlobalISel, then register allocation and machine-code emission. Each pass operates on the IR using `!dbg` metadata to preserve debug-info correctness across transformations.",
+      "refs": [
+        { "target": "ssa#why-compilers-use-ssa", "type": "powers" }
+      ]
+    },
+    {
+      "id": "backend-role",
+      "title": "Role as a backend",
+      "tags": ["backend", "codegen", "tradeoffs"],
+      "content": "LLVM is often chosen as a backend because it dramatically reduces the amount of target-specific code a new language must write. However, adopting LLVM means inheriting its abstractions, optimization assumptions, debugging model, and compile-time profile.\n\nLLVM-targeting languages benefit from:\n- 30+ year optimization investment\n- Multi-architecture support (x86, ARM, RISC-V, PowerPC, WebAssembly, NVPTX)\n- Sanitizer integration (AddressSanitizer, ThreadSanitizer, UndefinedBehaviorSanitizer)\n- Standard tooling (LLD, lldb, debug-info conventions)\n\nThey accept:\n- Multi-second compile times for large translation units\n- A C-shaped optimizer that can fit non-C semantics awkwardly (Swift had to add SIL above LLVM IR specifically to bypass LLVM optimizer assumptions)\n- A multi-million-line dependency",
+      "refs": [
+        { "target": "rust#overview", "type": "used-by" },
+        { "target": "cranelift#research-comparison-points", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "role-in-jit-and-tiered-systems",
+      "title": "Role in JIT and tiered systems",
+      "tags": ["jit", "runtime-design", "backend"],
+      "content": "LLVM can serve as a powerful optimizing backend in JIT and tiered systems, but its compile-time cost means it is often better suited to higher optimization tiers than the very fastest baseline compilation paths.\n\nProduction JIT users include WebKit's FTL (Faster Than Light tier of JavaScriptCore historically used LLVM, now uses B3), Pony's compiler, and Julia's runtime. The trade-off is sharp: LLVM gives top-tier optimization but second-by-second compile time. This is why several modern JITs explicitly moved away from LLVM IR — Cranelift was created by Mozilla for Wasmtime specifically to escape LLVM's compile latency, and V8's Turboshaft replaced TurboFan partly to avoid sea-of-nodes complexity inherited from LLVM-style design choices.",
+      "refs": [
+        { "target": "tiered-compilation#why-tiering-exists", "type": "informs" },
+        { "target": "copy-and-patch#stencil-based-code-generation", "type": "alternative-to" },
+        { "target": "deegen#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "relation-to-mlir",
+      "title": "Relation to MLIR",
+      "tags": ["infrastructure", "compiler-design"],
+      "content": "MLIR extends the LLVM ecosystem upward with richer domain-specific IR layers and progressive lowering strategies. LLVM IR remains a common lower-level target, but MLIR and LLVM serve different architectural roles in a compiler stack.\n\nThe relationship: MLIR is a framework for building IRs as composable dialects; LLVM IR is one specific dialect (`llvm` dialect) and one specific lowering target. A modern compiler stack often goes source → high-level MLIR dialect → progressively lower MLIR dialects → LLVM dialect → LLVM IR → machine code. Mojo, IREE, Triton, and Polygeist all follow this shape.\n\n`ClangIR` (CIR) is the most consequential MLIR dialect added since 2020: a high-level IR for C/C++ that retains language semantics through more of the optimizer than the historical AST-to-LLVM-IR lowering allowed.",
+      "refs": [
+        { "target": "mlir#overview", "type": "extends" },
+        { "target": "high-level-ir#why-compilers-keep-this-layer", "type": "context-for" }
+      ]
+    },
+    {
+      "id": "debug-info-and-tooling-implications",
+      "title": "Debug info and tooling implications",
+      "tags": ["debugging", "compiler", "metadata"],
+      "content": "LLVM is also a major practical reference point for how compiler infrastructures emit debug metadata, preserve source mappings, and expose optimization consequences to downstream tools. Backend choice therefore affects not only performance but also the quality of stepping, inspection, and post-mortem workflows.\n\n`!dbg` metadata threads through every IR instruction and must be propagated correctly across every optimization pass — a pass that drops debug info silently degrades the debugger experience. LLVM's discipline around this is one reason production debuggers (gdb, lldb, debuginfod) work well with LLVM-compiled code; languages targeting LLVM inherit this infrastructure for free.",
+      "refs": [
+        { "target": "dwarf-debug-info#overview", "type": "uses" },
+        { "target": "debugger-protocols#overview", "type": "informs" }
+      ]
+    },
+    {
+      "id": "strengths-and-tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["compiler-engineering", "tradeoffs"],
+      "content": "LLVM offers broad target support, a large optimization ecosystem, and strong maturity. The cost is complexity and significant compile latency.\n\nThe practical decision: for most AOT workloads (Rust, Swift, Julia, modern C/C++) LLVM is the clear default — the compile-time cost amortizes across a small number of build cycles per day. For JIT workloads where compilation is on the user's critical path, lighter-weight backends (Cranelift, copy-and-patch, hand-written macroassemblers) are increasingly preferred. The 30+ year optimizer investment is real but cannot beat physics on compile-time-sensitive paths.",
+      "refs": [
+        { "target": "cranelift#research-comparison-points", "type": "contrasts-with" },
+        { "target": "copy-and-patch#strengths", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "LLVM project",
+      "url": "https://llvm.org"
+    },
+    {
+      "label": "LLVM Language Reference",
+      "url": "https://llvm.org/docs/LangRef.html"
+    },
+    {
+      "label": "LLVM Machine IR Language Reference",
+      "url": "https://llvm.org/docs/MIRLangRef.html"
+    }
+  ]
+}

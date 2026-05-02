@@ -1,0 +1,49 @@
+{
+  "kind": "tool",
+  "name": "Boehm-Demers-Weiser GC — Conservative Tracing for Unmodified C/C++",
+  "aliases": ["BDW GC", "BDWGC", "Boehm GC", "libgc"],
+  "summary": "Hans Boehm, Alan Demers, and Mark Weiser's BDW collector (1988+) is the canonical conservative tracing GC and the reason GC is even an option for languages that 'don't have one'.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "conservative-gc", "production"],
+      "content": "Hans Boehm, Alan Demers, and Mark Weiser's **BDW collector** (1988+) is the canonical conservative tracing GC and the reason GC is even an option for languages that \"don't have one.\"\n\n*Conservative* means the collector treats every machine word as potentially a pointer — it has no static type information, so it cannot tell pointers from integers and must assume any value matching a heap address is a live reference. This trades some precision for the property that **C and C++ programs need no source modification**.",
+      "refs": [
+        { "target": "garbage-collection#conservative-and-frameworks", "type": "instance-of" },
+        { "target": "alloy-gc", "type": "consumed-by" },
+        { "target": "mps-memory-pool", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Conservative root scanning",
+      "tags": ["conservative-gc", "garbage-collection"],
+      "content": "BDW intercepts `malloc`/`realloc`/`free` (or replaces them via `LD_PRELOAD`-style hooks) and walks roots from CPU registers, the call stacks of all threads, and global data segments by **scanning bit patterns**.\n\nThe precision cost is bounded in practice — Boehm's empirical analyses show conservative misidentification typically retains <5% extra memory on real programs — but unbounded in the worst case (an integer that happens to match a heap address keeps an object alive indefinitely). To mitigate this, BDW supports **typed allocation** (`GC_malloc_typed`) where the program declares per-object pointer layout, restoring per-field precision while keeping the conservative root scan. Generational and incremental modes are available; the collector compiles on virtually every Unix and Windows platform."
+    },
+    {
+      "id": "comparison",
+      "title": "Comparison — BDW vs. precise tracers vs. MPS",
+      "tags": ["garbage-collection", "comparative-design"],
+      "content": "Distinct from precise tracing GCs (Immix, ZGC, Shenandoah, G1, Go, etc.): BDW does **not** require type metadata at every heap allocation, write barriers, or compiler cooperation — exactly the properties that make it deployable in unmodified C/C++ codebases.\n\nDistinct from MPS: BDW is one collector, MPS is a framework of pluggable pool classes. BDW is also distinct from MMTk: MMTk is a framework targeting precise GC for managed languages; BDW is a single conservative collector targeting unmanaged languages.",
+      "refs": [
+        { "target": "mps-memory-pool", "type": "contrasts-with" },
+        { "target": "mmtk", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Production deployments",
+      "tags": ["garbage-collection", "production"],
+      "content": "Production: GCJ (Java to native via GCC), historical Mono runtime (replaced by SGen in Mono 2.8, 2010), Mozilla SpiderMonkey's xpconnect bridge, many Scheme implementations (Chicken, MIT/GNU, Bigloo, Gambit), Inferno OS's Limbo runtime, Crystal language runtime, and ~20 years of embedded scripting where adding a precise GC was infeasible.\n\nStatus (as of 2026-04): still actively maintained and the conservative-GC reference for languages and runtimes that did not include GC support from the start. Alloy (research GC for Rust, OOPSLA 2025) uses BDWGC as its underlying conservative collector.",
+      "refs": [
+        { "target": "alloy-gc", "type": "consumed-by" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Boehm-Demers-Weiser GC home", "url": "https://hboehm.info/gc/" },
+    { "label": "BDW GC issues and design notes", "url": "https://www.hboehm.info/gc/issues.html" },
+    { "label": "Boehm & Weiser, \"Garbage Collection in an Uncooperative Environment\" (SP&E 1988)", "url": "https://www.hboehm.info/papers/spe_88_si.pdf" }
+  ]
+}

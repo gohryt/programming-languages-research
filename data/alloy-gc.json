@@ -1,0 +1,41 @@
+{
+  "kind": "runtime",
+  "name": "Alloy — GC for Rust with Destructor-as-Finalizer Analysis",
+  "aliases": ["Alloy GC", "Alloy Rust GC"],
+  "summary": "Hughes and Tratt's Alloy (OOPSLA 2025) is a research GC for Rust that tackles a very specific question: can a language built around ownership and destructors gain tracing GC without discarding existing destructor semantics? Alloy's answer is 'yes, but only with extra compiler analysis.'",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "conservative-gc", "rust", "research", "experimental"],
+      "content": "**Alloy** (Hughes and Tratt, OOPSLA 2025) is a research GC for Rust that tackles a very specific but important question: can a language built around ownership and destructors gain tracing GC **without discarding existing destructor semantics**?\n\nAlloy's answer is \"yes, but only with extra compiler analysis.\" It extends `rustc`, uses BDWGC as the underlying conservative collector, and allows ordinary Rust destructors to serve as GC finalizers where that is provably safe.",
+      "refs": [
+        { "target": "garbage-collection#hybrids-and-boundaries", "type": "instance-of" },
+        { "target": "boehm-bdwgc", "type": "extends" },
+        { "target": "ownership", "type": "complements" },
+        { "target": "reference-counting", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Three compiler analyses",
+      "tags": ["compiler", "rust", "garbage-collection"],
+      "content": "The distinctive mechanisms are threefold:\n\n- **Finalizer safety analysis** checks whether a destructor is safe to run as a finalizer at all: it rejects destructors that would be unsound because they access references, thread-local state, non-thread-safe data, or other GC values in ways that become dangerous once finalization is decoupled from lexical scope.\n- **Premature-finalizer prevention** inserts fences so that GC does not collect a value before the owning `Gc` wrapper's static lifetime has ended.\n- **Finalizer elision** removes finalizers whose destructor work is redundant with the collector's own reclamation — for example, when a destructor's only effect is freeing heap memory that the collector would free anyway."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Ownership + tracing as compiler responsibility",
+      "tags": ["rust", "ownership", "garbage-collection"],
+      "content": "The architectural lesson is not \"Rust should become a GC language\" so much as **ownership languages can integrate tracing GC if the compiler takes responsibility for the semantic mismatch between destructors and finalizers**. Alloy also shows that finalization is not merely a runtime problem: thread-safety, cycle-safety, and destructor eligibility become compile-time questions.\n\nIts use of a conservative collector is also instructive — allowing raw-pointer and integer-cast patterns to continue working pushes the design toward conservative root finding, because precise stack maps would not be sufficient once arbitrary pointer disguising is permitted."
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["research", "experimental", "rust"],
+      "content": "Status (as of 2026-04): Alloy is explicitly **not production-ready** as of late 2025: it is a modified compiler plus BDWGC integration, and its evaluation is exploratory rather than deployment-oriented.\n\nBut it is a valuable reference point for any new language hosted in Rust, or any language exploring a mixed story of ownership plus tracing for selected heap regions. The compiler consequences belong partly to compiler/IR records; the memory-model and finalization consequences belong to GC."
+    }
+  ],
+  "sources": [
+    { "label": "Hughes & Tratt — Garbage Collection for Rust: The Finalizer Frontier (OOPSLA 2025)", "url": "https://arxiv.org/pdf/2504.01841" }
+  ]
+}

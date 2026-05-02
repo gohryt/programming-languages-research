@@ -1,0 +1,31 @@
+{
+  "kind": "language",
+  "name": "Triton",
+  "aliases": ["OpenAI Triton", "Triton GPU DSL"],
+  "summary": "OpenAI's GPU kernel DSL: Python-embedded language for writing tile-based GPU kernels. Compiles via MLIR using polyhedral techniques to schedule tensor-core operations. Designed to fill the gap between hand-written CUDA (highest performance, hardest to write) and PyTorch operators (easiest, less tunable).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Triton** (OpenAI) is a GPU kernel DSL embedded in Python: programmers write tile-based GPU kernels using Triton's tile primitives, and the Triton compiler emits optimised PTX/SASS via MLIR. The design fills the gap between hand-written CUDA (highest performance, hardest to write) and PyTorch operators (easiest, less tunable).\n\nA Triton kernel looks like a Python function that operates on tiles — sub-blocks of a tensor — rather than individual elements. The compiler handles tile placement, memory hierarchy management, and tensor-core scheduling automatically. Programmers express the algorithm structure; Triton handles the GPU-specific scheduling.",
+      "refs": [
+        { "target": "polyhedral-optimization#overview", "type": "uses" },
+        { "target": "mlir#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Triton: Related Work", "url": "https://triton-lang.org/main/programming-guide/chapter-2/related-work.html" }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Design",
+      "tags": ["gpu", "dsl", "compiler"],
+      "content": "Triton's compiler uses polyhedral techniques to schedule tile-level operations on GPU tensor cores. The polyhedral model is well-suited to tile-based GPU kernels because tile loops are typically affine and the data-flow between tiles is statically determinable.\n\nThe compilation flow: Triton Python source → Triton MLIR dialect → various optimisation passes → NVPTX (NVIDIA) or AMDGCN (AMD) → PTX/SASS. The MLIR-based intermediate stages let Triton apply optimisations declaratively rather than embedding them in a hand-written backend.\n\nProduction usage: most modern PyTorch operators that need custom GPU kernels (`torch.compile`, FlashAttention, fused-MoE kernels) are written in Triton rather than CUDA. The DSL has become the de-facto standard for medium-complexity GPU kernels in the AI/ML ecosystem.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Triton Related Work", "url": "https://triton-lang.org/main/programming-guide/chapter-2/related-work.html" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-crash",
+  "tag": "granularity:per-crash",
+  "name": "Granularity: per crash",
+  "description": "Mechanism fires once per crash event, producing a single bounded artifact.",
+  "axis": "granularity"
+}

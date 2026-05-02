@@ -1,0 +1,36 @@
+{
+  "kind": "concept",
+  "name": "TLSF",
+  "aliases": ["Two-Level Segregated Fit", "TLSF allocator"],
+  "summary": "Two-Level Segregated Fit allocator delivering bounded-time *O(1)* malloc/free for hard real-time systems via two bitmap-indexed levels of segregated free lists, located in O(1) using `clz`/`ffs`.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "bounded-time-allocator", "realtime-allocator", "embedded"],
+      "content": "Two-Level Segregated Fit (TLSF) is the textbook real-time allocator. It delivers bounded-time *O(1)* malloc/free for hard real-time systems via two bitmap-indexed levels of segregated free lists, located in O(1) using count-leading-zeros / find-first-set instructions. It is the only allocator in the chapter giving a hard worst-case bound — the right choice when latency determinism rather than throughput is the goal.\n\nUnlike the throughput-oriented (mimalloc, snmalloc, rpmalloc) and fleet-scale (TCMalloc, jemalloc) families, TLSF's single quality-of-interest is *predictability*: every allocation must complete in a fixed number of machine instructions regardless of heap size or fragmentation state.",
+      "refs": [
+        { "target": "allocators#specialised-allocators", "type": "part-of" },
+        { "target": "hoard#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "two-level-bitmap",
+      "title": "Two-level bitmap and O(1) fit",
+      "tags": ["bin-segregated", "bitmap", "freelist"],
+      "content": "First-level bitmap partitions the size space by power-of-two; second-level bitmap subdivides each first-level bucket into linear ranges. A request is rounded up to the smallest fitting size class; a `clz`/`ffs` over the first-level mask finds the smallest non-empty power-of-two bucket large enough, a second `ffs` finds the specific bin within. Two bit-scan instructions locate a fitting block regardless of how many distinct sizes the heap currently holds.\n\nMetadata cost is roughly 4 bytes per allocation; reported fragmentation is typically below 15%, with a worst-case bound below 25%. Pools can be added or removed on the fly, and `TLSF-EXT` supports externalised headers for non-memory resource arenas (file descriptors, GPU buffers).",
+      "refs": []
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "embedded", "kernel"],
+      "content": "Production: Eclipse 4diac FORTE IEC 61499 runtime, Linux distros (in-kernel and userland tools), Ravenscar / hard-RT firmware, multimedia codecs, network appliances. The bounded-time guarantee is what makes TLSF appropriate when an allocation latency spike could cause a missed deadline — industrial control, avionics-adjacent firmware, and packet-processing fast paths are the canonical fit.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "TLSF site", "url": "http://www.gii.upv.es/tlsf/" },
+    { "label": "TLSF reference implementation (Conte)", "url": "https://github.com/mattconte/tlsf" }
+  ]
+}

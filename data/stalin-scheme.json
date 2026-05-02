@@ -1,0 +1,43 @@
+{
+  "kind": "tool",
+  "name": "Stalin Scheme Compiler",
+  "aliases": ["Stalin", "Siskind Stalin"],
+  "summary": "Jeffrey Mark Siskind's Stalin (Scheme to native via C, 1991+): whole-program type inference, control-flow analysis, escape analysis, and constant propagation run over the entire program before code generation. C code competitive with hand-written C on numeric benchmarks. Super-linear compile times; no separate compilation; no eval.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Jeffrey Mark Siskind's **Stalin** (Scheme to native via C, 1991+) takes whole-program optimisation to a research extreme: **type inference, control-flow analysis, escape analysis, and constant propagation are all run over the entire program** — including all libraries — before code generation. The compiler can elide allocation entirely for objects proven not to escape, specialise generic operations to monomorphic call sites, unbox numbers throughout, and emit C code competitive with hand-written C on numeric benchmarks.\n\nSiskind reports 0.6–4× of `gcc -O2` C performance on the SPEC suite, achieved purely through aggressive whole-program inference rather than runtime specialisation.",
+      "refs": [
+        { "target": "virgil-aeneas#overview", "type": "compared-with" },
+        { "target": "mlton#overview", "type": "compared-with" },
+        { "target": "sbcl#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Siskind — Stalin (APLAS 2003 invited)", "url": "https://engineering.purdue.edu/~qobi/papers/aplas2003.pdf" }
+      ]
+    },
+    {
+      "id": "architectural-cost",
+      "title": "Architectural cost",
+      "tags": ["compiler", "tradeoffs"],
+      "content": "The architectural cost is uncompromising:\n\n- **No separate compilation**: Stalin requires the whole program to be available at compile time. There is no library boundary; the compiler must see every definition.\n- **No dynamic loading or eval**: extending Scheme's reflective semantics is impossible because the type-inference algorithm relies on closed-world reasoning.\n- **Super-linear compilation time**: type inference scales poorly with program size. Stalin times out on some programs and falls back to less aggressive specialisation; large benchmarks can take minutes to hours to compile.\n- **Undecidable in general**: the underlying type-inference algorithm (a flow-sensitive form of Henglein's quartic-time inference adapted to Scheme) is undecidable in the worst case.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — upper bound on whole-program inference",
+      "tags": ["language-design", "research"],
+      "content": "The relevance to a new language is the **upper bound on what whole-program compilation can achieve** for a dynamically-typed source language. Stalin shows that Scheme's lack of language-level type information can be substantially recovered by whole-program inference, but only at compilation costs unacceptable for interactive development.\n\nVirgil takes a similar whole-program-reachability-first approach with weaker optimisation and faster compilation; Stalin shows the opposite trade-off in the same design space; SBCL is the production middle ground that gives up some specialisation power in exchange for incremental compilation. Status (as of 2026-04): research-grade. Stalin is no longer actively developed but the techniques continue to influence whole-program optimisers.",
+      "refs": [],
+      "sources": [
+        { "label": "Stalin source mirror", "url": "https://github.com/barak/stalin" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Siskind APLAS 2003", "url": "https://engineering.purdue.edu/~qobi/papers/aplas2003.pdf" },
+    { "label": "Stalin source", "url": "https://github.com/barak/stalin" }
+  ]
+}

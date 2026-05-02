@@ -1,0 +1,48 @@
+{
+  "kind": "framework",
+  "name": "Project CRaC — Coordinated Restore at Checkpoint",
+  "aliases": ["CRaC", "Azul CRaC", "JVM checkpoint restore"],
+  "summary": "Azul/OpenJDK 2021+: snapshot a fully warmed-up JVM (post-JIT, post-class-load, post-cache-warm) and restore from the snapshot on subsequent starts. Uses CRIU underneath plus `org.crac` API for resource coordination (close/reopen file handles, sockets, pools). Sub-millisecond restore for multi-second-warmup JVMs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Project CRaC** (OpenJDK, Anton Kozlov / Azul, since 2021) is the third OpenJDK answer to JVM startup latency, complementing Leyden (AOT cache) and GraalVM Native Image (closed-world AOT). Its mechanism is fundamentally different from both: rather than compiling code ahead of time, CRaC **snapshots a fully warmed-up JVM** — post-JIT, post-class-load, post-cache-warm — and restores from the snapshot on subsequent starts.",
+      "refs": [
+        { "target": "project-leyden#overview", "type": "complementary-to" },
+        { "target": "graalvm-native-image#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "OpenJDK Project CRaC", "url": "https://openjdk.org/projects/crac/" },
+        { "label": "Azul — CRaC introduction", "url": "https://docs.azul.com/core/crac/crac-introduction" },
+        { "label": "Azul — CRaC product page", "url": "https://azul.com/products/components/crac" },
+        { "label": "OpenJDK CRaC repository", "url": "https://github.com/openjdk/crac" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["jvm", "checkpoint"],
+      "content": "The mechanical core uses **CRIU** underneath on Linux but adds a coordination layer the generic CRIU lacks. Java applications hold open file descriptors, network connections, JDBC pools, and other live resources that cannot survive arbitrary process snapshotting. CRaC introduces the **`org.crac` API** with two callbacks per registered resource:\n\n- **`beforeCheckpoint(Context)`** — close files, flush buffers, drop sockets, release pool connections, persist in-memory state. Called in registration order.\n- **`afterRestore(Context)`** — reopen files, reconnect sockets, rebuild pools, rehydrate state. Called in *reverse* registration order — so an init sequence and its teardown are mirror-symmetric.\n\nA `jcmd JDK.checkpoint` command initiates a snapshot. The JVM walks all registered resources, invokes their `beforeCheckpoint`, then hands control to CRIU which writes the process image to disk. Restoration is the reverse: CRIU restores the process image, the JVM invokes `afterRestore` in reverse order, and the application resumes with all JIT-compiled code, class metadata, and warm caches intact — typical Spring Boot / Quarkus / Micronaut applications report 1–3 second cold starts dropping to **tens of milliseconds**.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — checkpoint as a third lever",
+      "tags": ["language-design", "deployment"],
+      "content": "The lesson generalises beyond the JVM: **for any managed runtime serving short-lived workloads (FaaS, CLI tools, batch workers, ephemeral containers), a coordinated checkpoint/restore mechanism is a third lever alongside AOT compilation and lazy initialisation**.\n\nThe coordination cost — explicit `beforeCheckpoint`/`afterRestore` discipline for resource-holding code — is the price for retaining all dynamism that AOT and closed-world approaches give up. CRIU's process-snapshot infrastructure is the OS-level enabler; CRaC is the language-runtime layer that makes it usable for production Java services.",
+      "refs": [],
+      "sources": [
+        { "label": "CRaC home page", "url": "https://crac.org/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Project CRaC", "url": "https://openjdk.org/projects/crac/" },
+    { "label": "CRaC home", "url": "https://crac.org/" },
+    { "label": "Azul — CRaC introduction", "url": "https://docs.azul.com/core/crac/crac-introduction" },
+    { "label": "Azul — CRaC product page", "url": "https://azul.com/products/components/crac" },
+    { "label": "OpenJDK CRaC repository", "url": "https://github.com/openjdk/crac" }
+  ]
+}

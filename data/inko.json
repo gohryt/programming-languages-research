@@ -1,0 +1,57 @@
+{
+  "kind": "language",
+  "name": "Inko",
+  "aliases": ["inko-lang"],
+  "summary": "Yorick Peterse's Inko is the closest production language to Rust's ownership + Erlang's processes — single-ownership with deterministic destruction, no shared mutable state across processes, message passing with ownership transfer, and a Rust-implemented runtime targeting native code via LLVM. Where Pony layers a six-capability lattice on an actor runtime, Inko picks the simpler discipline: every value has exactly one owner. Status (as of 2026-04): pre-1.0, 0.18 released 2025.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["inko", "ownership", "concurrency", "memory-safety"],
+      "content": "Yorick Peterse's **Inko** is the closest production language to \"Rust's ownership + Erlang's processes\" — single-ownership with deterministic destruction, no shared mutable state across processes, message passing with ownership transfer, and a Rust-implemented runtime targeting native code via LLVM.\n\nWhere Pony layers a six-capability lattice on top of an actor runtime, Inko picks the simpler discipline: every value has exactly one owner, sending a value over a channel transfers ownership to the receiver, and receivers cannot share their state back without explicitly cloning.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "actors", "type": "related" },
+        { "target": "pony", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Inko language", "url": "https://inko-lang.org/" },
+        { "label": "Inko concurrency manual", "url": "https://docs.inko-lang.org/manual/master/getting-started/concurrency/" }
+      ]
+    },
+    {
+      "id": "runtime-and-processes",
+      "title": "Lightweight processes and ownership transfer",
+      "tags": ["inko", "concurrency", "ownership", "value-semantics"],
+      "content": "The runtime uses **lightweight processes** scheduled cooperatively across an OS thread pool; messages cross processes by ownership move, eliminating the shared-heap data races that motivate Pony's reference capabilities.\n\nGarbage collection is *not* required for the ownership discipline (Inko's runtime uses RC for cyclic references inside one process), so allocation and reclamation are deterministic and the compiler can reason about resource lifetimes statically.",
+      "refs": [
+        { "target": "reference-counting", "type": "related" }
+      ]
+    },
+    {
+      "id": "comparison",
+      "title": "Comparison — Pony, Rust, Erlang",
+      "tags": ["inko", "ownership", "comparative-design"],
+      "content": "Distinct from Pony: no capability lattice — every value is \"owned by one process\" and that's the entire discipline. Distinct from Rust: no borrow checker; references are not first-class, and \"borrows\" within a function are inferred from lexical scope rather than explicit lifetime annotations. Distinct from Erlang: static typing throughout, with HM-derived inference and explicit type annotations at module boundaries.",
+      "refs": [
+        { "target": "pony", "type": "contrasts-with" },
+        { "target": "rust", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["inko"],
+      "content": "Status (as of 2026-04): pre-1.0, actively developed since ~2015, version 0.18 released 2025. Production users few; the language's value as a design data point is the proof that **the Rust-ownership/Erlang-process combination is a coherent design choice** without committing to either the borrow checker's complexity or the BEAM's runtime.",
+      "refs": [],
+      "sources": [
+        { "label": "Inko repository", "url": "https://github.com/inko-lang/inko" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Inko language", "url": "https://inko-lang.org/" },
+    { "label": "Inko concurrency manual", "url": "https://docs.inko-lang.org/manual/master/getting-started/concurrency/" },
+    { "label": "Inko repository", "url": "https://github.com/inko-lang/inko" }
+  ]
+}

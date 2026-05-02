@@ -1,0 +1,34 @@
+{
+  "kind": "language",
+  "name": "Unison — Hash-Addressed Codebase",
+  "aliases": ["content-addressed code"],
+  "summary": "Every term, type, and dependency is identified by a hash of its abstract syntax tree; names are metadata, not the canonical identifier. Source files are not the source of truth; a Unison codebase is a SQLite-backed database of hashed AST nodes. No build step, free renames, no dependency conflicts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Unison's program representation is its hash. Every term, type, and dependency is identified by a hash of its abstract syntax tree; names are *metadata* — a `name ↔ hash` mapping — rather than the canonical identifier. Source files are not the source of truth; a Unison codebase is a SQLite-backed database of hashed AST nodes.",
+      "refs": [
+        { "target": "content-addressed-ir#overview", "type": "instance-of" },
+        { "target": "unison#overview", "type": "storage-substrate-for" }
+      ],
+      "sources": [
+        { "label": "Unison: The Big Idea", "url": "https://www.unison-lang.org/docs/the-big-idea/" }
+      ]
+    },
+    {
+      "id": "consequences",
+      "title": "Consequences",
+      "tags": ["unison", "language-design"],
+      "content": "The consequences are radical:\n\n- **No build step**: definitions are stored compiled-by-hash. Changing a name renames a metadata entry; the compiled definition is unchanged.\n- **Renames are free**: pure metadata operation, no code changes.\n- **Dependency conflicts are eliminated by construction**: two libraries defining `map` are different hashes; both can coexist with no conflict.\n- **Distributed computation is trivial**: ship the bytecode tree by hash, dependencies sync on demand.\n- **Tests run once**: a tested-and-passed function's hash certifies it has passed; the test never re-runs unless the function (and thus the hash) changes.\n\nThe trade-off is an ecosystem-friction shift: Unison cannot consume libraries written for other languages without translation, and the development experience is unfamiliar (the editor talks to the codebase database rather than text files). For greenfield projects where the model fits, the ergonomic gains are substantial.",
+      "refs": [],
+      "sources": [
+        { "label": "Trying out Unison, part 1: code as hashes", "url": "https://softwaremill.com/trying-out-unison-part-1-code-as-hashes/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Unison Big Idea", "url": "https://www.unison-lang.org/docs/the-big-idea/" }
+  ]
+}

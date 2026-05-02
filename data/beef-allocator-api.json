@@ -1,0 +1,29 @@
+{
+  "kind": "concept",
+  "name": "Beef Allocator API",
+  "aliases": ["Beef new:allocator", "Beef scope"],
+  "summary": "Beef preserves `new` syntax but makes allocator selection a first-class part of allocation expressions: `scope` for lexical-lifetime objects, `new` for the workspace-selected global allocator, and `new:allocator` for a custom allocator object.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "beef", "ergonomics"],
+      "content": "Beef preserves familiar `new` syntax but makes allocator selection a first-class part of allocation expressions: `scope` for lexical-lifetime objects (RAII-style automatic deallocation at scope exit), `new` for the workspace-selected global allocator, and `new:allocator` for a custom allocator object that implements at least `Alloc` and `Free`.\n\nCore types like `String` and `List` expose overridable hooks; the runtime ships a debug allocator with real-time leak checking and hot-compilation support. The model sits between Odin's context-allocator implicit policy and Zig's per-call allocator parameter.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "zig-allocator-api#overview", "type": "compared-with" },
+        { "target": "odin-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "allocation-expressions",
+      "title": "Allocation expressions and debug allocator",
+      "tags": ["beef", "language-design"],
+      "content": "`scope MyType()` allocates on the local stack frame's scope — the object is destroyed when the scope exits, akin to a stack-allocated C++ value but heap-friendly. `new MyType()` uses the workspace-configured global allocator; `new:myalloc MyType()` routes through `myalloc` (any object implementing the allocator interface). Library types like `List<T>` accept allocator overrides on construction, mirroring the per-data-structure choice that Zig makes mandatory.\n\nThe debug allocator with real-time leak checking integrates with Beef's hot-recompile workflow: leaks reported on scope exit during a hot-recompiled run point at the offending allocation site without needing a separate run.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Beef memory guide", "url": "https://www.beeflang.org/docs/language-guide/memory/" }
+  ]
+}

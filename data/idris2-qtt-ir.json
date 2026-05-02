@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Idris 2 Quantitative Type Theory IR",
+  "aliases": ["idris-qtt-ir"],
+  "summary": "Idris 2's IR carries multiplicities from {0, 1, ω} on every binder. 0-quantity values are erased before runtime; 1-quantity values must be used exactly once; ω-quantity values are unrestricted. One multiplicity dimension subsumes both Granule's grades and traditional erasure markers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Representation layout: every binder in Idris 2 carries a multiplicity from {0, 1, ω}. 0-quantity values are erased before runtime; 1-quantity values must be used exactly once; ω-quantity values are unrestricted. Both type-level data and erased proof witnesses ride as 0; runtime values are 1 or ω.",
+      "refs": [
+        { "target": "linear-haskell-ir#overview", "type": "generalises" },
+        { "target": "granule#overview", "type": "simplifies" },
+        { "target": "linear-affine-types#overview", "type": "implements" },
+        { "target": "dependent-types#overview", "type": "integrates-with" },
+        { "target": "idris2#overview", "type": "ir-of" }
+      ],
+      "sources": [
+        { "label": "Idris 2 documentation", "url": "https://idris2.readthedocs.io/" }
+      ]
+    },
+    {
+      "id": "design-contribution",
+      "title": "One dimension subsumes linearity + erasure",
+      "tags": ["compiler-ir", "type-system", "linearity"],
+      "content": "The IR-design contribution is that one multiplicity dimension subsumes both Granule's grades and traditional erasure markers, keeping the IR simpler than carrying them as separate annotations.\n\nQTT-based languages (Idris 2 is the canonical example) get linearity, runtime erasure, and proof-vs-execution separation from the same machinery. Type-theory background (QTT, McBride 2016) and memory/resource framing live in the type-system and memory-discipline surveys; this record covers the IR-shape consequence.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Idris 2 documentation", "url": "https://idris2.readthedocs.io/" }
+  ]
+}

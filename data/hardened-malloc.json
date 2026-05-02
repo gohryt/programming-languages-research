@@ -1,0 +1,38 @@
+{
+  "kind": "tool",
+  "name": "hardened_malloc",
+  "aliases": ["GrapheneOS hardened_malloc"],
+  "summary": "GrapheneOS's 64-bit-only OpenBSD-malloc successor focused exclusively on hardening — heavy isolation, per-size-class regions with random bases, complete metadata/data separation, and double quarantine.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "hardened-allocator", "secure-allocator", "android"],
+      "content": "GrapheneOS hardened_malloc is a 64-bit-only OpenBSD-malloc successor focused exclusively on hardening. It sits at the most-aggressive end of the security/throughput trade-off — accepting substantial overhead for maximum exploit mitigation. Where Scudo aims at practical mitigation that ships everywhere, hardened_malloc aims at the strongest defense possible for security-conscious deployments.\n\nGrapheneOS uses it system-wide via Bionic; it is also usable on glibc/musl Linux as `LD_PRELOAD`.",
+      "refs": [
+        { "target": "allocators#hardened-allocators", "type": "part-of" },
+        { "target": "scudo#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Out-of-band metadata and quarantine",
+      "tags": ["out-of-line-metadata", "guard-page", "quarantine", "delayed-free", "tag-randomisation"],
+      "content": "All mutable allocator state lives in a single dedicated metadata region behind guard pages — no in-band metadata at all for slab allocations. Per-size-class regions have randomized base addresses; randomly sized guard pages around each large allocation make equal-sized requests yield non-deterministic mappings. Double quarantine combines a randomized array and a queue: freed blocks sit out-of-circulation long enough that adjacent-allocation reuse attacks lose their timing window, and write-after-free detection clears blocks on free so subsequent dangling writes are caught.\n\nIntegrates with ARM MTE on supported devices for hardware-tagged allocation on top of the address-space hardening.",
+      "refs": [
+        { "target": "arm-mte#overview", "type": "uses" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "android"],
+      "content": "Status (as of 2026-04): system-wide allocator on GrapheneOS via Bionic; available as `LD_PRELOAD` on glibc/musl Linux. The threat model is high-value mobile users (journalists, activists, researchers); the substantial overhead is justified by the exploit-mitigation surface area it removes.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "GrapheneOS hardened_malloc", "url": "https://github.com/GrapheneOS/hardened_malloc" },
+    { "label": "Synacktiv on hardened_malloc", "url": "https://synacktiv.com/en/publications/exploring-grapheneos-secure-allocator-hardened-malloc" }
+  ]
+}

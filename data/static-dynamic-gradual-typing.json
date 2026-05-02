@@ -1,0 +1,49 @@
+{
+  "kind": "concept",
+  "name": "Static, Dynamic, Gradual, and Hybrid Typing",
+  "aliases": ["gradual-typing", "migratory-typing", "soundness-spectrum"],
+  "summary": "The design axis along which a language places its type checks: ahead of execution (static), at runtime (dynamic), at typed/untyped boundaries with casts or contracts (gradual), or some hybrid. The choice changes compilation strategy, runtime metadata, optimizer assumptions, diagnostic quality, language-server latency — and what soundness guarantees the system can offer.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A static type checker rejects some programs before execution; a dynamic language defers most checks to runtime; a gradual type system deliberately allows typed and untyped regions to coexist, usually with runtime casts or contracts at boundaries. The engineering choice is not simply safety versus flexibility: it also changes compilation strategy, runtime metadata, optimizer assumptions, diagnostic quality, and language-server latency.\n\nThe distinguishing axis across implementations is **where the typed-untyped boundary lives** and **what enforces it at runtime**. Statically-typed cores with compile-time-erased types pay zero runtime cost but cannot interoperate with untyped values; dynamically-typed cores pay per-operation tag-checking cost; gradually-typed systems pay cost only at boundary crossings.",
+      "refs": [
+        { "target": "occurrence-typing#overview", "type": "supports" },
+        { "target": "nominal-structural-path-dependent#overview", "type": "complementary-axis" }
+      ]
+    },
+    {
+      "id": "typescript-as-pragmatic-structural",
+      "title": "TypeScript — pragmatic structural typing for JavaScript",
+      "tags": ["type-system", "typescript", "gradual"],
+      "content": "TypeScript is an intentionally pragmatic structural type system for JavaScript. Its handbook explicitly documents unsound compatibility choices made to model common JavaScript idioms — bivariant function parameters, unchecked any-typed values, downcasts via type assertions. The language's design philosophy treats unsoundness as a deliberate ergonomic choice, not a bug: programmers can opt into stricter checking via `--strict`, but the default is JavaScript-compatible.\n\nThe lesson is that **a gradual type system can be deliberately unsound** when its primary goal is migration, not formal guarantees. TypeScript's adoption shows that pragmatic unsoundness paired with good language-server tooling can succeed at scale; the cost is that programmers cannot assume the type system enforces all invariants without supplementary testing.",
+      "sources": [
+        { "label": "TypeScript Handbook — Type Compatibility", "url": "https://www.typescriptlang.org/docs/handbook/type-compatibility.html" }
+      ]
+    },
+    {
+      "id": "typed-racket-and-migratory-typing",
+      "title": "Typed Racket and migratory typing",
+      "tags": ["type-system", "typed-racket", "gradual"],
+      "content": "Typed Racket is a strong example of *migratory* typing: typed and untyped modules interoperate through contracts, and the type system uses occurrence typing to understand predicates common in dynamic code (`data/occurrence-typing`). The contracts at module boundaries enforce the static type's invariants when an untyped caller crosses into typed code; if the contract is violated at runtime, the untyped side is *blamed* — the diagnostic points at the wrong-shape data, not the typed code that received it.\n\nThe Typed Racket lineage establishes that **gradual typing can preserve sound static guarantees** if boundaries enforce contracts, paying the runtime cost only at the boundary rather than at every operation.",
+      "refs": [
+        { "target": "occurrence-typing#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Migratory Typing: Ten Years Later / Typed Racket", "url": "https://www2.ccs.neu.edu/racket/pubs/typed-racket.pdf" }
+      ]
+    },
+    {
+      "id": "soundness-usefulness-and-deliberate-unsoundness",
+      "title": "Soundness, usefulness, and deliberate unsoundness",
+      "tags": ["type-system", "soundness", "tradeoffs"],
+      "content": "A type system may aim for a formal progress-and-preservation theorem, an implementation-guiding informal discipline, or a pragmatic tool that catches many mistakes without proving full soundness. Deliberate unsoundness is sometimes chosen for compatibility, ergonomics, or ecosystem migration.\n\nThe trade-off is whether the choice is made explicit: a type checker that is sound by design can support stronger optimizer and runtime assumptions; a pragmatic checker can be easier to adopt but tends to silently promise guarantees it cannot provide unless that limitation is documented.\n\nFor language designers, the rule is: **decide soundness policy before users build mental models**. Once programmers expect the type system to catch a class of error, retrofitting soundness is hard; relaxing soundness is even harder because libraries will have come to rely on the implicit guarantees."
+    }
+  ],
+  "sources": [
+    { "label": "TypeScript Handbook — Type Compatibility", "url": "https://www.typescriptlang.org/docs/handbook/type-compatibility.html" },
+    { "label": "Migratory Typing: Ten Years Later / Typed Racket", "url": "https://www2.ccs.neu.edu/racket/pubs/typed-racket.pdf" }
+  ]
+}

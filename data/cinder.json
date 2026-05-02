@@ -1,0 +1,45 @@
+{
+  "kind": "runtime",
+  "name": "Cinder",
+  "aliases": ["CinderX", "Meta Cinder", "Instagram CPython"],
+  "summary": "Meta's CPython fork (since 2020): method-level JIT, function inliner, strict-typing module mode (Static Python), shadow bytecode for type-specialisation, and immortal-object support. The most-deployed alternative Python runtime — Instagram is the largest production Python deployment. CinderX (2025) repackages it as a CPython extension.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Cinder / CinderX** (Meta, since 2020) is the most-deployed alternative Python runtime: a fork of CPython 3.10/3.12 with a method-level JIT, a function inliner (\"Instagram inliner\"), a strict-typing module mode (`Static Python`), shadow bytecode for type-specialisation, and immortal-object support (objects whose refcount the runtime never decrements, useful for deeply-shared globals).\n\nCinder's JIT generates type-specialised native code per function; the function inliner aggressively inlines small callees including builtins, recovering performance lost to Python's dynamic dispatch. Production at Instagram (the largest production Python deployment) since 2020.",
+      "refs": [
+        { "target": "bytecode-quickening#overview", "type": "complementary-to" },
+        { "target": "pyston-pyjion#overview", "type": "compared-with" },
+        { "target": "copy-and-patch#strengths", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Cinder repository", "url": "https://github.com/facebookincubator/cinder" }
+      ]
+    },
+    {
+      "id": "key-techniques",
+      "title": "Key techniques",
+      "tags": ["python", "jit"],
+      "content": "**Method-level JIT**: Cinder compiles functions to native code on demand, with type-specialisation guided by runtime profiling. Failed speculations bail back to the interpreter via deoptimisation.\n\n**Static Python module mode**: opt-in `# distutils: language_level = static` declarations let entire modules use static type checking, with type errors caught at import time and the JIT trusting the declared types without runtime verification. This is a parallel to Cython's typed mode but native to CPython bytecode.\n\n**Function inliner (Instagram inliner)**: a heuristic-driven inliner that aggressively inlines small functions, including built-in operations that would otherwise cross the C-API boundary on every call. Reported 5–10% improvement on Instagram's workload from inlining alone.\n\n**Shadow bytecode**: a parallel bytecode stream that records type-specialisation decisions and feeds them to subsequent JIT runs. Combined with adaptive interpretation, this lets the JIT start \"warm\" on the second run rather than re-discovering specialisation opportunities.\n\n**Immortal objects**: objects with a sentinel refcount value the runtime treats as \"never decrement\". Eliminates atomic refcount updates on globally-shared objects (None, True, False, the empty tuple). Important for free-threading scalability.",
+      "refs": []
+    },
+    {
+      "id": "cinderx-strategic-shift",
+      "title": "CinderX strategic shift (2025)",
+      "tags": ["python", "deployment"],
+      "content": "The 2025 strategic shift was to repackage Cinder as **CinderX**, a CPython extension consumable from a vanilla CPython 3.12+ rather than a forked binary. The motivation: deploying a custom Python runtime alongside other Python ecosystem components (data-science notebooks, third-party packages, debugging tools) creates compatibility issues that a forked interpreter struggles with.\n\nAs an extension, CinderX coexists with mainline Python without requiring users to install a separate interpreter. The trade-off is reduced control over the Python core's internals, but the engineering payoff is large enough that Meta committed to the rewrite.",
+      "refs": [],
+      "sources": [
+        { "label": "CinderX repository", "url": "https://github.com/facebookincubator/cinderx" },
+        { "label": "Meta — Cinder JIT function inliner (2022)", "url": "https://engineering.fb.com/2022/05/02/open-source/cinder-jits-instagram/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "CinderX", "url": "https://github.com/facebookincubator/cinderx" },
+    { "label": "Cinder", "url": "https://github.com/facebookincubator/cinder" },
+    { "label": "Instagram inliner blog", "url": "https://engineering.fb.com/2022/05/02/open-source/cinder-jits-instagram/" }
+  ]
+}

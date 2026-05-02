@@ -1,0 +1,35 @@
+{
+  "kind": "tool",
+  "name": "DuckDB",
+  "aliases": ["DuckDB analytical database"],
+  "summary": "Raasveldt-Mühleisen CIDR 2020: a modern analytical database that explicitly rejects JIT compilation. Vectorised interpreter with tightly-tuned SIMD kernels reaches competitive throughput without compilation latency. The design point: JIT compile time is lethal for interactive analytics where queries run in milliseconds.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**DuckDB** (Raasveldt & Mühleisen, CIDR 2020) is a notable outlier: a modern analytical database that explicitly rejects JIT compilation. Instead, DuckDB uses a vectorised interpreter with tightly-tuned SIMD kernels, similar to Photon's approach.\n\nThe authors' argument: JIT compilation latency is lethal for interactive analytics where queries run in milliseconds; a 50ms compile time means 50ms of user-observed wait even if the query itself runs in 5ms. Vectorised interpretation reaches competitive throughput without any compilation phase at all.",
+      "refs": [
+        { "target": "databricks-photon#overview", "type": "shares-design-with" },
+        { "target": "hyper-umbra#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "DuckDB: an Embeddable Analytical Database", "url": "https://www.cidrdb.org/cidr2020/papers/p22-raasveldt-cidr20.pdf" }
+      ]
+    },
+    {
+      "id": "design-rationale",
+      "title": "Design rationale",
+      "tags": ["database", "vectorisation", "tradeoffs"],
+      "content": "DuckDB's position is a useful counterexample to the \"compile everything\" orthodoxy. When query latency matters more than throughput, and when the query plan space is small enough to pre-tune kernels, interpretation beats JIT. The design choice depends on workload.\n\nProduction usage of DuckDB has expanded substantially: data scientists embed it in Jupyter for ad-hoc analysis; backend services use it as a local analytical engine; the design has spawned imitators (Apache Doris, ClickHouse partial-vectorisation paths). DuckDB's existence and adoption demonstrate that the vectorised-no-JIT design point is robust at production scale.",
+      "refs": [],
+      "sources": [
+        { "label": "Why DuckDB", "url": "https://duckdb.org/why_duckdb.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "DuckDB CIDR 2020", "url": "https://www.cidrdb.org/cidr2020/papers/p22-raasveldt-cidr20.pdf" },
+    { "label": "Why DuckDB", "url": "https://duckdb.org/why_duckdb.html" }
+  ]
+}

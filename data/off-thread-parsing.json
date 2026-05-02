@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Off-Thread Parsing with Thread-Safety-Boundary Phase Split",
+  "aliases": ["thread-safety boundary parsing", "Ladybird LibJS off-thread parse"],
+  "summary": "Splitting frontend work by *thread-safety boundary* rather than by traditional pass names. Ladybird's LibJS pipeline runs lexing, parsing, and scope analysis on worker threads while keeping bytecode generation, regex compilation, and other GC-allocating work on the main thread.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A practical architecture pattern that deserves separate naming is **splitting frontend work by thread-safety boundary rather than by traditional pass names**. In early 2026, Ladybird's LibJS/LibWeb pipeline was restructured so that JavaScript **parsing and scope analysis** run on worker threads, while **bytecode compilation and GC-allocating steps** stay on the main thread. The key precondition was making the parse phase fully VM-free and GC-free; regular-expression compilation had to be deferred to a post-parse phase because the regex subsystem was not thread-safe.",
+      "refs": [],
+      "sources": [
+        { "label": "Ladybird PR #8211 — Parse JavaScript off the main thread", "url": "https://github.com/LadybirdBrowser/ladybird/pull/8211" }
+      ]
+    },
+    {
+      "id": "phase-partition",
+      "title": "Phase partition by thread-safety",
+      "tags": ["compiler-architecture", "concurrency"],
+      "content": "The resulting flow is: the main thread creates source-code objects and roots GC values needed by the callback; a worker thread performs lexing, parsing, and scope analysis into a pre-parsed form; control returns to the main thread; and only then does the runtime perform bytecode generation, regex compilation, and other heap-affine work.\n\nThe reported effect was directly user-visible: parsing no longer blocked page load on heavy sites. The parse phase, despite being substantial work, runs in parallel with main-thread responsiveness because its data structures are isolated from the VM's heap.",
+      "refs": []
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["language-design", "compiler-architecture"],
+      "content": "The design lesson is broader than browsers: **frontends can often be partitioned into a thread-safe, allocation-light phase and a runtime-coupled, heap-affine phase**. This improves responsiveness and parallelism without forcing the whole compiler or runtime to become thread-safe.\n\nIt also surfaces an important secondary principle: seemingly \"parse-time\" work such as regex-literal compilation, macro pre-expansion, or symbol canonicalisation may need to move later if it depends on GC state, global caches, or non-thread-safe subsystems. For a new language or toolchain, this is a concrete template for making IDEs, build systems, and embedded runtimes more responsive: isolate parsing and basic binding into a phase that can run anywhere, and keep heap-owning elaboration/codegen in the host thread that already owns VM state.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Ladybird PR #8211", "url": "https://github.com/LadybirdBrowser/ladybird/pull/8211" }
+  ]
+}

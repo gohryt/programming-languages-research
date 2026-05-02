@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Linear and Affine Types",
+  "aliases": ["linearity", "affine-types", "linear-haskell", "uniqueness-types"],
+  "summary": "Linear types require exactly-one use; affine types allow at-most-one use. Encode resource protocols, file handles, unique buffers, session-like APIs, and memory management without runtime tracing. Linear Haskell attaches linearity to function arrows; Clean and Rust use uniqueness/ownership-like approaches; Idris 2 QTT puts multiplicities in binders. Memory-safety policy is in `data/ownership` and `data/borrowing`.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Linear types require exactly-one use; affine types allow at-most-one use. They can encode resource protocols, file handles, unique buffers, session-like APIs, and memory management without runtime tracing.\n\nThe distinguishing axis across designs is *where the multiplicity lives*: on function arrows (Linear Haskell), on type-level multiplicities (Idris 2 QTT, `data/idris2-qtt-ir`), on uniqueness markers (Clean), or as an ability lattice on declarations (Move, `data/move-language`). Each placement has predictable consequences for inference, ergonomics, and runtime cost.",
+      "refs": [
+        { "target": "linear-haskell-ir#overview", "type": "instance" },
+        { "target": "idris2-qtt-ir#overview", "type": "generalises-to" },
+        { "target": "granule#overview", "type": "generalises-to" },
+        { "target": "ownership-as-type-constraint#overview", "type": "related" },
+        { "target": "move-language#overview", "type": "production-instance" },
+        { "target": "ats-language#overview", "type": "production-instance" },
+        { "target": "type-safe-packed-data#overview", "type": "library-level-instance" }
+      ],
+      "sources": [
+        { "label": "Linear Haskell: practical linearity in a higher-order polymorphic language", "url": "https://dl.acm.org/doi/10.1145/3158093" }
+      ]
+    },
+    {
+      "id": "linear-vs-uniqueness",
+      "title": "Linear types versus uniqueness types",
+      "tags": ["type-system", "linearity"],
+      "content": "Linearity and uniqueness are two related but distinct disciplines:\n\n- **Linear types** count consumptions. A value of linear type must be consumed exactly once; consumption typically means pattern-matching, function application, or explicit destruction. The linear discipline is *use-counting*.\n- **Uniqueness types** track aliasing. A value of unique type has no other reference to it; uniqueness can be relaxed to non-uniqueness once aliasing is observed. The uniqueness discipline is *aliasing-counting*.\n\nClean and Rust use uniqueness/ownership-like approaches. Linear Haskell uses true linearity attached to function arrows so the same value can be linear in one context and unrestricted in another, integrated with the existing higher-order polymorphic language. Resource-discipline framing — multiplicity-polymorphic arrows used to discharge memory-management obligations — is owned by `data/ownership` (covering Linear Haskell among other multiplicity systems) and `data/linear-haskell-ir` for the IR-level mechanism.",
+      "sources": [
+        { "label": "GHC proposal — Linear Types", "url": "https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html" }
+      ]
+    },
+    {
+      "id": "design-trade-offs",
+      "title": "Design trade-offs",
+      "tags": ["type-system", "language-design"],
+      "content": "From the type checker's side, linearity reduces to a constraint domain: resource variables with use counts, lifetime regions with subsumption rules, and obligations attached to references. The semantic-policy questions — what counts as a move, how partial moves and reborrows compose, how aliasing relates to mutability, when destructors run — are owned by memory-discipline records `data/ownership` and `data/borrowing`.\n\nFor language designers, the practical guidance:\n\n- **Linearity is most ergonomic when integrated early**: retrofitting linearity onto an existing language (Linear Haskell, the proposed Java linearity) is harder than designing for it from the start (Rust ownership, Move abilities).\n- **Choose the multiplicity placement based on the dominant use case**: arrow-level linearity (Haskell) is good for resource APIs without re-engineering the value world; type-level multiplicities (QTT) are good for languages that also need erasure and proof-relevance unification; ability lattices (Move) are good for narrow domains like asset typing.\n- **Plan polymorphism**: linear-only and unrestricted-only function types differ; multiplicity-polymorphic arrows (`a -> b` in Linear Haskell with multiplicity variable) let combinators work over both.\n- **Document destruction semantics**: linear types interact with finalizers, RAII, and explicit `drop` calls; the language must commit to one discipline."
+    }
+  ],
+  "sources": [
+    { "label": "Linear Haskell: practical linearity in a higher-order polymorphic language", "url": "https://dl.acm.org/doi/10.1145/3158093" },
+    { "label": "GHC proposal — Linear Types", "url": "https://ghc-proposals.readthedocs.io/en/latest/proposals/0111-linear-types.html" }
+  ]
+}

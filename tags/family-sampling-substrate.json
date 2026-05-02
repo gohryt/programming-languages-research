@@ -1,0 +1,7 @@
+{
+  "id": "family-sampling-substrate",
+  "tag": "family:sampling-substrate",
+  "name": "Family: sampling substrate",
+  "description": "Statistical-sampling primitives: timer/PMU triggers and stack-unwinding methods (frame pointers, DWARF .eh_frame, ORC, SFrame, LBR call-stack).",
+  "axis": "family"
+}

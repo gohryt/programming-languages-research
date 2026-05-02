@@ -1,0 +1,98 @@
+{
+  "kind": "tool",
+  "name": "Fil-C",
+  "aliases": [
+    "Pizlo Fil-C"
+  ],
+  "summary": "Filip Pizlo's fanatically-compatible memory-safe C/C++ compiler using invisible capabilities (InvisiCaps) — every 64-bit pointer has shadow capability metadata stored outside the visible address space, looked up on every dereference. Uses FUGC (Fil's Unbelievable Garbage Collector) for concurrent real-time accurate reclamation; ~1.5×–4× slowdown.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "cpp",
+        "cpp-safety",
+        "runtime-capability",
+        "memory-safety",
+        "capabilities"
+      ],
+      "content": "Filip Pizlo's Fil-C is a fanatically-compatible memory-safe C/C++ compiler using invisible capabilities (InvisiCaps) — every 64-bit pointer has shadow capability metadata stored outside the visible address space, looked up on every dereference. Thread-safe variant of SoftBound, immune to pointer races (worst case = panic). Stack allocations are heap-allocated to make signal handlers / `longjmp` memory-safe.\n\nWhere Profiles and Safe C++ both modify the source language (restriction or borrow checker), Fil-C leaves the source untouched and pays the safety price entirely at runtime through pointer-tagged capabilities and a real-time GC.",
+      "refs": [
+        {
+          "target": "capability-based-memory#overview",
+          "type": "related"
+        },
+        {
+          "target": "cheri",
+          "type": "related"
+        },
+        {
+          "target": "cpp-safety-profiles-resolution",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "invisicaps-and-fugc",
+      "title": "InvisiCaps and FUGC",
+      "tags": [
+        "runtime-capability",
+        "garbage-collection",
+        "cpp-safety"
+      ],
+      "content": "InvisiCaps store a shadow capability per pointer — bounds and authority — at a sidecar location outside the address the C source ever sees. Every dereference loads the shadow, checks bounds, and traps on violation. The thread-safe design is what distinguishes it from earlier capability-on-pointer schemes like SoftBound: there is no torn-tag race, the worst-case violation is a deterministic panic.\n\nFUGC (Fil's Unbelievable Garbage Collector) is concurrent, real-time, and accurate; threads are never suspended; freeing zeroes capability bounds so any subsequent dereference of a stale pointer traps. Stack allocations being heap-allocated is what makes signal handlers and `longjmp` memory-safe — a pointer captured during signal delivery cannot dangle when the original stack frame would have unwound.",
+      "refs": [
+        {
+          "target": "garbage-collection#overview",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Fil-C InvisiCaps",
+          "url": "https://fil-c.org/invisicaps.html"
+        },
+        {
+          "label": "Fil-C Manifesto",
+          "url": "https://github.com/pizlonator/fil-c/blob/deluge/Manifesto.md"
+        }
+      ]
+    },
+    {
+      "id": "compatibility-and-status",
+      "title": "Compatibility and status",
+      "tags": [
+        "cpp-safety",
+        "runtime-capability",
+        "memory-safety"
+      ],
+      "content": "Compiles unmodified Linux userspace (Linux From Scratch); supports pthreads, signals, mmap, C++ exceptions, atomics, SIMD intrinsics. Based on Clang 20.1.8. Active single-developer project; ~1.5× slowdown best case, ~4× worst.\n\nNot standardized but increasingly cited as the \"what a sound C/C++ memory-safety solution actually looks like\" reference point — when commenters argue Profiles cannot be sound without aliasing information, Fil-C is the counterpoint that *runtime* capabilities + GC do achieve soundness on unchanged C source, with the trade-off being slowdown rather than language disruption.",
+      "refs": [
+        {
+          "target": "safe-cpp",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Fil-C repository",
+          "url": "https://github.com/pizlonator/fil-c/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Fil-C repository",
+      "url": "https://github.com/pizlonator/fil-c/"
+    },
+    {
+      "label": "Fil-C InvisiCaps",
+      "url": "https://fil-c.org/invisicaps.html"
+    },
+    {
+      "label": "Fil-C Manifesto",
+      "url": "https://github.com/pizlonator/fil-c/blob/deluge/Manifesto.md"
+    }
+  ]
+}

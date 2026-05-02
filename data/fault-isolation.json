@@ -1,0 +1,140 @@
+{
+  "kind": "concept",
+  "name": "Fault Isolation",
+  "aliases": [],
+  "summary": "Techniques that narrow a failure to likely causes using automated search, slicing, ranking, symbolic reasoning, or replayable evidence; production techniques include delta debugging, program slicing, Tarantula, CBI, KLEE symbolic execution, Miri MIR interpretation, Whyline, algorithmic debugging, and CBMC bounded model checking.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Fault isolation is the broader task of narrowing a failure to likely causes, not only interactively inspecting a live or replayed process. It includes automated search, reduction, ranking, and explanation techniques that complement traditional debugging workflows.\n\nAutomated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Designs differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), aggregated value-histories (Daikon's dynamic invariants), or whole-program SMT formulae over bounded executions (CBMC).",
+      "refs": [
+        {
+          "target": "time-travel-debugging#bil-lewis-odb",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "search-and-reduction-techniques",
+      "title": "Search and reduction techniques",
+      "tags": [
+        "debugging",
+        "analysis",
+        "automation"
+      ],
+      "content": "Search-oriented fault isolation techniques reduce or isolate failure-inducing inputs, states, or execution differences. They are especially useful when the raw problem is too large or too noisy for direct manual inspection.\n\n**Andreas Zeller's delta debugging algorithm (1999)** answers \"what is the minimal input that still triggers this bug?\" Given a failing input, it systematically removes chunks — first large halves, then progressively smaller pieces — testing after each removal whether the failure persists. The result is a 1-minimal failing input. The algorithm extends beyond inputs: applied to code changes, it answers \"which of these 1000 commits introduced the bug?\" by binary-searching the change history (this is the principle behind `git bisect`).\n\n**Modern coverage-guided fuzzers** are indirectly powerful debuggers. AFL, libFuzzer, honggfuzz produce crashes by the thousand; the debugger-relevant part is what happens *after*. **`afl-tmin`** is delta debugging packaged inside AFL — produces the minimum byte-level input that still triggers the same crash, using instrumentation coverage signature to ensure the reduced input triggers *the same* bug. **AFL's `-C` crash exploration mode** fuzzes forward from a crashing input maintaining the crash condition as an invariant, producing a corpus of crash variants. **Hybrid concolic fuzzing** (Driller, angr's phuzzer) marries AFL with symbolic execution: when AFL gets stuck on a magic-number check it cannot mutate past, symbolic execution computes an input that satisfies the check.",
+      "refs": [
+        {
+          "target": "record-and-replay#rr-deterministic-record-replay",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Delta debugging",
+          "url": "https://www.cs.purdue.edu/homes/xyzhang/fall07/Papers/delta-debugging.pdf"
+        }
+      ]
+    },
+    {
+      "id": "program-slicing-and-dependency-analysis",
+      "title": "Program slicing and dependency analysis",
+      "tags": [
+        "debugging",
+        "analysis",
+        "dataflow"
+      ],
+      "content": "Program slicing and dependency-oriented diagnosis work backward from a failure point to identify relevant control and data influences. These techniques become especially powerful when execution history or dependency structure is available in a queryable form.\n\n**Mark Weiser introduced program slicing in 1981**: given a variable at a program point, compute the subset of the program that could affect that variable's value. **Static slicing** considers all possible executions: the slice includes every statement that *could* affect the variable on *any* input (often 30–50% of the program). **Dynamic slicing** considers a specific execution: the slice includes only statements that *actually* affected the variable on *this* input — much smaller and more useful for debugging. Granularity is the distinguishing axis from reverse dataflow tracking (Pernosco): program slicing operates on source statements, while Pernosco operates on individual memory writes and register transfers.\n\n**Andreas Zeller's cause-effect chains (FSE 2002)** extend delta debugging from *inputs* to *program states*. Setup: a passing run and a failing run frozen inside GDB at comparable execution points. Delta debugging applied to the variable-value differences. Output: a sequence \"at `main`, *v₁* differed; at `step_k`, that caused *v₂* to differ; at the crash, *v₃* was the immediate cause.\" Cause-effect chains are the *interventional* counterpart to Pernosco's *observational* reverse dataflow.\n\n**Andrew Ko and Brad Myers's Whyline** (CHI 2004 for Alice, OOPSLA 2008 for Java) is a different approach: when programmers debug, they don't step through code — they ask \"why did this happen?\" and \"why didn't that happen?\" The Whyline UI is a menu of why-did and why-didn't questions about program output, auto-generated from the program's source and execution. Selecting a question triggers static + dynamic slicing, precise call graphs, and new algorithms for why-not-reached code. Evaluation: programmers using Whyline debugged 7.8× faster; novices with Whyline outperformed experts without it.",
+      "refs": [
+        {
+          "target": "ssa#why-compilers-use-ssa",
+          "type": "related"
+        },
+        {
+          "target": "time-travel-debugging#toby-ho-structural-sharing",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Whyline (Java, OOPSLA 2008)",
+          "url": "https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf"
+        }
+      ]
+    },
+    {
+      "id": "statistical-and-symbolic-techniques",
+      "title": "Statistical and symbolic techniques",
+      "tags": [
+        "debugging",
+        "analysis",
+        "formal-methods"
+      ],
+      "content": "Some fault-isolation approaches rank suspicious code statistically or use symbolic reasoning to narrow the space of possible causes. These methods sit between testing, debugging, and formal analysis, and are often most useful once basic reproducibility exists.\n\n**Tarantula** (Jones, Harrold, Stasko, 2002) is a spectrum-based fault localization technique. Given a test suite with some passing and some failing tests, it computes a \"suspiciousness\" score for each source line: lines executed mostly by failing tests get high suspiciousness; lines executed mostly by passing tests get low suspiciousness. The visualization colors each source line on a red-to-green gradient. Empirically, Tarantula examines less than 20% of the code to find the fault in most cases.\n\n**Cooperative Bug Isolation (CBI)** — Ben Liblit's dissertation 2004 — answers a different question. Tarantula assumes a dense test suite with per-test coverage. CBI assumes *sparse, noisy feedback from thousands of end-user runs in the field* — and no per-run coverage information. The instrumentation strategy is **random sampling of predicates**: each predicate is observed with small probability, so per-run overhead stays low, but aggregated across many users the sampling is provably unbiased. The PLDI 2005 extension handles **multiple concurrent bugs**: an iterative voting procedure biclusters runs and predicates so predictors for bug A are not drowned out by the more-common bug B.\n\n**KLEE** (OSDI 2008, Cadar, Dunbar, Engler) is the archetypal LLVM-IR symbolic executor. Every branch *forks* the state into two children, one with the branch condition added to its path condition and one with the negation. On hitting a bug or reaching an exit, KLEE asks the solver to produce **concrete inputs satisfying the current path condition** — so every bug comes with a minimal, replayable test case. KLEE's empirical record: 56 bugs in 452 real applications, 10 fatal in GNU COREUTILS, 3 of them latent for over 15 years.\n\n**CBMC** (Edmund Clarke, 2000+) translates a C program plus assertions into a SAT/SMT formula whose unsatisfiability is equivalent to the assertions holding for **all executions up to a bounded loop unroll depth**. Production: AWS Encryption SDK, FreeRTOS kernel verification, Amazon S3 server code. **Kani** (model-checking for Rust) uses CBMC as its SMT-encoding backend.",
+      "refs": [
+        {
+          "target": "record-and-replay#rr-deterministic-record-replay",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Tarantula",
+          "url": "https://dl.acm.org/doi/10.1145/1101908.1101949"
+        },
+        {
+          "label": "KLEE (OSDI 2008)",
+          "url": "https://llvm.org/pubs/2008-12-OSDI-KLEE.pdf"
+        },
+        {
+          "label": "CBMC",
+          "url": "https://www.cprover.org/cbmc/"
+        }
+      ]
+    },
+    {
+      "id": "interpreter-based-checkers",
+      "title": "Interpreter-based UB detectors and dynamic invariants",
+      "tags": [
+        "debugging",
+        "ub-detection",
+        "compiler"
+      ],
+      "content": "**Miri** (Ralf Jung et al., 2017–) interprets Rust's MIR one operation at a time and detects **Undefined Behavior as it happens**, not as a statistical consequence of a downstream crash. The architecture reuses the compiler's `rustc_const_eval::interpret` engine — the same one that evaluates `const fn` at compile time. Every MIR operation goes through UB checks: out-of-bounds, use-after-free, read of uninitialized memory, misaligned access, invalid value, and aliasing-model violations under Stacked Borrows or Tree Borrows. The original contribution: **the debugger is an interpreter that speaks the compiler's own IR**. Compiler and debugger share an engine. The trade-off is crushing slowdown and incomplete coverage, but for *is there UB on this execution?* it answers authoritatively with an exact MIR-level diagnostic.\n\n**Daikon** (Ernst et al.) is the canonical dynamic-invariant detector. It instruments programs, records values at program points, and emits likely invariants that could be written as assertions or contracts: `x <= y`, `len(buffer) == count`, `field != null`. Useful for fault isolation because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations.\n\n**Algorithmic debugging** (Ehud Shapiro, MIT PhD 1982) given a program that produced a wrong answer, reifies the **computation tree** of that answer and **asks the user yes/no questions** about whether each subgoal's result is intended. The debugger bisects the tree based on the user's answers, isolating the buggy clause mechanically. This is **declarative debugging**: the user reasons about *intended semantics*, not operational behavior. Pairs with Lawrence Byrd's 4-port box model (1980) for tracing nondeterministic execution: every Prolog predicate is a state machine with `call`, `exit`, `redo`, `fail` ports.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Miri",
+          "url": "https://github.com/rust-lang/miri"
+        },
+        {
+          "label": "Daikon",
+          "url": "https://plse.cs.washington.edu/daikon/"
+        }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": [
+        "debugging",
+        "design-guidance",
+        "tooling"
+      ],
+      "content": "Fault isolation improves when language implementations emit good metadata, preserve useful execution structure, and support reproducible artifacts. The best systems are designed to produce evidence that can be searched and ranked, not merely stepped through.\n\nA unifying design lesson: **make values, computations, and intent observable at semantic program points**. Whyline reifies the connection from outputs back to the code that produced them (provenance); Shapiro's algorithmic debugging reifies the computation tree so the user can answer yes/no on each subgoal's intended result (semantic intent); Daikon mines invariants over instrumented runs (population-statistics intent). Each technique requires the compiler/runtime to expose more than raw memory reads — function entries/exits, loop heads, algebraic constructors, effect boundaries, output provenance — and rewards languages that emit such events with debuggers users do not have to translate from machine state into mental model.",
+      "refs": [
+        {
+          "target": "breakpoints#event-breakpoints-catchpoints",
+          "type": "related"
+        },
+        {
+          "target": "record-and-replay#rr-deterministic-record-replay",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

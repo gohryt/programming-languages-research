@@ -1,0 +1,41 @@
+{
+  "kind": "concept",
+  "name": "Hermes HIR",
+  "aliases": ["hermes-high-level-ir"],
+  "summary": "Meta's Hermes JS engine lowers JS to a high-level IR before emitting Hermes Bytecode. SSA-form with JS-aware operations that retain enough source semantics — closures, lexical scopes, hoisting, arguments materialization, try/catch regions — for the optimizer to reason about them.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Meta's Hermes JavaScript engine lowers JS to a high-level IR (HIR) before emitting Hermes Bytecode (HBC). HIR is SSA-form with JS-aware operations that retain enough source semantics — closures, lexical scopes, hoisting, `arguments` materialization, `try`/`catch` regions — for the optimizer to reason about them before they are flattened into register-based bytecode.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "hermes-hbc#overview", "type": "lowered-to" }
+      ],
+      "sources": [
+        { "label": "Hermes Optimizer", "url": "https://github.com/facebook/hermes/tree/main/lib/Optimizer" }
+      ]
+    },
+    {
+      "id": "scope-and-closure-analysis",
+      "title": "Scope and closure analysis at HIR level",
+      "tags": ["compiler-ir", "optimization", "javascript"],
+      "content": "Two HIR-level details worth recording. First, HIR carries enough scope information to decide *which captured variables can become stack slots* rather than living on a heap-allocated `Environment` — the Hermes-specific equivalent of escape analysis on closures. Second, HIR is what makes `Function.prototype.toString` and similar JS reflective features survivable across optimization: the bytecode emitter consults HIR-level annotations to recover source-faithful behaviour for the few APIs that demand it.",
+      "refs": []
+    },
+    {
+      "id": "shipping-model",
+      "title": "Build-time HIR, ship-only HBC",
+      "tags": ["mobile", "deployment"],
+      "content": "HIR runs at app build time, not on device. Hermes precompiles JS to HIR, optimises HIR (eager type narrowing, dead-code elimination, scope flattening, stack-promotion of captured variables), then lowers to HBC, which is what ships on the device. There is no JIT and HIR is not present at runtime — the device only sees HBC.\n\nThis split is what makes the Hermes pipeline unusual: the HIR is throwaway optimisation infrastructure consumed entirely at build time, while the bytecode is the durable artefact.",
+      "refs": [
+        { "target": "hermes-hbc#overview", "type": "shipped-form" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Hermes Optimizer", "url": "https://github.com/facebook/hermes/tree/main/lib/Optimizer" }
+  ]
+}

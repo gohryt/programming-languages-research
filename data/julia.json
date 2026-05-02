@@ -1,0 +1,50 @@
+{
+  "kind": "language",
+  "name": "Julia",
+  "aliases": [],
+  "summary": "Dynamically-typed scientific-computing language with module Foo ... end nesting, using/import distinction (using brings exports into scope, import requires qualification), include() for textual splicing of files into modules, and Julia 1.9+ native-code precompilation caches (pkgimage) addressing first-load JIT cost.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Julia (Jeff Bezanson et al., 2012+; current 1.10+) is a dynamically-typed multiple-dispatch language for scientific and numerical computing. Hot-reload via the Revise.jl package lives in `data/julia-revise`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "julia-revise#overview", "type": "runtime-aspect" }
+      ]
+    },
+    {
+      "id": "modules-and-include",
+      "title": "module ... end and include()",
+      "tags": ["julia", "modules", "imports"],
+      "content": "Julia's module system is closer to Python's than to Rust's, but with stronger compile-time integration and aggressive precompilation. A module is declared with `module Foo ... end`, can be nested inside another module, and can `include(\"file.jl\")` to splice in source files (textual inclusion, not module composition). The top-level module of a package is called `Main` for scripts and is the package's namespace for installed packages.",
+      "refs": [],
+      "sources": [
+        { "label": "Julia modules", "url": "https://docs.julialang.org/en/v1/manual/modules/" }
+      ]
+    },
+    {
+      "id": "using-vs-import",
+      "title": "using vs import — three import forms",
+      "tags": ["julia", "imports"],
+      "content": "Julia distinguishes `using` and `import`:\n\n- `using Foo` — imports the module's `export`-listed names into the current scope, plus the module name itself.\n- `import Foo` — imports only the module name, requiring qualified access (`Foo.bar`).\n- `import Foo: bar, baz` — imports specific names, allowing them to be extended (overloaded) in the current module.\n\nThe `export` directive lists the names brought into scope by `using`. Names not exported are still accessible via qualified syntax (`Foo.unexported`); Julia has no language-level enforcement of privacy beyond convention (an underscore prefix or just leaving the name unexported)."
+    },
+    {
+      "id": "precompilation-and-pkgimage",
+      "title": "Precompilation and Julia 1.9 pkgimage native-code caching",
+      "tags": ["julia", "precompilation", "performance"],
+      "content": "The interesting performance contribution is **precompilation**. Each Julia package is compiled to a `.ji` cache file the first time it is loaded, and subsequent loads use the cache. Since **Julia 1.9 (2023)**, packages also produce **native code caches** (`pkgimage`), which embed JIT-compiled native code for type-stable methods so that downstream packages do not pay the JIT cost on first use. This makes loading large package graphs (e.g., a Plots.jl pipeline) substantially faster, addressing the long-standing \"time to first plot\" complaint.\n\nJulia's package manager (`Pkg`) maintains environments: `Project.toml` lists dependencies, `Manifest.toml` records the resolved versions (a lockfile). Environments are stackable, so one can have a base environment plus a per-project environment; the resolution is deterministic.\n\nThe module-system-relevant lesson from Julia is that **`include`-style textual splicing can coexist with module declarations** if precompilation handles the resulting cost. Julia conventionally puts each module's contents into one file but uses `include` to assemble large modules from many files, treating files as a project-organization unit and modules as the namespace unit.",
+      "refs": [],
+      "sources": [
+        { "label": "Julia 1.9 highlights", "url": "https://julialang.org/blog/2023/04/julia-1.9-highlights/" },
+        { "label": "Julia code loading", "url": "https://docs.julialang.org/en/v1/manual/code-loading/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Julia modules", "url": "https://docs.julialang.org/en/v1/manual/modules/" },
+    { "label": "Julia code loading", "url": "https://docs.julialang.org/en/v1/manual/code-loading/" },
+    { "label": "Julia 1.9 highlights", "url": "https://julialang.org/blog/2023/04/julia-1.9-highlights/" }
+  ]
+}

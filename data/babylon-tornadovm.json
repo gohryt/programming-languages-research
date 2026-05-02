@@ -1,0 +1,46 @@
+{
+  "kind": "framework",
+  "name": "Project Babylon and TornadoVM",
+  "aliases": ["Babylon", "TornadoVM", "Java GPU offload"],
+  "summary": "OpenJDK Project Babylon: code reflection — Java code models lowered at runtime to OpenCL/PTX for GPU offload, without a separate kernel language. TornadoVM: production runtime that consumes Babylon code models and executes them on heterogeneous hardware. Brings Java to GPU without CUDA/OpenCL frontends.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Project Babylon** (OpenJDK, ongoing) introduces *code reflection* to the JVM: Java methods can be reflected as code models (typed AST representations) at runtime, which downstream tools can lower to alternative targets — most notably GPU kernels. **TornadoVM** is the production-oriented runtime that consumes Babylon code models and executes them on CPUs, NVIDIA GPUs (via PTX), AMD GPUs, and Intel iGPUs (via OpenCL or oneAPI Level Zero).\n\nThe pairing means Java code can run on GPUs without a separate kernel language: write a regular Java method, annotate it for GPU execution, and TornadoVM lowers it via Babylon's code model to the target accelerator's instruction set.",
+      "refs": [],
+      "sources": [
+        { "label": "OpenJDK Project Babylon", "url": "https://openjdk.org/projects/babylon/" }
+      ]
+    },
+    {
+      "id": "babylon-code-models",
+      "title": "Babylon code models",
+      "tags": ["jvm", "reflection", "compilation"],
+      "content": "A code model is a typed, structured representation of Java source — closer to an AST than to JVM bytecode but with full type information attached. Tools like TornadoVM consume code models, transform them (lower to OpenCL, optimise for tile-based GPU execution, allocate work to lanes), and emit target-specific code at runtime.\n\nThe alternative — generating CUDA or OpenCL source from Java at runtime — requires either a full JNI-bridge to invoke a native compiler or a separate runtime component to handle source-to-source translation. Babylon's code models eliminate the bridge: TornadoVM operates entirely within the JVM, lowering Java code models to GPU instructions directly via LLVM-based backends.",
+      "refs": [],
+      "sources": [
+        { "label": "TornadoVM home", "url": "https://www.tornadovm.org/" }
+      ]
+    },
+    {
+      "id": "production-status",
+      "title": "Production status",
+      "tags": ["jvm", "gpu", "ai"],
+      "content": "TornadoVM 2.0 (2025) added LLM inference support and integration with HuggingFace transformers. Status (as of 2026-04): TornadoVM is production-stable for selected workloads (image processing, scientific computing, ML inference); Babylon is still incubating as an OpenJDK project, with ongoing API evolution.\n\nThe lesson generalises: **a managed runtime can offer GPU offload without a separate kernel-language ecosystem if the runtime exposes typed code reflection**. The cost is substantial JVM-internal infrastructure; the benefit is that Java's vast library ecosystem becomes available for GPU computation without rewriting.",
+      "refs": [],
+      "sources": [
+        { "label": "InfoQ — TornadoVM 2.0 GPU LLM", "url": "https://www.infoq.com/news/2025/12/tornadovm-20-gpu-llm/" },
+        { "label": "TornadoVM documentation", "url": "https://tornadovm.readthedocs.io/en/latest/introduction.html" },
+        { "label": "Babylon and TornadoVM (Fumero blog)", "url": "https://jjfumero.github.io/posts/2025/02/07/babylon-and-tornadovm" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Project Babylon", "url": "https://openjdk.org/projects/babylon/" },
+    { "label": "TornadoVM", "url": "https://www.tornadovm.org/" },
+    { "label": "TornadoVM documentation", "url": "https://tornadovm.readthedocs.io/en/latest/introduction.html" },
+    { "label": "Babylon and TornadoVM (Fumero blog)", "url": "https://jjfumero.github.io/posts/2025/02/07/babylon-and-tornadovm" }
+  ]
+}

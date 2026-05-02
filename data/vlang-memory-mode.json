@@ -1,0 +1,40 @@
+{
+  "kind": "language",
+  "name": "V (Vlang) Memory Mode",
+  "aliases": ["V memory management", "Vlang memory modes", "-autofree", "-prealloc", "-gc none"],
+  "summary": "V exposes four orthogonal memory modes as command-line flags (default tracing GC, `-autofree`, `-prealloc`, `-gc none`), letting the user pick the discipline at compile time without committing the language source to one model.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "vlang", "ergonomics", "experimental"],
+      "content": "V (Alex Medvednikov, since 2019) takes a position the other language-level allocator-API records do not: it exposes four orthogonal memory modes as command-line flags, letting the user pick the discipline at compile time without committing the language source to one model. Where Zig is \"always explicit allocator parameter\" and Odin is \"implicit context allocator,\" V is \"your choice — compile flag picks the model.\"\n\nThe architectural lesson generalises: a language can expose memory-mode choice as a build flag rather than as a language commitment.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "zig-allocator-api#overview", "type": "compared-with" },
+        { "target": "odin-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "four-modes",
+      "title": "Four memory modes as compiler flags",
+      "tags": ["vlang", "language-design"],
+      "content": "**Default — minimal tracing GC**: a small, well-performing tracing collector. The default ergonomic choice for general-purpose application code.\n\n**`-autofree`**: the compiler statically inserts `free()` calls during compilation for ~90-100% of objects (Lobster-influenced). The remaining small fraction (objects whose lifetime escapes static analysis) is handled by the GC, or by reference counting in some V documentation versions. Programmers can mark functions `[manualfree]` to opt out per function.\n\n**`-prealloc`**: arena allocation tuned for short-lived single-threaded batch workloads (compilers, build tools, batch data processing). Allocation is bump-pointer; deallocation is end-of-program reset.\n\n**`-gc none`**: full manual via `C.malloc`/`C.free` exposed as builtins; the developer takes complete responsibility.\n\nThree less-flagship modes round it out: `[heap]` struct attribute forces heap allocation per type, `&MyStruct{...}` per-call-site heap allocation, and `[manualfree]` opts a single function out of autofree. The `-b wasm -autofree -gc none` combination produces WASM output with neither GC nor explicit allocator.",
+      "refs": [
+        { "target": "arena-allocation#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "deployment-flexibility",
+      "title": "Deployment flexibility and stabilisation",
+      "tags": ["vlang", "experimental"],
+      "content": "The benefit is unusual deployment flexibility: the same V codebase serves a server (default GC), a batch tool (prealloc), an embedded WASM module (manual), and a long-lived service (autofree once stable) without source-level rewrites. The cost is that the source code style must remain conservative (no relying on a specific lifetime model), and autofree as the most ambitious mode is still experimental.\n\nV's multiple backends (C as default, Go, JS in browser/Node/freestanding variants, native x64/arm64, WebAssembly) compose with the memory-mode choice — the same source can target a native binary with GC and a WASM module without GC from one codebase. Status (as of 2026-04): V is pre-1.0 (~v0.4.x at the time of writing), with autofree stabilisation gating the 1.0 milestone. The mode-as-flag design is established and the language has built itself with this discipline since inception.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "V (Vlang) Memory management", "url": "https://docs.vlang.io/memory-management.html" },
+    { "label": "V language home page", "url": "https://vlang.io/" },
+    { "label": "V -autofree discussion (#18374)", "url": "https://github.com/vlang/v/discussions/18374" }
+  ]
+}

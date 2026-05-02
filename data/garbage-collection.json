@@ -1,0 +1,445 @@
+{
+  "kind": "concept",
+  "name": "Garbage Collection",
+  "aliases": [
+    "gc",
+    "tracing-gc"
+  ],
+  "summary": "Concept hub for automatic memory-management strategies that reclaim unreachable objects without explicit programmer frees; collects design axes (throughput vs. latency vs. footprint, compaction policy, write-barrier cost) and indexes per-collector implementations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Garbage collection is a family of automatic memory-management strategies that reclaim unreachable objects without requiring explicit deallocation. It is one of the major alternatives to ownership, manual memory management, and reference counting, and remains the default reclamation strategy for most managed-language runtimes.\n\nTracing collectors trade per-op simplicity for periodic root-and-trace overhead. The dominant axis across modern collectors is *which performance dimension is optimized*: throughput (parallel collectors, generational hypothesis), latency (Pauseless / C4 / ZGC / Shenandoah lineage), memory footprint (Erlang per-process, request-private heaps), or actor isolation (Erlang again, OCaml 5 domains). Two further axes cut across: *whether the collector compacts* (mark-region in Immix, mark-compact in ZGC, mark-sweep with no compaction in Go) and *the write-barrier cost*.",
+      "refs": [
+        {
+          "target": "ownership#tradeoffs",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "reference-counting#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "region-based-memory#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": [
+        "garbage-collection",
+        "comparative-design",
+        "runtime"
+      ],
+      "content": "Modern collectors vary along several orthogonal axes:\n\n- **Optimisation target**: throughput (G1, parallel collectors), latency (ZGC, Shenandoah, Azul C4), footprint (BEAM per-process, Iso request-private), actor / domain isolation (BEAM, OCaml 5, Iso).\n- **Compaction policy**: full compaction (ZGC, Shenandoah, generational JVM majors), mark-region (Immix family), mark-sweep with no compaction (Go), per-region wholesale reclamation (Iso).\n- **Generational vs not**: Erlang and Go skip generations deliberately; most JVM collectors and OCaml 5 use them.\n- **Concurrency model**: stop-the-world parallel (parallel GC), concurrent + brief STW (G1, Shenandoah, ZGC), per-actor / per-domain heaps (BEAM, OCaml 5), request-private (Iso), conservative scanning (BDW).\n- **Hybrid with RC**: LXR combines RC with Immix's mark-region heap for low pauses; Alloy adds tracing GC into a Rust-with-destructors language; MMTk plugs in plans (Mark-Sweep, Immix, GenImmix, StickyImmix, LXR) under one binding API.\n- **Header / object-layout cost**: Project Lilliput shrinks JVM object headers; Project Valhalla flattens value classes — both reduce GC's allocation/scan cost without changing the collector itself.",
+      "refs": [
+        {
+          "target": "lxr-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "alloy-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mmtk",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "project-valhalla",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "project-lilliput",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "tracing-vs-reference-counting",
+      "title": "Tracing vs reference counting",
+      "tags": [
+        "garbage-collection",
+        "runtime",
+        "tradeoffs"
+      ],
+      "content": "Tracing collectors emphasize reachability discovery and global reclamation; reference counting emphasizes local ownership counts and deterministic destruction. Hybrid systems exist (RC-Immix, ORC's Bacon trial-deletion, LXR's RC + Immix combination) — modern designs frequently combine both rather than picking one.\n\nThe cleanest counterexample to the orthodoxy that low pauses require concurrent copying is LXR: combining RC with Immix's mark-region heap delivers low pauses via brief regular STW + occasional concurrent tracing, contradicting the C4/ZGC/Shenandoah cost premise.",
+      "refs": [
+        {
+          "target": "reference-counting#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "lxr-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "rc-immix",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "language-design-implications",
+      "title": "Language design implications",
+      "tags": [
+        "garbage-collection",
+        "design-guidance",
+        "runtime"
+      ],
+      "content": "Choosing garbage collection affects runtime latency, memory layout, FFI boundaries, concurrency strategy, observability, and the design of value versus reference semantics. It should be understood as a language-wide architectural choice, not just a runtime implementation detail.\n\nHeap-layout work matters even decades after a runtime ships: shrinking object headers (Project Lilliput) and flattening value classes (Project Valhalla) reduce footprint and pointer-chasing on existing collectors without redesigning them. Allocator-runtime layer choices (mark-region heaps, request-private heaps) interact with collector choice as much as collector internals do.\n\nFor language designers: (1) is GC the *primary* memory model or a hybrid with ownership / RC? (2) is the optimization target throughput (batch jobs), tail latency (request workloads), or footprint (embedded / per-process)? (3) does the runtime want a pluggable framework (MMTk, Eclipse OMR, Ravenbrook MPS) or a hand-rolled collector? (4) is conservative scanning (BDWGC) acceptable to avoid stack-map work?",
+      "refs": [
+        {
+          "target": "rust#type-system",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "allocators#overview",
+          "type": "related"
+        },
+        {
+          "target": "region-based-memory#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "project-valhalla",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "project-lilliput",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "low-latency-collectors",
+      "title": "Low-latency collectors",
+      "tags": [
+        "garbage-collection",
+        "latency",
+        "runtime"
+      ],
+      "content": "Low-latency tracing collectors share a common ancestry in concurrent compaction with read/load barriers and self-healing or fixing semantics. Pauses stay sub-millisecond to low-millisecond independent of heap size up to multi-TB heaps, at the cost of barrier overhead and (historically) higher CPU under load.\n\nThe Pauseless-collector lineage starts with Azul C4 (production since 2010) and feeds ZGC and Shenandoah, which inherit the loaded-value barrier and simultaneous-generational concurrency ideas. C4's distinctive contribution is making young and old GC concurrent and independent so neither blocks the other; ZGC turned that into colored 64-bit pointers with self-healing load barriers; Shenandoah evolved Brooks-style forwarding pointers into load-reference barriers and self-fixing CAS semantics.",
+      "refs": [
+        {
+          "target": "ownership#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "zgc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "shenandoah-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "azul-c4",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "throughput-collectors",
+      "title": "Throughput-leaning regional and tricolor collectors",
+      "tags": [
+        "garbage-collection",
+        "throughput",
+        "runtime"
+      ],
+      "content": "G1 and Go's collector represent the throughput-leaning side of the design space. Both pick simple per-collection schemes and accept multi-millisecond pauses (G1) or full-heap collections every cycle (Go) in exchange for predictable steady-state behaviour and simple tuning. The most consequential design choice in Go's case is *not having generations* — Go bet the generational hypothesis would not hold for its actual workloads, and the bet held.",
+      "refs": [
+        {
+          "target": "g1-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "go-gc",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "actor-and-domain-collectors",
+      "title": "Per-process and per-domain collectors",
+      "tags": [
+        "garbage-collection",
+        "concurrency",
+        "isolation"
+      ],
+      "content": "Per-process / per-domain / per-request heaps make the generational hypothesis less relevant: the dominant reclamation mechanism is process death, request completion, or domain teardown, not generational age.\n\nErlang/BEAM gives each lightweight process a private generational copying heap with deep-copied messages between heaps, eliminating any global GC pause and making major collections almost-never-run. OCaml 5 retrofits multicore onto a previously single-threaded GC with one private minor heap per domain plus a shared major heap. Iso (PLDI 2025) extends the same idea to request-shaped Java workloads using Immix's 32 KB blocks as the substrate.\n\nThe lesson generalises: runtime memory management should match the unit of failure and isolation. Actor-local heaps, per-actor snapshots, and mailbox-aware reachability can make actor runtimes more predictable than a single global object graph (CRGC studies this for Apache Pekko's fault-recovering actor model).",
+      "refs": [
+        {
+          "target": "beam-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "ocaml-multicore-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "iso-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "crgc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "virtual-threads#pinning-and-blocking-hazards",
+          "type": "related"
+        },
+        {
+          "target": "work-stealing#fairness-and-locality-tradeoffs",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "v8-and-lua-collectors",
+      "title": "JS- and Lua-side collectors",
+      "tags": [
+        "garbage-collection",
+        "runtime",
+        "comparative-design"
+      ],
+      "content": "Two production runtimes outside the JVM ecosystem illustrate the same axes from different angles. V8's Orinoco combines parallel, concurrent, and incremental techniques across a generational heap (Scavenger young + Mark-Compact major) to push GC work off the main JS thread. Lua 5.4 added an optional generational mode (opt-in via `collectgarbage(\"generational\")`) alongside the default incremental tricolor collector, deliberately leaving generational off by default because it doesn't help large-data-structure workloads — the cleanest example of \"generational hypothesis is workload-specific.\"",
+      "refs": [
+        {
+          "target": "v8-orinoco",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "lua-generational-gc",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "conservative-and-frameworks",
+      "title": "Conservative collectors and pluggable frameworks",
+      "tags": [
+        "garbage-collection",
+        "framework",
+        "comparative-design"
+      ],
+      "content": "The Boehm-Demers-Weiser conservative tracing collector and Ravenbrook's Memory Pool System sit at the conservative-and-pluggable end of the spectrum. BDW treats every machine word as potentially a pointer (no static type information needed), enabling C and C++ programs to gain GC with no source modification at the cost of unbounded worst-case retention; MPS is a flexible framework supporting both precise and conservative scanning and structured around pool classes the application chooses per allocation domain. Together they represent the \"don't require precise stack maps / don't pick one collector\" design point complementary to MMTk and Eclipse OMR's pluggable-plans approach.",
+      "refs": [
+        {
+          "target": "boehm-bdwgc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mps-memory-pool",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "runtime-interaction-with-concurrency",
+      "title": "Runtime interaction with concurrency",
+      "tags": [
+        "runtime",
+        "concurrency",
+        "garbage-collection"
+      ],
+      "content": "Garbage collection interacts directly with concurrency because stack scanning, suspension, thread coordination, and allocator behavior all become runtime-wide questions. Concurrency models and GC strategies cannot be chosen independently in many language runtimes: actor runtimes complicate ordinary GC because reachability is not only a heap-graph question — actors own mailboxes, in-flight messages, supervision relationships, and failure/restart state. The general design lesson is that runtime memory management should match the unit of failure and isolation, with actor-local heaps, per-actor snapshots, and mailbox-aware reachability making actor runtimes more predictable than a single global object graph.",
+      "refs": [
+        {
+          "target": "crgc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "python-memory-tiering",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "virtual-threads#pinning-and-blocking-hazards",
+          "type": "related"
+        },
+        {
+          "target": "work-stealing#fairness-and-locality-tradeoffs",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "hybrids-and-boundaries",
+      "title": "Hybrids, frameworks, and boundaries",
+      "tags": [
+        "garbage-collection",
+        "comparative-design",
+        "runtime"
+      ],
+      "content": "Many real systems blur the boundaries between tracing GC, ownership, regions, and reference counting. Hybrid systems matter because they show that memory management is often not a single mechanism choice but a layered architectural decision spanning the type system, runtime, and allocation model.\n\nThree integration points are particularly interesting: (1) Alloy (OOPSLA 2025) is a research GC for Rust answering whether ownership languages can integrate tracing GC if the compiler takes responsibility for the semantic mismatch between destructors and finalizers; (2) MMTk is a portable language-agnostic GC framework written in Rust providing pluggable plans and now driving Ruby's Modular GC since Ruby 3.4; (3) Eclipse OMR is IBM's open-source extraction of J9 runtime components into a language-agnostic toolkit, decoupling runtime services from language semantics. The Boehm-Demers-Weiser conservative collector and Ravenbrook's MPS sit at the conservative-and-pluggable end of the spectrum.",
+      "refs": [
+        {
+          "target": "alloy-gc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mmtk",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "eclipse-omr",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "boehm-bdwgc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mps-memory-pool",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "ownership#language-examples",
+          "type": "related"
+        },
+        {
+          "target": "reference-counting#runtime-vs-compile-time-rc",
+          "type": "related"
+        },
+        {
+          "target": "region-based-memory#non-lexical-and-hybrid-region-models",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "per-technology-records",
+      "title": "Per-technology records",
+      "tags": [
+        "garbage-collection",
+        "index",
+        "collectors"
+      ],
+      "content": "Collectors and supporting infrastructure with their own per-technology records:\n\n- **Mark-region core**: Immix (the mark-region collector), and the LXR RC + Immix hybrid; RC-Immix uses the same substrate.\n- **Low-latency JVM collectors**: ZGC (colored 64-bit pointers), Shenandoah (load-reference barriers), Azul C4 (production ancestor), HotSpot CMS (deprecated predecessor).\n- **Throughput / regional**: G1 (default JVM since JDK 9).\n- **Non-JVM production runtimes**: Go's tricolor mark-sweep; BEAM's per-process generational copying; OCaml 5's parallel minor + concurrent major; V8's Orinoco; Lua's optional generational mode; MoarVM's collector.\n- **Conservative and pluggable frameworks**: Boehm-Demers-Weiser; Memory Pool System (Ravenbrook); MMTk; Eclipse OMR.\n- **Hybrids and research**: Alloy (GC for Rust); Iso (request-private GC); Arborescent GC (incremental cycle reclamation, also indexed under reference-counting); CRGC (fault-recovering actor GC).\n- **Heap layout enabling**: Project Valhalla (value classes / flat layout); Project Lilliput (compact object headers); Python's memory tiering.\n- **Cross-related concepts**: reference counting and region-based memory for the contrasting reclamation strategies; ownership as the static-discipline alternative.",
+      "refs": [
+        {
+          "target": "immix-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "lxr-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "mmtk",
+          "type": "per-technology"
+        },
+        {
+          "target": "zgc",
+          "type": "per-technology"
+        },
+        {
+          "target": "shenandoah-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "g1-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "azul-c4",
+          "type": "per-technology"
+        },
+        {
+          "target": "go-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "beam-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "ocaml-multicore-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "v8-orinoco",
+          "type": "per-technology"
+        },
+        {
+          "target": "lua-generational-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "moarvm-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "boehm-bdwgc",
+          "type": "per-technology"
+        },
+        {
+          "target": "alloy-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "mps-memory-pool",
+          "type": "per-technology"
+        },
+        {
+          "target": "hotspot-cms",
+          "type": "per-technology"
+        },
+        {
+          "target": "project-valhalla",
+          "type": "per-technology"
+        },
+        {
+          "target": "project-lilliput",
+          "type": "per-technology"
+        },
+        {
+          "target": "iso-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "arborescent-gc",
+          "type": "per-technology"
+        },
+        {
+          "target": "eclipse-omr",
+          "type": "per-technology"
+        },
+        {
+          "target": "crgc",
+          "type": "per-technology"
+        },
+        {
+          "target": "python-memory-tiering",
+          "type": "per-technology"
+        },
+        {
+          "target": "reference-counting",
+          "type": "related-concept"
+        },
+        {
+          "target": "region-based-memory",
+          "type": "related-concept"
+        },
+        {
+          "target": "ownership",
+          "type": "related-concept"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Garbage Collection Handbook",
+      "url": "https://www.gchandbook.org/"
+    },
+    {
+      "label": "Immix — Mark-Region Collector (PLDI 2008)",
+      "url": "https://www.steveblackburn.org/pubs/papers/immix-pldi-2008.pdf"
+    }
+  ]
+}

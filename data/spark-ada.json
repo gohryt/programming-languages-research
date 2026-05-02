@@ -1,0 +1,144 @@
+{
+  "kind": "tool",
+  "name": "SPARK / Ada — Industrial Auto-Active Verification",
+  "aliases": [
+    "spark",
+    "ada-spark",
+    "adacore-spark"
+  ],
+  "summary": "AdaCore's SPARK (subset of Ada with formal-verification annotations, descended from work at Praxis/Altran in the 1980s) is the longest-running production formal-verification toolchain — used in DO-178C avionics, EAL-rated security products, railway signalling, and increasingly Linux-kernel and CHERI-related verification. Five proof levels (Stone, Bronze, Silver, Gold, Platinum). Multi-prover Why3 backend. Production deployments include Ariane-class space launchers, Boeing avionics, Eurofighter Typhoon flight control, NVIDIA security firmware.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "formal-verification",
+        "auto-active-verifier",
+        "deductive-verification",
+        "ada-verifier",
+        "industrial",
+        "production"
+      ],
+      "content": "AdaCore's **SPARK** (subset of Ada with formal-verification annotations, descended from work at Praxis/Altran in the 1980s) is the longest-running production formal-verification toolchain — used in DO-178C avionics, EAL-rated security products, railway signalling, and increasingly Linux-kernel and CHERI-related verification.\n\nWhere Verus, Prusti, and Creusot target Rust, SPARK targets Ada with the same auto-active discipline: pre/postconditions on subprograms, loop invariants, type predicates, and dependency contracts (`Depends`, `Global`) discharged by an SMT solver via Why3 (`data/verification-intermediate-languages` covers Why3 as a verification IL).",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#whyml",
+          "type": "compiles-to"
+        },
+        {
+          "target": "verus#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "prusti#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "creusot#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "compcert#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "fstar#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "refinement-types#overview",
+          "type": "implements"
+        },
+        {
+          "target": "liquid-haskell#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "AdaCore — Year in Review 2025",
+          "url": "https://www.adacore.com/blog/year-in-review-2025-a-transformative-year-for-high-integrity-software-at-adacore"
+        },
+        {
+          "label": "FOSDEM 2025 — Liquid types and SPARK",
+          "url": "https://archive.fosdem.org/2025/schedule/event/fosdem-2025-4879-understanding-liquid-types-contracts-and-formal-verification-with-ada-spark/"
+        }
+      ]
+    },
+    {
+      "id": "proof-levels-and-design",
+      "title": "Five proof levels and incremental adoption",
+      "tags": [
+        "auto-active-verifier",
+        "deductive-verification"
+      ],
+      "content": "The SPARK design is unusually mature in production:\n\n- **Five proof levels** (`Stone`, `Bronze`, `Silver`, `Gold`, `Platinum`) corresponding to absence-of-runtime-errors, initialization correctness, key-property partial proof, full functional correctness, and worst-case-execution-time bounds. Each level extends the previous; teams adopt incrementally without requiring full Platinum across an entire codebase.\n- **Ghost code** — `Ghost` aspect on declarations marks them as proof-only, automatically erased before code generation. Lets specifications express invariants over data structures without runtime cost.\n- **Proof contexts** declared explicitly with `pragma SPARK_Mode` per package — pragma can be `On`, `Off`, or `Auto` per declaration, allowing incremental migration of an Ada codebase to SPARK section by section.\n- **Liquid-types-style refinement** — type predicates (`Subtype X is Integer with Predicate => X mod 2 = 0`) provide a refinement-typing surface integrated with the rest of Ada's type system, comparable to LiquidHaskell (`data/liquid-haskell`) but with a longer production history.",
+      "refs": [
+        {
+          "target": "refinement-types#design-placement",
+          "type": "instance-of"
+        }
+      ]
+    },
+    {
+      "id": "target-and-backend",
+      "title": "Why3 multi-prover backend",
+      "tags": [
+        "whyml",
+        "smt-based",
+        "z3",
+        "cvc5"
+      ],
+      "content": "**Multi-prover backend via Why3** — same Z3 / CVC4 / CVC5 / Alt-Ergo dispatch the rest of the Why3 ecosystem uses (`data/verification-intermediate-languages`). This is where SPARK shares infrastructure with **Frama-C**, **Creusot**, and other Why3-based verifiers. A SPARK proof obligation may be discharged by Z3 in milliseconds, by CVC5 after a few seconds, or by Alt-Ergo for goals where the others time out — the user does not see the prover dispatch, only the pass/fail outcome per obligation.\n\nThis is operationally identical to Creusot's backend story (`creusot.json#target-and-backend`); the difference is the source language (Ada with strong typing and tasking primitives vs Rust with ownership) and the front-end translation.",
+      "refs": [
+        {
+          "target": "creusot#target-and-backend",
+          "type": "shares-backend"
+        }
+      ]
+    },
+    {
+      "id": "deployments-and-status",
+      "title": "Production deployments and 2025 retrospective",
+      "tags": [
+        "industrial",
+        "production"
+      ],
+      "content": "Status (as of 2026-04): production deployment includes **Ariane-class space launchers**, **Boeing avionics**, **Eurofighter Typhoon flight control**, **NVIDIA security firmware**, and thousands of certified-system codebases. AdaCore's 2025 retrospective covers Wind River's CHERI Alliance partnership (relevant to `cheri.json`), expanded LLM-generated-code verification studies (SCITEPRESS 2025), and increasing FAA/EASA acceptance of SPARK as a DO-178C verification path.\n\nDistinct from CompCert: CompCert verifies a *compiler*; SPARK verifies *application code*. Distinct from Verus: Verus targets Rust with Rust's ownership for soundness; SPARK targets Ada with Ada's strong-typing-plus-contracts for soundness — both are auto-active, both use SMT, but the source language constraints differ. Distinct from F\\*/Low\\*: F\\* is dependently-typed with effects; SPARK is first-order Ada plus refinement.",
+      "refs": [
+        {
+          "target": "cheri#overview",
+          "type": "deployment-adjacent"
+        }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "The decades-of-maturation lesson",
+      "tags": [
+        "industrial",
+        "language-design"
+      ],
+      "content": "The lesson generalises: **a production-mature formal-verification toolchain takes decades to mature**. SPARK's lineage is over 35 years old; Ada's was already 15 years old when SPARK began. For new languages contemplating formal verification as a feature, the cost is not just the verification IL (Why3, Boogie, Viper — all covered in `data/verification-intermediate-languages`) but also the multi-decade community investment in proof patterns, certifying-authority acceptance, and educational material. **Easier to target an existing verifier than to ship a new one.**",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "AdaCore — Year in Review 2025",
+      "url": "https://www.adacore.com/blog/year-in-review-2025-a-transformative-year-for-high-integrity-software-at-adacore"
+    },
+    {
+      "label": "FOSDEM 2025 — Liquid types and SPARK",
+      "url": "https://archive.fosdem.org/2025/schedule/event/fosdem-2025-4879-understanding-liquid-types-contracts-and-formal-verification-with-ada-spark/"
+    },
+    {
+      "label": "Cramer et al. — Verifying LLM-Generated Code with SPARK (SCITEPRESS 2025)",
+      "url": "https://www.scitepress.org/Papers/2025/134619/134619.pdf"
+    },
+    {
+      "label": "The Language That Refuses to Crash (Hackernoon, 2025)",
+      "url": "https://hackernoon.com/the-language-that-refuses-to-crash-why-ada-still-matters-in-2025"
+    }
+  ]
+}

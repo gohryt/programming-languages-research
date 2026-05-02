@@ -1,0 +1,67 @@
+{
+  "kind": "language",
+  "name": "OxCaml",
+  "aliases": ["oxidized-ocaml", "jane-street-oxcaml"],
+  "summary": "Jane Street's OxCaml branch (Lorenzen, Dolan, White et al.; Oxidizing OCaml with Modal Memory Management, ICFP 2024) retrofits Rust-style ownership onto OCaml without abandoning the language's tracing GC. Mechanism: three orthogonal mode axes — locality, uniqueness, affinity — attached to every binding. exclave_ keyword lets local values escape into a parent stack frame when call structure permits. Production at Jane Street since early 2024; OxCaml branch open-sourced July 2025. Modes are a lower-cost retrofit path for ownership disciplines than language redesign.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["oxcaml", "ocaml", "modal-types", "ownership", "memory-safety"],
+      "content": "Jane Street's **OxCaml** branch (Lorenzen, Dolan, White et al.; \"Oxidizing OCaml with Modal Memory Management\", ICFP 2024) retrofits Rust-style ownership onto OCaml without abandoning the language's tracing GC.\n\nThe mechanism is **three orthogonal mode axes** attached to every binding: locality, uniqueness, and affinity. The combinations form a small mode lattice; arrow types carry mode annotations on parameters and results (`f : 'a @ local -> 'b @ unique`). The compiler infers most mode usage; explicit annotations are needed at the API boundary.",
+      "refs": [
+        { "target": "ocaml", "type": "extends" },
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "garbage-collection", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Oxidizing OCaml with Modal Memory Management (ICFP 2024)", "url": "https://antonlorenzen.de/oxidizing-ocaml-modal-memory-management.pdf" },
+        { "label": "Jane Street — Oxidizing OCaml: Locality", "url": "https://blog.janestreet.com/oxidizing-ocaml-locality/" },
+        { "label": "Jane Street — Oxidizing OCaml: Ownership", "url": "https://blog.janestreet.com/oxidizing-ocaml-ownership/" }
+      ]
+    },
+    {
+      "id": "three-mode-axes",
+      "title": "Three orthogonal mode axes",
+      "tags": ["oxcaml", "modal-types", "ownership", "uniqueness-types", "affine-types"],
+      "content": "- **Locality** (`local` vs `global`): a `local` value is allowed to allocate on the call's stack frame and may not escape it; `global` values may escape and are heap-allocated under GC. The compiler statically rejects programs that try to return a `local` from a function or store one in a heap data structure.\n- **Uniqueness** (`unique` vs `shared`): a `unique` value has no aliases; the compiler can rewrite operations on it in place — proven statically rather than checked at runtime.\n- **Affinity** (`affine` vs `many`): an `affine` value can be used at most once; `many` values are unrestricted. Affinity composes with uniqueness to recover Rust-style move semantics for resource handles (file descriptors, mutex tokens) within an otherwise GC'd language.",
+      "refs": [
+        { "target": "linear-affine-types", "type": "related" },
+        { "target": "region-based-memory", "type": "related" }
+      ],
+      "sources": [
+        { "label": "OxCaml stack-allocation reference", "url": "https://oxcaml.org/documentation/stack-allocation/reference/" }
+      ]
+    },
+    {
+      "id": "exclave",
+      "title": "exclave_ — escape into a parent frame",
+      "tags": ["oxcaml", "modal-types", "lifetime"],
+      "content": "OxCaml ships an `exclave_` keyword that lets `local` values escape *into* a parent stack frame when the call structure permits, recovering the equivalent of Hylo's subscript-yields for OCaml. The keyword names the program point at which a locally-scoped value is allowed to outlive the current frame by being placed in the caller's frame instead.",
+      "refs": [
+        { "target": "hylo", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "design-contribution",
+      "title": "Design contribution and status",
+      "tags": ["oxcaml", "ocaml", "language-design"],
+      "content": "The architectural contribution is showing that **ownership and a tracing GC compose in one language** without choosing between them. Rust gives up GC entirely; Hylo gives up first-class references; Mojo gives up Python compatibility. OxCaml gives up nothing — existing OCaml code typechecks unchanged at the default modes (`global`, `shared`, `many`), and performance-critical code opts into the more restrictive modes for stack allocation, in-place mutation, and resource management.\n\nStatus (as of 2026-04): production at Jane Street since early 2024; the OxCaml branch was open-sourced July 2025; merging the modes into mainline OCaml is being negotiated, with parts (locality/stack allocation) likelier to land first.\n\nThe lesson generalises: **modes are a lower-cost retrofit path for ownership disciplines than language redesign**. A language with a sound type system can introduce locality, uniqueness, and affinity as opt-in modes without breaking existing code, with the compiler enforcing them only where annotated.",
+      "refs": [
+        { "target": "hylo", "type": "compared-with" },
+        { "target": "mojo", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Tarides — Introducing Jane Street's OxCaml Branch", "url": "https://tarides.com/blog/2025-07-09-introducing-jane-street-s-oxcaml-branch/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Oxidizing OCaml with Modal Memory Management (ICFP 2024)", "url": "https://antonlorenzen.de/oxidizing-ocaml-modal-memory-management.pdf" },
+    { "label": "Jane Street — Oxidizing OCaml: Locality", "url": "https://blog.janestreet.com/oxidizing-ocaml-locality/" },
+    { "label": "Jane Street — Oxidizing OCaml: Ownership", "url": "https://blog.janestreet.com/oxidizing-ocaml-ownership/" },
+    { "label": "OxCaml stack-allocation reference", "url": "https://oxcaml.org/documentation/stack-allocation/reference/" },
+    { "label": "Tarides — Introducing Jane Street's OxCaml Branch", "url": "https://tarides.com/blog/2025-07-09-introducing-jane-street-s-oxcaml-branch/" }
+  ]
+}

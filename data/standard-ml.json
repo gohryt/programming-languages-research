@@ -1,0 +1,46 @@
+{
+  "kind": "language",
+  "name": "Standard ML",
+  "aliases": ["sml"],
+  "summary": "The classical reference for the typed module-system tradition: structures (module implementations), signatures (module interfaces), and functors (parameterised modules); makes the separation between values/types, modules/signatures, implementation/interface, and modules/higher-order module computation fully explicit.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Standard ML (Milner, Tofte, Harper, MacQueen — Definition of Standard ML 1990, revised 1997) is the classical reference for the typed module-system tradition that OCaml later industrialized. Production implementations: SML/NJ (Standard ML of New Jersey, the canonical reference), MLton (whole-program optimising compiler — `data/mlton`), MLKit (region-inferring — `data/mlkit`, `data/mlkit-regionexp`), Poly/ML, MosML.",
+      "refs": [
+        { "target": "module-calculi#overview", "type": "canonical-instance" },
+        { "target": "ocaml#overview", "type": "industrialised-by" }
+      ]
+    },
+    {
+      "id": "structures-signatures-functors",
+      "title": "Structures, signatures, and functors",
+      "tags": ["sml", "module-systems", "module-calculus"],
+      "content": "Its core concepts are:\n- **structures** — module implementations,\n- **signatures** — module interfaces,\n- **functors** — parameterized modules.\n\nThe importance of SML in this document is conceptual. It makes the separation between:\n- values and types,\n- modules and signatures,\n- implementation and interface,\n- and modules and higher-order module computation\n\nfully explicit. In other words, it presents the \"module system\" not as syntax around files, but as a language-within-the-language for managing abstraction at a larger grain.",
+      "refs": [
+        { "target": "module-calculi#applicative-vs-generative-functors", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Definition of Standard ML 1997", "url": "https://smlfamily.github.io/sml97-defn.pdf" }
+      ]
+    },
+    {
+      "id": "design-baseline",
+      "title": "Design baseline for the typed-module tradition",
+      "tags": ["sml", "design-guidance"],
+      "content": "Many modern languages inherit only fragments of this tradition. Rust has strong visibility and package structure, but not higher-order modules. Haskell has modules and export lists, but not the same full functor-oriented module calculus. Racket has powerful module phases, but with a different emphasis. SML is the clean baseline for understanding what \"modules as semantic abstraction\" actually means before later languages compromise or specialize it.\n\nThe trade-off, as always, is that expressive power increases conceptual weight. SML's module system is elegant, but it is not lightweight. That makes it useful as a design boundary even when an implementer ultimately stays far simpler.",
+      "refs": [],
+      "sources": [
+        { "label": "Programming in Standard ML (Harper)", "url": "https://www.cs.cmu.edu/~rwh/isml/book.pdf" },
+        { "label": "MacQueen — Modules for Standard ML", "url": "https://homepages.inf.ed.ac.uk/dts/fps/papers/MacQueen.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Definition of Standard ML 1997", "url": "https://smlfamily.github.io/sml97-defn.pdf" },
+    { "label": "Programming in Standard ML (Harper)", "url": "https://www.cs.cmu.edu/~rwh/isml/book.pdf" },
+    { "label": "MacQueen — Modules for Standard ML", "url": "https://homepages.inf.ed.ac.uk/dts/fps/papers/MacQueen.pdf" }
+  ]
+}

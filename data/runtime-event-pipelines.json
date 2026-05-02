@@ -1,0 +1,464 @@
+{
+  "kind": "concept",
+  "name": "Runtime-native event pipelines",
+  "aliases": [
+    "runtime tracing pipelines",
+    "event-pipeline tracing"
+  ],
+  "summary": "Event emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Event emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically. What separates this family from `data/bytecode-and-code-patching` code-patching is that the events are part of the runtime's own semantics — GC pauses, scheduler transitions, query-plan nodes, signpost intervals — not a layer over raw instructions. Entries span JVM, .NET, Windows kernel, Linux kernel, Erlang, Haskell, Go, Apple, database engines, the MoarVM language runtime, and the kernel-event-instrumentation tier (PCP for long-horizon metrics, Sysdig for syscall capture, Falco for security rule evaluation); the mechanism shape (providers + sessions + ring buffers) is remarkably consistent across very different runtimes.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`\n- **domain**: `domain:observability`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-syscall`\n"
+    },
+    {
+      "id": "jdk-flight-recorder-jfr",
+      "title": "JDK Flight Recorder (JFR) — Thread-Local Buffers + Global Circular Buffer",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "jvm",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "JFR is one of the cleanest examples of a production tracing system designed from the start around the \"flight recorder\" metaphor: keep a rolling history with low enough overhead that it can stay available in real systems. OpenJDK's design writes events lock-free to **thread-local buffers**; when those fill, they are promoted into a **global in-memory circular buffer** that keeps the most recent history. Depending on configuration, the oldest data is either discarded or flushed to disk as a `.jfr` recording.\n\nThe original angle is not just \"low-overhead tracing,\" but **after-the-fact incident analysis without having to predict the exact failure point in advance**. JFR is explicitly designed so that you can leave it off, turn it on selectively, or keep a rolling buffer and dump the recent past when operations detect a problem. This is closer in spirit to an aircraft flight recorder than to a classic profiler session.\n\nJEP 328 set explicit success metrics: **at most 1% out-of-the-box overhead on SPECjbb2015** and **no measurable overhead when not enabled**. That is an unusually concrete performance target for a tracing facility. Also notable is the event model: events are typed, self-describing, and can come from the JVM, JDK libraries, the OS, and user code via `jdk.jfr.Event`.\n\nThe trade-off is scope. JFR is excellent for JVM-centric troubleshooting, but it is not a source-level debugger, and it does not give you arbitrary native process introspection the way OS-level tracing or DBI tools do.",
+      "sources": [
+        {
+          "url": "https://openjdk.org/jeps/328"
+        },
+        {
+          "url": "https://docs.oracle.com/javacomponents/jmc-5-4/jfr-runtime-guide/about.htm"
+        }
+      ]
+    },
+    {
+      "id": "etw-providers-controllers-consumers",
+      "title": "Event Tracing for Windows (ETW) — Provider / Controller / Consumer Sessions",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low",
+        "windows"
+      ],
+      "content": "ETW is the canonical Windows tracing substrate. Its architecture is particularly elegant: **providers** emit events, **controllers** start/stop/configure trace sessions, and **consumers** read the resulting stream in real time or from ETL files. This separation makes tracing a dynamic system capability instead of a compile-time choice.\n\nThe implementation detail that stands out is the buffering strategy. An ETW logging session is a kernel-managed collection of **in-memory non-paged buffers**, ETW **assigns a buffer to each processor**, and event generation/buffering is **lock-free**. This is the Windows analogue of the \"engineered-for-production\" philosophy that makes ftrace and JFR so compelling: the hot path is optimized first, and tooling is built around that constraint.\n\nThe original side here is the **session model**. Multiple providers can be composed into a single session; sessions can be enabled or disabled dynamically without restarting the system or process; and the same infrastructure supports debugging, performance analysis, and production observability. ETW is not just a tracer — it is an operating-system-level event bus with trace semantics.\n\nThe downside is ecosystem complexity. ETW is immensely capable, but provider discovery, schema evolution, event volume management, and tooling ergonomics are all non-trivial. The mechanism is excellent; the human factors are harder.",
+      "sources": [
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/sessions"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/about-event-tracing-for-drivers"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/event-tracing-for-windows"
+        }
+      ]
+    },
+    {
+      "id": "dotnet-eventpipe",
+      "title": ".NET EventPipe — Cross-Platform Runtime Tracing via Diagnostic Port",
+      "tags": [
+        "domain:tracing",
+        "dotnet",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "EventPipe is .NET's answer to the question \"what is the ETW-like thing if I want it to work the same way on Windows, Linux, and macOS?\" It is built into the runtime, collects events from runtime components and `EventSource` providers, serializes them to `.nettrace`, and can stream them to an external consumer through a **diagnostic port**.\n\nIts original side is the combination of **cross-platform semantics**, **out-of-process control**, and **low operational friction**. Unlike ETW or `perf_events`, EventPipe does not require platform-specific high-privilege tracing infrastructure. Microsoft explicitly documents that, for EventPipe, the tracer can operate as the **same user** as the target process rather than requiring admin/root access. That is a strong design choice: make production diagnostics available to application teams, not just system administrators.\n\nThe session API also exposes the design directly. A client can request rundown data and specify the size of the **circular buffer** the target runtime should use while collecting events. This makes EventPipe feel less like an opaque profiler and more like a first-class, scriptable diagnostic protocol.\n\nThe limitation is scope: EventPipe only sees **managed code and the runtime itself**. If you need kernel events, native stacks for arbitrary unmanaged libraries, or whole-system scheduling context, you still have to go out to ETW, `perf_events`, or other OS-native tools.",
+      "sources": [
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/eventpipe"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/microsoft-diagnostics-netcore-client"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace"
+        }
+      ]
+    },
+    {
+      "id": "ghc-eventlog-threadscope",
+      "title": "GHC Eventlog + ThreadScope — Runtime-Native Parallel Timeline",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "haskell",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "GHC's eventlog mechanism is easy to underestimate if you think only in terms of line stepping and breakpoints. What it offers is a **runtime-native timeline** of the things that actually matter in parallel Haskell: HEC activity, sparks, garbage collection, scheduler events, and user-defined markers. ThreadScope then renders that into a graphical view showing spark creation, spark-to-thread promotions, and GC behavior over time.\n\nThe original side is that the trace is expressed in the runtime's own semantic units, not generic CPU samples. For parallel functional programs, that is a much better fit than a conventional profiler. A developer does not just want to know \"which function used time\"; they want to know whether work was balanced across capabilities, whether sparks were converted into real work, and whether GC or load imbalance dominated the run.\n\nGHC developers also explicitly contrast eventlog with heavier profiling modes. Eventlog emission has much lower runtime impact because events are essentially **a few values written into a buffer** that the RTS flushes later, whereas full profiling changes the generated code much more substantially. That makes eventlog a better \"big picture first\" tool.\n\nIt is not an interactive debugger, and it is obviously Haskell-specific. But as a runtime-aware design for understanding concurrency and parallelism, it is original and worth adding.",
+      "sources": [
+        {
+          "url": "https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html"
+        },
+        {
+          "url": "https://www.haskell.org/ghc/blog/20190924-eventful-ghc.html"
+        },
+        {
+          "url": "https://manpages.ubuntu.com/manpages/jammy/man1/threadscope.1.html"
+        }
+      ]
+    },
+    {
+      "id": "go-runtime-trace-flight-recorder",
+      "title": "Go `runtime/trace` — Partitioned Execution Traces and Flight Recorder",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "go",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Go's `runtime/trace` is a first-party execution tracer emitting runtime-semantic events — `GoCreate`, `GoStart`, `GoBlock{Recv,Send,Select,Sync,Cond}`, `GoSysCall`, `GCStart`, plus user-defined `Task` and `Region` spans. Buffers are **per-P** (per scheduler processor), written without locks, and serialization is split from emission. Dmitry Vyukov's original 2014 design targeted ~35% overhead; Felix Geisendörfer and Nick Ripley brought it below 1% by Go 1.21 primarily by switching to **frame-pointer-based unwinding**. Go has kept frame pointers available by default on key production architectures for years, making tracebacks a pointer chase rather than a DWARF decode on those platforms; see `data/sampling-profiling#go-frame-pointer-discipline` for the policy history.\n\nThe Go 1.22 execution-tracer overhaul (Michael Knyszek) changed the on-wire shape from one monolithic trace to a sequence of **self-contained generations**. Each partition is a complete mini-trace that a reader can parse independently; the historical \"buffer the whole thing in RAM to sort events\" pain disappears. This is the load-bearing change that enabled Go 1.25's **`FlightRecorder` API** — a fixed-size in-memory circular buffer holding the last ~N seconds of runtime events, flushed on application-side trigger (error, SLO breach, user command). Status (as of 2026-04): shipped in Go 1.25 (released 2025-08). Directly parallel to JFR (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`), reached via a partition/generation model instead of a global circular buffer.\n\nThe other Go contribution is the **pprof `profile.proto` format** used by `runtime/pprof`. Rather than repeat the interchange-format details here, `data/continuous-profiling#pprof-profile-proto` covers why pprof became the common wire format for CPU, heap, goroutine, block, mutex, and custom profiles.\n\nBecause Go 1.14 added asynchronous preemption (SIGURG-delivered `asyncPreempt` that synthesizes a safepoint at many otherwise non-cooperative PCs), its SIGPROF-driven CPU profiler is much less tied to cooperative safepoints than older managed-runtime profilers. It can still lose or bias samples because of signal delivery, runtime state, cgo/native frames, and unwinding constraints, but it avoids the worst HotSpot-style safepoint bias of `data/cooperative-safepoints#safepoint-bias-async-get-call-trace`. This is one of the clearer cases where language-level runtime decisions (frame-pointer discipline + async preemption) pay down profiling pathology that other managed runtimes still work around via AGCT-style side doors.",
+      "sources": [
+        {
+          "url": "https://go.dev/blog/execution-traces-2024"
+        },
+        {
+          "url": "https://go.dev/blog/flight-recorder"
+        },
+        {
+          "url": "https://github.com/golang/proposal/blob/master/design/60773-execution-tracer-overhaul.md"
+        },
+        {
+          "url": "https://blog.felixge.de/waiting-for-go1-21-execution-tracing-with-less-than-one-percent-overhead/"
+        },
+        {
+          "url": "https://github.com/google/pprof/blob/main/proto/profile.proto"
+        }
+      ]
+    },
+    {
+      "id": "dtrace-d-bpftrace",
+      "title": "DTrace D and bpftrace — Safety-Constrained DSLs with Aggregation Primitives",
+      "tags": [
+        "domain:tracing",
+        "dtrace",
+        "ebpf",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "`data/bytecode-and-code-patching#dtrace-usdt-is-enabled-probes` covers DTrace's USDT *probes*. DTrace as a *system* (Cantrill, Shapiro, Leventhal — USENIX ATC 2004) is the broader design, and it deserves its own entry because its distinctive contribution is a **tracing-specialized query DSL**, not just the probe mechanism. The **D language** has, as a design axiom, *no loops and no backward branches*. What replaces loops is a rich set of **aggregation types**: `@count[]`, `@sum[]`, `@avg[]`, `@quantize[]` (log2 histogram), `@lquantize[]` (linear histogram). Each CPU updates a local copy, and reduction happens at output time — so aggregations are MP-safe *by construction*, and the no-loops rule makes bounded per-probe execution a trivial property rather than something the runtime must verify dynamically.\n\nThe other DTrace contribution is the **provider / module / function / name** probe namespace: `syscall::open:entry`, `proc:::exec-success`, `io:::start`, `sched:::on-cpu`, plus the generic `fbt` (function boundary tracing for all kernel functions) and `pid` (arbitrary user-function entry). A decade before Linux distinguished tracepoints / kprobes / uprobes / USDT as separate mechanisms, DTrace unified them behind one query syntax.\n\n**bpftrace** (Alastair Robertson 2016, with Brendan Gregg porting DTrace's tool library) is the modern Linux revival. It compiles a D-like DSL to eBPF, inheriting safety *twice*: once from the DSL (no loops, aggregations only), once from the eBPF verifier's static analysis. Every DTrace probe class maps to a bpftrace prefix — `tracepoint:`, `kprobe:`, `uprobe:`, `usdt:`, `profile:hz:99` — and the one-liner culture (`bpftrace -e '...'`) is a direct cultural inheritance.\n\n**SystemTap** is the instructive counter-example. Red Hat's pre-eBPF answer to DTrace (2005–) compiled `.stp` scripts to C, then to **loadable kernel modules** loaded via `insmod`. The language was inspired by D, but the execution model was not: a codegen bug meant a kernel panic, compile/load latency was seconds, and kernel-debuginfo dependency was punishing. eBPF's verifier-bounded sandbox is deliberately *less* powerful than SystemTap's module model, and that is exactly why it won — kernel-supported safety beat maximum expressiveness.\n\nThe principle: when the workload is \"let many users install ad-hoc observations into a production kernel,\" the tracer's language must be restricted enough that safety is structural, not reviewed. DTrace established this; eBPF + bpftrace confirms it. Contrast with ETW (`data/runtime-event-pipelines#etw-providers-controllers-consumers`), which is a push-from-provider event bus — DTrace is pull-by-query, and the two models compose well (an ETW-style session can feed into a bpftrace-style aggregation pipeline).",
+      "sources": [
+        {
+          "url": "https://www.usenix.org/legacy/event/usenix04/tech/general/full_papers/cantrill/cantrill.pdf"
+        },
+        {
+          "url": "https://illumos.org/books/dtrace/chp-intro.html"
+        },
+        {
+          "url": "https://github.com/bpftrace/bpftrace"
+        },
+        {
+          "url": "https://www.brendangregg.com/blog/2018-10-08/dtrace-for-linux-2018.html"
+        },
+        {
+          "url": "https://lwn.net/Articles/852112/"
+        }
+      ]
+    },
+    {
+      "id": "lttng-ctf",
+      "title": "LTTng and CTF — Lockless Per-CPU Ring Buffers Across Kernel and Userspace",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "linux",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Mathieu Desnoyers's **LTTng** (Linux Trace Toolkit Next Generation, 2006–) is the Linux tracer whose distinguishing property is that the *same* lockless per-CPU ring-buffer algorithm runs in the kernel tracer and in the userspace tracer (`liblttng-ust`). On the fast path, reservation is a local compare-and-exchange loop using only local-CPU-ordered atomics — no cross-CPU memory barriers, no cacheline false sharing, no locks. This is the same design family as JFR's thread-local → global circular buffers (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`) and ETW's per-processor buffers (`data/runtime-event-pipelines#etw-providers-controllers-consumers`), but generalized so that user and kernel events share one buffering discipline and one wire format.\n\nThat wire format is **CTF (Common Trace Format)**, now at CTF 2. It is a standardized binary format consumed by Babeltrace, Trace Compass, and the GDB/LLDB trace loaders. The significance is that CTF is *tool-agnostic*: a CTF stream from LTTng, from a custom embedded tracer, or from a barebones microcontroller target can all be analyzed by the same viewers, the same query tools, and the same scripting library. This is the tracing analogue of pprof as a profile-format lingua franca (`data/continuous-profiling#pprof-profile-proto`).\n\nThe design lesson is that **buffer discipline and wire format are separable design decisions**. LTTng treats them as two orthogonal standards: any producer that emits CTF can be analyzed by any CTF consumer, and any lockless-per-CPU producer can target any binary format. The combination — lockless per-CPU production into CTF — is what makes LTTng a viable backbone for high-frequency kernel-plus-userspace correlation in production systems.",
+      "sources": [
+        {
+          "url": "https://lttng.org/docs/"
+        },
+        {
+          "url": "https://www.kernel.org/doc/ols/2006/ols2006v1-pages-209-224.pdf"
+        },
+        {
+          "url": "https://www.dorsal.polymtl.ca/files/publications/desnoyers-mcc09-final.pdf"
+        }
+      ]
+    },
+    {
+      "id": "apple-os-signpost-instruments",
+      "title": "Apple `os_signpost` + Instruments — One Emission, Three Modalities",
+      "tags": [
+        "apple",
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Apple's platform tracing (macOS 10.12 / iOS 10, 2016) is structured around three primitives that share one emission backend: **`os_log`** (structured logging), **`os_signpost`** (scoped intervals + markers), and **`os_activity`** (activity trees / causal grouping). A single `os_signpost_interval_begin`/`_end` pair is simultaneously a structured-log entry in `log show` / Console, a flame-bar interval in Instruments's Points-of-Interest track, and an input to Instruments's aggregation (duration stats, event counts). The developer writes one call site; tooling chooses the projection.\n\nThe mechanical trick that makes this cheap enough to leave on in shipping apps is **compile-time format extraction**: the call site is split at compile time into a static format descriptor plus typed length-encoded dynamic arguments, so the runtime never parses `printf`-style format strings at emission. It emits a tiny binary payload into the persistent **`.tracev3`** ring under `/var/db/diagnostics`, collected by `logd` and projected into text, signpost, or metric views on demand. Cost when off is effectively zero (disabled subsystems elide the call at the log-handle level); cost when on is a `memcpy` of a pre-encoded payload to a per-process shared buffer.\n\n**Signpost IDs** reify causal grouping across threads with explicit `Process` / `Thread` / `System` matching scopes; paired with `os_activity`, the unified system gives an OS-enforced causality model — the same abstraction Go's `runtime/trace` tasks/regions (`data/runtime-event-pipelines#go-runtime-trace-flight-recorder`) and JFR's event stacks (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`) rediscovered independently. **Instruments** is the native viewer: template-based, with CPU sampling, allocation, network, thread-state, and signpost tracks unified on one timeline. It has been around since 2007 (originally DTrace-based); signposts as first-class timeline intervals date from WWDC 2018.\n\nThe design insight worth carrying forward: **a tracing API that emits one payload but supports three viewing projections (text log, timeline interval, aggregate metric) is strictly more useful than three separate APIs with three separate emission costs**. ETW (`data/runtime-event-pipelines#etw-providers-controllers-consumers`) decouples provider from viewer but still makes the provider author shape events per-viewer; Apple's design pushes the projection decision entirely into the consumer.",
+      "sources": [
+        {
+          "url": "https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf"
+        },
+        {
+          "url": "https://developer.apple.com/documentation/os/recording-performance-data"
+        },
+        {
+          "url": "https://developer.apple.com/videos/play/wwdc2018/405/"
+        }
+      ]
+    },
+    {
+      "id": "linux-io-uring-tracing",
+      "title": "Linux `io_uring` Tracing — When the Syscall Boundary Stops Being the Tracing Boundary",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "linux",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "`io_uring` (Jens Axboe, 2019) replaced the per-operation syscall model for async I/O with shared-memory submission and completion queues. In steady state, with `IORING_SETUP_SQPOLL`, a dedicated kernel poller thread drains submission queue entries (SQEs) from userspace-shared memory with *zero* `io_uring_enter` syscalls. Completions arrive in the CQ ring the same way.\n\nThis breaks every traditional tracing assumption. `strace` (`data/external-process-observation#strace-seccomp-bpf`) sees at most one `io_uring_enter` per batch — or nothing at all with SQPOLL — and cannot decode the individual SQEs that submission carried; `strace` issue #109 is the canonical \"strace cannot trace io_uring\" bug. Kernel kprobes attached to VFS functions see the operations fire but without the io_uring dispatch context needed to attribute them. The \"trace at the syscall boundary\" discipline is structurally blind here.\n\nThe robust production answer is **first-party tracepoints inside the io_uring subsystem itself**. Status (as of 2026-04): the names below are taken from `include/trace/events/io_uring.h` in mainline Linux and have evolved as the subsystem has grown — readers should consult the kernel source for the version they target. Representative tracepoints include `io_uring_submit_sqe` (per-SQE, where strace sees one batched enter), `io_uring_complete` (per-CQE), `io_uring_queue_async_work`, `io_uring_link`, `io_uring_poll_arm`/`_poll_wake`, `io_uring_cqring_wait`, `io_uring_cqe_overflow`, and about a dozen others. External probes can observe fragments of the path, but without subsystem-provided semantic events they are unstable and cannot reliably reconstruct per-SQE/per-CQE causality. Tools consume the tracepoints via `perf trace`, bpftrace (`data/runtime-event-pipelines#dtrace-d-bpftrace`), and specialized io_uring analyzers; causal reconstruction across submit and complete is a join on the `user_data` cookie each SQE carries. Cost when on is the standard NOP-patched tracepoint cost (`data/bytecode-and-code-patching#ftrace-ebpf-nop-to-call`), zero when off — the expensive axis is *volume*, since busy rings emit millions of CQEs per second, so consumers typically aggregate in-kernel via bpftrace maps rather than streaming raw events.\n\nThe broader structural lesson is the one worth carrying forward: **shared-memory-queue IPC is a tracing blindspot that requires cooperation from the subsystem being traced**. Any transport where the syscall boundary is crossed once per *batch* rather than per *operation* — DPDK, SPDK, RDMA verbs, Vulkan command buffers, GPU submit queues — has the same property. The operation semantics live primarily in user/kernel shared memory; externally attached probes can be useful for expert diagnosis, but stable causality requires first-party semantic tracepoints. This is the inverse of the DTrace/eBPF \"probe anything\" promise of `data/runtime-event-pipelines#dtrace-d-bpftrace` and a strong argument for language/runtime tracepoints (`data/runtime-event-pipelines#jdk-flight-recorder-jfr` / `data/runtime-event-pipelines#dotnet-eventpipe` / `data/runtime-event-pipelines#go-runtime-trace-flight-recorder`) as a *primary* design target rather than an afterthought.",
+      "sources": [
+        {
+          "url": "https://kernel.dk/io_uring.pdf"
+        },
+        {
+          "url": "https://kernel.dk/axboe-kr2022.pdf"
+        },
+        {
+          "url": "https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h"
+        },
+        {
+          "url": "https://lwn.net/Articles/1063853/"
+        },
+        {
+          "url": "https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/"
+        }
+      ]
+    },
+    {
+      "id": "database-query-tracing",
+      "title": "Database Query Tracing — Every Engine Reinvents ETW for Itself",
+      "tags": [
+        "database",
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Database engines have their own tracing subsystems parallel to ETW (`data/runtime-event-pipelines#etw-providers-controllers-consumers`), JFR (`data/runtime-event-pipelines#jdk-flight-recorder-jfr`), and EventPipe (`data/runtime-event-pipelines#dotnet-eventpipe`), because query-plan tracing needs to see operator-level events (scan, join, sort, hash-build, lock-acquire, async-I/O-request) that OS-level tracing cannot see. Three engines illustrate the design space.\n\n**SQL Server Extended Events (XE)** mirrors ETW's topology — packages → events → actions → predicates → sessions → dispatcher/buffers → targets — and even ships an `etw_classic_sync_target` that forwards events into OS ETW. The design point worth naming is that **predicates are evaluated synchronously on the firing thread before any buffer write**, so filtered-out events cost only a predicate evaluation.\n\n**PostgreSQL** takes the opposite path: no event bus, instead a small set of global function-pointer **executor hooks** (`ExecutorStart/Run/Finish/End_hook`, `planner_hook`, `post_parse_analyze_hook`) that extensions chain at `_PG_init()`. `auto_explain` and `pg_stat_statements` are two consumers of the same hook surface — the former emits per-query plan-tree text when `log_min_duration` is exceeded; the latter canonicalizes parse trees into query IDs (literals replaced by `$n`) and accumulates per-ID counters as a metrics endpoint.\n\n**MySQL Performance Schema** (since 5.7) inverts the interface entirely: events materialize into in-memory tables (`events_statements_current`, `events_waits_history_long`, `events_stages_summary_by_thread_by_event_name`) inside a dedicated `PERFORMANCE_SCHEMA` storage engine, queried via ordinary `SELECT`. With the consumer disabled, the hot path is an atomic-read of a boolean — the cheap-guard / expensive-payload pattern (`data/bytecode-and-code-patching#dtrace-usdt-is-enabled-probes`) again.\n\nThe chapter takeaway: **mature DB engines reinvent ETW for themselves** because operator-level visibility requires in-engine instrumentation. The runtime is a database, the events are plan-node transitions, and the design space is the same one ETW / JFR / EventPipe already mapped out at the OS / VM level. Complement rather than compete with `data/distributed-tracing#opentelemetry` OpenTelemetry's `db.statement` attribute: OTEL sees the query from outside, XE / auto_explain / Performance Schema see it from inside.",
+      "sources": [
+        {
+          "url": "https://www.postgresql.org/docs/current/auto-explain.html"
+        },
+        {
+          "url": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server"
+        },
+        {
+          "url": "https://dev.mysql.com/doc/refman/en/performance-schema.html"
+        }
+      ]
+    },
+    {
+      "id": "moarvm-telemetry-snapper-heap-snapshots",
+      "title": "MoarVM Telemetry, snapper, and Heap Snapshots",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Raku's MoarVM ships production-grade language-runtime observability built around three pieces. The **`Telemetry`** module instruments `Usage`, `Thread`, `ThreadPool`, and `AdHoc` event sources; `$*SAMPLER` controls active instruments. A dedicated **`snapper` thread** samples every 0.1 s; `-Msnapper` / `-Msafe-snapper` enables zero-code-change profiling on any Raku program. **Heap snapshots** use a binary format `MoarHeapDumpv00X` (current version 3, subversion 1), produced by `src/profiler/heapsnapshot.c`, with a TOC + string-intern table; produced via `--profile=foo.mvmheap` or `Telemetry::snap(:heap)` and saved with the `.mvmheap` extension.\n\nTooling: **`App::MoarVM::HeapAnalyzer`** is a CLI shell over the binary format; **`moarperf`** (timo, last release 2020 but still working) is a web UI; the now-discontinued Comma IDE integrated the same. The architectural design — snapper thread + opcode-level Telemetry events + a binary heap-snapshot format with offline analyzer tools — sits squarely in the JFR / EventPipe / `runtime/trace` family (§`data/runtime-event-pipelines#jdk-flight-recorder-jfr`, 3.3, 3.5), but for a smaller, less-known runtime. Worth recording as evidence that a small-team VM can ship credible always-on observability if the binary format and the analyzer are co-designed from the start — with the caveat that bus-factor is real: moarperf's last release was 2020 and the analyzer ecosystem is small enough that a single maintainer's departure is meaningful risk.",
+      "sources": [
+        {
+          "url": "https://docs.raku.org/type/Telemetry"
+        },
+        {
+          "url": "https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c"
+        },
+        {
+          "url": "https://github.com/timo/moarperf"
+        }
+      ]
+    },
+    {
+      "id": "pcp-sysdig-falco",
+      "title": "PCP, Sysdig, and Falco — Kernel-Layer Telemetry Beyond Runtime Pipelines",
+      "tags": [
+        "domain:observability",
+        "ebpf",
+        "family:buffered-event-emission",
+        "granularity:per-syscall",
+        "linux",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Three Linux-ecosystem tracing systems that occupy a different niche from the runtime-native event pipelines of §`data/runtime-event-pipelines#jdk-flight-recorder-jfr`–3.11. They instrument the OS kernel rather than the language runtime, and they answer different questions about a system's behaviour.\n\n**Performance Co-Pilot (PCP)** (Red Hat, 2000+) is a metrics-collection and analysis framework that predates eBPF and has unusually long-horizon retention discipline. A long-running daemon (`pmcd`) collects metrics from per-domain agents (`pmda`s for the kernel, MySQL, PostgreSQL, JVM, Apache, NFS, BIND, and dozens of others), retains time-series in a binary archive format that survives across reboots, and exposes them to query clients (`pminfo`, `pmval`, `pmrep`, Grafana via the PCP datasource). Distinct from Prometheus: per-host architecture with archives shipped to central storage, not pull-from-central scraping. Distinct from eBPF (§`data/bytecode-and-code-patching#ebpf-uprobes`, 1.11): agent-based with stable per-domain plugin contracts, not in-kernel-program-based. The strength is **decade-long historical retention** of metrics with consistent schema across kernel and application domains, which makes it the canonical telemetry stack for production-incident retrospectives at companies running PCP for many years.\n\n**Sysdig** (Sysdig, Inc., 2014+) wraps system calls in a tcpdump-like UI: `sysdig` captures all syscalls and kernel-tracepoint events into a file or live stream, with filters resembling Wireshark's display filters (`fd.type=ipv4 and proc.name=nginx and evt.type=connect`). Distinct from `strace` (`data/external-process-observation#strace-seccomp-bpf`): designed for whole-system observation rather than single-process attachment, with optimised in-kernel capture rather than ptrace per syscall. Modern Sysdig uses eBPF (§`data/bytecode-and-code-patching#ebpf-uprobes`, 1.11) as the capture mechanism, with the original kernel-module path as fallback for older kernels. The \"tcpdump for syscalls\" framing is the design lesson: a generic capture-and-filter tool over a uniform per-event schema scales to investigations that would require dozens of `strace` / `perf` / `ftrace` invocations to reconstruct.\n\n**Falco** (Sysdig, Inc., 2016+; CNCF graduated 2024) is the security-tracing layer on top of Sysdig: a rule engine evaluating syscall events against threat-detection rules (`spawned_process_in_container_with_unexpected_image`, `outbound_connection_from_unauthorized_user`, `write_to_etc_directory_outside_install_phase`) and emitting alerts. Production use in Kubernetes runtime security (Sysdig Secure, Aqua, Prisma Cloud, RedHat ACS). The architectural contribution: **kernel-event-based runtime threat detection at container scale** — a single Falco daemon per node observes every syscall in every container and can flag anomalies that file-integrity-monitor or process-list-scan tools would miss.\n\nThe design lesson distinguishing these from §`data/runtime-event-pipelines#jdk-flight-recorder-jfr`–3.11: **the runtime-native event pipelines instrument the language runtime; PCP, Sysdig, and Falco instrument the OS kernel**. Both layers are valuable; they answer different questions. Language-runtime tracing tells you why your async task is slow; kernel-syscall tracing tells you why your container is making unexpected network calls. A complete production observability story usually needs both, and the wire-format choice (CTF `data/runtime-event-pipelines#lttng-ctf`, OpenTelemetry `data/distributed-tracing#opentelemetry`, Falco's JSON, PCP's archive) is what determines whether the two layers correlate cleanly.",
+      "sources": [
+        {
+          "url": "https://pcp.io/"
+        },
+        {
+          "url": "https://sysdig.com/blog/sysdig-vs-strace/"
+        },
+        {
+          "url": "https://falco.org/"
+        },
+        {
+          "url": "https://github.com/falcosecurity/falco"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://openjdk.org/jeps/328"
+    },
+    {
+      "url": "https://docs.oracle.com/javacomponents/jmc-5-4/jfr-runtime-guide/about.htm"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/sessions"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/about-event-tracing-for-drivers"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/event-tracing-for-windows"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/eventpipe"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/microsoft-diagnostics-netcore-client"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace"
+    },
+    {
+      "url": "https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html"
+    },
+    {
+      "url": "https://www.haskell.org/ghc/blog/20190924-eventful-ghc.html"
+    },
+    {
+      "url": "https://manpages.ubuntu.com/manpages/jammy/man1/threadscope.1.html"
+    },
+    {
+      "url": "https://go.dev/blog/execution-traces-2024"
+    },
+    {
+      "url": "https://go.dev/blog/flight-recorder"
+    },
+    {
+      "url": "https://github.com/golang/proposal/blob/master/design/60773-execution-tracer-overhaul.md"
+    },
+    {
+      "url": "https://blog.felixge.de/waiting-for-go1-21-execution-tracing-with-less-than-one-percent-overhead/"
+    },
+    {
+      "url": "https://github.com/google/pprof/blob/main/proto/profile.proto"
+    },
+    {
+      "url": "https://www.usenix.org/legacy/event/usenix04/tech/general/full_papers/cantrill/cantrill.pdf"
+    },
+    {
+      "url": "https://illumos.org/books/dtrace/chp-intro.html"
+    },
+    {
+      "url": "https://github.com/bpftrace/bpftrace"
+    },
+    {
+      "url": "https://www.brendangregg.com/blog/2018-10-08/dtrace-for-linux-2018.html"
+    },
+    {
+      "url": "https://lwn.net/Articles/852112/"
+    },
+    {
+      "url": "https://lttng.org/docs/"
+    },
+    {
+      "url": "https://www.kernel.org/doc/ols/2006/ols2006v1-pages-209-224.pdf"
+    },
+    {
+      "url": "https://www.dorsal.polymtl.ca/files/publications/desnoyers-mcc09-final.pdf"
+    },
+    {
+      "url": "https://devstreaming-cdn.apple.com/videos/wwdc/2016/721wh2etddp4ghxhpcg/721/721_unified_logging_and_activity_tracing.pdf"
+    },
+    {
+      "url": "https://developer.apple.com/documentation/os/recording-performance-data"
+    },
+    {
+      "url": "https://developer.apple.com/videos/play/wwdc2018/405/"
+    },
+    {
+      "url": "https://kernel.dk/io_uring.pdf"
+    },
+    {
+      "url": "https://kernel.dk/axboe-kr2022.pdf"
+    },
+    {
+      "url": "https://github.com/torvalds/linux/blob/master/include/trace/events/io_uring.h"
+    },
+    {
+      "url": "https://lwn.net/Articles/1063853/"
+    },
+    {
+      "url": "https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/auto-explain.html"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/sql-server-extended-events-engine"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/extended-events/targets-for-extended-events-in-sql-server"
+    },
+    {
+      "url": "https://dev.mysql.com/doc/refman/en/performance-schema.html"
+    },
+    {
+      "url": "https://docs.raku.org/type/Telemetry"
+    },
+    {
+      "url": "https://github.com/MoarVM/MoarVM/blob/master/src/profiler/heapsnapshot.c"
+    },
+    {
+      "url": "https://github.com/timo/moarperf"
+    },
+    {
+      "url": "https://pcp.io/"
+    },
+    {
+      "url": "https://sysdig.com/blog/sysdig-vs-strace/"
+    },
+    {
+      "url": "https://falco.org/"
+    },
+    {
+      "url": "https://github.com/falcosecurity/falco"
+    }
+  ]
+}

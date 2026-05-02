@@ -1,0 +1,54 @@
+{
+  "kind": "tool",
+  "name": "Cargo",
+  "aliases": [],
+  "summary": "Rust's package manager and build tool; canonical example of layered identity (package → crate → module), first-class workspace support, content-hashed lockfile (`Cargo.lock`), and tightly integrated build/test/doc/publish workflow.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["tooling", "packaging"],
+      "content": "Cargo is Rust's package manager and build tool. It is one of the clearest examples of a language ecosystem where package management, build orchestration, testing, documentation, and dependency resolution are deliberately integrated rather than treated as separate tools.\n\nRust's package/crate/module layering is canonical: a **package** is Cargo's build/share/publish concept, containing one or more **crates** (the compiler's primary compilation unit: a library crate or binary crate rooted at `lib.rs` or `main.rs`), and inside a crate is a **tree of modules** formed by `mod` declarations. This three-level distinction prevents \"what gets compiled together?\", \"what gets published together?\", and \"what is a namespace boundary?\" from collapsing into one concept.",
+      "refs": [
+        { "target": "rust#tooling", "type": "part-of-ecosystem" }
+      ]
+    },
+    {
+      "id": "dependency-resolution",
+      "title": "Dependency resolution and lockfiles",
+      "tags": ["packaging", "reproducibility", "tooling"],
+      "content": "Cargo is frequently discussed in packaging research because it combines manifests, dependency resolution, lockfiles, and workspaces in a way that is relatively coherent for users and tooling. It is often used as a comparison point in discussions of deterministic builds and ecosystem ergonomics.\n\n**`Cargo.lock`** is TOML-formatted, listing every crate and version with content checksums. Recommended for binary projects, optional for libraries. The content-hash approach (Cargo, Go, Nix, pnpm) is increasingly the consensus: a lockfile entry pins not just a version number but the bytes of the dependency, so tampering or registry compromise is detectable.\n\nThe **single global namespace** on crates.io — first-come-first-served names, no organizational scoping — has suffered from name-squatting, typo-squatting, and maintenance abandonment. Scoped namespaces (npm `@scope`, Maven `groupId`) defend against this but require organizations to claim and maintain their scopes. Any new registry should commit to scoped names from the start; retrofitting is painful (npm's `@scope` introduction in 2014 left a long tail of unscoped legacy names).",
+      "refs": [],
+      "sources": [
+        { "label": "Cargo.toml vs Cargo.lock", "url": "https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html" }
+      ]
+    },
+    {
+      "id": "workspaces",
+      "title": "Workspaces and monorepos",
+      "tags": ["packaging", "workspaces", "tooling"],
+      "content": "Cargo workspaces provide a practical model for managing related packages in one repository while sharing dependency resolution and lockfile state. This makes Cargo relevant to language research that treats build graphs and package identity as first-class concerns.\n\nA workspace is a top-level grouping declared by a root `Cargo.toml` with a `[workspace]` table listing its `members`. Each member is a package (with its own `Cargo.toml` and one or more crates inside it), but the workspace as a whole shares one `Cargo.lock`, one `target/` directory, and (optionally) one set of shared `[workspace.dependencies]` resolved consistently across members. The workspace boundary buys *coordinated dependency resolution and build artifacts* across packages that ship and version separately, while the package boundary continues to own *what gets published as a unit on crates.io*. Cross-member dependencies in a workspace can be path-based (resolved locally during development) without changing the published-package identity.\n\nThe package-manager design lesson is that **workspace support must be a first-class feature, not a hack on top of the single-package model**. Cargo and pnpm got this right relatively early; npm and Yarn took years to converge on consistent semantics.",
+      "refs": [],
+      "sources": [
+        { "label": "Cargo workspaces", "url": "https://doc.rust-lang.org/cargo/reference/workspaces.html" }
+      ]
+    },
+    {
+      "id": "integrated-toolchain",
+      "title": "Integrated toolchain — build, test, doc, publish",
+      "tags": ["tooling", "packaging", "design-guidance"],
+      "content": "Cargo's integration of `cargo build`, `cargo test`, `cargo doc`, `cargo publish`, `cargo bench`, `cargo fmt`, `cargo clippy` (via rustup) into one cohesive command surface is itself a design contribution. The common interface is what makes Rust feel like a polished modern ecosystem: any new project gets standard test discovery, doc generation, formatter integration, linter integration, and registry publishing without the user having to assemble these pieces from competing tool ecosystems.\n\nThe lesson generalises: a language designed in 2026 should integrate its package manager, build tool, formatter, and linter from day one. The Rust ecosystem's reputation for polished tooling comes from this integration, not from any single tool being superior in isolation. Python's `pip + setuptools + tox + black + flake8 + isort` fragmentation (now partially consolidated by `uv` and `ruff`) is the cautionary tale.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Cargo book",
+      "url": "https://doc.rust-lang.org/cargo/"
+    }
+  ],
+  "provenance": {
+    "createdAt": "2026-05-01T12:03:44.943Z",
+    "updatedAt": "2026-05-01T12:06:35.623Z"
+  }
+}

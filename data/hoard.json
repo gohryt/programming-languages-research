@@ -1,0 +1,37 @@
+{
+  "kind": "tool",
+  "name": "Hoard",
+  "aliases": ["Berger Hoard"],
+  "summary": "Emery Berger et al.'s foundational scalable malloc (ASPLOS 2000) that combines per-processor heaps with a single global heap under a discipline that *provably* bounds blowup (factor of P) and avoids false sharing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "general-purpose-allocator"],
+      "content": "Emery Berger's Hoard (ASPLOS 2000) is the foundational scalable malloc — the *first* allocator to provably bound memory blowup to a constant under producer-consumer workloads. It combines per-processor heaps with a single global heap under a discipline that *provably* bounds blowup (a factor of P, where P is the number of processors) and avoids false sharing.\n\nMost subsequent allocators (jemalloc, tcmalloc, mimalloc, snmalloc) cite Hoard as ancestor. Worth naming for design genealogy even though the production allocator landscape has moved on.",
+      "refs": [
+        { "target": "allocators#fleet-and-decay-allocators", "type": "part-of" },
+        { "target": "tcmalloc#overview", "type": "successor" },
+        { "target": "jemalloc#overview", "type": "successor" }
+      ]
+    },
+    {
+      "id": "superblock-model",
+      "title": "Superblock model and provable bounds",
+      "tags": ["thread-cache", "size-class"],
+      "content": "Heaps own contiguous superblocks; when a per-processor heap drops below a fullness threshold, mostly-empty superblocks migrate to the global heap for any thread to claim. The fullness threshold and migration discipline are what give the provable blowup bound: Berger's analysis shows that under producer-consumer workloads, total memory consumption stays within a factor of P of the application's true working set — much better than allocators (such as Solaris malloc at the time) that had unbounded blowup.\n\nReported numbers from the original paper: up to 60x speed-up vs. Solaris malloc and 18x vs. then-best alternatives on 14 CPUs.",
+      "refs": []
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["production"],
+      "content": "Status (as of 2026-04): still maintained by Berger's group; production use exists but is overshadowed by mimalloc, jemalloc, and TCMalloc in modern deployments. Hoard's lasting contribution is the proof technique and the per-processor-heap-with-global-fallback architecture that nearly every modern scalable allocator inherits.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Hoard ASPLOS 2000", "url": "https://people.cs.umass.edu/~emery/pubs/berger-asplos2000.pdf" },
+    { "label": "Hoard project page", "url": "https://emeryberger.github.io/Hoard/" }
+  ]
+}

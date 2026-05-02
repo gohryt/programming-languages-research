@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Roslyn Semantic Model",
+  "aliases": ["roslyn-typed-view"],
+  "summary": "Typed, name-resolved view layered on top of Roslyn's syntax tree. Computed lazily — querying for one expression doesn't trigger full-program analysis. The model exposes type, symbol, and binding facts on demand by composing with the underlying red-green tree.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Roslyn's \"semantic model\" is the typed, name-resolved view layered on top of the syntax tree. Where the syntax tree is purely lexical, the semantic model answers questions: \"what type does this expression have?\" \"what symbol does this identifier refer to?\" \"is this method override valid?\" The model is computed lazily — querying it for one expression doesn't trigger full-program analysis.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "roslyn-red-green#overview", "type": "extends" }
+      ],
+      "sources": [
+        { "label": "Microsoft Learn — Roslyn semantic analysis", "url": "https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/semantic-analysis" }
+      ]
+    },
+    {
+      "id": "lazy-query-model",
+      "title": "Lazy query model",
+      "tags": ["compiler-ir", "ide", "incrementality"],
+      "content": "Distinct from a separate IR layer: Roslyn does not lower the syntax tree into a different data structure for semantic queries. Instead, the syntax tree is queried *with* a semantic model parameter, and the model produces type/symbol facts on demand. This is the lazy-query equivalent of Salsa, but framed as IDE infrastructure rather than compiler architecture.\n\nThe pattern lets IDE features like hover-typing, go-to-definition, and find-references work at interactive latency without invalidating the entire compilation each time the user moves the cursor.",
+      "refs": [
+        { "target": "salsa-incremental#overview", "type": "analogous-to" },
+        { "target": "language-server#overview", "type": "powers" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Microsoft Learn — Roslyn semantic analysis", "url": "https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/semantic-analysis" }
+  ]
+}

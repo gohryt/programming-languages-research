@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Forth CREATE / DOES>",
+  "aliases": ["defining words", "DOES> idiom"],
+  "summary": "Forth's runtime-extensible defining-word pair: `CREATE name` reserves dictionary space; `DOES>` overrides the default execution semantics so everything after `DOES>` becomes the runtime behavior of words created by the defining word. Achieves a large fraction of macro-system expressiveness with one primitive.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Forth's `CREATE` / `DOES>` pair predates most modern macro systems and achieves a large fraction of their expressiveness with one primitive. `CREATE name` reserves dictionary space and installs default execution semantics (push the allocated address on the data stack). `DOES>` overrides those semantics: everything after `DOES>` in a *defining word* becomes the runtime behavior for every word the defining word later creates.\n\n```forth\n: CONSTANT  CREATE ,  DOES>  @ ;\n42 CONSTANT ANSWER   \\ defines ANSWER so that it pushes 42\n```\n\n`CONSTANT` is a defining word: calling it `CREATE`s a new word (`ANSWER`), comma-compiles `42` into its dictionary space, and — via `DOES>` — arranges that invoking `ANSWER` fetches from that space.",
+      "refs": [],
+      "sources": [
+        { "label": "Forth CREATE / DOES> explanation", "url": "https://softwareengineering.stackexchange.com/questions/339283/forth-how-do-create-and-does-work-exactly" }
+      ]
+    },
+    {
+      "id": "use-cases",
+      "title": "Use cases",
+      "tags": ["forth", "metaprogramming"],
+      "content": "Arrays, structures, object-dispatch tables, and entire object systems have been built on nothing but `CREATE` / `DOES>`. The pattern composes: a defining word can itself be created by another defining word, allowing layered abstractions.\n\nExample patterns this single primitive covers cleanly:\n\n- **Constants and variables** with custom access semantics.\n- **Records and structures** where each field-name is a word that adds a known offset to a base address.\n- **Object dispatch tables**: a defining word for classes that creates dispatch tables and methods at compile time.\n- **State machines**: defining words that emit transition logic for each named state.\n- **Lookup tables**: arrays indexed by the word's name rather than a numeric index.",
+      "refs": []
+    },
+    {
+      "id": "design-insight",
+      "title": "Design insight",
+      "tags": ["language-design", "metaprogramming"],
+      "content": "The insight: `CREATE / DOES>` fuses a compile-time action (shaping the new word's dictionary entry) and a deferred runtime action (the `DOES>`-installed behavior) using the language's existing execution model — no separate macro language, no hygiene system, no AST transformation. Modern languages achieve similar expressiveness through comptime or macros, but usually at the cost of a dedicated metaprogramming phase. Forth makes its runtime its metaprogram.\n\nThe trade-off is scope: `CREATE/DOES>` targets defining-word patterns specifically, not arbitrary compile-time computation. But defining-word patterns turn out to cover a surprisingly large fraction of the use cases that push other languages toward full macro systems, and the mechanism costs almost nothing to implement.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Forth CREATE / DOES>", "url": "https://softwareengineering.stackexchange.com/questions/339283/forth-how-do-create-and-does-work-exactly" }
+  ]
+}

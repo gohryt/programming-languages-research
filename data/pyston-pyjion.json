@@ -1,0 +1,32 @@
+{
+  "kind": "runtime",
+  "name": "Pyston and Pyjion",
+  "aliases": ["Pyston", "Pyjion", "Dropbox Pyston"],
+  "summary": "Two minor Python JIT efforts grouped for completeness. Pyston (Dropbox 2014–2017, revived 2020+) JIT-compiles CPython with attribute-cache acceleration; Pyston-lite (2022) repackaged it as a CPython extension. Pyjion (Microsoft 2016–2021) used the .NET CLR's RyuJIT as codegen backend. Both mostly dormant; eclipsed by mainline JIT and CinderX.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Cinder is the dominant alternative Python JIT today. Two earlier efforts deserve historical mention. **Pyston** (originally Dropbox 2014–2017, revived 2020+) is a JIT-compiling CPython fork with attribute-cache acceleration, JIT-compiled bytecode interpretation, and a runtime model closer to PyPy than to mainline Python. **Pyston-lite** (2022) repackaged the JIT as a CPython extension (`pip install pyston-lite-autoload`) — same idea CinderX adopted three years later.\n\n**Pyjion** (Microsoft, 2016–2021) is the third historical production JIT effort, using the .NET CLR's RyuJIT as the codegen backend for CPython bytecode. It demonstrated that a host JIT can be reused for a guest language but shipped as research and was archived in 2022.",
+      "refs": [
+        { "target": "cinder#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Pyston repository", "url": "https://github.com/pyston/pyston" },
+        { "label": "Pyston blog", "url": "https://blog.pyston.org/" }
+      ]
+    },
+    {
+      "id": "design-lessons",
+      "title": "Design lessons",
+      "tags": ["python", "jit", "history"],
+      "content": "Both projects illustrate the difficulty of sustained engineering investment for an alternative Python implementation. Pyston was Dropbox's project until 2017, then went dormant when Dropbox refocused; revived in 2020, it eventually got eclipsed by the mainline CPython JIT and Cinder. Pyjion was a Microsoft research project; archived when its champion left.\n\nThe deployment lesson Pyston-lite established — JIT as CPython extension rather than fork — was important enough that CinderX adopted it. The technique angle still matters: copy-and-patch baselines, adaptive interpreters, and method-level JITs occupy distinct points in the same design space. The project-specific code is mostly historical interest now, but the design points remain relevant for new Python-acceleration efforts.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Pyston repo", "url": "https://github.com/pyston/pyston" },
+    { "label": "Pyston blog", "url": "https://blog.pyston.org/" }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "kind": "concept",
+  "name": "ARM MTE — Memory Tagging Extension",
+  "aliases": ["MTE", "ARM Memory Tagging Extension"],
+  "summary": "ARM's hardware memory-tagging mechanism: 4-bit tag per 16-byte granule stored both in pointer top bits (TBI) and in shadow tag memory; hardware checks on every load/store. SYNC / ASYNC / ASYMM modes trade precision for speed. Shipping on Pixel 8/9 and other flagship Android SoCs as of 2026-04.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["memory-tag", "pointer-tagging", "aarch64", "arm", "hardware-safety", "memory-safety", "exploit-mitigation"],
+      "content": "ARM's **Memory Tagging Extension** stores a 4-bit tag per 16-byte granule, both in pointer top bits (Top-Byte-Ignore / TBI) and in shadow tag memory; hardware checks on every load/store. The mechanism is the production-silicon descendant of the SPARC ADI design point and the architectural counterpart of HWASan's software tagging.\n\nMTE sits at the *per-allocation tagging* point in the hardware-assisted memory-safety design space — orthogonal to PAC's pointer integrity, CET's control-flow integrity, MPK's per-page protection groups, and CHERI's full bounded-capability model.",
+      "refs": [
+        { "target": "sparc-adi", "type": "successor-of" },
+        { "target": "hwasan", "type": "analog-of" },
+        { "target": "apple-mie", "type": "related" },
+        { "target": "shadow-memory", "type": "related" }
+      ]
+    },
+    {
+      "id": "modes-and-mechanism",
+      "title": "SYNC / ASYNC / ASYMM modes",
+      "tags": ["memory-tag", "tag-mismatch-trap", "aarch64", "use-after-free", "linear-overflow"],
+      "content": "SYNC / ASYNC / ASYMM modes trade precision for speed:\n\n- **SYNC** traps immediately on tag mismatch with the faulting PC and exact address.\n- **ASYNC** accumulates faults to a status register checked on context switch.\n- **ASYMM** combines synchronous-on-load with asynchronous-on-store.\n\nScudo allocator integration randomises tags on malloc/free for use-after-free and linear-overflow detection. Stack tagging is provided by the `AArch64StackTagging` compiler instrumentation pass.",
+      "refs": [
+        { "target": "shadow-memory", "type": "related" }
+      ]
+    },
+    {
+      "id": "overhead-and-status",
+      "title": "Overhead, deployment, and TIKTAG",
+      "tags": ["production", "aarch64", "exploit-mitigation"],
+      "content": "Overhead: Scudo + MTE SYNC ≈ 12% geomean SPECrate, MTE ASYNC ≈ 4% (NanoTag, 2025). Originally marketed as \"near-zero\" — real cost is non-trivial in SYNC.\n\nStatus (as of 2026-04): shipping on Pixel 8/9 (opt-in) and upcoming flagship Android SoCs; Apple MIE on recent A-series devices is covered separately as a more aggressive consumer deployment combining EMTE with secure typed allocators.\n\nThe **TIKTAG attack** (2024) demonstrated speculative tag leakage on Pixel 8 — the same class of vulnerability that Apple's Tag Confidentiality Enforcement was designed to mitigate.",
+      "refs": [
+        { "target": "apple-mie", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Bionic MTE docs", "url": "https://android.googlesource.com/platform/bionic/+/main/docs/mte.md" },
+        { "label": "NanoTag / MTE overhead 2025", "url": "https://arxiv.org/pdf/2509.22027" },
+        { "label": "Arm learning path — MTE on Pixel 8", "url": "https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Bionic MTE docs", "url": "https://android.googlesource.com/platform/bionic/+/main/docs/mte.md" },
+    { "label": "NanoTag / MTE overhead 2025", "url": "https://arxiv.org/pdf/2509.22027" },
+    { "label": "Arm learning path — MTE on Pixel 8", "url": "https://learn.arm.com/learning-paths/mobile-graphics-and-gaming/mte_on_pixel8/" }
+  ]
+}

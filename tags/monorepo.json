@@ -1,0 +1,9 @@
+{
+  "id": "monorepo",
+  "tag": "monorepo",
+  "name": "Monorepo",
+  "description": "Sections tagged with the Monorepo concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "monorepos"
+  ]
+}

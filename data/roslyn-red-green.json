@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Roslyn Red-Green Trees",
+  "aliases": ["red-green-trees"],
+  "summary": "C# and VB.NET's compiler API uses a two-layer tree: immutable, position-free green nodes that store kind + width + child references, and ephemeral red nodes that wrap green nodes with absolute positions and parent pointers computed lazily. Editing produces a new green tree that shares unchanged subtrees.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "C# and VB.NET's compiler API uses a two-layer tree: immutable, position-free **green nodes** that store kind + width + child references, and ephemeral **red nodes** that wrap green nodes with absolute text positions and parent pointers computed lazily on demand. Editing produces a new green tree that shares unchanged subtrees with the old one — an O(edit-size) update rather than O(file-size). The red tree is rebuilt on each navigation but cheap because it caches over the underlying green structure.",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "instance-of" },
+        { "target": "rowan#overview", "type": "inspired" }
+      ],
+      "sources": [
+        { "label": "Roslyn Red-Green Trees (Eric Lippert)", "url": "https://ericlippert.com/2012/06/08/red-green-trees/" }
+      ]
+    },
+    {
+      "id": "width-only-storage",
+      "title": "Width-only green nodes",
+      "tags": ["cst", "incrementality", "memory-layout"],
+      "content": "The original contribution is treating *width-only* nodes as the storage representation. Most position-aware ASTs store absolute offsets per node, paying for them on every edit. Roslyn pays for absolute positions only when the user navigates, and only for the path actually visited.\n\nThis is the design insight that makes whole-file edits cheap: changing the first character of a file would invalidate every absolute offset in a position-storing tree, but green nodes only carry widths, so the green tree is structurally unchanged below the edit point.",
+      "refs": []
+    },
+    {
+      "id": "ide-integration",
+      "title": "IDE and semantic model integration",
+      "tags": ["ide", "tooling"],
+      "content": "The semantic model layer of Roslyn is layered on top of the syntax tree: typed, name-resolved view computed lazily — querying it for one expression doesn't trigger full-program analysis. Roslyn is a foundational example of \"compiler as service\" architecture, where the same data structures power batch compilation, IDE features, refactoring tools, and build-time code generation.",
+      "refs": [
+        { "target": "roslyn-semantic-model#overview", "type": "extends" },
+        { "target": "language-server#overview", "type": "powers" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Roslyn Red-Green Trees (Eric Lippert)", "url": "https://ericlippert.com/2012/06/08/red-green-trees/" },
+    { "label": "Microsoft Learn — Work with the syntax model (Roslyn)", "url": "https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax" }
+  ]
+}

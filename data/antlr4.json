@@ -1,0 +1,98 @@
+{
+  "kind": "framework",
+  "name": "ANTLR4",
+  "aliases": [
+    "all-star"
+  ],
+  "summary": "Parser generator built on Terence Parr and Sam Harwell's ALL(*) algorithm: at each ambiguous decision, parse-time subset-construction-style lookahead replaces compile-time grammar analysis. Linear on real grammars; O(n⁴) worst case.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Terence Parr and Sam Harwell's ALL(*) algorithm (OOPSLA 2014, with Kathleen Fisher) is the engine behind ANTLR4. The idea is to move grammar analysis from generator time to parse time: at each ambiguous decision point, ALL(*) launches a subset-construction-style lookahead that explores all viable alternatives in parallel over the actual input, building a prediction DFA lazily and caching it for future visits. When regular lookahead is insufficient, it falls back to GLL-style exploration. The earlier LL(*) algorithm (PLDI 2011) did static analysis; ALL(*) is the adaptive, dynamic successor that removed LL(*)'s grammar restrictions.",
+      "refs": [
+        {
+          "target": "deterministic-ll-lr#overview",
+          "type": "extends"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Parr, Harwell, Fisher — ALL(*) tech report (OOPSLA 2014)",
+          "url": "https://www.antlr.org/papers/allstar-techreport.pdf"
+        }
+      ]
+    },
+    {
+      "id": "all-star-algorithm",
+      "title": "ALL(*) and adaptive LL parsing",
+      "tags": [
+        "parser",
+        "ll",
+        "adaptive-parsing"
+      ],
+      "content": "The worst case is theoretically O(n⁴), but Parr and Harwell report that ALL(*) consistently runs linearly on real grammars and outperforms GLR/GLL by orders of magnitude on practical inputs. The algorithm handles any non-left-recursive CFG directly; direct left recursion is rewritten by ANTLR4's front-end into the equivalent Pratt-like precedence-climbing form.\n\nAdaptive lookahead caching means cold paths pay a two-pass analyze-then-parse cost; warm paths are linear because the prediction DFA is reused.",
+      "refs": [
+        {
+          "target": "deterministic-ll-lr#overview",
+          "type": "extends"
+        },
+        {
+          "target": "ambiguity-and-parse-forests#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "grammar-authoring",
+      "title": "Grammar authoring and generated parsers",
+      "tags": [
+        "parser",
+        "parser-generator",
+        "tooling"
+      ],
+      "content": "ALL(*) is why ANTLR4 displaced yacc/bison for many grammar-first users: grammars stay readable (no manual precedence disambiguation or conflict refactoring), lookahead is effectively unlimited, and the generated parsers produce decent error messages out of the box.\n\nANTLR4 generates parsers in Java, C#, Python, JavaScript/TypeScript, Go, C++, Swift, PHP, and Dart. Grammar files (`.g4`) can be reused across these targets, which makes ANTLR4 attractive when one grammar must drive parsers in multiple host languages.",
+      "refs": [
+        {
+          "target": "deterministic-ll-lr#grammar-engineering-tradeoffs",
+          "type": "improves-on"
+        },
+        {
+          "target": "pest#grammar-authoring",
+          "type": "sibling"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": [
+        "parser",
+        "tradeoffs",
+        "tooling"
+      ],
+      "content": "The practical limits are code size, the two-pass analyze-then-parse overhead on cold code paths, and the same \"generated parser is a black box\" pressures that push production compilers towards hand-written recursive descent. Editor-grade incremental reparsing and contextual error recovery are harder to retrofit into a generated ANTLR4 parser than to maintain in a hand-written one — which is why tools like Ruff migrated away from a generated parser as they matured.",
+      "refs": [
+        {
+          "target": "tree-sitter#parser-architecture",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "recursive-descent#strengths",
+          "type": "contrasts-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "ANTLR4 repository",
+      "url": "https://github.com/antlr/antlr4"
+    },
+    {
+      "label": "Parr, Harwell, Fisher — ALL(*) tech report (OOPSLA 2014)",
+      "url": "https://www.antlr.org/papers/allstar-techreport.pdf"
+    }
+  ]
+}

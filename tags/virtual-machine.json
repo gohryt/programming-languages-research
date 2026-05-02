@@ -1,0 +1,9 @@
+{
+  "id": "virtual-machine",
+  "tag": "virtual-machine",
+  "name": "Virtual Machine",
+  "description": "Sections tagged with the Virtual Machine concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "virtual-machines"
+  ]
+}

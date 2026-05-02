@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "DEX",
+  "aliases": ["dalvik-executable", "android-dex"],
+  "summary": "Android's register-based bytecode. Each method declares a fixed register set (typically 8–16 registers per method), and instructions name source/destination registers explicitly. Multiple class files merge into a single classes.dex per app with shared string and type pools.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Android's DEX is *register-based* bytecode: each method declares a fixed register set (typically 8–16 registers per method), and instructions name source and destination registers explicitly. This contrasts with JVM stack bytecode and aligns with Dalvik VM's choice (later inherited by ART) to optimise for the dispatch-cost characteristics of mobile CPUs.\n\nDEX's distinctive design: multiple class files merge into a single `classes.dex` per app, with shared string and type pools. This dramatically reduces APK size compared to shipping individual `.class` files.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "register-vs-stack-bytecode#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "Android DEX format", "url": "https://source.android.com/docs/core/runtime/dex-format" }
+      ]
+    },
+    {
+      "id": "as-aot-target",
+      "title": "DEX as install-time AOT target",
+      "tags": ["bytecode", "aot", "android"],
+      "content": "DEX is also the AOT compilation target on Android: javac/kotlinc emit JVM `.class` files, `d8` (or older `dx`) translates them to DEX, and ART compiles DEX to native at install or first-run, caching the result in `/data/dalvik-cache`. Multidex (handling apps with >64K methods) and ART's profile-guided AOT are downstream consequences of this format choice.\n\nThis dual role — distribution format *and* AOT input — is unusual. Most platforms separate the two: the bytecode is the distribution format, and the native artifact is a separate caching layer.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Android DEX format", "url": "https://source.android.com/docs/core/runtime/dex-format" }
+  ]
+}

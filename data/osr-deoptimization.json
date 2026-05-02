@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "On-Stack Replacement and Deoptimization",
+  "aliases": ["OSR", "deopt", "deoptless", "on-stack replacement"],
+  "summary": "OSR transitions execution between tiers without unwinding: the lower-tier frame is reconstructed from the higher tier's optimised state. Deoptimization is the reverse — when a speculation fails, reconstruct the interpreter frame and resume there. D'Elia & Demetrescu PLDI 2018; Deoptless (Flückiger et al., PLDI 2022) avoids the deopt by dispatched OSR.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**On-Stack Replacement (OSR)** is the mechanism that transitions execution between tiers without unwinding the call stack. When a hot loop in the interpreter is identified for JIT compilation, OSR jumps from the interpreter into the JIT-compiled version mid-loop, transferring locals and the program counter as it goes.\n\n**Deoptimization** is the reverse: when a JIT-compiled function's speculation fails (a guard fires because an observed type changed), the runtime reconstructs the interpreter's stack frame from the JIT's optimised state and resumes execution in the interpreter. The mapping from JIT-state to interpreter-state is the deopt metadata, recorded by the JIT at every speculative point.",
+      "refs": [
+        { "target": "trace-based-jit#overview", "type": "supports" },
+        { "target": "tiered-compilation#overview", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "On-Stack Replacement, Distilled (D'Elia & Demetrescu, PLDI 2018)", "url": "https://season-lab.github.io/papers/osr-distilled-pldi18.pdf" }
+      ]
+    },
+    {
+      "id": "deoptless",
+      "title": "Deoptless — speculation with dispatched OSR",
+      "tags": ["jit", "speculation"],
+      "content": "**Deoptless** (Flückiger et al., PLDI 2022) is the modern refinement: instead of compiling a single optimised function with deopt sites that jump back to the interpreter, compile *multiple* specialised versions and dispatch between them. When a guard fails in version A, the runtime jumps to version B (optimised for the new type) rather than to the interpreter.\n\nThe payoff is that a function that frequently sees two type combinations stays JIT-compiled in both cases — no interpreter fallback. The cost is more compile time and more memory for multiple specialised versions, but R's deoptless implementation reports substantial steady-state wins on workloads with bimodal type distributions.",
+      "refs": [],
+      "sources": [
+        { "label": "Deoptless: Speculation with Dispatched OSR (Flückiger et al., PLDI 2022)", "url": "https://janvitek.org/pubs/pldi22.pdf" }
+      ]
+    },
+    {
+      "id": "metadata-encoding",
+      "title": "Deopt metadata encoding",
+      "tags": ["jit", "compiler"],
+      "content": "The deopt metadata is the load-bearing data structure. At every guard, the JIT must record enough state to reconstruct the interpreter frame: register-to-local mappings, inlined-frame stack reconstruction, partial-evaluation-eliminated values that must be re-materialised. The metadata is compact in production (~1 byte per JIT instruction is typical) but its design constrains every JIT decision.\n\nFrame state metadata typically uses a deduplicated representation: most points in the JIT have similar interpreter-frame state, so the metadata stores deltas from a baseline rather than full snapshots. V8's TurboFan, HotSpot's C2, SpiderMonkey IonMonkey, and JavaScriptCore DFG all have variations on this design.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "OSR Distilled", "url": "https://season-lab.github.io/papers/osr-distilled-pldi18.pdf" },
+    { "label": "Deoptless PLDI 2022", "url": "https://janvitek.org/pubs/pldi22.pdf" }
+  ]
+}

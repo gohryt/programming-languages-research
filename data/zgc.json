@@ -1,0 +1,96 @@
+{
+  "kind": "runtime",
+  "name": "ZGC — Colored Pointers and Self-Healing Load Barriers",
+  "aliases": [
+    "Z Garbage Collector",
+    "OpenJDK ZGC",
+    "Generational ZGC"
+  ],
+  "summary": "OpenJDK's ZGC is a concurrent region-based compacting collector using colored 64-bit pointers with metadata bits and load barriers to translate stale references on the fly, achieving sub-millisecond pauses independent of heap size up to 16 TB.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "garbage-collection",
+        "tracing-gc",
+        "concurrent-gc",
+        "compacting-gc",
+        "low-latency-gc",
+        "sub-millisecond-pause",
+        "jvm",
+        "openjdk"
+      ],
+      "content": "OpenJDK's **ZGC** is a concurrent region-based compacting collector using **colored 64-bit pointers** with metadata bits and **load barriers** to translate stale references on the fly, achieving sub-millisecond pauses independent of heap size up to 16 TB.\n\nZGC and Shenandoah are the two production heirs to Azul's C4 lineage; both inherit the colored-pointer/load-barrier design but diverge on barrier choice and remembered-set strategy.",
+      "refs": [
+        {
+          "target": "garbage-collection#low-latency-collectors",
+          "type": "instance-of"
+        },
+        {
+          "target": "azul-c4",
+          "type": "successor-of"
+        },
+        {
+          "target": "shenandoah-gc",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "g1-gc",
+          "type": "complements"
+        }
+      ]
+    },
+    {
+      "id": "colored-pointers",
+      "title": "Colored pointers and self-healing load barriers",
+      "tags": [
+        "colored-pointer",
+        "read-barrier",
+        "self-healing-barrier",
+        "load-reference-barrier"
+      ],
+      "content": "**Colored pointers** — Marked0/Marked1/Remapped/Finalizable bits embedded in the high bits of 64-bit references; a load barrier resolves stale pointers without an STW remap phase. **Self-healing barriers** update the loaded reference back into the field, ensuring each barrier slow path fires at most once per location.\n\nThe self-healing property is what gives ZGC its constant-time barrier behaviour: the slow path runs once per field, then subsequent loads from the healed field hit the fast path. This is the key correctness/performance invariant ZGC inherits from Azul C4's Loaded Value Barrier."
+    },
+    {
+      "id": "generational-zgc",
+      "title": "Generational ZGC (JEP 439)",
+      "tags": [
+        "generational-gc",
+        "concurrent-gc"
+      ],
+      "content": "**Generational ZGC** (JEP 439, JDK 21+) added a young generation with store barriers for young/old tracking; in JDK 25 it became the *only* ZGC implementation (legacy non-generational mode removed).\n\nThe rationale: even pauseless concurrent compaction benefits from generational filtering of long-lived from short-lived data. Most allocations are short-lived (the generational hypothesis); concentrating GC work on the young generation reduces the total marking and compaction effort, while the colored-pointer + load-barrier infrastructure ensures pauses remain sub-millisecond regardless."
+    },
+    {
+      "id": "status",
+      "title": "Status and deployment",
+      "tags": [
+        "production",
+        "jvm",
+        "openjdk",
+        "low-latency-gc"
+      ],
+      "content": "Status (as of 2026-04, JDK 25): production since JDK 15. **Generational ZGC is the only ZGC mode in JDK 25 LTS**, which does not imply ZGC is the default JVM collector — G1 remains the default; ZGC is opt-in for latency-sensitive workloads. Linux/Windows/macOS.\n\nWith Project Lilliput (compact object headers, JEP 519) shipped in JDK 25, ZGC's barrier costs scale proportionally — fewer object headers traversed means lower steady-state barrier overhead.",
+      "refs": [
+        {
+          "target": "project-lilliput",
+          "type": "complements"
+        },
+        {
+          "target": "project-valhalla",
+          "type": "complements"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "JEP 439 — Generational ZGC",
+      "url": "https://openjdk.org/jeps/439"
+    },
+    {
+      "label": "OpenJDK ZGC wiki",
+      "url": "https://wiki.openjdk.java.net/display/zgc"
+    }
+  ]
+}

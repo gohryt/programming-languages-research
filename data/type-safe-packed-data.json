@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "Type-Safe Packed Data with Indexed Readers",
+  "aliases": ["packed-data", "indexed-cursor-types", "cursor-protocol"],
+  "summary": "Jamet and Vollmer (ECOOP 2025): library-level recovery of compiler-supported packed representations without modifying the compiler. Phantom/index types describe the sequence of values in a buffer; an indexed monad PackedReader before after result tracks cursor movement through the type system. Reader expecting Int cannot accidentally read Char.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Jamet and Vollmer's **type-safe and portable support for packed data** (ECOOP 2025) shows how a library can recover many benefits of compiler-supported packed representations without modifying the compiler.\n\nThe Haskell `packed-data` library represents packed buffers with phantom/index types that describe the sequence of values in the buffer, and uses an indexed monad `PackedReader before after result` to track cursor movement through the type system. A reader that expects an `Int` cannot accidentally read a `Char`, and a computation that has not consumed the expected bytes cannot be run as if it were finished.",
+      "refs": [
+        { "target": "linear-affine-types#overview", "type": "leverages" },
+        { "target": "typestate#encoding-strategies", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "Type-safe and portable support for packed data", "url": "https://arxiv.org/abs/2504.20166" },
+        { "label": "Type-Safe and Portable Support for Packed Data (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.38" }
+      ]
+    },
+    {
+      "id": "type-system-mechanism",
+      "title": "Type-system mechanism — indexed cursor protocol",
+      "tags": ["type-system", "packed-data"],
+      "content": "The type-system mechanism is ordinary type indexing plus code generation. Template Haskell derives pack/read/case/transform functions for user ADTs; optional indirection flags change the generated reader types to expose field-size words. This makes layout choices visible at the type level: code written for a buffer with indirections is not silently reused for a buffer without them.\n\nThe performance lesson is mixed but useful. Traversals over packed trees can be up to **60% faster** than unpacked Haskell in favourable full-traversal cases by avoiding pointer chasing and deserialization; random field access can be much worse without indirections; monadic abstraction overhead remains visible. The general design lesson is that **data-layout safety can be encoded as a type-level cursor protocol**, giving a safer library-level path to packed data before committing to compiler-native support."
+    }
+  ],
+  "sources": [
+    { "label": "Type-safe and portable support for packed data (arXiv)", "url": "https://arxiv.org/abs/2504.20166" },
+    { "label": "Type-Safe and Portable Support for Packed Data (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.38" }
+  ]
+}

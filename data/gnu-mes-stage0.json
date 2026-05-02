@@ -1,0 +1,35 @@
+{
+  "kind": "tool",
+  "name": "GNU Mes and stage0 — Full-Source Bootstrapping",
+  "aliases": ["GNU Mes", "stage0", "Bootstrappable Builds"],
+  "summary": "Bootstrappable Builds project: traces every build dependency back to a 357-byte hex0 binary that reads hex source. stage0 builds up step by step to a C compiler (Mescc → tinycc → GCC), from which the rest of a system can be built. Total trust surface: 357 bytes plus source for everything else.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The **Bootstrappable Builds** project traces every build dependency back to a small, auditable seed. The canonical chain: **stage0** is a 357-byte binary (called `hex0`) that reads hex source code. stage0 builds up, step by step, to a C compiler (Mescc → tinycc → GCC), from which the rest of a system can be built.\n\n**GNU Mes** implements the upper layers: a tiny Scheme interpreter that compiles to a tinycc-precursor, which compiles a full tinycc, which compiles GCC. The total trust surface is the 357-byte hex0 binary plus source for everything else — auditable by humans, not dependent on any binary blob.",
+      "refs": [
+        { "target": "trusting-trust#overview", "type": "addresses" },
+        { "target": "mrustc#overview", "type": "complementary-to" }
+      ],
+      "sources": [
+        { "label": "Bootstrappable Builds", "url": "https://bootstrappable.org/" }
+      ]
+    },
+    {
+      "id": "design-principle",
+      "title": "Design principle",
+      "tags": ["bootstrap", "security", "build"],
+      "content": "The principle applies beyond security: for any language with an evolving self-hosting compiler, having a low-dependency bootstrap path (even if slow) is insurance against losing the ability to rebuild from source if the compiled-compiler chain breaks.\n\nA full-source bootstrap is dramatically more conservative than mrustc's alternative-compiler approach: it traces the dependency chain all the way to a binary small enough to audit by hand. The cost is a multi-hour bootstrap process versus mrustc's minutes; the benefit is that every byte of every intermediate compiler is reproducible from source.",
+      "refs": [],
+      "sources": [
+        { "label": "GNU Mes", "url": "https://www.gnu.org/software/mes/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Bootstrappable Builds", "url": "https://bootstrappable.org/" },
+    { "label": "GNU Mes", "url": "https://www.gnu.org/software/mes/" }
+  ]
+}

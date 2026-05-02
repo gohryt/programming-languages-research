@@ -1,0 +1,112 @@
+{
+  "kind": "concept",
+  "name": "Ownership",
+  "aliases": [],
+  "summary": "Concept hub for resource lifetime, aliasing, and mutation disciplines enforced statically by the type system; collects design-space axes, comparisons against tracing GC, reference counting, regions, and capabilities, and indexes per-language ownership designs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ownership is a discipline for controlling resource lifetime, aliasing, and mutation. As a concept hub it connects type-system design, safe sharing, borrowing, and runtime behavior rather than describing a single implementation technique.\n\nOwnership systems make memory safety a static type-system property by enforcing aliasing rules at compile time. The distinguishing axis across language designs is *what discipline replaces ambient mutable aliasing*: shared-versus-mutable borrowing (Rust), mutable value semantics (Hylo), exclusivity layered on ARC (Swift), reference capabilities (Pony), modal types over a GC'd language (OxCaml), single ownership plus processes (Inko), or resource types (Move). Each picks a different point on the annotation-burden / inference-power / expressiveness triangle.",
+      "refs": [
+        { "target": "rust#type-system", "type": "used-by" },
+        { "target": "garbage-collection#overview", "type": "contrasts-with" },
+        { "target": "reference-counting#overview", "type": "contrasts-with" },
+        { "target": "region-based-memory#overview", "type": "contrasts-with" },
+        { "target": "capability-based-memory#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": ["ownership", "comparative-design", "type-system"],
+      "content": "Ownership designs vary along several orthogonal axes:\n\n- **Reference model**: first-class references with lifetimes (Rust), no first-class references (Hylo's projections), references plus modes (OxCaml), capabilities-as-references (Pony, Austral).\n- **Linearity flavor**: affine (Rust drop), strict linear (Austral, Linear Haskell, Granule), quantitative with multiplicities 0/1/ω (Idris 2 QTT), uniqueness types (Clean), opt-in noncopyable (Swift).\n- **Annotation vs inference**: explicit lifetime annotations only at function signatures (Rust), zero annotations via projections (Hylo), modal axes inferred from usage (OxCaml), per-binder multiplicity annotations (Idris 2).\n- **Concurrency integration**: ownership-as-sendability (Pony reference capabilities, Inko's per-process ownership), ownership orthogonal to concurrency (Rust's `Send`/`Sync`), or modal locality controlling stack vs. heap escape (OxCaml).\n- **Cycle handling**: banned by linearity (Austral, Linear Haskell), banned by language semantics (Lean 4 pure values), permitted but tracked by RC (Swift weak/unowned), tolerated by GC (OxCaml).",
+      "refs": [
+        { "target": "linear-affine-types", "type": "related" },
+        { "target": "ownership-as-type-constraint", "type": "related" },
+        { "target": "typestate", "type": "related" }
+      ]
+    },
+    {
+      "id": "ownership-versus-other-memory-models",
+      "title": "Ownership versus other memory models",
+      "tags": ["ownership", "comparative-design", "memory-safety"],
+      "content": "Ownership is best understood by contrast: unlike tracing garbage collection, it makes resource lifetime explicit; unlike reference counting, it avoids steady per-reference runtime costs by shifting discipline into the type or effect system; unlike regions, it usually reasons at the object or value boundary rather than only through grouped lifetimes; unlike capabilities, it controls *aliasing of accessible memory* rather than *which memory exists at all* in a component's reachable graph.\n\nHybrid points exist along every edge: OxCaml proves ownership and tracing GC compose; Swift layers exclusivity over ARC; Pony fuses ownership with object capabilities; Vale layers regions over generational references.",
+      "refs": [
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "reference-counting#runtime-vs-compile-time-rc",
+          "type": "contrasts-with"
+        },
+        { "target": "region-based-memory#overview", "type": "contrasts-with" },
+        { "target": "capability-based-memory#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and design implications",
+      "tags": ["ownership", "tradeoffs", "design-guidance"],
+      "content": "Ownership-based systems often improve safety, resource predictability, and local reasoning, but they can increase annotation burden, constrain program structure, and complicate certain data-sharing patterns. They are best understood as one design point among garbage collection, reference counting, regions, and capability systems rather than a universally superior answer.\n\nFor language designers, the practical questions are: (1) is ownership a *retrofit* (modes added to an existing language, à la OxCaml) or *foundational* (the language is built around it, à la Rust, Austral, Hylo)? (2) does ownership double as concurrency control (Pony, Inko) or stay orthogonal (Rust)? (3) is linearity opt-in (Swift `~Copyable`, Linear Haskell linear arrows) or pervasive (Austral, Idris 2)? (4) where on the inference / annotation curve does the design sit?\n\nOwnership shapes APIs, data structure choices, mutation strategy, and how systems expose sharing or transfer at the language surface. This is one reason ownership affects architecture much earlier than a low-level memory-management mechanism alone would.",
+      "refs": [
+        { "target": "go#concurrency", "type": "contrasts-with" },
+        { "target": "borrowing#tradeoffs", "type": "related" },
+        { "target": "sendability#tradeoffs", "type": "related" }
+      ]
+    },
+    {
+      "id": "ownership-as-concurrency-control",
+      "title": "Ownership as concurrency control",
+      "tags": ["concurrency", "memory-safety", "ownership"],
+      "content": "Ownership is often relevant to concurrency not because it is itself a scheduler model, but because it can regulate aliasing and transfer at concurrency boundaries. This makes it one of the strongest ways to connect memory safety, sendability, and race control in one design.\n\nTwo points illustrate the spectrum: Pony's reference-capability lattice statically partitions the heap into a sendable subset that can cross actor boundaries, with `consume`/`recover` blocks for safe capability changes; Inko's single-ownership model makes process-to-process message passing equivalent to ownership transfer without a capability lattice. Both eliminate shared-heap data races at the type level, but trade a different point on the expressiveness/annotation curve.",
+      "refs": [
+        { "target": "pony#overview", "type": "exemplified-by" },
+        { "target": "inko#overview", "type": "exemplified-by" },
+        {
+          "target": "sendability#relation-to-ownership-and-capabilities",
+          "type": "related"
+        },
+        { "target": "borrowing#shared-vs-exclusive-access", "type": "related" },
+        { "target": "actors#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "language-examples",
+      "title": "Language examples — per-technology records",
+      "tags": ["ownership", "index", "languages"],
+      "content": "Ownership appears in multiple forms across languages: explicit ownership and borrowing, uniqueness types, affine types, modal memory systems, and hybrid models that combine ownership with tracing or reference counting. Each language and mechanism in the design space has its own per-technology record:\n\n- **Rust-family ownership/borrowing**: borrow checker plus lifetimes and the operational aliasing models that ground `noalias` optimization.\n- **Mutable value semantics and projection-based safety**: Hylo treats every binding as an independent value and uses compile-time projections instead of references.\n- **Modal/retrofit ownership**: OxCaml grafts orthogonal locality / uniqueness / affinity modes onto OCaml without abandoning tracing GC.\n- **Ownership in Python-like syntax**: Mojo grafts Rust-style ownership with last-use destruction onto a Python surface.\n- **Exclusivity over ARC**: Swift's law of exclusivity plus opt-in `~Copyable` types layered onto an ARC-managed runtime.\n- **Linear-and-affine functional designs**: Linear Haskell (linearity on the function arrow), Clean (uniqueness types), Austral (linearity-as-capability), Idris 2's QTT (multiplicities 0/1/ω), Granule (graded modal types), Koka (Perceus-driven), ATS (linear types over C).\n- **Resource-typed languages**: Move's resource-as-linear-type discipline.\n- **Process-based single ownership**: Inko's per-process ownership without capability lattice.\n- **Capability-as-rcap**: Pony's six reference capabilities double as ownership and ocap discipline.\n- **Borrow-checking research**: Polonius, non-lexical lifetimes, view types, Stacked / Tree Borrows, Pin/Unpin.",
+      "refs": [
+        { "target": "hylo", "type": "per-technology" },
+        { "target": "mojo", "type": "per-technology" },
+        { "target": "swift-ownership", "type": "per-technology" },
+        { "target": "austral", "type": "per-technology" },
+        { "target": "pony", "type": "per-technology" },
+        { "target": "oxcaml", "type": "per-technology" },
+        { "target": "inko", "type": "per-technology" },
+        { "target": "clean-language", "type": "per-technology" },
+        { "target": "linear-haskell-ir", "type": "per-technology" },
+        { "target": "idris2", "type": "per-technology" },
+        { "target": "idris2-qtt-ir", "type": "per-technology" },
+        { "target": "granule", "type": "per-technology" },
+        { "target": "koka", "type": "per-technology" },
+        { "target": "move-language", "type": "per-technology" },
+        { "target": "ats-language", "type": "per-technology" },
+        { "target": "borrowing", "type": "related-concept" },
+        { "target": "linear-affine-types", "type": "related-concept" },
+        { "target": "ownership-as-type-constraint", "type": "related-concept" },
+        { "target": "typestate", "type": "related-concept" },
+        { "target": "polonius", "type": "related-mechanism" },
+        { "target": "non-lexical-lifetimes", "type": "related-mechanism" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Rust language reference",
+      "url": "https://doc.rust-lang.org/reference/"
+    }
+  ]
+}

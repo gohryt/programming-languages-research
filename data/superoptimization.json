@@ -1,0 +1,68 @@
+{
+  "kind": "concept",
+  "name": "Superoptimisation",
+  "aliases": [
+    "STOKE",
+    "Souper",
+    "Denali"
+  ],
+  "summary": "Reframes the optimiser as a search problem: given a short instruction sequence, find an equivalent sequence that's shorter or faster, without a fixed set of rewrite rules. Slow (minutes-hours per sequence) but transformative as a *source of optimiser rules* — Souper has contributed dozens of LLVM peephole rules.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Superoptimisation rethinks the optimiser as a search problem: given a short instruction sequence, find an equivalent sequence that is shorter or faster, *without* a fixed set of rewrite rules. Where conventional optimisation applies a curated catalogue of transformations, superoptimisation searches the entire instruction-sequence space.\n\nThe practical upshot is limited: superoptimisation is slow (minutes to hours per sequence) and only applies to short code fragments. But as a *source of optimiser rules*, it is transformative — rules proven by a solver are strictly better than rules hand-designed against test cases.",
+      "refs": [
+        {
+          "target": "e-graphs#overview",
+          "type": "shares-design-space-with"
+        }
+      ]
+    },
+    {
+      "id": "denali-and-stoke",
+      "title": "Denali and STOKE",
+      "tags": [
+        "compiler",
+        "optimization",
+        "research"
+      ],
+      "content": "**Denali** (Joshi, Nelson, Randall, 2002) used an E-graph and SAT solver to search for instruction-level optima on Alpha assembly. The E-graph represents many equivalent forms of the input; the SAT solver searches for an extraction (one form per node) minimising a cost function.\n\n**STOKE** (Schkufza, Churchill, Aiken, ASPLOS 2013) uses MCMC-style stochastic search over the instruction space, with a cost function combining correctness (via test equivalence) and performance (via measured throughput). STOKE proposes random instruction-sequence mutations, accepts mutations that improve the cost, and rejects mutations that fail correctness checks. STOKE found sequences for `popcount` and related primitives that beat hand-written Intel reference code — a striking demonstration that even hand-tuned assembly can be improved by stochastic search.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "STOKE paper",
+          "url": "https://raw.githubusercontent.com/eschkufz/stoke-release/master/docs/stoke.pdf"
+        }
+      ]
+    },
+    {
+      "id": "souper",
+      "title": "Souper — proof-driven LLVM rules",
+      "tags": [
+        "compiler",
+        "llvm",
+        "smt"
+      ],
+      "content": "**Souper** (Regehr, Sasnauskas, et al.) targets LLVM IR. It extracts \"interesting\" IR fragments from real programs, asks an SMT solver whether a shorter equivalent exists, and produces proven-correct peephole rules that can be fed back into LLVM's `InstCombine` pass.\n\nMany real LLVM optimisations have come directly from Souper output. The workflow: run Souper over a large corpus of LLVM IR (open-source projects, benchmarks), collect the optimisations Souper finds, manually review and integrate the most impactful ones into `InstCombine`. This is a hybrid of automated discovery and human curation: Souper finds candidates the SMT solver proves correct, and humans decide which are worth shipping.\n\nThe lesson: superoptimisation's value is *off-line*. Use it to discover optimiser rules; don't try to use it as a runtime pass.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Souper repository",
+          "url": "https://github.com/google/souper"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "STOKE",
+      "url": "https://raw.githubusercontent.com/eschkufz/stoke-release/master/docs/stoke.pdf"
+    },
+    {
+      "label": "Souper",
+      "url": "https://github.com/google/souper"
+    }
+  ]
+}

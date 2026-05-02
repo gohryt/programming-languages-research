@@ -1,0 +1,104 @@
+{
+  "kind": "concept",
+  "name": "Safe C++ (P3390 / Circle)",
+  "aliases": [
+    "P3390",
+    "Safe C++",
+    "Circle Safe C++"
+  ],
+  "summary": "Sean Baxter's Safe C++ grafts Rust-style affine types and an invasive borrow checker onto C++ as a `#feature on safety` mode with a parallel `std2` standard library. Implemented end-to-end in Circle (single-author Clang fork); effectively dead in WG21 as of mid-2025 after SG23 voted to prioritize Profiles.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "cpp",
+        "cpp-safety",
+        "borrow-check",
+        "safe-cpp-borrow-check",
+        "wg21"
+      ],
+      "content": "Safe C++ (Sean Baxter, P3390) grafts Rust-style affine types plus an invasive borrow checker onto C++ as a `#feature on safety` mode with a parallel `std2` standard library. The proposal includes a viral `safe`-specifier and full Mid-Level IR-based NLL borrow checking. New reference syntax `T^` / `const T^` (mutable/shared borrow) with explicit lifetime parameters and outlives-constraints; `rel` relocation operator; choice types (Rust-style enums) with safe pattern matching; and affine (move-only) value semantics enforcing the law of exclusivity.",
+      "refs": [
+        {
+          "target": "borrowing#overview",
+          "type": "related"
+        },
+        {
+          "target": "ownership#overview",
+          "type": "related"
+        },
+        {
+          "target": "cpp-safety-profiles-resolution",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "cpp-stroustrup-profiles",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "p3444-alternative",
+      "title": "P3444 — Memory safety without lifetime parameters",
+      "tags": [
+        "cpp-safety",
+        "borrow-check",
+        "lifetime"
+      ],
+      "content": "P3444 is an alternative formulation (\"Memory Safety without Lifetime Parameters\") that uses `T%` reference with a single invented lifetime per call — eliminates explicit lifetime annotation burden at cost of expressivity. The trade is that callers and callees can no longer relate borrow lifetimes through the type system; the analysis becomes a simpler intra-procedural check at the cost of rejecting some legitimate patterns that explicit lifetimes would express.",
+      "refs": [
+        {
+          "target": "borrowing#polonius-and-future-borrow-checking",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "P3444 Memory Safety without Lifetime Parameters",
+          "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3444r0.html"
+        }
+      ]
+    },
+    {
+      "id": "implementation-and-status",
+      "title": "Circle implementation and WG21 status",
+      "tags": [
+        "circle-compiler",
+        "cpp-safety",
+        "wg21"
+      ],
+      "content": "Implemented end-to-end in Circle (single-author Clang fork); proves a borrow-checker-equipped C++ subset is feasible. Circle is the only C++ compiler that has implemented full NLL-style borrow checking on a real C++ codebase, and the implementation is widely cited as evidence that the Safe C++ design is technically achievable.\n\nStatus (as of 2026-04): effectively dead in WG21; Baxter publicly stopped work mid-2025 (\"The Rust safety model is unpopular with the committee\"). His critique site enumerates concrete reasons Profiles cannot achieve sound memory safety without aliasing information — the technical position is that no analysis without viral aliasing/exclusivity annotation can be sound, only heuristic.",
+      "refs": [
+        {
+          "target": "cpp-safety-profiles-resolution",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Circle draft profiles",
+          "url": "https://www.circle-lang.org/draft-profiles.html"
+        },
+        {
+          "label": "Safe C++ proposal withdrawn (The Register)",
+          "url": "https://www.theregister.com/2025/09/16/safe_c_proposal_ditched/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Safe C++ P3390",
+      "url": "https://safecpp.org/P3390R0.html"
+    },
+    {
+      "label": "P3444 Memory Safety without Lifetime Parameters",
+      "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3444r0.html"
+    },
+    {
+      "label": "Circle draft profiles",
+      "url": "https://www.circle-lang.org/draft-profiles.html"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "kind": "concept",
+  "name": "CHERI-Lite — Lower-Cost Capability-Style Mitigation",
+  "aliases": [],
+  "summary": "Microsoft Research 2025 proposal exploring a middle ground between full CHERI capabilities and lighter-weight pointer-tagging designs such as MTE. Retains tagged, non-forgeable pointers while reducing the hardware and software adoption burden of full architectural capabilities. Research-stage proposal as of 2026-04.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "capability-hardware",
+        "pointer-tagging",
+        "research",
+        "exploit-mitigation",
+        "memory-safety"
+      ],
+      "content": "**CHERI-Lite** (Microsoft Research, 2025) explores a middle ground between full CHERI capabilities and lighter-weight pointer-tagging designs such as MTE. The core idea is to retain the security value of *tagged, non-forgeable pointers* while reducing the hardware and software adoption burden of full architectural capabilities.\n\nInstead of carrying the full CHERI semantic model — bounds, permissions, sealed object capabilities, and a pure-capability ABI — CHERI-Lite focuses on preventing attackers from freely fabricating pointers and reusing stale ones in the most common exploit patterns.",
+      "refs": [
+        {
+          "target": "cheri",
+          "type": "derived-from"
+        },
+        {
+          "target": "arm-mte",
+          "type": "compared-with"
+        },
+        {
+          "target": "arm-pac",
+          "type": "compared-with"
+        }
+      ]
+    },
+    {
+      "id": "design-point",
+      "title": "Design point — transition strategy",
+      "tags": [
+        "capability-hardware",
+        "pointer-tagging",
+        "research"
+      ],
+      "content": "The design point matters because full CHERI is powerful but expensive:\n- pointers become larger;\n- ABIs and compilers change substantially;\n- legacy code and interoperability become harder;\n- hardware support must be pervasive to get the full benefit.\n\nCHERI-Lite is therefore best read as a **transition strategy** rather than as a replacement for full CHERI. It suggests a practical deployment path for ecosystems that want stronger memory-safety exploit mitigation than MTE/PAC/CET alone provide, but cannot yet absorb the full compatibility cost of CHERI.\n\nFor language and runtime designers, the lesson is that hardware memory-safety mechanisms need not be all-or-nothing. There is a meaningful design space between:\n- full spatial+authority capability systems (CHERI, CHERIoT);\n- tagging-only systems (MTE, HWASan);\n- and control-flow-only integrity systems (PAC, CET).",
+      "refs": [
+        {
+          "target": "cheri",
+          "type": "compared-with"
+        },
+        {
+          "target": "cheriot",
+          "type": "compared-with"
+        },
+        {
+          "target": "arm-mte",
+          "type": "compared-with"
+        },
+        {
+          "target": "hwasan",
+          "type": "compared-with"
+        },
+        {
+          "target": "arm-pac",
+          "type": "compared-with"
+        },
+        {
+          "target": "intel-cet",
+          "type": "compared-with"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": [
+        "research"
+      ],
+      "content": "Status (as of 2026-04): research-stage proposal, not a mainstream deployed hardware target.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "CHERI-Lite for Memory Safety Exploit Mitigation",
+          "url": "https://www.microsoft.com/en-us/research/publication/cheri-lite-for-memory-safety-exploit-mitigation/"
+        },
+        {
+          "label": "CHERI-Lite paper PDF",
+          "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2025/11/CHERI-Lite-for-Memory-Safety.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "CHERI-Lite for Memory Safety Exploit Mitigation",
+      "url": "https://www.microsoft.com/en-us/research/publication/cheri-lite-for-memory-safety-exploit-mitigation/"
+    },
+    {
+      "label": "CHERI-Lite paper PDF",
+      "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2025/11/CHERI-Lite-for-Memory-Safety.pdf"
+    }
+  ]
+}

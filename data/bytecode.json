@@ -1,0 +1,139 @@
+{
+  "kind": "concept",
+  "name": "Bytecode",
+  "aliases": [],
+  "summary": "Compact, portable, verifiable executable representation. Trades extra dispatch cost for portability, sandboxing, and a stable interpreter/JIT boundary. Stack-based vs register-based design is the dominant axis; in-kernel verifier-restricted (BPF) and ship-only-bytecode (Hermes HBC) are notable corners.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Bytecode is a compact executable representation designed for virtual machines or portable runtimes, often acting as the boundary between a frontend compiler and a runtime or JIT. It preserves more structure than machine code (typed instructions, structured control flow) while remaining directly runnable.\n\nThe distinguishing axis across designs is what the bytecode optimizes for: stack-based compactness (JVM, .NET CIL, CPython, WebAssembly), register-based dispatch efficiency (Lua, Dalvik DEX, V8 Ignition, LuaJIT), in-kernel safety via verifier (BPF/eBPF), or platform-specific download size (Hermes HBC, HHBC). Same family, very different design pressures.",
+      "refs": [
+        {
+          "target": "tiered-compilation#common-architecture-patterns",
+          "type": "consumes"
+        },
+        {
+          "target": "llvm#role-in-jit-and-tiered-systems",
+          "type": "alternative-to"
+        }
+      ]
+    },
+    {
+      "id": "stack-vs-register-designs",
+      "title": "Stack-based and register-based designs",
+      "tags": [
+        "virtual-machine",
+        "instruction-set",
+        "tradeoffs"
+      ],
+      "content": "Stack-based bytecode (JVM, CPython, WebAssembly, .NET CIL): operations pop operands from an implicit stack and push results. Instructions are small (often 1 byte opcode + minimal operands) because operand locations are implicit. Each sub-computation requires separate push/pop instructions, inflating instruction count.\n\nRegister-based bytecode (Lua 5+, Dalvik DEX, V8 Ignition, LuaJIT): operations reference named virtual registers. Instructions are wider (typically 3–4 bytes with opcode + operand fields), but the same computation uses far fewer instructions. Lua's switch from stack to register bytecode (Lua 5.0, 2005) reduced executed instructions by ~50%.\n\nShi et al. (VEE 2008) measured the trade-off precisely: register-based VMs execute ~47% fewer VM instructions but their code is ~25% larger. On modern CPUs, dispatch cost often dominates, so dynamic-language VMs have favoured register bytecode since Lua 5 and Dalvik. WebAssembly and several managed runtimes are important counterexamples — stack discipline enables compact encoding, single-pass validation, and structured control flow that outweigh dispatch-reduction gains in their target environments.",
+      "refs": [
+        {
+          "target": "ssa#overview",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Ierusalimschy — The Implementation of Lua 5.0",
+          "url": "https://www.lua.org/doc/jucs05.pdf"
+        },
+        {
+          "label": "Shi et al. — Virtual Machine Showdown: Stack Versus Registers (VEE 2008)",
+          "url": "https://static.usenix.org/events/vee08/full_papers/shi/shi.pdf"
+        }
+      ]
+    },
+    {
+      "id": "why-systems-use-bytecode",
+      "title": "Why systems use bytecode",
+      "tags": [
+        "portability",
+        "runtime-design",
+        "verification"
+      ],
+      "content": "Systems use bytecode for portability, inspectability, and (often) verifiability. Concrete properties production runtimes get from a bytecode layer:\n\n- **Portability**: same binary runs on x86, ARM, RISC-V without recompilation.\n- **Verification**: JVM verifier, WebAssembly validator, BPF verifier all run on bytecode before execution permits untrusted code.\n- **Tiered execution**: an interpreter consumes bytecode directly; a JIT (Liftoff, TurboFan, V8 Ignition→TurboFan, HotSpot C1→C2) compiles hot code on demand.\n- **Sandboxing**: WebAssembly's structured control flow + bounded linear memory + verifier together yield process-level isolation without an OS process.\n- **Mobile distribution**: Hermes HBC ships as device-loaded bytecode (no source); Android DEX merges multiple class files for APK compactness.",
+      "refs": [
+        {
+          "target": "tiered-compilation#why-tiering-exists",
+          "type": "enables"
+        },
+        {
+          "target": "jvm-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "cil-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "dex-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "beam-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "luajit-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "cpython-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "moarvm-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "webassembly#overview",
+          "type": "instance"
+        },
+        {
+          "target": "hhbc-bytecode#overview",
+          "type": "instance"
+        },
+        {
+          "target": "hermes-hbc#overview",
+          "type": "instance"
+        },
+        {
+          "target": "ebpf-verifier-jit#overview",
+          "type": "instance"
+        }
+      ]
+    },
+    {
+      "id": "trade-offs",
+      "title": "Trade-offs",
+      "tags": [
+        "tradeoffs",
+        "runtime-design"
+      ],
+      "content": "Bytecode is slower than direct machine code without further compilation, but more portable and introspectable. The layer is justified when portability, VM verification, sandboxing, or staged runtime compilation matter as much as peak throughput.\n\nA bytecode layer also fixes an ABI: the bytecode is the contract between frontend and runtime. This is good for compatibility (old bytecode runs on new VMs) and bad for evolution (new language features may need new bytecode opcodes, which requires VM updates).",
+      "refs": [
+        {
+          "target": "copy-and-patch#stencil-based-code-generation",
+          "type": "consumed-by"
+        },
+        {
+          "target": "record-and-replay",
+          "type": "consumed-by"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Ierusalimschy — The Implementation of Lua 5.0",
+      "url": "https://www.lua.org/doc/jucs05.pdf"
+    },
+    {
+      "label": "Shi et al. — Virtual Machine Showdown: Stack Versus Registers (VEE 2008)",
+      "url": "https://static.usenix.org/events/vee08/full_papers/shi/shi.pdf"
+    }
+  ]
+}

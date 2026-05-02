@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "MoarVM new-disp Dispatcher Mechanism",
+  "aliases": ["new-disp", "MoarVM dispatcher programs"],
+  "summary": "MoarVM's unified dispatch substrate: a recorded dispatch program (guards + delegate + resume) replaces ad-hoc dispatch implementations for method calls, multi-dispatch, role mixin, role composition, and other Raku dispatch kinds. One mechanism handles all dispatch shapes; spesh specialises the dispatcher just like any other code.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**new-disp** is MoarVM's unified dispatch substrate, replacing ad-hoc dispatch implementations for the various Raku dispatch kinds (method calls, multi-dispatch, role mixin, role composition, currying). A dispatcher program — written in NQP (Not Quite Perl, MoarVM's bootstrap subset) — records guards, delegate calls, and resume points; the runtime re-runs the program at every dispatch site.\n\nThe design point: rather than bake each dispatch kind into the VM as a special opcode, define a generic dispatcher mechanism and let user code (NQP, ultimately) implement each dispatch flavour as a dispatcher program.",
+      "refs": [
+        { "target": "moarvm-spesh#overview", "type": "interacts-with" },
+        { "target": "moarvm-jit#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "The new MoarVM dispatch mechanism is here (jnthn, 2021)", "url": "https://6guts.wordpress.com/2021/09/29/the-new-moarvm-dispatch-mechanism-is-here/" }
+      ]
+    },
+    {
+      "id": "dispatcher-programs",
+      "title": "Dispatcher programs",
+      "tags": ["moarvm", "dispatch", "raku"],
+      "content": "A dispatcher program is a sequence of operations:\n\n- **Guards** check that the inputs match the recorded conditions (target type, arity, role, etc.). If a guard fails, the dispatcher re-runs from the top with the new inputs, possibly recording a new program for that case.\n- **Delegate** invokes another dispatcher (for multi-stage dispatch — first the multi-dispatch, then the per-candidate method call).\n- **Resume** continues execution at a specific point with the dispatched callee.\n\nSpesh sees dispatcher programs as ordinary code and specialises them: the recorded guards become inline-cache-style fast paths; the delegate calls become inlined when possible; the resume points become direct jumps. The dispatch overhead collapses from \"call into VM dispatcher logic\" to \"check a couple of guards and jump to the dispatched body.\"",
+      "refs": [],
+      "sources": [
+        { "label": "Raku multiple dispatch with the new MoarVM dispatcher (jnthn, 2021)", "url": "https://6guts.wordpress.com/2021/04/15/raku-multiple-dispatch-with-the-new-moarvm-dispatcher/" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["language-design", "vm"],
+      "content": "The new-disp design lesson generalises: when a runtime needs to support many flavours of dispatch (method, multi-dispatch, mixin, currying, type-class resolution), one generic dispatcher mechanism with user-programmable dispatch programs is cleaner than multiple specialised opcodes.\n\nThe cost is upfront design effort plus a non-trivial NQP-style dispatch DSL. The benefit is that adding a new dispatch flavour later doesn't require new VM opcodes — it's a new dispatcher program. MoarVM had to refactor substantial existing VM code to migrate to new-disp; for a new VM, designing this in from the start is much cheaper.",
+      "refs": [],
+      "sources": [
+        { "label": "New MoarVM dispatch design gist", "url": "https://gist.github.com/jnthn/e81634dec57acdea87fcb2b92c722959" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "new-disp blog post 2021", "url": "https://6guts.wordpress.com/2021/09/29/the-new-moarvm-dispatch-mechanism-is-here/" }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "kind": "tool",
+  "name": "RE2 and Rust regex",
+  "aliases": ["RE2", "Rust regex", "Cox NFA-DFA regex", "Thompson NFA"],
+  "summary": "Cox 2007 design: Thompson NFA + on-demand lazy DFA cache. Linear-time worst case (O(nm)), no backreferences or lookaround. RE2 (Google), Rust regex crate (Andrew Gallant), GNU grep all descend from this. The right choice when worst-case time matters more than syntactic features.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Russ Cox's 2007 article \"Regular Expression Matching Can Be Simple And Fast\" laid out the modern NFA-and-lazy-DFA regex architecture. Thompson construction builds an NFA from the regex; an on-demand lazy DFA caches subset-construction results as they're computed during matching. The result is O(nm) worst-case time — linear in input size — with no backreferences or lookaround.\n\nThe trade-off is sharp: linear worst case (no catastrophic backtracking, ever) at the cost of not supporting backreferences, lookbehind, or recursive subpatterns. For applications where the regex executes on user-controlled input at scale (log analysis, intrusion detection, source-code search), linear-time guarantees are a hard requirement.",
+      "refs": [
+        { "target": "regex-derivatives#overview", "type": "alternative-to" },
+        { "target": "pcre-jit#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Cox — Regular Expression Matching Can Be Simple And Fast", "url": "https://swtch.com/~rsc/regexp/regexp1.html" }
+      ]
+    },
+    {
+      "id": "production",
+      "title": "Production implementations",
+      "tags": ["regex", "production"],
+      "content": "**RE2** (Google) is the canonical production implementation. Used internally at Google for many regex-on-untrusted-input workloads; open-sourced and widely adopted.\n\n**Rust regex** (Andrew Gallant) brings the same design to the Rust ecosystem, with substantial engineering work on Unicode handling, the lazy DFA cache, SIMD prefilters, and compile-time-tunable feature sets. Rust regex is the regex engine for ripgrep, fd, and a substantial fraction of Rust ecosystem tooling. Performance is comparable to or better than PCRE-JIT on most non-pathological patterns, with the linear-time guarantee always intact.\n\n**GNU grep** uses a similar architecture (with additional optimisations like Boyer-Moore for fixed-string fast paths). The lineage of NFA + lazy DFA dominates server-side regex applications where worst-case time matters.",
+      "refs": [],
+      "sources": [
+        { "label": "Rust regex crate", "url": "https://docs.rs/regex/latest/regex/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Cox regex matching", "url": "https://swtch.com/~rsc/regexp/regexp1.html" },
+    { "label": "Rust regex", "url": "https://docs.rs/regex/latest/regex/" }
+  ]
+}

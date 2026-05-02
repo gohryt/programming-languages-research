@@ -1,0 +1,34 @@
+{
+  "kind": "library",
+  "name": "rowan",
+  "aliases": ["rust-analyzer-rowan"],
+  "summary": "Rust port of Roslyn's red-green tree design, used by rust-analyzer and a growing number of language servers (Lelwel, Typst, several research projects). Adds green-node interning by hash, thin SyntaxNode handles (~16 bytes), and trivia attached to tokens rather than separate trivia nodes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "rowan is the Rust port of Roslyn's red-green design, used by rust-analyzer and a growing number of language servers (Lelwel, Typst's parser, several research projects). The red/green split is the same as Roslyn's; the distinctive additions are green-node interning by hash, thin `SyntaxNode` handles (~16 bytes), and attaching trivia to tokens rather than synthesising separate trivia nodes.",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "instance-of" },
+        { "target": "roslyn-red-green#overview", "type": "ports" }
+      ],
+      "sources": [
+        { "label": "rowan (rust-analyzer)", "url": "https://github.com/rust-analyzer/rowan" }
+      ]
+    },
+    {
+      "id": "content-agnostic-library",
+      "title": "Content-agnostic CST library",
+      "tags": ["cst", "library", "language-server"],
+      "content": "rowan is content-agnostic: the language-specific node kind enum is supplied by the consumer. The same library powers Rust, Typst, Lelwel-generated grammars, and several DSL projects. This separation of concrete-syntax-tree mechanics from language-specific node types is what makes rowan a reusable lossless-tree library rather than a Rust-specific component.",
+      "refs": [
+        { "target": "language-server#overview", "type": "powers" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "rowan (rust-analyzer)", "url": "https://github.com/rust-analyzer/rowan" },
+    { "label": "Introducing ungrammar (rust-analyzer blog)", "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html" }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Move Bytecode Verifier",
+  "aliases": ["Move VM verifier", "Aptos/Sui Move verifier"],
+  "summary": "Mandatory bytecode verifier at the smart-contract trust boundary in Aptos/Sui Move. Statically enforces linear-resource discipline (resources cannot be silently dropped or duplicated), type safety, reference safety, and ability constraints before any execution. Same verifier-first design as BPF, applied to blockchain assets.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The same verifier-first design that BPF deploys at the OS kernel boundary appears at the smart-contract trust boundary in **Move** (Aptos/Sui). Every Move bytecode module submitted to a Move VM (Aptos blockchain, Sui blockchain, or off-chain executor) passes through a **mandatory bytecode verifier** before any execution.",
+      "refs": [
+        { "target": "ebpf-verifier-jit#overview", "type": "shares-design-with" },
+        { "target": "move-language#bytecode-verifier", "type": "implements" }
+      ],
+      "sources": [
+        { "label": "Aptos Move language and runtime", "url": "https://aptos.dev/network/blockchain/move" }
+      ]
+    },
+    {
+      "id": "verifier-checks",
+      "title": "Verifier checks",
+      "tags": ["move", "blockchain", "verification"],
+      "content": "The verifier statically enforces:\n\n- **Linear resource discipline**: types declared with the `key`/`store` abilities (resources) cannot be silently dropped or duplicated; every code path must explicitly destroy, store, or transfer them.\n- **Type safety**: every operand must have the type the opcode expects, including across module boundaries; no implicit coercions.\n- **Reference safety**: borrowed references cannot escape their scope; mutable and immutable borrows of the same object cannot overlap (Rust-borrow-checker-class invariants enforced at the bytecode layer).\n- **Bounded execution**: structural limits on stack depth, function nesting, and instruction count.\n- **Module visibility and access**: cross-module calls respect declared `public`/`friend` visibility; cross-module storage accesses respect ability constraints.\n\nLike BPF, Move's verifier accepts *only* programs it can prove safe; rejected modules cannot run at all.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — verifier-restricted bytecode at trust boundaries",
+      "tags": ["language-design", "verification"],
+      "content": "The lesson generalises: **a verifier-restricted bytecode is the natural compilation target for any language whose programs run in untrusted contexts**. BPF deploys this for kernel modules; Move deploys it for blockchain smart contracts; WASI/Component Model deploys it for sandboxed Wasm.\n\nFor language designers building compilers that target sandbox-class execution environments (WebAssembly with capability discipline, embedded scripting languages with restricted authority, plug-in systems for other applications), the verifier-restricted bytecode pattern is the structurally cleanest answer.",
+      "refs": [],
+      "sources": [
+        { "label": "Move language reference", "url": "https://move-language.github.io/move/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Aptos Move", "url": "https://aptos.dev/network/blockchain/move" },
+    { "label": "Move language reference", "url": "https://move-language.github.io/move/" }
+  ]
+}

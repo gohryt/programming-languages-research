@@ -1,0 +1,49 @@
+{
+  "kind": "concept",
+  "name": "Package Resolution",
+  "aliases": [],
+  "summary": "Selects concrete dependency versions and artifact providers from declared constraints; resolution algorithms span SAT-solving (Cargo, PubGrub), greedy/Minimal Version Selection (Go), and tree-based fallback (npm classic).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Package resolution turns declared version constraints into a concrete dependency graph. It is a central ecosystem mechanism because the exact rules used by the resolver affect conflicts, upgrades, reproducibility, and user expectations.\n\nThe resolver takes the project's manifest (`Cargo.toml`, `package.json`, `go.mod`, `pyproject.toml`) plus all transitive manifests it discovers, and produces a concrete pinned graph that satisfies every declared constraint. The strategy used to select among multiple compatible versions is what differs across ecosystems.",
+      "refs": [{ "target": "cargo#dependency-resolution", "type": "example" }]
+    },
+    {
+      "id": "resolution-models",
+      "title": "Resolution models — SAT, MVS, tree-based",
+      "tags": ["packaging", "dependency-resolution", "algorithms"],
+      "content": "Resolvers may use greedy policies, minimal-version approaches, SAT-like solving, or more constrained ecosystem-specific rules. The chosen model changes how often users encounter version conflicts and how predictable dependency upgrades feel.\n\n**Cargo + PubGrub** uses a SAT-like solver. Natalie Weizenbaum's PubGrub algorithm (developed for Dart's pub) does conflict-driven clause learning over version constraints, producing better error messages than naive backtracking. Cargo migrated to PubGrub-style resolution; Python's `uv` (Astral, 2024+) is also PubGrub-based.\n\n**Go's Minimal Version Selection (MVS)** (Russ Cox, 2018) takes the opposite approach. Each module specifies the minimum version of each dependency it needs; the resolver picks the *minimum version that satisfies every requirement* across the transitive graph. No SAT solver, no version range arithmetic, no \"latest compatible.\" This is unusual but principled: builds are reproducible by construction (the resolved graph depends only on the requirements, not on registry timing), and dependency upgrades are explicit acts requiring a `go.mod` edit.\n\n**npm's tree-based resolution** historically allowed multiple versions of the same package to coexist in nested `node_modules` directories, with each importer seeing its own resolved version. This lets conflicting requirements coexist but bloats install sizes and can produce surprising behavior when the \"same\" library has multiple in-memory copies. pnpm uses content-addressed flat storage with symlinks instead.",
+      "refs": [
+        { "target": "go#packaging", "type": "related" },
+        { "target": "cargo#dependency-resolution", "type": "related" }
+      ]
+    },
+    {
+      "id": "determinism-and-conflict-handling",
+      "title": "Determinism and conflict handling",
+      "tags": ["reproducibility", "dependency-resolution", "packaging"],
+      "content": "Deterministic resolution improves CI stability, debugging, and editor tooling because the same declared inputs lead to the same resolved graph. Conflict handling is not only a solver concern but also a usability and architecture concern.\n\nConflict-driven clause learning (PubGrub) gives qualitatively better error messages than naive backtracking — \"because foo requires bar ^1.0 and baz requires bar ^2.0, no resolution exists\" is much more actionable than the older \"Cannot find compatible version for bar.\" Go's MVS produces no resolution conflicts in the traditional sense — if a constraint cannot be satisfied, the build simply fails with a clear minimum-version requirement; if multiple constraints disagree, the resolver picks the maximum of their minimums, which may or may not satisfy all of them.\n\nDeno and Nix flake `flake.lock` content-address every input via SHA-256 / narHash, so identity is not just \"version 1.2.3 of foo\" but \"these specific bytes,\" defending against retroactive registry changes.",
+      "refs": [
+        {
+          "target": "language-server#design-constraints",
+          "type": "relevant-to"
+        },
+        { "target": "module-identity#design-implications", "type": "related" }
+      ]
+    },
+    {
+      "id": "resolution-outputs",
+      "title": "Resolution outputs",
+      "tags": ["packaging", "lockfiles", "build-graph"],
+      "content": "Resolution should produce concrete artifact identities that can be recorded, cached, or pinned in lockfiles. These outputs become the practical bridge between abstract dependency declarations and reproducible builds.\n\nThe resolved graph is typically serialized to a lockfile that records every transitively-resolved dependency at a moment in time. The lockfile is committed to source control alongside the project's manifest, and the package manager uses it as the authoritative source of truth in CI and on other developers' machines. Cargo.lock, package-lock.json, go.sum, Pipfile.lock / poetry.lock / uv.lock, and Manifest.toml (Julia) all serve this role with different format conventions.",
+      "refs": [
+        { "target": "lockfiles#what-lockfiles-capture", "type": "related" },
+        { "target": "cargo#dependency-resolution", "type": "related" }
+      ]
+    }
+  ],
+  "sources": []
+}

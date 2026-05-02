@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "LLVM SelectionDAG and GlobalISel",
+  "aliases": ["SelectionDAG", "GlobalISel", "GMIR"],
+  "summary": "LLVM's two-generation instruction selectors. SelectionDAG (legacy) builds a per-block DAG with tablegen-generated patterns; GlobalISel (replacement) operates on LLVM IR via GMIR with explicit Legalize → Select → RegBankSelect passes. The shift reflects a broader trend toward CFG-level rather than block-local selection.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "LLVM's instruction selection has two generations. **SelectionDAG** (the legacy path) builds a DAG per basic block, applies target-independent legalisation, then matches target patterns via tablegen-generated selectors. The DAG representation enables matching across multi-node idioms (e.g., recognising `(x & -x)` as a single BMI instruction). Drawback: per-block DAGs lose inter-block information, and the DAG→MI (Machine Instruction) conversion is expensive.\n\n**GlobalISel** (the replacement) operates on LLVM IR directly via the **GMIR** (Generic MIR) representation, going through Legalize → Select → RegBankSelect as explicit passes. GlobalISel was designed to compile faster than SelectionDAG while retaining target-specific pattern-matching expressiveness, and it avoids the per-block DAG split. Adoption is gradual — AArch64 uses it by default at `-O0`, other targets are migrating.",
+      "refs": [
+        { "target": "burg-burs#overview", "type": "compared-with" },
+        { "target": "llvm#overview", "type": "part-of" }
+      ],
+      "sources": [
+        { "label": "LLVM GlobalISel docs", "url": "https://llvm.org/docs/GlobalISel/" }
+      ]
+    },
+    {
+      "id": "selectiondag",
+      "title": "SelectionDAG",
+      "tags": ["llvm", "compiler", "code-generation"],
+      "content": "SelectionDAG converts a basic block of LLVM IR into a directed acyclic graph where each node is a typed operation. Target-independent legalisation transforms unsupported types and operations into supported equivalents; each target then runs a tablegen-driven pattern matcher to choose machine instructions for each DAG node.\n\nThe DAG representation enables matching across multi-node idioms — patterns like `(x + (y * z))` can match a fused multiply-add even when the operands are not directly adjacent in the original IR. This is a strict superiority over BURG-style tree tiling for any target with such fused operations.\n\nThe drawback is the per-block scope. Each basic block builds its own DAG; cross-block redundancies (a value computed at the end of one block and used at the start of another) are not visible to the selector. Modern targets compensate with peephole passes after machine-code generation, but the architectural friction is real.",
+      "refs": []
+    },
+    {
+      "id": "globalisel",
+      "title": "GlobalISel",
+      "tags": ["llvm", "compiler", "code-generation"],
+      "content": "GlobalISel operates on LLVM IR directly via **GMIR (Generic MIR)** — a target-independent SSA representation that is closer to MIR than to LLVM IR. The pipeline has explicit phases:\n\n- **Legalize**: convert unsupported types and operations to supported forms (pattern-driven, target-specific).\n- **RegBankSelect**: choose register banks (FP vs integer vs vector) for each value.\n- **Select**: choose final machine instructions.\n\nEach phase has its own tablegen-driven patterns, but they operate over a unified GMIR representation rather than per-block DAGs. The split maps to a broader trend: compiler backends want global CFG-level selection rather than block-local DAG-level selection, because modern ISA features (predication, tail calls, link-time patchability) often span blocks.",
+      "refs": [],
+      "sources": [
+        { "label": "LLVM CodeGenerator", "url": "https://llvm.org/docs/CodeGenerator.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "LLVM GlobalISel", "url": "https://llvm.org/docs/GlobalISel/" },
+    { "label": "LLVM CodeGenerator", "url": "https://llvm.org/docs/CodeGenerator.html" }
+  ]
+}

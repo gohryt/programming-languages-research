@@ -1,0 +1,80 @@
+{
+  "kind": "tool",
+  "name": "Perfetto",
+  "aliases": [],
+  "summary": "Google's open-source system-wide tracing platform (2018+) with three layers — instrumentation SDK, tracing service, web UI — that ingests protobuf-formatted traces from kernel ftrace, eBPF, runtime events, and custom application instrumentation; PerfettoSQL exposes traces as SQLite-queryable tables.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Perfetto is a trace collection, storage, query, and visualization platform designed for large event timelines across applications, runtimes, and systems. It is one of the strongest concrete examples of how trace formats, viewers, and query engines can form a shared observability surface.\n\nPerfetto (Google, 2018, open-source) is a production system-wide tracing platform with three layers: an instrumentation SDK, a tracing service that multiplexes producers into buffers, and a web UI that renders protobuf-formatted traces. Because the wire format is documented, kernel ftrace converters, eBPF probes, runtime events, and custom application instrumentation can all land in the same zoomable timeline.",
+      "refs": [
+        {
+          "target": "trace-storage-and-visualization#overview",
+          "type": "example"
+        },
+        {
+          "target": "instrumentation#span-oriented-and-event-oriented-instrumentation",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "timeline-and-query-model",
+      "title": "Timeline and query model — TraceProcessor + PerfettoSQL",
+      "tags": ["trace-format", "visualization", "analysis"],
+      "content": "Perfetto is notable not only because it stores traces, but because it turns them into queryable timelines rather than mere logs. This makes it useful for debugging, performance analysis, and cross-runtime reasoning over long execution histories.\n\n**TraceProcessor** ingests a trace and exposes execution events as SQLite-queryable relational tables. That makes a trace more than a timeline. A debugger or investigation tool can ask structured questions over `slice`, `thread_slice`, `counter`, `process`, `thread`, `cpu`, and symbol tables instead of manually scrolling through rectangles. **PerfettoSQL** adds domain-specific table/function/view/macro support and reusable metrics, turning common performance-debugging questions into named queries.\n\nThe design lesson is narrow and important: if runtime events are emitted with stable typed schemas, a debugger can treat execution history as queryable evidence. Timeline UI is one view; SQL-like analysis is the more general interface.",
+      "refs": [
+        {
+          "target": "time-travel-debugging#bil-lewis-odb",
+          "type": "related"
+        },
+        {
+          "target": "fault-isolation#program-slicing-and-dependency-analysis",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        { "label": "PerfettoSQL", "url": "https://perfetto.dev/docs/analysis/perfetto-sql-getting-started" }
+      ]
+    },
+    {
+      "id": "format-and-viewer-ecosystem",
+      "title": "Format and viewer ecosystem",
+      "tags": ["tooling", "trace-format", "observability"],
+      "content": "Perfetto is a practical example of why trace ecosystems benefit from a common interchange format and viewer. When many producers target one analysis surface, tracing becomes much more reusable across subsystems and teams.\n\nThe **Fuchsia Trace Format (FTF)** illustrates the producer-side half of the universal-viewer pattern: use a compact emission format where hot-path cost matters, then convert into Perfetto `TracePacket` or another interchange format for storage and visualization. Chrome trace JSON remains the older import-friendly path. The important distinction is capture format vs viewer format; they do not have to be identical.\n\nThe meta-insight is architectural: the tracing ecosystem is fragmented across dozens of capture tools, but they become composable if they can export to a common viewer or wire format. Perfetto plays that role for timelines, much as pprof does for profiles and CTF does for structured event streams.\n\nJane Street's `magic-trace` (Intel PT control-flow recorder) emits Perfetto-format JSON. Mozilla's profiler.firefox.com imports Chrome `trace_event` JSON. NVIDIA Nsight Systems composes NVTX + CUPTI + OS-level perf-like sampling into a single timeline. The pattern of \"vendor tool emits, universal viewer ingests\" generalizes broadly.",
+      "refs": [
+        {
+          "target": "trace-storage-and-visualization#perfetto-fuchsia-trace-format",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        { "label": "Perfetto trace packet proto", "url": "https://perfetto.dev/docs/reference/trace-packet-proto" }
+      ]
+    },
+    {
+      "id": "why-perfetto-matters",
+      "title": "Why Perfetto matters",
+      "tags": ["debugging", "profiling", "tooling"],
+      "content": "Perfetto matters because it demonstrates that large-scale tracing needs more than event capture: it needs usable formats, scalable visualization, and query workflows that let humans and tools reason about causality across time. It is one of the best practical anchors for the repository's tracing records.\n\nFor a new language: emit traces in a Perfetto-compatible format from day one. The entire timeline-viewer ecosystem will accept them without adapter code, and the SQL-queryable backbone provides retrospective analysis without bespoke tooling.",
+      "refs": [
+        {
+          "target": "continuous-profiling#pprof-profile-proto",
+          "type": "related"
+        },
+        {
+          "target": "debugger-protocols#overview",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Perfetto",
+      "url": "https://perfetto.dev/"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "languages",
+  "tag": "languages",
+  "name": "Languages",
+  "description": "Sections tagged with the Languages concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "language"
+  ]
+}

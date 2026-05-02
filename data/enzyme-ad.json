@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": "Enzyme — Automatic Differentiation in LLVM",
+  "aliases": ["Enzyme", "Enzyme AD"],
+  "summary": "MIT/Lawrence Berkeley LLVM-IR-level automatic differentiation: takes LLVM IR for a function and produces LLVM IR for its derivative. Operates after compiler optimisation, so derivatives benefit from optimised forward code. Cross-language (C/C++/Rust/Julia/Fortran/Python) and CPU/GPU.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Enzyme (William Moses et al.) performs automatic differentiation directly on LLVM IR. It takes the IR for a function and emits IR for its derivative — applying AD as an LLVM pass rather than at the source-language level. The pivotal architectural choice: AD runs *after* the compiler's standard optimisations, so the derivative is computed on already-optimised IR and benefits from those optimisations.\n\nLanguage-agnostic by virtue of LLVM IR: Enzyme works on C, C++, Rust, Julia, Fortran, Python (via Numba), and any other LLVM-frontend language. CPU and GPU (via NVPTX) targets supported.",
+      "refs": [
+        { "target": "llvm#overview", "type": "operates-on" }
+      ],
+      "sources": [
+        { "label": "Enzyme: High-Performance AD of LLVM", "url": "https://enzyme.mit.edu/" }
+      ]
+    },
+    {
+      "id": "design-position",
+      "title": "Design position",
+      "tags": ["compiler", "ai", "differentiation"],
+      "content": "Most production AD systems (PyTorch's autograd, JAX's `grad`, TensorFlow GradientTape) implement AD at the source-language or framework level: they intercept array operations, build a computation graph, and emit derivative computations from the graph. This works well for tensor-shaped computations but degrades for general code (loops, branches, recursive data structures).\n\nEnzyme's IR-level approach handles general code uniformly: any LLVM-IR-expressible computation can be differentiated. The trade-off is more compiler-engineering overhead and worse error messages — the derivative is shaped by LLVM IR, not by user-friendly source constructs. For mixed scientific-computing workloads where AD needs to work on the same code the user already optimises with LLVM, Enzyme is the natural choice.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Enzyme home", "url": "https://enzyme.mit.edu/" },
+    { "label": "Enzyme GPU AD paper", "url": "https://c.wsmoses.com/papers/EnzymeGPU.pdf" }
+  ]
+}

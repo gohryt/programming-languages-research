@@ -1,0 +1,71 @@
+{
+  "kind": "concept",
+  "name": "JavaScriptCore DFG",
+  "aliases": [
+    "data-flow-graph-jit"
+  ],
+  "summary": "JavaScriptCore's mid-tier JIT IR: SSA with explicit dataflow edges, aggressive speculative type guards, and OSR exits carrying register/stack state to resume in the lower tier. Sits between Baseline and FTL/B3 in JSC's four-tier ladder.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "DFG (Data Flow Graph) is SSA with explicit dataflow edges and aggressive speculative type guards. Each guard records an *OSR exit* (On-Stack Replacement: the mechanism that transitions execution between tiers without unwinding) carrying enough register and stack state to resume in the lower tier.",
+      "refs": [
+        {
+          "target": "mid-level-ir#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "ssa#overview",
+          "type": "exemplifies"
+        },
+        {
+          "target": "osr-deoptimization#overview",
+          "type": "feeds"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Introducing the WebKit FTL JIT",
+          "url": "https://webkit.org/blog/3362/introducing-the-webkit-ftl-jit/"
+        }
+      ]
+    },
+    {
+      "id": "jsc-tier-ladder",
+      "title": "JSC's four-tier ladder",
+      "tags": [
+        "jit",
+        "tiered-compilation"
+      ],
+      "content": "JSC's four tiers are: LLInt (interpreter), Baseline (template JIT), DFG (mid-tier), FTL (Faster Than Light, the top tier built on B3, JSC's lower-level SSA optimizer). DFG is the mid-tier slot; it speculates aggressively based on Baseline-collected feedback but compiles much faster than FTL.\n\nTier orchestration (when each tier is invoked, OSR transitions, when to recompile) belongs in `data/tiered-compilation`; this record covers the data model only.",
+      "refs": [
+        {
+          "target": "tiered-compilation#overview",
+          "type": "fits-into"
+        },
+        {
+          "target": "v8-maglev#overview",
+          "type": "analogous-to"
+        }
+      ]
+    },
+    {
+      "id": "explicit-dataflow",
+      "title": "Explicit dataflow edges",
+      "tags": [
+        "compiler-ir",
+        "ssa"
+      ],
+      "content": "DFG is distinguished from sea-of-nodes IRs (TurboFan, HotSpot C2) by making dataflow edges explicit rather than implicit in the graph structure. Each value has named uses; each use refers to a specific definition. This makes range analyses, constant propagation, and type-narrowing passes more direct, at the cost of more bookkeeping during construction.\n\nFor a JIT-tier role, the explicitness is a feature: passes can run in fixed order with predictable cost, which matters when the goal is to compile and ship to the CPU before the user notices.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Introducing the WebKit FTL JIT",
+      "url": "https://webkit.org/blog/3362/introducing-the-webkit-ftl-jit/"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "SPIR-V",
+  "aliases": ["SPIR-V GPU IR", "Khronos portable GPU IR"],
+  "summary": "Khronos Group's portable GPU intermediate representation. Binary SSA IR consumed by Vulkan, OpenCL, Mesa, and most modern GPU drivers. Lets frontend compilers (HLSL → SPIR-V via DXC, GLSL → SPIR-V via glslang, Slang, Metal Shading Language) target one IR rather than per-driver IRs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "SPIR-V is the Khronos Group's portable GPU intermediate representation. A binary SSA IR designed for GPU shaders and compute kernels, SPIR-V is consumed by Vulkan, OpenCL, Mesa drivers, and most modern GPU runtimes. Frontend compilers (HLSL → SPIR-V via DXC, GLSL → SPIR-V via glslang, Slang, Metal Shading Language → SPIR-V via various translators) target this single IR rather than per-driver IRs.\n\nThe payoff: one SPIR-V module runs across NVIDIA, AMD, Intel, ARM Mali, and Apple GPU drivers. The driver lowers SPIR-V to the vendor's native ISA at runtime. Application code is GPU-vendor-agnostic at the IR level.",
+      "refs": [
+        { "target": "mesa-nir#overview", "type": "lowers-to" }
+      ],
+      "sources": [
+        { "label": "Khronos SPIR-V", "url": "https://www.khronos.org/spir/" }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Design",
+      "tags": ["gpu", "ir", "ssa"],
+      "content": "SPIR-V is binary, SSA-form, and typed at instruction granularity. The instruction set is broad — graphics shaders, compute kernels, ray-tracing shaders, mesh shaders all share the same IR with capability flags marking which features a module uses.\n\nThe binary format is compact and validatable: drivers verify SPIR-V on load to ensure type-safety, control-flow validity, and capability compatibility before lowering to native code. This is the GPU analogue of WebAssembly's validation model — the IR is portable and verified before it runs.",
+      "refs": [],
+      "sources": [
+        { "label": "SPIR-V Specification", "url": "https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Khronos SPIR-V", "url": "https://www.khronos.org/spir/" },
+    { "label": "SPIR-V Specification", "url": "https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html" }
+  ]
+}

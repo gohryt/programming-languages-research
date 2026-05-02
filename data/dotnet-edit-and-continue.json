@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": ".NET Edit-and-Continue",
+  "aliases": ["EnC", "JVM HotSwap", "ICorProfilerInfo IL replacement"],
+  "summary": "Visual Studio's feature: modify source code while a debug session is paused, continue execution with the new code applied. CLR's Profiling API exposes `ICorProfilerInfo::SetILFunctionBody` for IL replacement. Restricted to Debug builds, certain edit categories. JVM HotSwap via JVMTI is the Java analogue.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": ".NET's **Edit-and-Continue (EnC)** is Visual Studio's feature that lets a developer modify source code while a paused debug session is active and continue execution with the new code applied. The CLR's Profiling API exposes `ICorProfilerInfo::SetILFunctionBody`, allowing the debugger to replace method IL at the bytecode level mid-execution.",
+      "refs": [
+        { "target": "dlopen-live-reload#overview", "type": "compared-with" },
+        { "target": "julia-revise#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Visual Studio Edit and Continue", "url": "https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue" }
+      ]
+    },
+    {
+      "id": "constraints",
+      "title": "Constraints and trade-offs",
+      "tags": ["dotnet", "debugger"],
+      "content": "The implementation constraints are substantial:\n\n- EnC only works in Debug builds (so optimisation can't have inlined or eliminated the target method).\n- Only certain categories of edits are supported: method body changes yes, signature changes no, adding/removing fields no.\n- The new IL must be re-JIT-compiled before the next call; the old version is invalidated.\n\nDespite these limits, EnC remains one of the most-used Visual Studio features for iterative debugging. The analog in Java is **HotSwap** via the JVMTI (JVM Tool Interface): debuggers can replace method bodies in a running JVM, subject to similar constraints. IntelliJ IDEA uses this for its \"Reload Changed Classes\" feature.\n\nFor a language designer wanting EnC-style support: the runtime must support re-JIT of methods, the debugger protocol must support code replacement, and the optimisation pipeline must distinguish debug builds (which preserve method boundaries) from optimised builds (which inline freely).",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Edit and Continue", "url": "https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue" }
+  ]
+}

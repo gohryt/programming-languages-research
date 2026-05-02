@@ -1,0 +1,104 @@
+{
+  "kind": "framework",
+  "name": "ETW",
+  "aliases": [
+    "event-tracing-for-windows"
+  ],
+  "summary": "Windows event tracing substrate where providers, sessions, and consumers form a shared runtime/OS observability framework; per-processor lock-free buffer assignment is the canonical \"engineered-for-production\" tracing primitive; pairs tightly with PerfView and Windows Performance Analyzer.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ETW, or Event Tracing for Windows, is a system-wide event tracing substrate built around providers, sessions, and consumers. It is a useful architectural anchor because it shows what a tracing ecosystem looks like when the event pipeline is treated as an operating-system and runtime service rather than a library convention.\n\nETW is the canonical Windows tracing substrate. Its architecture is particularly elegant: **providers** emit events, **controllers** start/stop/configure trace sessions, and **consumers** read the resulting stream in real time or from ETL files. This separation makes tracing a dynamic system capability instead of a compile-time choice.",
+      "refs": [
+        {
+          "target": "instrumentation#runtime-native-instrumentation-surfaces",
+          "type": "example"
+        },
+        {
+          "target": "trace-storage-and-visualization#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "provider-session-consumer-model",
+      "title": "Provider, session, and consumer model",
+      "tags": [
+        "tracing",
+        "framework",
+        "operating-system"
+      ],
+      "content": "ETW's core design is a separation between event producers, collection sessions, and downstream consumers. This separation makes it a strong example of how observability infrastructure can be shared across many components without forcing one unified implementation strategy for every producer.\n\nThe implementation detail that stands out is the buffering strategy. An ETW logging session is a kernel-managed collection of **in-memory non-paged buffers**, ETW **assigns a buffer to each processor**, and event generation/buffering is **lock-free**. This is the Windows analogue of the \"engineered-for-production\" philosophy that makes ftrace and JFR so compelling: the hot path is optimized first, and tooling is built around that constraint.\n\nThe original side here is the **session model**. Multiple providers can be composed into a single session; sessions can be enabled or disabled dynamically without restarting the system or process; and the same infrastructure supports debugging, performance analysis, and production observability. ETW is not just a tracer — it is an operating-system-level event bus with trace semantics.",
+      "refs": [
+        {
+          "target": "debugger-protocols#overview",
+          "type": "related"
+        },
+        {
+          "target": "distributed-tracing#opentelemetry",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "ETW sessions",
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/sessions"
+        }
+      ]
+    },
+    {
+      "id": "runtime-and-system-observability",
+      "title": "Runtime and system observability",
+      "tags": [
+        "runtime",
+        "observability",
+        "tooling"
+      ],
+      "content": "ETW is especially important because it spans both runtime-level and system-level events. This makes it a practical case of observability where schedulers, allocators, runtime metadata, and application events can all coexist in one collection substrate.\n\n**.NET EventPipe** is .NET's answer to the question \"what is the ETW-like thing if I want it to work the same way on Windows, Linux, and macOS?\" It collects events from runtime components and `EventSource` providers, serializes them to `.nettrace`, and can stream them to an external consumer through a **diagnostic port**. Unlike ETW or `perf_events`, EventPipe does not require platform-specific high-privilege tracing infrastructure — Microsoft explicitly documents that the tracer can operate as the same user as the target process rather than requiring admin/root access.\n\n**PerfView** (Vance Morrison, Microsoft, 2011+; open-source 2014) is the canonical .NET performance and memory analyser, and **Windows Performance Analyzer (WPA)** is the GUI for ETW. Both occupy the Windows-side equivalent of Linux's perf + flame-graph + heaptrack ecosystem, with deeper integration into the .NET runtime and the Windows kernel ETW substrate. PerfView's value over generic profilers comes from understanding .NET CLR ETW events (GC start/stop, JIT compilation, exception throw, type-load, tier-up to optimised code) at the same depth that VTune understands Intel PMU events. WPA's value comes from understanding kernel ETW providers (scheduler context-switch reasons, page-fault sources, file-I/O wait categories, registry access patterns) that no third-party tool maintains as comprehensively.",
+      "refs": [
+        {
+          "target": "jfr#runtime-native-event-pipeline",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "continuous-profiling#pprof-profile-proto",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "PerfView",
+          "url": "https://github.com/microsoft/perfview"
+        }
+      ]
+    },
+    {
+      "id": "why-etw-matters",
+      "title": "Why ETW matters",
+      "tags": [
+        "tooling",
+        "operating-system",
+        "observability"
+      ],
+      "content": "ETW matters because it demonstrates the power of treating tracing as infrastructure rather than an afterthought. It is one of the clearest examples of a reusable observability substrate that shapes the surrounding ecosystem's tooling and diagnostic possibilities.\n\nThe downside is ecosystem complexity. ETW is immensely capable, but provider discovery, schema evolution, event volume management, and tooling ergonomics are all non-trivial. The mechanism is excellent; the human factors are harder.\n\nDistinct from Linux ecosystem: where Linux observability is fragmented across perf, ftrace, eBPF, bpftrace, Sysdig, and a dozen GUI tools, the Windows ecosystem is **ETW-as-substrate plus PerfView/WPA-as-analyser**, much more vertically integrated. The downside is platform lock-in; the upside is consistent UX and deep semantic awareness of Microsoft platform events.",
+      "refs": [
+        {
+          "target": "instrumentation#overview",
+          "type": "related"
+        },
+        {
+          "target": "trace-storage-and-visualization#perfetto-fuchsia-trace-format",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "ETW overview",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/etw/about-event-tracing"
+    }
+  ]
+}

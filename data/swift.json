@@ -1,0 +1,98 @@
+{
+  "kind": "language",
+  "name": "Swift",
+  "aliases": [],
+  "summary": "Apple's modern systems language with modules-as-frameworks/SPM-targets, six-level visibility lattice (open/public/package/internal/fileprivate/private), Library Evolution Mode emitting .swiftinterface files for resilient ABI, and Swift Package Manager (SPM) for distribution.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Swift (Apple, 2014+; Swift 5.x stable, current ~5.10/6.0 transition as of 2026) is a multi-paradigm systems and application language. Memory aspects live in `data/swift-arc`, `data/swift-ownership`; SIL (compiler IR) in `data/swift-sil`; macros in `data/swiftsyntax`. This record covers the language-level module-system surface.",
+      "refs": [
+        {
+          "target": "module-systems#overview",
+          "type": "instance-of"
+        }
+      ]
+    },
+    {
+      "id": "modules-as-frameworks-and-spm-targets",
+      "title": "Modules as frameworks and SPM targets",
+      "tags": [
+        "swift",
+        "modules",
+        "framework"
+      ],
+      "content": "Swift's module unit is the **module**, which corresponds operationally to a Swift framework, a static library, an Xcode target, or a Swift Package Manager (SPM) target. Imports are a single keyword: `import Foundation`, `import MyAppKit`. Within a module, all source files share a flat namespace; types can reference each other without import declarations. Across modules, imports are the only way to reference declarations.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Swift Package Manager",
+          "url": "https://www.swift.org/documentation/package-manager/"
+        }
+      ]
+    },
+    {
+      "id": "visibility-lattice",
+      "title": "Six-level visibility lattice",
+      "tags": [
+        "swift",
+        "visibility",
+        "access-control"
+      ],
+      "content": "Swift's visibility lattice is deeper than Java's or Kotlin's:\n\n- **`open`** — public + subclassable across modules.\n- **`public`** — visible across modules, not subclassable across modules without `open`.\n- **`package`** — visible within the same Swift package (added in Swift 5.9, 2023).\n- **`internal`** — default; visible within the module.\n- **`fileprivate`** — visible within the source file.\n- **`private`** — visible within the enclosing declaration.\n\nStatus (as of 2026-04): `package` is the most recent significant addition; previously, Swift had no way to share types between sibling modules in a multi-module package without making them `public`, polluting the published API surface.",
+      "refs": [
+        {
+          "target": "visibility-and-exports#visibility-granularity",
+          "type": "example"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Swift access control",
+          "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol"
+        },
+        {
+          "label": "SE-0386 — package access modifier",
+          "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0386-package-access-modifier.md"
+        }
+      ]
+    },
+    {
+      "id": "library-evolution-mode",
+      "title": "Library Evolution Mode — resilient ABI",
+      "tags": [
+        "swift",
+        "abi",
+        "library-evolution"
+      ],
+      "content": "The most distinctive Swift contribution is **Library Evolution Mode**, the resilient-ABI compilation mode that lets a binary module evolve its internal layout without breaking already-compiled clients. With Library Evolution enabled, Swift emits per-module **`.swiftinterface`** text files (a stable serialized form of the module's public API) plus binary `.swiftmodule` files. Consumers compile against the interface, and the runtime resolves layouts dynamically.\n\nThis is what allows Apple to ship a new iOS SDK and have apps built against an older SDK continue to run — the equivalent of .NET's `TypeForwardedTo` plus C++ ABI conventions, baked into the compiler at module granularity.\n\nSwift Package Manager (SPM) added the package-level distribution layer, with `Package.swift` describing dependencies, products, and target structure. SPM packages can declare both library products (consumed as modules) and executable products. Cross-module visibility within a package is the `package` access level; cross-package visibility requires `public`.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Swift Library Evolution",
+          "url": "https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Swift access control",
+      "url": "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/accesscontrol"
+    },
+    {
+      "label": "SE-0386 — package access",
+      "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0386-package-access-modifier.md"
+    },
+    {
+      "label": "Swift Library Evolution",
+      "url": "https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst"
+    },
+    {
+      "label": "Swift Package Manager",
+      "url": "https://www.swift.org/documentation/package-manager/"
+    }
+  ]
+}

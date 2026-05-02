@@ -1,0 +1,85 @@
+{
+  "kind": "concept",
+  "name": "E-Graphs",
+  "aliases": ["egraphs", "e-graph", "equality-saturation"],
+  "summary": "Data structure representing equivalence classes of expressions compactly. Equality saturation accumulates rewrites into one structure, then extracts the best form — dissolving phase-ordering at the cost of a heavier representation. Production: egg, egglog, Cranelift mid-end.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "E-graphs represent not one program but an equivalence class of programs. When an optimizer rewrites `x * 2 → x << 1`, both forms remain in the e-graph; an extraction pass selects the best form after all rewrites have run to saturation. This dissolves the phase-ordering problem (the order of optimizations no longer matters) at the cost of a heavier representation.\n\nThe distinguishing axis across implementations is how tightly e-graph machinery integrates with the rest of the compiler: as a general-purpose library (egg), as a Datalog-extended rewriting engine (egglog), as an integrated optimization pass (Cranelift mid-end), or as a non-SSA program structure (RVSDG).",
+      "refs": [
+        { "target": "ssa#overview", "type": "alternative-to" },
+        { "target": "mlir#overview", "type": "complements" }
+      ]
+    },
+    {
+      "id": "core-ideas",
+      "title": "Core ideas",
+      "tags": ["optimization", "rewriting"],
+      "content": "An e-graph stores expressions in equivalence classes (e-classes). Each e-class contains one or more equivalent e-nodes, and merging two e-classes when a rewrite proves them equal preserves alternatives rather than destroying them.\n\nThe usual workflow has three phases:\n\n1. **Add**: insert the input program.\n2. **Saturate**: apply rewrite rules repeatedly. Each rewrite merges e-classes rather than replacing nodes; the e-graph grows but never loses alternatives.\n3. **Extract**: select an e-node from each e-class according to a cost model (smallest, fastest, fewest allocations) to produce the final program.\n\nMax Willsey's `egg` library made e-graph operations (add, merge, rebuild) near-linear time using a deferred-rebuild strategy, which is what moved equality saturation from research to production.",
+      "refs": [
+        { "target": "nanopass#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        {
+          "label": "egg — Equality Saturation Library",
+          "url": "https://egraphs-good.github.io/"
+        },
+        {
+          "label": "egglog — Datalog-extended e-graph rewriting",
+          "url": "https://github.com/egraphs-good/egglog"
+        }
+      ]
+    },
+    {
+      "id": "why-they-matter",
+      "title": "Why they matter",
+      "tags": ["optimization", "compiler-ir"],
+      "content": "E-graphs are attractive because they reduce phase-ordering problems and support algebraic optimization domains well. They are especially useful when a compiler wants to explore many equivalent transformations systematically rather than relying on a fixed pass ordering.\n\nProduction adopters: Cranelift's mid-end uses an *aegraph* (acyclic e-graph) so extraction is tractable; rewrite rules are written in ISLE patterns that match against the aegraph. Herbie (numerical accuracy), SymbolicUtils.jl, Tensat (tensor algebra), and several research compilers use egg directly. egglog extends the model with Datalog for multi-pattern, recursive rewrites.",
+      "refs": [
+        { "target": "cranelift#overview", "type": "production-use" },
+        { "target": "sea-of-nodes#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        {
+          "label": "Cranelift e-graph RFC",
+          "url": "https://github.com/bytecodealliance/rfcs/blob/main/accepted/cranelift-egraph.md"
+        }
+      ]
+    },
+    {
+      "id": "limitations",
+      "title": "Limitations",
+      "tags": ["optimization", "tradeoffs"],
+      "content": "E-graphs are powerful, but real costs apply:\n\n- **Search-space growth**: aggressive rewrite rules can explode the e-graph. \"Destructive E-Graph Rewrites\" (EGRAPHS 2025) addresses this by allowing matched terms to be removed rather than retained as alternatives.\n- **Extraction cost**: choosing the best form across an e-graph is itself an optimization problem. Cranelift's aegraph restricts to acyclic e-graphs to keep extraction tractable.\n- **Imperative control flow integration**: e-graphs are most natural for pure expression rewriting; integrating with side effects, control flow, and machine-level concerns requires extra structure (RVSDG is one research answer).\n\nE-graphs are best understood as a strong optimization technique in specific domains, not a total replacement for every compiler pipeline stage.",
+      "refs": [
+        { "target": "llvm#optimization", "type": "alternative-to" },
+        { "target": "cranelift#overview", "type": "uses-restricted-form" },
+        { "target": "rvsdg#overview", "type": "alternative-graph-shape" }
+      ],
+      "sources": [
+        { "label": "Destructive E-Graph Rewrites (EGRAPHS 2025)", "url": "https://pldi25.sigplan.org/details/egraphs-2025-papers/7/Destructive-E-Graph-Rewrites" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "egg — Equality Saturation Library",
+      "url": "https://egraphs-good.github.io/"
+    },
+    {
+      "label": "Cranelift e-graph RFC",
+      "url": "https://github.com/bytecodealliance/rfcs/blob/main/accepted/cranelift-egraph.md"
+    },
+    {
+      "label": "egglog — Datalog-extended e-graph rewriting",
+      "url": "https://github.com/egraphs-good/egglog"
+    },
+    {
+      "label": "Destructive E-Graph Rewrites (EGRAPHS 2025)",
+      "url": "https://pldi25.sigplan.org/details/egraphs-2025-papers/7/Destructive-E-Graph-Rewrites"
+    }
+  ]
+}

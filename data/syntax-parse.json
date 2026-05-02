@@ -1,0 +1,58 @@
+{
+  "kind": "framework",
+  "name": "syntax-parse",
+  "aliases": [],
+  "summary": "Ryan Culpepper and Matthias Felleisen's Racket parser for macro inputs (ICFP 2010 \"Fortifying Macros\"; JFP 2012). Specification-driven error attribution above the reader/syntax-object level.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ryan Culpepper and Matthias Felleisen's syntax-parse (ICFP 2010 \"Fortifying Macros\"; JFP 22(4–5) 2012 extended version) is Racket's parser for macro inputs. Racket's reader turns text into syntax objects; syntax-parse is the layer above that turns a macro's received syntax object into structured data, with error messages that explain misuse.\n\nIn Racket this is not a niche tool: every non-trivial `define-syntax` in the standard library is written against syntax-parse, and the syntax classes themselves are the standard way to document \"what a valid macro call looks like.\"",
+      "refs": [
+        { "target": "scannerless-parsing#overview", "type": "related" },
+        { "target": "parser-combinators#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "syntax-classes",
+      "title": "Syntax classes",
+      "tags": ["parser", "macros", "syntax"],
+      "content": "A macro author writes a pattern — for example `(my-for ([x:id seq] ...) body ...+)` — using syntax classes like `id`, `expr`, or user-defined classes with their own pattern structure, optional annotations, side conditions, and attributes. Syntax classes give macro authors a way to define reusable input categories with constraints and associated structure, supporting modular macro APIs and more precise error reporting than ad hoc syntax destructuring.",
+      "refs": []
+    },
+    {
+      "id": "deterministic-error-attribution",
+      "title": "Deterministic error attribution",
+      "tags": ["error-recovery", "macros", "diagnostics"],
+      "content": "When a macro is called with syntactically ill-formed arguments, syntax-parse does not emit an opaque \"bad syntax\". It points at the specific sub-form that failed to match and explains which alternative was expected.\n\nThe 2012 paper formalises the system as a pattern language with deterministic error attribution: given several failed alternatives, syntax-parse picks the one that got furthest into the input and reports that, mirroring Parsec/Megaparsec error-quality heuristics but at the syntax-object level.",
+      "refs": [
+        { "target": "parser-combinators#tradeoffs", "type": "related" },
+        { "target": "language-server#design-constraints", "type": "relevant-to" }
+      ],
+      "sources": [
+        {
+          "label": "Culpepper & Felleisen — Fortifying Macros (JFP 2012)",
+          "url": "https://www2.ccs.neu.edu/racket/pubs/c-jfp12.pdf"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["parser", "tradeoffs", "macros"],
+      "content": "syntax-parse delivers specification-driven macro error messages comparable to a parser generator's diagnostics — at the cost of a second parsing layer above the reader and of being Racket-specific in a way that readtables, Pratt, and combinators are not. The expressiveness depends on Racket's syntax-object model with hygienic source location; reusing the design outside Racket would require those primitives.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Racket — Parsing Syntax with syntax-parse",
+      "url": "https://docs.racket-lang.org/syntax/Parsing_Syntax.html"
+    },
+    {
+      "label": "Culpepper & Felleisen — Fortifying Macros (JFP 2012)",
+      "url": "https://www2.ccs.neu.edu/racket/pubs/c-jfp12.pdf"
+    }
+  ]
+}

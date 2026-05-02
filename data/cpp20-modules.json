@@ -1,0 +1,39 @@
+{
+  "kind": "concept",
+  "name": "C++20 Modules",
+  "aliases": ["cpp-modules", "cpp20-named-modules"],
+  "summary": "C++20's first-class named-module feature: export module foo declares a module interface unit; the compiler produces a Built Module Interface (BMI) cache that subsequent import statements load directly, bypassing tokenization and parsing; macros do not leak across module boundaries.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "C++20 introduced **named modules** as a first-class alternative to header inclusion. The syntax is deliberately small:\n\n```cpp\n// foo.cppm — module interface unit\nexport module foo;\nexport int answer() { return 42; }\nint helper() { return 0; }  // not exported — internal linkage to the module\n\n// main.cpp\nimport foo;\nint main() { return answer(); }\n```\n\nA **module interface unit** declares the module name and which entities are exported. A **module implementation unit** (declared `module foo;` without `export`) contributes additional definitions to the same module without exposing them. **Module partitions** (`export module foo:bar;`) let large modules be split across multiple files while presenting one external interface.",
+      "refs": [
+        { "target": "cpp-translation-units#overview", "type": "replaces" }
+      ],
+      "sources": [
+        { "label": "cppreference — modules", "url": "https://en.cppreference.com/w/cpp/language/modules" },
+        { "label": "P1103R3 — Merging Modules", "url": "https://isocpp.org/files/papers/P1103R3.pdf" }
+      ]
+    },
+    {
+      "id": "bmi-and-toolchain",
+      "title": "BMI — Built Module Interface caching",
+      "tags": ["cpp", "build-tools", "compilation"],
+      "content": "The compiler produces a **Built Module Interface (BMI)** — a binary serialization of the module interface that subsequent `import` statements can load directly, bypassing tokenization and parsing. BMIs are toolchain-specific (GCC's `.gcm`, Clang's `.pcm`, MSVC's `.ifc`), not portable across compilers or even compiler versions. This is intentional: the BMI is a compiler implementation detail, not a distribution format. Distribution still happens at the source level, with consumers building their own BMIs.\n\nStatus (as of 2026-04): GCC 14+, Clang 17+, and MSVC have varying levels of named-module support; build systems (CMake, Bazel) added module dependency scanning relatively late; cppcheck, clangd, and other analyzers needed specific module support. Named modules are usable but not yet ubiquitous; the standard library import (`import std;`) is the most common entry point because it requires only consumer-side adoption."
+    },
+    {
+      "id": "benefits-over-include",
+      "title": "Benefits over #include",
+      "tags": ["cpp", "performance", "encapsulation"],
+      "content": "The performance and engineering benefits over `#include` are substantial:\n\n- **Parse once per module**, not once per translation unit that includes the module. On large codebases this can be a 5–10x compile-time improvement, larger on aggressive header-only template-heavy code.\n- **Macros do not leak** across module boundaries. `#define` inside a module is invisible to importers unless the module explicitly exports it (which most do not).\n- **Declaration order is internal** to the module. An importer sees the module's exported entities as a flat set, not as a sequence whose visibility depends on where in the file they appear.\n- **`import std;`** (C++23) provides a single named-module replacement for the entire standard library, replacing dozens of `#include <...>` lines."
+    },
+    {
+      "id": "header-units-and-migration",
+      "title": "Header units and migration story",
+      "tags": ["cpp", "migration", "tooling"],
+      "content": "C++20 also defines **header units** (`import \"foo.h\";`), which let an existing header be imported as if it were a module, getting most of the parse-once benefit without rewriting the header. Header units are a transitional bridge: they let a project move incrementally from `#include` to `import` without big-bang rewrites. But header units also inherit some of the header model's weaknesses — they can leak macros (with restrictions) and they require the toolchain to determine what to do at the import-vs-include boundary.\n\nThe deeper lesson is conservative: **a language without modules at the start will accumulate a textual-include-style alternative whose inertia eventually exceeds the benefit of the formal module system**. The right time to introduce modules is before there is anything to migrate. C++20 modules are real and good; they will not displace `#include` ecosystem-wide for many more years."
+    }
+  ]
+}

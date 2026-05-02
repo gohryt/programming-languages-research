@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "Perceus — Compile-Time Reference Counting with Reuse",
+  "aliases": [
+    "Koka RC",
+    "frame-limited reuse"
+  ],
+  "summary": "Daan Leijen et al. (Microsoft Research): the compiler statically inserts inc/dec/reset/reuse operations for reference-counted memory in Koka. Reuse analysis enables in-place updates of pure-functional data without allocation. Frame-Limited Reuse, FIP, and TRMC make the system production-strong.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Perceus is the canonical compile-time reference counting system, used by Koka. The compiler statically inserts `inc`/`dec`/`reset`/`reuse` operations into the IR — ordinary operations that the optimiser can analyse, move, and elide. The pure-functional source language is compiled to imperative code with explicit lifetime management.\n\nThe core insight: with linear-resource analysis, the compiler can prove when a value's reference count is exactly 1 and reuse the allocation in place — turning a functional update into a destructive update without changing the source language's semantics. The result: Koka can match imperative-style performance from a purely functional source.",
+      "refs": [
+        {
+          "target": "reference-counting#overview",
+          "type": "compile-time-form-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Perceus: Garbage Free Reference Counting with Reuse (PLDI 2021)",
+          "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2020/11/perceus-tr-v1.pdf"
+        }
+      ]
+    },
+    {
+      "id": "developments",
+      "title": "Frame-Limited Reuse, FIP, TRMC",
+      "tags": [
+        "compiler",
+        "rc",
+        "research"
+      ],
+      "content": "Three significant developments since 2022:\n\n**Frame-Limited Reuse** (Lorenzen-Leijen, ICFP 2022): drop-guided reuse formally proven *frame-limited* — peak heap grows by at most a constant factor — replacing fragile size-pairing reuse with a robust derivation rule.\n\n**FIP / FP² calculus** (ICFP 2023): the `fip` keyword statically certifies a function uses zero allocation and constant stack; covers splay trees, finger trees, merge/quick sort, and generically derived in-place `map`.\n\n**TRMC + first-class constructor contexts** (POPL 2023; JFP 2024): tail-recursion modulo context generalises TRMc to CPS, monoids, and evaluation contexts; the hybrid implementation uses Perceus heap semantics so call/cc and effect handlers stay sound.\n\nTogether these turn Perceus from a refcount-with-reuse system into a complete *compile-time imperative-from-functional* programming model — purely functional source, in-place mutation in the binary, with formal frame bounds.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Perceus PLDI 2021",
+      "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2020/11/perceus-tr-v1.pdf"
+    }
+  ]
+}

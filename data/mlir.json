@@ -1,0 +1,80 @@
+{
+  "kind": "framework",
+  "name": "MLIR",
+  "aliases": ["multi-level-ir"],
+  "summary": "Lattner et al.'s 2020 generalization of multi-level IR: every IR is a self-contained dialect (operations, types, verification rules); dialects coexist and lower into each other. Substrate for Mojo, IREE, Triton, Torch-MLIR, Polygeist, ClangIR, and many other modern compiler stacks.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "MLIR (Lattner et al., 2020) generalizes the multi-level IR pattern: instead of a fixed cascade, every IR is a *dialect* — a self-contained set of operations, types, and verification rules — and dialects can coexist in one MLIR module. Lowering between dialects is a transformation pass (the `linalg` dialect lowers to `scf` lowers to `llvm`); analyses and optimizations can target any dialect that exposes their structure.\n\nThe contribution: making \"the IR you want\" cheap to define. Adding a new dialect for a domain (CUDA `gpu`, Linalg structured-loop, SPV for SPIR-V, Tensor) is a few hundred lines; integrating it with the rest of MLIR is automatic.",
+      "refs": [
+        { "target": "llvm#relation-to-mlir", "type": "extends" },
+        { "target": "ssa#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "MLIR home", "url": "https://mlir.llvm.org/" }
+      ]
+    },
+    {
+      "id": "core-concepts",
+      "title": "Core concepts",
+      "tags": ["compiler-ir", "infrastructure"],
+      "content": "MLIR organizes IR around dialects, operations, types, attributes, and progressive lowering. Each dialect declares its operations and verification rules; the framework provides shared infrastructure (rewrite-pattern engine, type interfaces, conversion framework, region-based control flow, block parameters as the SSA merge form).\n\nThis is how Mojo, IREE, Triton, Torch-MLIR, Polygeist, and many other projects build their compilers — they don't write a compiler from scratch; they write a few dialects on top of MLIR.",
+      "refs": [
+        { "target": "e-graphs#overview", "type": "compatible-with" },
+        { "target": "nanopass#overview", "type": "shares-philosophy" }
+      ]
+    },
+    {
+      "id": "multi-level-lowering",
+      "title": "Multi-level lowering",
+      "tags": ["compiler-design", "lowering", "compiler-ir"],
+      "content": "A major strength of MLIR is that it encourages compilers to lower through multiple semantically meaningful stages instead of flattening everything into one universal representation immediately. A typical flow goes high-level domain dialect → progressively lower dialects → `llvm` dialect → LLVM IR → machine code.\n\nThis lets domain-specific reasoning run on the right abstraction at the right time: a tensor compiler can do shape inference and operator fusion in `linalg` before lowering to scalar loops, and only commit to LLVM IR when target-specific codegen begins.",
+      "refs": [
+        { "target": "llvm#relation-to-mlir", "type": "lowers-to" },
+        { "target": "nanopass#design-goals", "type": "shares-philosophy" }
+      ]
+    },
+    {
+      "id": "clangir",
+      "title": "ClangIR — C/C++ as an MLIR dialect",
+      "tags": ["compiler-ir", "c-cpp", "lowering"],
+      "content": "Status (as of 2026-04): ClangIR (CIR) — an MLIR-based high-level IR for C and C++ — is the most consequential MLIR dialect added to the LLVM mainline since 2020. The ClangIR incubator was frozen for new development on 2026-02-20 with development moved fully into the LLVM monorepo; CIR is invoked via `clang -fclangir`.\n\nCIR sits between Clang's internal AST and LLVM IR, exposing C/C++ language constructs (constructors, exceptions, virtual dispatch, RAII, atomics) as MLIR operations rather than the immediate translation to LLVM IR that Clang historically performed. The motivation: Clang's traditional AST → LLVM IR lowering loses language-level structure that high-level analyses (ownership inference, lifetime analysis, exception-flow tracking) want. CIR is the canonical fix: a structured, MLIR-based IR that retains C/C++ semantics through a chunk of the optimization pipeline before lowering to LLVM IR.",
+      "refs": [
+        { "target": "high-level-ir#why-compilers-keep-this-layer", "type": "exemplifies" }
+      ],
+      "sources": [
+        {
+          "label": "ClangIR project",
+          "url": "https://llvm.github.io/clangir/"
+        },
+        {
+          "label": "ClangIR transition plans (LLVM Discourse)",
+          "url": "https://discourse.llvm.org/t/clangir-transition-plans-for-the-clangir-incubator/89583"
+        }
+      ]
+    },
+    {
+      "id": "limits-and-tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["infrastructure", "tradeoffs"],
+      "content": "MLIR's flexibility is powerful, but it brings framework complexity: dialect design burden, conversion-pattern boilerplate, and the discipline of choosing which abstraction belongs at which level. Not every compiler needs this degree of infrastructure — a smaller backend-oriented stack (Cranelift, QBE) is often a better fit when only one IR layer is wanted.\n\nThe right question is whether the workload genuinely needs multiple semantically meaningful IR layers (tensor compilers, GPU kernel compilers, hardware-synthesis compilers — yes; small AOT compilers for one source language — usually no).",
+      "refs": [
+        { "target": "cranelift#research-comparison-points", "type": "alternative-to" },
+        { "target": "llvm#strengths-and-tradeoffs", "type": "extends" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "MLIR home",
+      "url": "https://mlir.llvm.org/"
+    },
+    {
+      "label": "ClangIR project",
+      "url": "https://llvm.github.io/clangir/"
+    }
+  ]
+}

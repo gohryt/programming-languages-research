@@ -1,0 +1,42 @@
+{
+  "kind": "language",
+  "name": "Haxe",
+  "aliases": [],
+  "summary": "Strict statically-typed cross-compilation language by Nicolas Cannasse: same source compiles to JavaScript, PHP, C++, C#, Java, Python, Lua, HashLink, NekoVM, or JVM bytecode; module system is target-aware via #if conditional compilation and target-specific std subpackages (js.*, php.*, etc.).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Nicolas Cannasse's **Haxe** is a strict, statically-typed language whose distinguishing trait is that the *target backend* is a configuration choice at compile time: the same source can compile to JavaScript, PHP, C++, C#, Java, Python, Lua, HashLink (Haxe's own VM), NekoVM, or Haxe-specific JVM bytecode.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "modules-with-conditional-compilation",
+      "title": "Modules with #if conditional compilation",
+      "tags": ["haxe", "modules", "cross-compilation"],
+      "content": "The module system uses Java-like file-as-module-with-`package`-declaration semantics (a file `com/foo/Bar.hx` declares `package com.foo;` and exports class `Bar`), but with one critical addition: **conditional compilation via `#if <flag>`** is used to gate target-specific code, allowing one module file to provide platform-specific implementations behind a single API.\n\nThe module-system-interesting property is the **target-conditional dependency**. A library may depend on `js.html.Document` only when compiling to JavaScript, on `cpp.NativeMath` only when compiling to C++, and on neither when compiling to Python. The Haxe build system (`haxelib` + `hxml` build scripts) resolves the dependency graph per-target, so the same library can declare different sets of cross-module imports depending on target — a design point that languages with single-target compilation never need to address.\n\nThe std library itself is partitioned into target-specific subpackages (`js.*`, `php.*`, `python.*`, etc.) plus a target-agnostic core, and the `target.*` namespace conventions encode the boundary explicitly.",
+      "refs": [],
+      "sources": [
+        { "label": "Haxe manual — introduction", "url": "https://haxe.org/manual/introduction.html" }
+      ]
+    },
+    {
+      "id": "vs-kotlin-multiplatform-and-fable",
+      "title": "Contrast with Kotlin Multiplatform and F# Fable",
+      "tags": ["haxe", "comparison", "cross-compilation"],
+      "content": "Distinct from Kotlin Multiplatform (`data/kotlin#kotlin-multiplatform-modules`) which compiles to JVM/JS/Native via separate per-target source-set hierarchies: Haxe uses one source set with `#if` directives, simpler at small scale and noisier at large scale.\n\nDistinct from F# (`data/fsharp`) which has a Fable transpiler to JavaScript: Fable is one bolt-on backend whereas Haxe was multi-target from the start, and the Haxe macro system (compile-time AST manipulation in Haxe itself) lets a library generate target-specific bindings programmatically rather than maintaining hand-written stubs per target.\n\nProduction: **Heaps** game engine, **Shiro Games** (Northgard, Dune: Spice Wars), **Motion-Twin** (Dead Cells before C++ rewrite), enterprise PHP apps via the `php7` target, and several embedded UI systems on HashLink.\n\nThe lesson for a language designer: **if cross-compilation to multiple radically different runtimes is a first-class goal, the module system needs to be target-aware from the start**. Retrofitting target-conditional imports onto a single-target module system (as Kotlin and F# did) tends to produce per-target source-set hierarchies whose composition rules are awkward; designing the module system around a target enum from day one (as Haxe and Zig with `comptime` target detection do) keeps the surface uniform.",
+      "refs": [
+        { "target": "kotlin#kotlin-multiplatform-modules", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Haxe manual", "url": "https://haxe.org/manual/introduction.html" },
+    { "label": "Haxe", "url": "https://haxe.org/" },
+    { "label": "Haxe repository", "url": "https://github.com/HaxeFoundation/haxe" },
+    { "label": "haxelib", "url": "https://lib.haxe.org/" }
+  ]
+}

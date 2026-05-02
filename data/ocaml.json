@@ -1,0 +1,57 @@
+{
+  "kind": "language",
+  "name": "OCaml",
+  "aliases": ["ocaml-lang", "ocaml-5"],
+  "summary": "ML-family language whose type system repeatedly chooses pragmatic boundaries that preserve predictable inference, compilation speed, and interoperability over maximal type-level expressiveness. Production answer to let-polymorphism + mutation is the value restriction; polymorphic variants showcase row inference; OCaml 5 ships runtime effect handlers without static effect typing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "OCaml is a counterweight to Haskell: it repeatedly chooses pragmatic boundaries that preserve predictable inference, compilation speed, and interoperability over maximal type-level expressiveness.\n\nThe broader lesson from OCaml is that a language can repeatedly prefer *manageable, explainable compromises* over maximal static expressiveness without losing usability. The classic examples — value restriction, polymorphic variants, runtime effects without static safety — each chose ergonomics and predictability over expressive maximalism.",
+      "refs": [
+        { "target": "hindley-milner#overview", "type": "exemplifies" },
+        { "target": "row-polymorphism#overview", "type": "exemplifies" },
+        { "target": "ocaml-flambda#overview", "type": "compiler-of" }
+      ],
+      "sources": [
+        { "label": "OCaml manual overview", "url": "https://v2.ocaml.org/releases/5.0/htmlman/manual001.html" },
+        { "label": "OCaml C interface manual", "url": "https://v2.ocaml.org/manual/intfc.html" }
+      ]
+    },
+    {
+      "id": "value-restriction",
+      "title": "Value restriction — let-polymorphism plus mutation",
+      "tags": ["type-system", "ocaml"],
+      "content": "The classic production answer to let-polymorphism interacting with mutation is the **value restriction** (and its relaxed variant): rather than papering over the unsoundness, OCaml makes the restriction explicit and pushes annotations or eta-expansion onto the programmer at the call sites where it matters.\n\nThe rule: only *syntactic values* (lambdas, constructors applied to values, etc.) get generalised at let-bindings. Expressions that might allocate mutable state — including innocuous-looking applications — do not get polymorphic types unless eta-expanded. This is the smallest restriction that recovers soundness in the presence of mutation, at the cost of occasional surprise when a programmer expects a non-syntactic-value let-binding to be polymorphic."
+    },
+    {
+      "id": "polymorphic-variants",
+      "title": "Polymorphic variants — production row inference",
+      "tags": ["type-system", "row-polymorphism", "ocaml"],
+      "content": "OCaml's polymorphic variants are the canonical production example of structural variant polymorphism with row inference; the row-polymorphism treatment is in `data/row-polymorphism`.\n\nBackticked tags (`` `Ok of int ``, `` `Error of string ``) form open variants whose row type can be inferred and unified across modules. The cost is more complex error messages — row variables expose implementation detail — and slower compile times on row-heavy code. The benefit is extensible variants without central registration: an additional case can appear in any module without modifying the type's declaration.",
+      "sources": [
+        { "label": "Garrigue — Programming with Polymorphic Variants", "url": "https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf" }
+      ]
+    },
+    {
+      "id": "ocaml-5-effects",
+      "title": "OCaml 5 effect handlers — runtime without static safety",
+      "tags": ["effect-system", "ocaml-5"],
+      "content": "OCaml 5 ships runtime effect handlers via the `Effect` module without static effect typing. The runtime supports stack-switching primitives that capture and resume continuations; effect operations become calls to runtime stack-switching routines.\n\nThe deliberate decision was to stabilise the runtime mechanism first and defer the type-system commitment. From a type-rule perspective, this means OCaml's effects are unchecked at the type level even when handled at runtime. Programs that fail to handle an effect raise at runtime rather than failing to compile.\n\nFor language designers, this is the data point that **effect handlers can ship as a runtime feature ahead of a type-system commitment**. The type-system question can be deferred to a later language version while the runtime mechanism stabilises. The trade-off is no static safety — but a substantial body of OCaml code now uses effects ergonomically with runtime-level discipline.",
+      "refs": [
+        { "target": "effect-handler-lowering#ocaml-5-runtime-effects", "type": "lowering-detail" },
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "OCaml 5 effect handlers manual", "url": "https://ocaml.org/manual/5.2/effects.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "OCaml manual overview", "url": "https://v2.ocaml.org/releases/5.0/htmlman/manual001.html" },
+    { "label": "OCaml 5 effect handlers manual", "url": "https://ocaml.org/manual/5.2/effects.html" },
+    { "label": "Garrigue — Polymorphic Variants", "url": "https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf" },
+    { "label": "OCaml C interface manual", "url": "https://v2.ocaml.org/manual/intfc.html" }
+  ]
+}

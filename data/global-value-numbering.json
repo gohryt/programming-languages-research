@@ -1,0 +1,64 @@
+{
+  "kind": "concept",
+  "name": "Global Value Numbering",
+  "aliases": [
+    "GVN",
+    "value numbering"
+  ],
+  "summary": "Assigns the same value number to expressions that provably compute the same result, then replaces redundant computations with references to the earlier value. Hash-based and RPO-based variants. Typically the single most impactful scalar optimisation — 5–15% speedup on integer benchmarks.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "GVN assigns the same \"value number\" to expressions that provably compute the same result, then replaces redundant computations with references to the earlier value. Unlike local common subexpression elimination (CSE), GVN operates across the whole function, handling values that flow through φ-functions.\n\nGVN is typically the single most impactful scalar optimisation — a 5–15% speedup on integer benchmarks is routine. It also enables downstream passes by surfacing equivalences that were not syntactically obvious in the original source.",
+      "refs": [
+        {
+          "target": "ssa#overview",
+          "type": "operates-on"
+        }
+      ]
+    },
+    {
+      "id": "hash-and-rpo-variants",
+      "title": "Hash-based and RPO-based variants",
+      "tags": [
+        "compiler",
+        "optimization"
+      ],
+      "content": "**Hash-based GVN** (the common implementation) canonicalises each SSA instruction into a tuple `(opcode, operands, type)`, looks up the tuple in a hash table, and reuses any prior matching value. This handles purely structural redundancies cleanly but does not see through loop-carried equivalences.\n\n**RPO-based GVN** (Reverse Post-Order) extends hash-based GVN to handle loops by iterating to a fixed point. Each pass over the program may discover new equivalences as φ-function operands become known equal; iteration continues until no further merges happen.\n\nLLVM's `GVN` pass additionally integrates **memory dependence analysis** to handle load-store redundancy: a load whose value is provably the same as an earlier load (because no aliasing store happened in between) can be eliminated. This is where GVN bleeds into alias analysis territory and where most of the implementation complexity lives.",
+      "refs": []
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": [
+        "compiler",
+        "production"
+      ],
+      "content": "Every serious optimising compiler runs GVN. LLVM's `-gvn` is one of the standard `-O2`/`-O3` passes. GCC's analogue (FRE — full redundancy elimination) plays the same role. JIT compilers run a lighter version because compile time matters.\n\nGVN often pays for itself many times over because it surfaces redundancies that downstream passes can act on. Constant propagation finds more constants once redundant computations have been merged. Dead code elimination removes more code once it sees that two instructions produce the same value. The pass-ordering interaction is one reason e-graphs (which subsume GVN as one rewrite) have become attractive: rather than running GVN-then-something-else and hoping the order is right, e-graphs explore both forms simultaneously.",
+      "refs": [
+        {
+          "target": "e-graphs#overview",
+          "type": "subsumed-by"
+        },
+        {
+          "target": "sparse-conditional-constant-propagation#overview",
+          "type": "complementary-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "LLVM GVN pass reference",
+          "url": "https://llvm.org/docs/Passes.html#gvn-global-value-numbering"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "LLVM GVN",
+      "url": "https://llvm.org/docs/Passes.html#gvn-global-value-numbering"
+    }
+  ]
+}

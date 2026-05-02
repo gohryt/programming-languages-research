@@ -1,0 +1,34 @@
+{
+  "kind": "tool",
+  "name": "QBE",
+  "aliases": ["QBE backend", "Carbonneaux QBE"],
+  "summary": "Quentin Carbonneaux's compact compiler backend in ~14,000 lines of C99 with zero dependencies. Delivers ~50–70% of LLVM -O2 performance at near-instant compile times. SSA-based IL, modest optimisation set, full C ABI on amd64/arm64/riscv64. The cproc C11 compiler is the canonical consumer.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "QBE is a compiler backend by Quentin Carbonneaux that targets the sweet spot between TCC (no optimisation) and LLVM (full industrial optimiser). Written in ~14,000 lines of C99 with zero dependencies, QBE provides:\n\n- Uniform SSA-based IL used at all compilation stages\n- Copy elimination, sparse conditional constant propagation, dead instruction elimination\n- Registerisation of small stack slots\n- Linear register allocator with hinting (split spiller + allocator, enabled by SSA)\n- Full C ABI support on amd64, arm64, and riscv64\n\nBenchmarks show QBE-compiled code runs roughly 50–70% the speed of LLVM -O2. Compilation is near-instant (~2 seconds for the compiler itself with `-O2`).",
+      "refs": [
+        { "target": "linear-scan-regalloc#overview", "type": "uses" },
+        { "target": "ssa#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "QBE Compiler Backend", "url": "https://c9x.me/compile/" }
+      ]
+    },
+    {
+      "id": "design-philosophy",
+      "title": "Design philosophy and use cases",
+      "tags": ["compiler", "tradeoffs"],
+      "content": "The `cproc` C11 compiler (8,000 lines of C) uses QBE as its backend and can build GCC 4.7, binutils, git, and much more. The combination of cproc + QBE is roughly 22,000 lines total — a complete C11 compiler and code generator that produces 50–70% of GCC's performance.\n\nThe lesson for new languages: you don't need LLVM to get reasonable codegen. QBE provides a self-contained, hackable, and understandable backend that any language can target. For bootstrapping compilers or interpreter-to-native tiers — where small dependency footprint and hackability matter more than peak code quality — QBE is one of the strongest options to evaluate.",
+      "refs": [
+        { "target": "cranelift#overview", "type": "compared-with" },
+        { "target": "tpde#overview", "type": "compared-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "QBE", "url": "https://c9x.me/compile/" }
+  ]
+}

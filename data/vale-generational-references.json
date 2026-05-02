@@ -1,0 +1,24 @@
+{
+  "kind": "concept",
+  "name": "Vale Generational References",
+  "aliases": ["generational refs", "Vale gen refs", "region borrowing"],
+  "summary": "Vale's generational references: every allocation has a 48-bit generation counter; pointers carry the expected generation. Dereferencing checks expected vs current; mismatch traps. ~2–10% runtime cost without GC, RC, or borrow checker. Region borrowing eliminates checks within blocks proven safe.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Evan Ovadia's **Vale** uses **generational references** as its primary memory-safety mechanism. Every allocation has a 48-bit generation counter; references carry the generation expected at allocation. Dereferencing a generational reference checks the expected generation against the current one; if they don't match, the reference points at memory that has been reused for something else, and the access traps.\n\nThe approach trades runtime overhead (typically 2–10% on real workloads) for the simplicity of having no GC, no RC, and no borrow checker. Allocations can be freed eagerly at end-of-scope without tracking references; existing references just become invalid (and trap on next use).",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "complementary-to" }
+      ]
+    },
+    {
+      "id": "region-borrowing",
+      "title": "Region borrowing prototype",
+      "tags": ["vale", "memory-safety"],
+      "content": "The first region-borrowing prototype shipped July 2023: pure functions and `region` blocks can temporarily make data immutable, eliminating generation checks for code inside the block. The August 2025 **Group Borrowing** proposal (Nick Smith, endorsed by Ovadia) is a *zero-overhead* alternative to aliasable-xor-mutable — adds mutable aliasing without RC/GC/generational refs, described as cleaner than Vale's regions, still draft.\n\nHybrid-Generational Memory was effectively abandoned after ~32 iterations; Ovadia explicitly says regions + generational refs subsumed it.\n\nAnnotation burden is opt-in: programs run without regions; add `pure`/region annotations only where you want zero generation checks. This is the \"regions as immutability projection\" design point — distinct from regions as deallocation discipline.",
+      "refs": []
+    }
+  ]
+}

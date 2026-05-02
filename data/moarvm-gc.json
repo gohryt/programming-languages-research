@@ -1,0 +1,36 @@
+{
+  "kind": "runtime",
+  "name": "MoarVM GC — Generational, Parallel STW, Per-Thread Nursery",
+  "aliases": ["MoarVM GC", "Raku GC"],
+  "summary": "Raku's MoarVM ships a generational, parallel, precise, moving GC. 'Parallel' means stop-the-world but multi-thread cooperation on the collection — not concurrent or mostly-concurrent in the ZGC / Shenandoah / Go sense.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "generational-gc", "parallel-gc", "stop-the-world", "copying-gc", "precise-gc", "moarvm", "raku"],
+      "content": "Raku's **MoarVM** ships a generational, parallel, precise, *moving* GC. \"Parallel\" here means stop-the-world but multi-thread cooperation on the collection — *not* concurrent or mostly-concurrent in the ZGC / Shenandoah / Go sense.\n\nThe nursery is per-thread (semi-space copying for cheap death-young behaviour); the old generation uses sized buckets with large-object special-casing.",
+      "refs": [
+        { "target": "garbage-collection#actor-and-domain-collectors", "type": "related" },
+        { "target": "zgc", "type": "contrasts-with" },
+        { "target": "shenandoah-gc", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "in-tray",
+      "title": "Cross-thread reachability via in-tray",
+      "tags": ["parallel-gc", "moarvm"],
+      "content": "Cross-thread reachability is handled by passing `ThreadWork` / `WorkToPass` structures via a per-thread \"**in-tray**\" (`add_in_tray_to_worklist`) — the GC's analogue of work-passing across mutator threads, distinct from a traditional remembered-set + write-barrier approach.\n\nThe in-tray is a queue of work items each thread holds for incoming cross-thread reachability information. When thread A creates a reference into thread B's nursery, the corresponding work item is dropped into B's in-tray; B processes its in-tray as part of its next GC cycle. The design avoids a global write barrier table at the cost of more cross-thread bookkeeping during collection."
+    },
+    {
+      "id": "dedicated-nursery",
+      "title": "PR #1861 — dedicated nursery memory area",
+      "tags": ["write-barrier", "moarvm"],
+      "content": "The in-flight PR #1861 (\"Dedicated nursery memory area\") reserves a single ~1 GB virtual region at startup for nursery allocation so the **nursery-membership test on the write barrier collapses to a bounds check** — eliminating pointer-following on the hot path.\n\nEven without colored pointers or load-reference barriers, an aggressive per-thread nursery plus bounds-check write barrier delivers respectable latency on a workload (Raku) where most allocations die young."
+    }
+  ],
+  "sources": [
+    { "label": "MoarVM features overview", "url": "https://www.moarvm.org/features.html" },
+    { "label": "MoarVM gc/collect.c", "url": "https://github.com/MoarVM/MoarVM/blob/master/src/gc/collect.c" },
+    { "label": "MoarVM PR #1861 dedicated nursery", "url": "https://github.com/MoarVM/MoarVM/pull/1861" }
+  ]
+}

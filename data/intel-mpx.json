@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Intel MPX — Memory Protection Extensions (deprecated)",
+  "aliases": ["MPX", "Intel MPX", "Memory Protection Extensions"],
+  "summary": "Cautionary tale: Intel's hardware bounds-checking extension, deprecated and removed post-Tiger Lake. Failed for concrete reasons — up to 50% slowdown, only 4 bounds registers, no temporal safety, ABI-breaking, false positives, broken with multithreading. The MPX failure pattern directly informed MTE / CET / CHERI designs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["bounds-check", "x86", "memory-safety", "exploit-mitigation"],
+      "content": "**Intel MPX** (deprecated, removed post-Tiger Lake) is the cautionary tale of hardware safety done badly. It added bounds-check instructions plus a small set of bounds registers backed by software-walked bounds tables — superficially similar to SoftBound but with hardware acceleration.\n\nMPX failed for concrete reasons:\n- up to 50% slowdown, 4× page faults, cache pressure from bounds-table walks;\n- only 4 bounds registers → constant spill/fill into bounds tables;\n- no temporal safety;\n- ABI-breaking;\n- false positives on legal C idioms;\n- broken with multithreading and SGX/TSX.\n\nGCC dropped support, Clang never added it.",
+      "refs": [
+        { "target": "softbound-cets", "type": "compared-with" },
+        { "target": "sparc-adi", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "lessons",
+      "title": "Lessons for successor designs",
+      "tags": ["bounds-check", "x86", "memory-safety"],
+      "content": "The MPX failure pattern — too few hardware resources, no temporal coverage, ABI breakage — directly informed MTE / CET / CHERI designs:\n\n- **MTE** uses per-allocation tags, not per-pointer bounds registers, sidestepping the register-pressure problem.\n- **CET** is opt-in via `ENDBR` and shadow-stack pages, avoiding ABI breakage.\n- **CHERI** changes the pointer representation itself rather than adding parallel bounds registers — bounds always travel with the pointer, no spill/fill.\n\nMPX is the design point that every later hardware memory-safety architecture is implicitly defined against.",
+      "refs": [
+        { "target": "arm-mte", "type": "successor-of" },
+        { "target": "intel-cet", "type": "related" },
+        { "target": "cheri", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Intel MPX retrospective", "url": "https://arxiv.org/pdf/2009.06490" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Intel MPX retrospective", "url": "https://arxiv.org/pdf/2009.06490" }
+  ]
+}

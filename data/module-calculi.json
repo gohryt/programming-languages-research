@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "Module Calculi",
+  "aliases": ["module-calculus", "applicative-vs-generative-functors", "first-class-modules"],
+  "summary": "Theoretical and research-grade module systems beyond mainstream production languages: Standard ML's classical structure/signature/functor calculus, applicative vs generative functor semantics, and first-class modules; the design space that informs OCaml's industrialization, MixML, 1ML, and Backpack.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The module-calculus tradition treats modules not as a syntactic feature for grouping declarations, but as a *language-within-the-language* for managing abstraction at a larger grain. The canonical primitives are **structures** (module implementations), **signatures** (module interfaces) and **functors** (parameterised modules — functions from modules to modules).\n\nThis record collects the cross-cutting calculus topics: applicative vs generative functor semantics, first-class modules, and the SML classical reference. Production realisations live in `data/standard-ml`, `data/ocaml`, and the research extensions `data/1ml`, `data/modular-implicits`, `data/backpack-haskell`, `data/mixml`.",
+      "refs": [
+        { "target": "standard-ml#overview", "type": "production-realisation" },
+        { "target": "ocaml#overview", "type": "production-realisation" }
+      ]
+    },
+    {
+      "id": "applicative-vs-generative-functors",
+      "title": "Applicative vs generative functors",
+      "tags": ["module-calculus", "functors", "type-system"],
+      "content": "When the same functor is applied twice to identical arguments, are the resulting modules considered to share abstract types or be freshly distinct? **Applicative** functor semantics say identical applications yield identical abstract types; **generative** semantics say each application produces freshly opaque types.\n\nOCaml uses applicative functor semantics by default; SML uses generative semantics. The choice has real consequences for what programs typecheck. Applicative semantics make `F(M).t = F(M).t` (useful for shared abstract types across the program); generative semantics enforce freshness (useful for each application creating its own private state).\n\nNeither is universally right. The deeper lesson for a language designer is that **functor-application semantics is a real design decision** that affects type identity, not just an implementation strategy.",
+      "refs": [
+        { "target": "ocaml#overview", "type": "example" },
+        { "target": "standard-ml#overview", "type": "example" }
+      ]
+    },
+    {
+      "id": "first-class-modules",
+      "title": "First-class modules",
+      "tags": ["module-calculus", "first-class", "type-system"],
+      "content": "First-class modules let modules be values: passed to functions, stored in data structures, returned from functions, dynamically dispatched. OCaml supports them via the `(module M : S)` syntax; SML does not (modules and core values are distinct universes).\n\nThe trade-off: first-class modules increase expressivity but complicate the type system because module identity now depends on runtime values rather than only on static declaration sites. The 1ML research project (`data/1ml`) takes this further by unifying modules and core into one language, eliminating the universe split entirely.",
+      "refs": [
+        { "target": "1ml#overview", "type": "research-extension" },
+        { "target": "ocaml#overview", "type": "production-realisation" }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": ["module-calculus", "design-guidance"],
+      "content": "A language designer choosing to expose module-calculus features should answer:\n\n1. Are modules a separate universe from core values, or unified (1ML approach)?\n2. Are functors applicative or generative?\n3. Are functors first-class (callable at runtime, stored in values)?\n4. Are signatures recursive, mutually recursive (MixML), or strictly hierarchical?\n5. Does the elaboration to type theory match standard ML, OCaml's path-dependent types, or a research alternative (Dreyer's RTG, Rossberg's F-ing modules)?\n\nThe consequences cascade: more powerful modules require more sophisticated type theory and bigger compilers, but enable architectural patterns (parameterised libraries, abstract type matching) that conventional languages can express only through traits/type-classes/templates."
+    }
+  ]
+}

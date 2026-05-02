@@ -1,0 +1,41 @@
+{
+  "kind": "runtime",
+  "name": "HotSpot CMS / ParNew / Parallel Scavenge — The Pre-G1 Lineage",
+  "aliases": ["CMS", "Concurrent Mark-Sweep", "ParNew", "Parallel Scavenge", "Parallel Old", "HotSpot legacy collectors"],
+  "summary": "The HotSpot collector lineage that preceded G1, ZGC, and Shenandoah. ParNew is a parallel young-generation copying collector that pairs with CMS (Concurrent Mark-Sweep) for the old generation. Parallel Scavenge / Parallel Old is the throughput-oriented STW alternative.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "concurrent-gc", "mark-sweep", "non-compacting", "parallel-gc", "jvm", "hotspot", "openjdk", "deprecated"],
+      "content": "The HotSpot collector lineage that preceded G1, ZGC, and Shenandoah is worth recording for design genealogy.\n\n- **ParNew** is a parallel young-generation copying collector (1990s) that pairs with **CMS** for the old generation.\n- **CMS (Concurrent Mark-Sweep)** performs concurrent marking and concurrent sweeping with brief STW initial-mark and final-remark pauses, and *does not compact* — accepting fragmentation in exchange for low pauses, the same trade-off Go's GC makes today.\n- **Parallel Scavenge / Parallel Old** is the throughput-oriented STW alternative: parallel young-and-old generation collection without concurrency, optimising for total throughput rather than pause time.",
+      "refs": [
+        { "target": "garbage-collection#throughput-collectors", "type": "predecessor-of" },
+        { "target": "g1-gc", "type": "predecessor-of" },
+        { "target": "zgc", "type": "predecessor-of" },
+        { "target": "shenandoah-gc", "type": "predecessor-of" },
+        { "target": "go-gc", "type": "design-inspired" }
+      ]
+    },
+    {
+      "id": "history",
+      "title": "Lifecycle — JDK 1.4.2 to JDK 14",
+      "tags": ["jvm", "hotspot", "deprecated"],
+      "content": "CMS shipped in **Java 1.4.2 (2003)** and was the latency-oriented JVM collector for over a decade. The architectural pattern — **concurrent marking with STW initial/final marking phases plus non-compacting sweeping** — directly inspired Go's tricolor mark-sweep and indirectly motivated the colored-pointer load-barrier designs in C4/ZGC/Shenandoah.\n\nStatus (JDK 14+, 2020): CMS was deprecated in JDK 9 (2017, JEP 291) and removed in JDK 14 (2020, JEP 363), replaced by G1 as default and ZGC/Shenandoah for low-latency. **ParNew is removed alongside CMS**. Parallel Scavenge / Parallel Old remains available as the throughput-tuned alternative."
+    },
+    {
+      "id": "failure-modes",
+      "title": "CMS failure modes — fragmentation and remark pauses",
+      "tags": ["non-compacting", "garbage-collection"],
+      "content": "CMS's failure modes also drove the next-generation designs:\n\n- **Fragmentation** accumulates without compaction, and the eventual fall-back **STW Full GC** becomes the tail-latency floor.\n- **Remark-phase pauses** scale with mutation rate and can be unpredictable.\n- **Promotion failures** cascade into stop-the-world events when the old generation fragments enough that an object cannot be promoted.\n\nThe deprecation is itself a design lesson: **a collector without compaction accumulates fragmentation that eventually forces a full STW compacting collection, and the bound on that pause becomes the tail-latency floor** — exactly what colored-pointer designs (ZGC, Shenandoah, C4) eliminate by making compaction concurrent.",
+      "refs": [
+        { "target": "azul-c4", "type": "design-influenced" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Oracle JDK 13 — Concurrent Mark-Sweep collector tuning", "url": "https://docs.oracle.com/en/java/javase/13/gctuning/concurrent-mark-sweep-cms-collector.html" },
+    { "label": "JEP 291: Deprecate CMS", "url": "https://openjdk.org/jeps/291" },
+    { "label": "JEP 363: Remove CMS", "url": "https://openjdk.org/jeps/363" }
+  ]
+}

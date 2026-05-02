@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Roc Morphic — Borrow Inference and Alias Analysis",
+  "aliases": ["morphic", "roc-morphic-alias-inference"],
+  "summary": "Borrow-based RC inference plus alias analysis used by Roc to eliminate most inc/dec ops before lowering. The upstream `morphic-lang/morphic` is the cleaner reference implementation; in Roc, a December 2024 alias-analysis bug around `joinpoint`/`jump` loops prompted PR #7370 to limit Morphic to trivial analysis until fixed.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["reference-counting", "compile-time-rc", "borrow-inference", "alias-analysis", "uniqueness-inference", "roc"],
+      "content": "Roc combines **Morphic** (borrow-based RC inference, eliminates most inc/dec) + Perceus reuse + LLVM. Morphic is an alias-and-borrow analysis: it propagates per-binding flags about whether a reference is borrowed (no RC traffic needed) or owned (drop emits a `dec`), and whether two references may alias (constraining where in-place mutation is safe).\n\nThis is a different angle on the same compile-time RC problem solved by Perceus, Lean 4, and Lobster: rather than inserting `inc`/`dec` from a uniqueness proof, Morphic inserts them from a *borrow* proof. The two are complementary, and Roc runs Perceus reuse on top of Morphic's borrow output.\n\nMorphic is documented as `data/roc-morphic` (this record); Roc's *lambda-set / defunctionalisation* angle is documented in `data/roc-lambda-sets`. The two analyses interact (lambda-set inference shapes what Morphic can see) but are conceptually separate.",
+      "refs": [
+        { "target": "reference-counting#lobster-and-roc-morphic", "type": "covered-by" },
+        { "target": "perceus#overview", "type": "complemented-by" },
+        { "target": "roc-lambda-sets#overview", "type": "sibling-analysis" }
+      ],
+      "sources": [
+        { "label": "morphic-lang/morphic", "url": "https://github.com/morphic-lang/morphic" },
+        { "label": "Roc — Fast page", "url": "https://www.roc-lang.org/fast" }
+      ]
+    },
+    {
+      "id": "borrow-and-alias-inference",
+      "title": "Borrow and alias inference",
+      "tags": ["borrow-inference", "alias-analysis", "uniqueness-inference", "compile-time-rc", "inc-elision", "in-place-update"],
+      "content": "The reference implementation lives in the upstream `morphic-lang/morphic` repository — cleaner than the Roc embedding because it is studied in isolation rather than entangled with Roc's lambda-set machinery and platform glue. Two passes:\n\n- **Borrow inference** — annotates each function parameter and let-binding with whether it is borrowed (caller retains ownership; callee may not consume) or owned (callee gets the only handle and is responsible for the drop). Borrowed references emit no RC traffic; owned references get an explicit `dec` at end-of-life.\n- **Alias analysis** — propagates may-alias information so the reuse analyser (Perceus-style) knows when a destructive write to a refcount-1 cell is safe. Two references that may alias cannot both be treated as unique writers.\n\nThe combination eliminates most `inc`/`dec` operations before they reach LLVM, and the residual RC ops feed into Perceus's reuse pass for in-place updates.",
+      "refs": [
+        { "target": "perceus#developments", "type": "feeds-into" }
+      ],
+      "sources": [
+        { "label": "morphic-lang/morphic", "url": "https://github.com/morphic-lang/morphic" }
+      ]
+    },
+    {
+      "id": "joinpoint-bug-and-pr-7370",
+      "title": "December 2024 alias-bug and PR #7370 limit",
+      "tags": ["alias-analysis", "compile-time-rc", "roc", "experimental"],
+      "content": "A Morphic alias-analysis bug surfaced in December 2024 (issue #7367): incorrect in-place mutation when `joinpoint`/`jump` form loops in Roc's IR. The analysis treated the back-edge as if it preserved uniqueness, allowing a destructive write that aliased a still-live reference reaching the join point on the next iteration.\n\nPR #7370 *limited Morphic to trivial analysis* until the bug was fixed — a useful lesson on the difficulty of proving uniqueness across CFG back-edges. Until the more aggressive analysis is restored, Roc trades some inc/dec elision for soundness.\n\nStatus (as of 2026-04): the trivial-analysis fallback is the operative behaviour in Roc. The upstream `morphic-lang/morphic` repository remains the reference for the full design. The episode reinforces a broader observation in the compile-time RC literature (Perceus reuse, Lean 4 `isExclusive`, Lobster lifetime analysis): proving uniqueness inside ordinary acyclic CFGs is tractable; doing so across loop back-edges and join points requires a much more careful argument, and getting the fixed-point wrong silently corrupts the heap.",
+      "refs": [
+        { "target": "reference-counting#lobster-and-roc-morphic", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Roc Morphic loop bug", "url": "https://github.com/roc-lang/roc/issues/7367" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "morphic-lang/morphic", "url": "https://github.com/morphic-lang/morphic" },
+    { "label": "Roc Morphic loop bug", "url": "https://github.com/roc-lang/roc/issues/7367" },
+    { "label": "Roc — Fast page", "url": "https://www.roc-lang.org/fast" }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Scope Graphs",
+  "aliases": ["scope-graph-framework", "neron-tolmach-visser-wachsmuth"],
+  "summary": "Name resolution as a graph-query problem: binding structure is represented as graph edges (declarations, references, imports, parents) and resolving a name is a traversal. Néron-Tolmach-Visser-Wachsmuth introduced the formalism; Spoofax productionized it for editor tooling and language workbenches.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Scope-graph approaches represent binding structure as graph edges and resolve names through graph queries. The Néron–Tolmach–Visser–Wachsmuth scope-graph framework formalized this view; subsequent work and Spoofax tooling have built on it. The approach is attractive for IDEs because it lets editor features ask for exactly the semantic fact needed at a cursor location instead of forcing whole-program analysis.\n\nThe distinguishing feature versus a traditional symbol table is that the binding structure is *first-class data*: edges are explicit, queries are reified, and the resolution algorithm is a graph traversal that can be memoized at any granularity.",
+      "refs": [
+        { "target": "name-resolution#overview", "type": "alternative-architecture" },
+        { "target": "stratego-spoofax#overview", "type": "implemented-in" }
+      ]
+    },
+    {
+      "id": "graph-elements",
+      "title": "Graph elements and resolution as query",
+      "tags": ["name-resolution", "compiler-architecture"],
+      "content": "A scope graph has scopes (regions of binding), declarations (bindings of names to entities), references (uses of names), and labelled edges between scopes (parent, import, lexical-extension). A reference resolves by traversing edges from the reference's scope outward, collecting visible declarations, applying shadowing and well-formedness conditions along the way.\n\nThis design naturally generalizes:\n\n- lexical scoping is parent edges;\n- module imports are import edges;\n- mixin/inheritance is extension edges;\n- type-directed lookup adds query-language predicates over edge labels.\n\nThe resolution algorithm becomes a regular path query over labelled graphs, which is well-studied and admits clean caching strategies."
+    },
+    {
+      "id": "ide-and-incrementality",
+      "title": "IDE and incrementality fit",
+      "tags": ["tooling", "incrementality"],
+      "content": "Query-based compilers and language servers often memoize name-resolution and type-checking facts so that edits invalidate only affected facts. Scope graphs fit this discipline naturally: a path query over a graph is exactly the kind of thing a demand-driven framework like Salsa can memoize at the node level.\n\nFor a language designer, the practical lesson is that **if name resolution is reified as a graph + queries from the start, an IDE-quality language server costs much less to build than if name resolution lives only as imperative code in a batch-compiler pass**. Spoofax exploits this for language workbenches; rust-analyzer uses a related demand-driven approach without the explicit graph reification.",
+      "refs": [
+        { "target": "salsa-incremental#overview", "type": "complementary-architecture" },
+        { "target": "language-server#resolution-and-identity-constraints", "type": "supports" }
+      ]
+    }
+  ]
+}

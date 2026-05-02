@@ -1,0 +1,9 @@
+{
+  "id": "build-systems",
+  "tag": "build-systems",
+  "name": "Build Systems",
+  "description": "Sections tagged with the Build Systems concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "build-system"
+  ]
+}

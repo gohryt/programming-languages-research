@@ -1,0 +1,50 @@
+{
+  "kind": "framework",
+  "name": "Eclipse OMR — Pluggable Multi-Language Runtime Toolkit",
+  "aliases": ["OMR", "Eclipse OMR", "OpenJ9", "JitBuilder", "IBM J9"],
+  "summary": "IBM's Eclipse OMR is the open-source extraction of the J9 JVM's runtime components (GC framework, JIT compiler, port library, threading, diagnostic) into a language-agnostic toolkit. Underpins OpenJ9; reusable for OMR Ruby+, SOM++, and DSL runtimes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "framework", "language-agnostic-gc-toolkit", "pluggable-gc", "jvm", "openj9", "production"],
+      "content": "IBM's **Eclipse OMR** is the open-source extraction of the J9 JVM's runtime components (GC framework, JIT compiler, port library, threading, diagnostic) into a language-agnostic toolkit.\n\nOriginally built for J9 Java, OMR now serves as the runtime substrate for **OpenJ9** (IBM's drop-in JVM alternative to HotSpot), **Eclipse Omega VM**, and several research/production projects retrofitting GC and JIT capabilities onto languages without their own runtime: **OMR Ruby+** (a Ruby integration with GC and JIT acceleration), **SOM++** (a Smalltalk dialect), and various OMR-based DSL runtimes. **JitBuilder** is the OMR component that lets a language frontend describe its semantics declaratively and get a JIT-compiled implementation without writing a backend.",
+      "refs": [
+        { "target": "garbage-collection#hybrids-and-boundaries", "type": "instance-of" },
+        { "target": "mmtk", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "openj9",
+      "title": "OpenJ9 as primary consumer",
+      "tags": ["jvm", "openj9", "openjdk", "production"],
+      "content": "**OpenJ9** is the production-grade IBM JVM that consumes OMR as its runtime substrate. Distinct from HotSpot (the OpenJDK default), OpenJ9 ships in IBM Semeru Runtimes and several enterprise Java distributions, with its primary differentiation in:\n\n- **AOT compilation via Shared Class Cache** (a per-machine cache of compiled classes shared across JVM instances).\n- Aggressive memory-footprint optimisation (typically 30–60% lower heap-after-startup than HotSpot on equivalent workloads).\n- Architecture that lets Garbage Collection policy be selected per workload (`-Xgc:concurrentScavenge`, `-Xgc:gencon`, `-Xgc:metronome`, `-Xgc:balanced`).\n\nThe Shared Class Cache is conceptually similar to .NET R2R and Project Leyden — pre-compiled native code amortised across runs — but OpenJ9's predates Leyden by over a decade and operates at a different granularity (per-class, machine-wide cache)."
+    },
+    {
+      "id": "comparison",
+      "title": "Comparison with HotSpot and MMTk",
+      "tags": ["framework", "comparative-design"],
+      "content": "**vs HotSpot**: OpenJ9 (OMR) and HotSpot are the two production JVMs. OpenJ9 emphasises footprint and embedded/cloud deployment; HotSpot emphasises peak throughput and the broader OpenJDK ecosystem. ZGC, Shenandoah, and G1 belong to HotSpot; OpenJ9's collectors (`gencon`, `metronome`, `balanced`, `concurrentScavenge`) are independent designs sharing OMR's GC framework primitives.\n\n**vs MMTk**: MMTk targets GC alone; OMR is broader (also covers JIT, port library, threading) and originated from production J9 code rather than research prototypes. A language designer choosing between them: pick MMTk for cutting-edge GC research available across multiple bindings, pick OMR for production-tested GC + JIT + threading in one toolkit."
+    },
+    {
+      "id": "consumers",
+      "title": "Consumers — Ruby+, SOM++, JitBuilder, DSL runtimes",
+      "tags": ["framework", "language-agnostic-gc-toolkit"],
+      "content": "Beyond OpenJ9:\n\n- **OMR Ruby+** is an experimental Ruby implementation with GC and JIT acceleration via OMR.\n- **SOM++** is a Smalltalk dialect built on OMR.\n- **JitBuilder** is OMR's declarative JIT frontend — a language can describe semantics and get a JIT without writing backend code generation.\n\nThe architectural contribution is the **decoupling of runtime services from language semantics**: GC, threading, JIT, and diagnostics are reusable libraries with well-defined interfaces, and a new language implementation can pick which to consume rather than building each from scratch."
+    },
+    {
+      "id": "status",
+      "title": "Status and design lesson",
+      "tags": ["framework", "production"],
+      "content": "Status (as of 2026-04): actively maintained at github.com/eclipse-omr/omr; production via OpenJ9.\n\nThe lesson: **a language designer building a new managed runtime should evaluate OMR + JitBuilder before writing GC and JIT from scratch**, much as a frontend designer evaluates LLVM before writing a backend. The cost is OMR's specific APIs and assumptions; the benefit is decades of production-tested GC and JIT engineering."
+    }
+  ],
+  "sources": [
+    { "label": "Eclipse OMR repository", "url": "https://github.com/eclipse-omr/omr" },
+    { "label": "What is OMR?", "url": "https://eclipse.dev/omr/starter/whatisomr.html" },
+    { "label": "Eclipse OMR project page", "url": "https://projects.eclipse.org/projects/technology.omr" },
+    { "label": "Eclipse OpenJ9 home", "url": "https://www.eclipse.org/openj9/" },
+    { "label": "OpenJ9 documentation", "url": "https://www.eclipse.org/openj9/docs/" },
+    { "label": "IBM Semeru Runtimes", "url": "https://developer.ibm.com/languages/java/semeru-runtimes/" }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "kind": "concept",
+  "name": "Hash Consing and String Interning",
+  "aliases": [
+    "string interning",
+    "symbol interning"
+  ],
+  "summary": "Store each unique value once, refer to it by index or pointer. String interning is the simplest case (every identifier becomes an integer); hash consing generalises to arbitrary structured data and makes structural equality an O(1) pointer comparison.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Hash consing and string interning solve the same problem at different granularities: deduplicating equivalent values so equality reduces to pointer or index comparison.\n\nString interning is the simplest case. Every identifier in the source becomes an interned `Symbol` — an integer index into a content-addressed string table. Two interned strings are equal iff their indices are equal, an O(1) check. Every major compiler uses this for identifiers — rustc's `Symbol`, V8's `InternedString`, Swift's `Identifier`, OCaml's hash-consed string pool.\n\nHash consing generalises the idea to structured data: instead of deduplicating bytes, deduplicate entire data structures. If two AST or type nodes are structurally identical, they share the same allocation. Equality becomes pointer comparison — O(1) regardless of structure size.",
+      "refs": [
+        {
+          "target": "arena-allocation#overview",
+          "type": "complementary-technique"
+        }
+      ]
+    },
+    {
+      "id": "string-interning",
+      "title": "String interning",
+      "tags": [
+        "compiler",
+        "symbols"
+      ],
+      "content": "The implementation is a hash map from string content to integer index. The strings themselves are stored in a contiguous buffer (often arena-allocated). The first occurrence of a name pays a hash and a compare; subsequent uses are O(1) lookups returning the existing index.\n\nThe payoff in compilers is large: every name reference (uses, definitions, scope lookups, error messages) becomes integer-keyed rather than string-keyed. Symbol tables become integer-keyed hash maps; cross-module lookups compare integer indices; debug printing dereferences the index back to a string only when a human reads it.\n\nA common refinement is to assign predefined interned indices to keywords and standard-library names at compiler startup, so the parser can compare against integer constants rather than re-interning known strings on every parse.",
+      "refs": []
+    },
+    {
+      "id": "hash-consing-of-structures",
+      "title": "Hash consing of structured data",
+      "tags": [
+        "compiler",
+        "type-representation"
+      ],
+      "content": "Hash consing extends interning to arbitrary structured values. Constructing a value first hashes its content (kind plus children), looks up that hash in a global table, and either returns the existing entry or inserts a new one. Two structurally identical values are then guaranteed to share the same allocation.\n\nThe key property: hash-consed structures are automatically persistent (immutable). Modifications create new structures that share unmodified subparts. This enables efficient structural diff, undo/redo, and incremental computation patterns where many program states share most subexpressions.\n\nIn compilers, hash consing is most useful for type representations — many expressions share the same type (`int`, `string`, `Vec<u8>`), and deduplicating type objects can dramatically reduce memory usage. Rust's type interner, OCaml's type representation, and most ML-family compilers hash-cons their type objects. BDD (binary decision diagram) libraries depend on hash consing for correctness, not just efficiency. JuliaSymbolics reported up to 100× faster numerical evaluation from hash-consed symbolic expressions.",
+      "refs": [
+        {
+          "target": "content-addressed-ir#overview",
+          "type": "generalises-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Hash Consing — Wikipedia overview",
+          "url": "https://en.wikipedia.org/wiki/Hash_consing"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and pitfalls",
+      "tags": [
+        "tradeoffs"
+      ],
+      "content": "Interning costs one hash and one comparison per *new* string or structure. The lookup table itself takes memory proportional to the number of unique entries, plus per-entry overhead (typically 16–32 bytes per hash-table slot on top of the value itself).\n\nFor compilers, the trade-off is almost always worth it: identifier references vastly outnumber unique identifier strings, and equivalent type expressions repeat heavily. The interner pays for itself within the first few thousand source tokens.\n\nThe main pitfalls are concurrency (a global interner needs synchronization, often a sharded lock map) and lifetime (interned values typically live for the whole compilation, so interning short-lived strings wastes memory). Most production interners use weak references or per-phase interners to bound retention.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Hash Consing — Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Hash_consing"
+    }
+  ]
+}

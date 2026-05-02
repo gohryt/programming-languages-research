@@ -1,0 +1,83 @@
+{
+  "kind": "tool",
+  "name": "WasmFX / Wasm Stack Switching",
+  "aliases": [
+    "wasm-stack-switching",
+    "typed-continuations"
+  ],
+  "summary": "WebAssembly proposal for typed continuations and structured non-local control flow that can compile fibers, lightweight threads, coroutines, generators, async/await, and effect handlers without privileging any one of them; reference implementation in Wasmtime, did not land in Wasm 3.0 but continues toward a subsequent milestone.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "WasmFX / typed continuations aims to extend WebAssembly with structured non-local control flow for efficient compilation of async/await, generators, continuations, and effect handlers. The proposed primitives — `cont.new` to create a fresh continuation from a function, `resume` to enter or re-enter it (passing values), `suspend` to yield from inside the continuation back to the caller — are structured to compile every higher-level concurrency primitive without privileging any one of them.\n\nDistinct from C++/Rust async (which compile to one specific stackless state-machine shape per language) and from OCaml 5 effect handlers / Raku continuations (per-language runtime substrates): WasmFX is a Wasm-level analogue at the binary-format layer.",
+      "refs": [
+        {
+          "target": "webassembly#overview",
+          "type": "extends"
+        },
+        {
+          "target": "virtual-threads#ocaml-effect-handlers",
+          "type": "comparable-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "WasmFX explainer",
+          "url": "https://wasmfx.dev/specs/explainer/"
+        },
+        {
+          "label": "Wasm stack-switching proposal explainer",
+          "url": "https://github.com/WebAssembly/stack-switching/blob/main/proposals/stack-switching/Explainer.md"
+        }
+      ]
+    },
+    {
+      "id": "wasm-3-and-stack-switching",
+      "title": "Wasm 3.0 and the stack-switching milestone",
+      "tags": [
+        "webassembly",
+        "concurrency",
+        "standards"
+      ],
+      "content": "**WebAssembly 3.0** (announced September 2025) consolidated several long-running proposals into one milestone: GC, memory64, exception handling with `exnref`, threads, SIMD, and JS string builtins all shipped cross-browser through 2024–2025. The stack-switching proposal, however, did *not* land in Wasm 3.0 — it remains a separate ongoing effort targeting a subsequent milestone, with reference implementation in Wasmtime (`wasm-tools` 2025+) and partial browser implementations behind flags.\n\nThe stack-switching primitives matter for the broader concurrency-substrate question because they let a single Wasm instance manage **multiple execution stacks concurrently** through typed continuation operations.",
+      "refs": []
+    },
+    {
+      "id": "jspi-relationship",
+      "title": "Relationship to JSPI",
+      "tags": [
+        "webassembly",
+        "javascript",
+        "interop"
+      ],
+      "content": "The interaction with **JSPI (JavaScript Promise Integration)** — already shipping in Chrome 126+ — is worth recording. JSPI lets Wasm code call JS Promise-returning functions and *suspend* the Wasm computation until the Promise resolves, without forcing the Wasm side to be authored in CPS or to drive its own scheduler. Stack switching generalises this: JSPI is essentially a single-purpose application of the same mechanism, specialised for the Wasm ↔ JS boundary. Once stack switching ships, JSPI becomes one consumer of it rather than the only one.",
+      "refs": []
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications for new languages targeting Wasm",
+      "tags": [
+        "webassembly",
+        "design-guidance"
+      ],
+      "content": "Status (as of 2026-04): Wasm 3.0 is shipping in production; stack switching is in late-Phase Wasm-CG progression with WasmFX as the reference implementation.\n\nThe lesson generalises: **a cross-vendor binary format can ship structured stack-switching primitives** — historically a per-language concern — making language-runtime concurrency portable across Wasm hosts (browsers, Wasmtime, WAMR, Bun, Node). For new languages targeting Wasm, the design question is whether to compile to current Wasm 3.0 (CPS-transform required for resumable computation) or wait for stack switching to ship and use it natively.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "WasmFX explainer",
+      "url": "https://wasmfx.dev/specs/explainer/"
+    },
+    {
+      "label": "Wasm stack-switching proposal",
+      "url": "https://github.com/WebAssembly/stack-switching/blob/main/proposals/stack-switching/Explainer.md"
+    },
+    {
+      "label": "WebAssembly 3.0 release announcement",
+      "url": "https://webassembly.org/news/2025-09-17-wasm-3.0/"
+    }
+  ]
+}

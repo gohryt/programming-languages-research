@@ -1,0 +1,28 @@
+{
+  "kind": "concept",
+  "name": "Algebraic Data Types",
+  "aliases": ["adt", "sum-types", "product-types", "tagged-union"],
+  "summary": "Combine products (records, tuples) and sums (variants, tagged unions). Make many invariants explicit and support pattern matching, exhaustiveness checking, serialization schemas, and constructor-driven optimizations. Type-checker concerns: constructor result types, field types, visibility, generic parameters, and whether constructors are closed or extensible across modules.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Algebraic data types combine products and sums. They make many invariants explicit and support pattern matching, exhaustiveness checking, serialization schemas, and compiler optimizations.\n\nThe type checker should track constructor result types, field types, visibility, generic parameters, and whether constructors are closed or extensible across modules. The same value-shape (a tagged variant) is implemented very differently depending on optimization choices: niche-filling, NaN-boxing, tagged pointers, indirection-only — but the *semantic* commitment of an ADT is that pattern matching enumerates exactly the constructors declared.",
+      "refs": [
+        { "target": "exhaustiveness-checking#overview", "type": "supported-by" },
+        { "target": "gadts#overview", "type": "extended-by" },
+        { "target": "pattern-matching-decision-trees#overview", "type": "lowered-via" }
+      ]
+    },
+    {
+      "id": "closed-vs-extensible",
+      "title": "Closed versus extensible variants",
+      "tags": ["type-system", "modules"],
+      "content": "A central design question is whether the constructor set is **closed** (fixed by the type's declaration) or **extensible** (additional constructors can be added in other modules). Closed variants are the default in ML, Haskell, Rust, Scala 3 enums; they admit straightforward exhaustiveness checking. Extensible variants — OCaml polymorphic variants, open enums in Swift, extensible-error-type encodings — let new cases appear in client modules at the cost of making exhaustiveness checking module-local rather than global.\n\nThe trade-off is API evolution versus pattern-match safety: closed variants force API breakage when adding a case but give compile-time guarantees that every match handles every case; extensible variants allow add-without-break but require a default branch or runtime fallback.",
+      "refs": [
+        { "target": "row-polymorphism#extensible-variants", "type": "exemplifies-extensible-side" }
+      ]
+    }
+  ]
+}

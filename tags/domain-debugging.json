@@ -1,0 +1,7 @@
+{
+  "id": "domain-debugging",
+  "tag": "domain:debugging",
+  "name": "Domain: debugging",
+  "description": "Section concerns interactive or post-hoc debugging — pausing, inspecting, replaying, or querying program execution to find bugs.",
+  "axis": "domain"
+}

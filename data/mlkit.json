@@ -1,0 +1,60 @@
+{
+  "kind": "language",
+  "name": "MLKit — Tofte-Talpin Region Inference Implementation",
+  "aliases": ["mlkit-implementation", "tofte-talpin-mlkit"],
+  "summary": "MLKit is the canonical 'no annotations, all inferred' baseline for region-based memory management. It implements Tofte-Talpin's stack-of-regions semantics for Standard ML using Algorithm R (TOPLAS 1998). Recent work combines region inference with tag-free generational GC (JFP 2021) and parallelises inference itself (PLDI 2023).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["mlkit", "ml", "region-based", "region-inference"],
+      "content": "**MLKit** is the canonical \"no annotations, all inferred\" baseline for region-based memory management. It implements Tofte-Talpin's stack-of-regions semantics (1994; ICFP 1996; IC 1997) for Standard ML: a region-annotated lambda calculus where every value lives in a region, regions form a runtime stack, and `letregion ρ in e` is the only allocation/deallocation primitive.\n\nThe sister record `data/mlkit-regionexp` covers the IR/representation angle — the typed-region annotated lambda calculus the compiler operates over. This record covers the implementation, the inference algorithm, and the modern (2021–2023) extensions to the MLKit story.",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "instance-of" },
+        { "target": "mlkit-regionexp#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "MLKit project", "url": "https://elsman.com/mlkit/" }
+      ]
+    },
+    {
+      "id": "tofte-talpin-theory",
+      "title": "Tofte-Talpin theory and region/effect polymorphism",
+      "tags": ["region-inference", "region-polymorphism", "effect-polymorphism", "let-region", "lifo-region"],
+      "content": "Tofte-Talpin's stack-of-regions semantics is a region-annotated lambda calculus where every value lives in a region, regions form a runtime stack, and `letregion ρ in e` is the only allocation/deallocation primitive. **Region- and effect-polymorphism with polymorphic recursion in regions** is the load-bearing extension: type schemes ∀α…ρ…ε.τ are required for recursive functions to allocate into different regions per call.\n\nWithout polymorphic recursion in regions, recursive functions would have to share a single region for all call levels, which would either pin too much data live or force a uniform deallocation point too late. Polymorphic recursion lets each recursive call materialise a fresh region variable in its scheme.",
+      "refs": [],
+      "sources": [
+        { "label": "MLKit retrospective", "url": "https://elsman.com/mlkit/pdf/retro.pdf" }
+      ]
+    },
+    {
+      "id": "algorithm-r",
+      "title": "Algorithm R and the leak problem",
+      "tags": ["region-inference", "compiler", "ml"],
+      "content": "Algorithm specification: unification + constraint-solving. Mads Tofte / Martin Elsman's syntax-directed **Algorithm R** (TOPLAS 1998) uses Algorithm-W-style unification with fixed-point iteration to handle polymorphic-recursive regions; Birkedal-Tofte's alternative is constraint-based. MLKit ships the syntax-directed one. **Storage-mode / multiplicity inference** further refines representations after inference.\n\nAnnotation burden: zero; inference power: very strong, with classic pathologies (region \"stuck\" until end of program — the **leak problem**, partly fixed by Aiken-Fähndrich-Levien 1995's relaxed LIFO, which lets regions die earlier than the syntactic scope that introduced them when usage allows).",
+      "refs": [],
+      "sources": [
+        { "label": "Tofte-Elsman Algorithm R (TOPLAS 1998)", "url": "https://elsman.com/mlkit/pdf/toplas98.pdf" }
+      ]
+    },
+    {
+      "id": "regions-plus-gc-and-parallel-inference",
+      "title": "Regions + GC and parallel region inference",
+      "tags": ["mlkit", "region-inference", "garbage-collection", "concurrency-isolation"],
+      "content": "Two recent extensions update the 1990s MLKit story to a multicore world.\n\n**Elsman & Hallenberg (JFP 2021)** combine region inference with tag-free generational GC: per-region collectors are specialised by exploiting *typed regions*, and write barriers are minimised. Empirically the combination often beats either technique alone — regions handle the common case (short-lived data freed in bulk), GC handles the pathological case (long-lived data with complex sharing). Status (as of 2026-04): production-strong in the MLKit distribution.\n\n**Elsman & Henriksen (PLDI 2023)** deliver parallel region inference for MLKit with leaf threads, avoiding allocation races during inference itself. This extends the practical applicability of region inference to multicore-era compilation.",
+      "refs": [
+        { "target": "garbage-collection#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "MLKit + GC (JFP 2021)", "url": "https://elsman.com/mlkit/pdf/jfp2021.pdf" },
+        { "label": "Parallel region inference (PLDI 2023)", "url": "https://elsman.com/mlkit/pdf/parreg-pldi23.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Tofte-Elsman Algorithm R (TOPLAS 1998)", "url": "https://elsman.com/mlkit/pdf/toplas98.pdf" },
+    { "label": "MLKit retrospective", "url": "https://elsman.com/mlkit/pdf/retro.pdf" },
+    { "label": "MLKit + GC (JFP 2021)", "url": "https://elsman.com/mlkit/pdf/jfp2021.pdf" },
+    { "label": "Parallel region inference (PLDI 2023)", "url": "https://elsman.com/mlkit/pdf/parreg-pldi23.pdf" }
+  ]
+}

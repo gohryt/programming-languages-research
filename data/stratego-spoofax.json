@@ -1,0 +1,32 @@
+{
+  "kind": "framework",
+  "name": "Stratego / Spoofax",
+  "aliases": ["stratego-xt", "spoofax-language-workbench"],
+  "summary": "Stratego is a strategic term-rewriting language; Spoofax is the language workbench built on it. Programs are represented as terms (similar to ASTs), and transformations are strategies — composable rewrite rules with traversal control. The IR is the term tree plus the strategy that operates on it.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Stratego is a strategic term-rewriting language; Spoofax is the language workbench built on it. Programs are represented as terms (similar to ASTs), and transformations are strategies — composable rewrite rules with traversal control. The \"IR\" is the term tree plus the strategy that operates on it.",
+      "refs": [
+        { "target": "abstract-syntax-trees#overview", "type": "operates-on" }
+      ],
+      "sources": [
+        { "label": "Spoofax language workbench", "url": "https://www.spoofax.dev/" },
+        { "label": "Spoofax SDF3 bibliography", "url": "https://www.spoofax.dev/background/bibliography/sdf3/" }
+      ]
+    },
+    {
+      "id": "whole-language-rewriting",
+      "title": "Whole-language definitions as rewrites",
+      "tags": ["compiler-ir", "metaprogramming", "language-workbench"],
+      "content": "Stratego/Spoofax has been used for whole-language definitions (parser, type-checker, code generator, IDE features all expressed as rewrites). The contribution is showing that compilation can be expressed as term rewriting, with the rewrite engine providing the dispatch and traversal infrastructure. Production users include MetaBorg and Rascal (a related language workbench).\n\nThe approach trades performance (rewrite engines are slower than hand-written compilers) for declarativeness — language designers can iterate on a language by editing rewrite rules rather than maintaining a complex hand-written compiler pipeline.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Spoofax language workbench", "url": "https://www.spoofax.dev/" },
+    { "label": "Spoofax SDF3 bibliography", "url": "https://www.spoofax.dev/background/bibliography/sdf3/" }
+  ]
+}

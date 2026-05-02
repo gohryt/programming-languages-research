@@ -1,0 +1,42 @@
+{
+  "kind": "language",
+  "name": "Virgil and the Aeneas Compiler",
+  "aliases": ["Virgil", "Aeneas", "Ben Titzer Virgil"],
+  "summary": "Ben Titzer's Virgil (compiled by Aeneas, 2006+) is the compiler-engineering existence proof for production-grade whole-program optimisation with ~50× faster compilation than rustc and ~300× faster than TinyGo, plus binary outputs ~35× smaller than Rust and ~20× smaller than TinyGo on benchmarks.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ben Titzer's **Virgil** (compiled by **Aeneas**, the Virgil compiler binary, 2006–present) is a compiler-engineering existence proof: production-grade whole-program optimisation with compile times and binary sizes one to two orders of magnitude better than mainstream alternatives. Status (as of 2026-04): public measurements (linked from `github.com/titzer/virgil/issues/80`) report Virgil compiling benchmarks ~50× faster than rustc and ~300× faster than TinyGo, with executable output ~35× smaller than Rust and ~20× smaller than TinyGo; numbers are upstream-published, not independently re-benchmarked here.",
+      "refs": [],
+      "sources": [
+        { "label": "Virgil — A Fast and Lightweight Systems Programming Language", "url": "https://github.com/titzer/virgil/" }
+      ]
+    },
+    {
+      "id": "techniques",
+      "title": "Techniques that get Virgil there",
+      "tags": ["compiler", "language-design"],
+      "content": "- **Reachability-first compilation.** The compiler parses and type-checks all code but only lowers reachable code from `main()`. Unreachable generic code never gets specialised, imported-but-unused modules never get codegened. Most languages do dead-code elimination post-optimisation; Virgil does it pre-optimisation, saving the optimiser's time on code that will be discarded.\n- **Specialisation driven by reachability.** Polymorphic instantiation only happens for combinations that are actually reached — not the Cartesian product of all type arguments × all call sites. This collapses the generic explosion that hurts compile times in Rust and C++.\n- **Local SSA optimisations, no fixed-point iteration.** Most of Virgil's optimiser is lightweight local peephole-style rewrites on SSA. Unlike LLVM, which iterates many passes to saturation, Virgil does mostly single-pass transformations. Less aggressive, much faster.\n- **Fully self-hosted, no runtime in another language.** Compiler, runtime, GC, libraries, system interface are all in Virgil. On native targets, there is no C startup code — Virgil's own `_start` calls directly into the kernel.\n- **Multi-target from one compiler.** Same source compiles to x86-darwin, x86-64-linux, JAR (JVM), or Wasm. The compiler is contained in a single executable; no separate linker, assembler, or runtime package.",
+      "refs": []
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["language-design"],
+      "content": "The lesson for a new language: \"LLVM-level optimisation\" is not always the right target. For systems where compile latency is a first-class concern (game engines, dev workflows, small embedded targets), a simpler compiler with reachability analysis can deliver both faster builds and smaller binaries than a fully-optimising toolchain. The trade-off is that generated code is slower than LLVM -O3 output — but often only by a small margin on the workloads Virgil targets.\n\nVirgil also publishes research on novel representations (Teo & Titzer, \"Unboxing Virgil ADTs for Fun and Profit,\" JENSFEST 2024) demonstrating that whole-program knowledge enables ADT representation choices that would be unsafe under separate compilation.",
+      "refs": [
+        { "target": "stalin-scheme#overview", "type": "compared-with" },
+        { "target": "mlton#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Why is Virgil so fast? (GitHub issue)", "url": "https://github.com/titzer/virgil/issues/80" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Virgil repo", "url": "https://github.com/titzer/virgil/" },
+    { "label": "Virgil benchmark issue", "url": "https://github.com/titzer/virgil/issues/80" }
+  ]
+}

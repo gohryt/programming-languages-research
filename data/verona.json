@@ -1,0 +1,58 @@
+{
+  "kind": "language",
+  "name": "Verona — Per-Region Pluggable Strategies and Behaviour-Oriented Concurrency",
+  "aliases": ["project-verona", "verona-language"],
+  "summary": "Microsoft Research / Imperial / Uppsala's Verona is a concurrent OO language where every object lives in exactly one of a forest of isolated regions, and a thread has at most one 'window of mutability' — the active region — at a time. Per-region pluggable memory strategies (trace, RC, arena) are chosen by the programmer; reference capabilities (iso/mut/imm) enforce isolation. Behaviour-Oriented Concurrency (OOPSLA 2023) and Dynamic Region Ownership (PLDI 2025) extend the model.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["verona", "region-based", "concurrency-isolation"],
+      "content": "Microsoft Research / Imperial / Uppsala's **Verona** is a concurrent OO language where every object lives in exactly one of a *forest of isolated regions*, and a thread has at most one \"window of mutability\" — the active region — at a time. Verona is the most ambitious modern composition of regions + concurrency + memory-strategy choice.\n\nStatus (as of 2026-04): research project at Microsoft, with active publications and an open-source repository. Not aimed at production use yet; the design is the contribution.",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "instance-of" },
+        { "target": "ownership#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Verona repository", "url": "https://github.com/microsoft/verona" }
+      ]
+    },
+    {
+      "id": "per-region-strategies-and-capabilities",
+      "title": "Per-region pluggable strategies and reference capabilities",
+      "tags": ["verona", "region-based", "concurrency-isolation"],
+      "content": "The distinctive contribution: **per-region pluggable memory strategies** (trace, RC, arena) chosen by the programmer, so a region's policy doesn't bleed into the rest of the program (Cheeseman et al., OOPSLA 2023). One region can be a tracing-GC region, a sibling region can be reference-counted, and a third can be an arena — each suited to its data shape and lifetime — without requiring a single global memory strategy.\n\n**Reference-capability types** — `iso`, `mut`, `imm`, plus capabilities for moving objects between regions/threads — enforce isolation with no atomic ops on data accesses. `iso` is an isolation capability that names the region root; `mut` is mutable access within the active region; `imm` is shared immutable access. Capabilities and the active-region invariant together guarantee data-race freedom statically.",
+      "refs": [],
+      "sources": [
+        { "label": "Verona BoC + capabilities (OOPSLA 2023)", "url": "https://dl.acm.org/doi/10.1145/3622846" }
+      ]
+    },
+    {
+      "id": "behaviour-oriented-concurrency",
+      "title": "Behaviour-Oriented Concurrency (OOPSLA 2023)",
+      "tags": ["verona", "behavior-oriented-concurrency", "actor-region"],
+      "content": "**Behaviour-Oriented Concurrency** (BoC, OOPSLA 2023) replaces actors with `when` behaviours that asynchronously acquire exclusive access to multiple `cown`-wrapped regions atomically — solving the \"atomic update of N actors\" problem actors leave open. A `when (a, b, c) { ... }` block is scheduled to run when exclusive access to `a`, `b`, and `c` can be granted simultaneously, eliminating the deadlock and re-entrancy problems that arise when independent actors must coordinate across multiple state updates.\n\nBoC sits between actors and STM in the design space: stronger atomicity than actors, no rollback like STM, and statically scheduled rather than optimistic.",
+      "refs": [
+        { "target": "actors#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Verona BoC (OOPSLA 2023)", "url": "https://dl.acm.org/doi/10.1145/3622846" }
+      ]
+    },
+    {
+      "id": "dynamic-region-ownership",
+      "title": "Dynamic Region Ownership (PLDI 2025)",
+      "tags": ["verona", "concurrency-isolation"],
+      "content": "**Dynamic Region Ownership** (PLDI 2025) is a *dynamic* enforcement of the same discipline retrofitted into Python, relevant to the free-threaded CPython work. The static Verona design assumes a cooperative type system; for a dynamic language like Python, the same isolation invariants are enforced at runtime through capability tracking on objects.\n\nThis matters because as CPython removes the GIL, application code needs a coordination model that does not depend on a global mutex; Dynamic Region Ownership gives Python a region-based isolation model without requiring Python source-level type annotations.",
+      "refs": [],
+      "sources": [
+        { "label": "Verona Dynamic Region Ownership (PLDI 2025)", "url": "https://www.microsoft.com/en-us/research/publication/dynamic-region-ownership-for-concurrency-safety/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Verona BoC + capabilities (OOPSLA 2023)", "url": "https://dl.acm.org/doi/10.1145/3622846" },
+    { "label": "Verona Dynamic Region Ownership (PLDI 2025)", "url": "https://www.microsoft.com/en-us/research/publication/dynamic-region-ownership-for-concurrency-safety/" },
+    { "label": "Verona repository", "url": "https://github.com/microsoft/verona" }
+  ]
+}

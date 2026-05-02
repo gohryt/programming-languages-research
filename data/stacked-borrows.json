@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Stacked Borrows",
+  "aliases": ["stacked-borrows-model"],
+  "summary": "Jung, Dang, Kang, Dreyer (POPL 2020) operational aliasing model for unsafe Rust: every memory location has a stack of pointer tags. Borrowing pushes; using a pointer requires its tag to be in the stack and pops anything above it — a dynamic version of the static borrow checker that works without lifetimes. Defines what counts as undefined behaviour for unsafe Rust so the compiler can soundly enforce noalias, and so Miri can detect aliasing violations dynamically.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["stacked-borrows", "aliasing", "unsafe", "rust", "memory-safety"],
+      "content": "Stacked Borrows (Jung, Dang, Kang, Dreyer — POPL 2020) is not a borrow-checker but an *operational aliasing model* — it defines what counts as undefined behaviour for `unsafe` Rust, so the compiler can soundly enforce `noalias` optimizations, and so Miri can detect aliasing violations dynamically.\n\nThe model gives every memory location a stack of pointer tags. Borrowing pushes; using a pointer requires its tag to be in the stack and pops anything above it — a *dynamic* version of the static borrow checker that works without lifetimes.\n\nStacked Borrows remains the more established operational model for Miri-based aliasing checks today.",
+      "refs": [
+        { "target": "tree-borrows", "type": "predecessor-of" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "ownership", "type": "related" },
+        { "target": "rust", "type": "exemplified-by" }
+      ],
+      "sources": [
+        { "label": "Stacked Borrows (POPL 2020)", "url": "https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf" },
+        { "label": "Ralf Jung — Stacked Borrows", "url": "https://www.ralfj.de/blog/2018/08/07/stacked-borrows.html" }
+      ]
+    },
+    {
+      "id": "role-and-tradeoffs",
+      "title": "Role: optimization soundness vs. acceptable patterns",
+      "tags": ["stacked-borrows", "aliasing", "static-analysis", "memory-safety"],
+      "content": "The model exists to license optimizations that depend on `noalias` semantics (the LLVM attribute attached to `&T`/`&mut T`) while detecting violations dynamically in Miri. Empirically, Stacked Borrows rejects more real-world unsafe-Rust patterns than its successor Tree Borrows, motivating the latter's design.\n\nMechanical aliasing detection from the debugger angle is described elsewhere; this entry covers the model itself.",
+      "refs": [
+        { "target": "tree-borrows", "type": "compared-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Stacked Borrows (POPL 2020)", "url": "https://plv.mpi-sws.org/rustbelt/stacked-borrows/paper.pdf" },
+    { "label": "Ralf Jung — Stacked Borrows", "url": "https://www.ralfj.de/blog/2018/08/07/stacked-borrows.html" }
+  ]
+}

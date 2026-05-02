@@ -1,0 +1,7 @@
+{
+  "id": "family-heavyweight-instrumentation",
+  "tag": "family:heavyweight-instrumentation",
+  "name": "Family: heavyweight instrumentation",
+  "description": "Heavy DBI + shadow-state mechanisms: Frida Stalker, Valgrind, AddressSanitizer, ThreadSanitizer, Coz, coverage-guided fuzzers.",
+  "axis": "family"
+}

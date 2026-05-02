@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "HHVM HHIR",
+  "aliases": ["hiphop-intermediate-representation"],
+  "summary": "HHVM's region-scoped SSA IR: generated from a region (connected subgraph of HHBC), not whole functions. PHP/Hack dynamic dispatch, magic methods, weak typing, and reference semantics ride as HHIR-specific ops. Side-exit metadata maps back to HHBC offsets.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "HHIR is region-scoped SSA: it's generated from a *region* (a connected subgraph of HHBC, HHVM's bytecode) rather than from whole functions. Side-exit metadata maps back to HHBC offsets so failed speculations resume in the interpreter or baseline JIT. PHP/Hack dynamic dispatch, magic methods, weak typing, and reference semantics ride as HHIR-specific ops.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "hhbc-bytecode#overview", "type": "lowered-from" }
+      ],
+      "sources": [
+        { "label": "HHVM JIT source tree", "url": "https://github.com/facebook/hhvm/tree/master/hphp/runtime/vm/jit" }
+      ]
+    },
+    {
+      "id": "region-vs-function-jit",
+      "title": "Region vs whole-function JIT",
+      "tags": ["jit", "compiler-ir"],
+      "content": "Region-JIT orchestration takes a connected subgraph of bytecode (a hot path through a function or across function calls) rather than a single function. The benefit on a dynamic-dispatch language like PHP/Hack is that warm paths can be compiled without paying for the cold parts of the same function — magic-method bookkeeping, infrequent dispatch branches, and rarely-taken error paths stay interpreted.\n\nThe trade-off is more bookkeeping at side exits: each region has its own deopt boundary, and falling out of a hot region means resuming in the interpreter at a specific HHBC offset.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "HHVM JIT source tree", "url": "https://github.com/facebook/hhvm/tree/master/hphp/runtime/vm/jit" }
+  ]
+}

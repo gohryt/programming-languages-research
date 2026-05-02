@@ -1,0 +1,159 @@
+{
+  "kind": "concept",
+  "name": "Live visualization debugging",
+  "aliases": [
+    "live debugger",
+    "in-engine overlays",
+    "GPU frame debuggers"
+  ],
+  "summary": "Live visualization abandons the stop-inspect-resume loop in favor of continuous execution with behavior projected as an overlay — onto source code (WhiteBox), a timeline slider (Bret Victor, Light Table, Observable), the game viewport (Unreal Gameplay Debugger), a captured GPU frame (RenderDoc, NSight, PIX), or the user's own state chart (XState).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Live visualization abandons the stop-inspect-resume loop in favor of continuous execution with behavior projected as an overlay. Entries differ on **what surface the behavior is projected onto**: the source code itself (WhiteBox), a timeline slider (Bret Victor, Light Table, Observable), a reactive-cell dependency graph (Excel's Trace Precedents), the game viewport (Unreal Gameplay Debugger), a captured GPU frame (RenderDoc, NSight, PIX), or the state chart the user already wrote (XState). Each asks what the user's mental model is and renders debugging in that model, not in the machine's.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:live-visualization`\n- **domain**: `domain:debugging`\n- **on-cost**: `on-cost:dominant`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`\n"
+    },
+    {
+      "id": "whitebox-live-visualization",
+      "title": "Andrew Reece — WhiteBox",
+      "tags": [
+        "domain:debugging",
+        "family:live-visualization",
+        "on-cost:dominant"
+      ],
+      "content": "WhiteBox compiles, runs, and \"debugs\" C/C++ code live, displaying execution patterns and data transforms inline alongside the source code. Every expression shows what values it took, every branch shows how many times it was taken. A timeline slider allows scrubbing through the execution.\n\nWhiteBox is not a debugger in the traditional sense — it is a **visualizer**. There is no \"pause\" or \"step.\" Instead, the program runs to completion and the results are displayed as an overlay on the source code. It supports a \"black box only\" recording option that is faster but less detailed.\n\nThe philosophical point: separating \"running\" and \"debugging\" is an artificial distinction. If recording is cheap enough, every execution can be a debugging session. The UI should show behavior *alongside* the code, not in a separate pane.",
+      "sources": [
+        {
+          "url": "https://whitebox.systems/"
+        }
+      ]
+    },
+    {
+      "id": "bret-victor-timeline-scrubber",
+      "title": "Bret Victor — Timeline Scrubber",
+      "tags": [
+        "domain:debugging",
+        "family:live-visualization"
+      ],
+      "content": "Bret Victor's \"Inventing on Principle\" talk (2012) proposed that execution is a timeline you scrub with a slider rather than something you step through, with each line's execution history visualized alongside the source. The vision drove later live-coding environments (`data/live-visualization-debugging#light-table-eve-observable`), where the shipped slices of the idea are surveyed.",
+      "sources": [
+        {
+          "url": "https://vimeo.com/36579366"
+        }
+      ]
+    },
+    {
+      "id": "light-table-eve-observable",
+      "title": "Light Table, Eve, Observable — Shipped Live-Coding Environments",
+      "tags": [
+        "domain:debugging",
+        "family:live-visualization"
+      ],
+      "content": "Where Bret Victor's \"Inventing on Principle\" (`data/live-visualization-debugging#bret-victor-timeline-scrubber`) was a vision, Light Table (Chris Granger, 2012) was an attempt to ship it. Every expression evaluates inline as you type; **watches** are a \"next-gen println\" where an expression annotated with a watch streams its value back to the editor in real time during normal execution, across Clojure, JS, and Python. Light Table integrated with Chrome DevTools Protocol (`data/debugger-protocols#chrome-devtools-protocol`) for live JS edits to running pages and with IPython for inline matplotlib.\n\nEve, the successor project, confirmed a lesson from Light Table: **imperative languages fight live evaluation**. Eve abandoned imperative code for set-oriented rules with no evaluation order, exposing the fact that the Light Table vision required *language co-design* (similar to Hazel `data/retroactive-evaluation#hazel-typed-holes-live-eval` and Elm `data/time-travel-debugging#elm-immutable-state-time-travel`). Light Table's own work to get live eval to behave reliably in JS and Python required \"numerous caveats and strange edge cases.\"\n\nObservable (Mike Bostock et al.) is the shipped form of the idea in production today. Each cell in an Observable notebook is a JavaScript expression with statically analyzed free variables; the runtime builds a **reactive dataflow DAG** and re-runs each cell whenever its inputs change. Cells may return promises or generators — the runtime composes dependencies across async boundaries and animation frames. The **Minimap** visualizes the DAG as a sidebar of cells with inbound/outbound blue wires, making the notebook's dataflow itself a debuggable artifact: click a cell to see what it depends on and what depends on it.\n\nThe lesson is the same as Elm's: **if the language (or notebook model) makes dependencies static, the debugger can read them without re-execution**. Observable's explicit limitation — the Minimap cannot see side-effect-driven dependencies — underscores the point: the moment you escape the reactive model, the static view goes blind.\n\nThe prior art is older than any of these. Excel has shipped **Trace Precedents / Trace Dependents** for decades: click a cell, press `Ctrl+[` or the Formula Auditing ribbon button, and blue arrows trace every cell feeding the formula; `Ctrl+]` traces downstream dependents; red arrows mark error propagation; black arrows with worksheet icons mark cross-sheet references. The **Watch Window** is a live cross-workbook variable watch — add any cell and observe its value update as upstream inputs change. Third-party tools (TraceModel) externalize the full dependency graph as an interactive node view. Excel's dataflow debugger predates Observable's Minimap by decades, and the design lesson is the same: a reactive-language debugger needs to expose the dependency DAG as first-class UI.",
+      "sources": [
+        {
+          "url": "http://lighttable.com/"
+        },
+        {
+          "url": "https://witheve.com/deepdives/lighttable.html"
+        },
+        {
+          "url": "https://observablehq.com/documentation/debugging/minimap"
+        },
+        {
+          "url": "https://support.microsoft.com/en-us/office/display-the-relationships-between-formulas-and-cells-a59bef2b-3701-46bf-8ff1-d3518771d507"
+        }
+      ]
+    },
+    {
+      "id": "unreal-gameplay-debugger",
+      "title": "Unreal Gameplay Debugger — In-Engine Replicated Overlays",
+      "tags": [
+        "domain:debugging",
+        "family:live-visualization",
+        "game-engine",
+        "granularity:per-frame"
+      ],
+      "content": "Game engines debug differently from application code because the \"program\" is a real-time simulation where pausing destroys the feedback loop. Unreal's Gameplay Debugger Tool (GDT) is a **runtime overlay on the game viewport** activated with a single key (apostrophe by default, or the `EnableGDT` cheat). While the game runs, pressing a numpad key toggles a data category — Abilities, Behavior Tree, NavMesh, Perception, NavGrid — which draws its state as text and shapes *on top of the game world*, against a specific actor selected by pointing the camera at it.\n\nThe original contribution is that **GDT data flows through Unreal's network replication layer**. The same replication that keeps client and server worlds in sync carries debug payloads. The consequence is that GDT displays **both server and local client values side-by-side** when you point at an actor — and any divergence reveals client-side prediction drift or ability-activation desync as visible text, not hidden bugs. This is an in-engine race detector for distributed simulation state, built out of machinery the engine already has.\n\nCustom categories are C++ classes: `UGameplayDebuggingComponent` collects data (replicated), `AGameplayDebuggingHUDComponent` draws it. The sibling tool is the **Visual Logger**: per-tick actor snapshots saved into a timeline that can be scrubbed inside the editor, with per-category log channels — a post-hoc replay purpose-built for \"why did the AI do that 30 seconds ago?\" and usable in recorded PIE sessions as well as live runs.\n\nThe design pattern generalizes: shipping the debugger *inside the product*, gated by a cheat flag rather than a separate debug build, means debugging happens *in the environment where bugs actually occur* — live multiplayer, cooked builds, on-device. WhiteBox (`data/live-visualization-debugging#whitebox-live-visualization`) and retroactive console.log (`data/retroactive-evaluation#replay-io-retroactive-console-log`) share the philosophy; GDT applies it to a latency-sensitive distributed simulation.",
+      "sources": [
+        {
+          "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/using-the-gameplay-debugger-in-unreal-engine"
+        }
+      ]
+    },
+    {
+      "id": "gpu-frame-debuggers",
+      "title": "GPU Frame Debuggers — RenderDoc, NVIDIA NSight, Microsoft PIX",
+      "tags": [
+        "domain:debugging",
+        "family:live-visualization",
+        "gpu",
+        "granularity:per-frame"
+      ],
+      "content": "GPU execution is massively parallel, asynchronous, and unpausable — thousands of shader invocations fire per draw call, each with its own register state. Live, global step-through debugging of GPU execution is usually meaningless; frame debuggers instead capture the frame and allow offline inspection, including step-through replay of selected shader invocations. RenderDoc (open source, Baldur Karlsson), NVIDIA NSight Graphics, and Microsoft PIX converge on this model: **capture an entire frame offline and inspect it as a queryable object.**\n\nA capture contains every API call issued during the frame — draws, dispatches, state-setting calls, resource updates — plus all bound textures, buffers, render targets, and shader blobs, plus the framebuffer at each boundary. The **Event Browser** is the primary navigation UI: a hierarchical tree of API events by EID (Event ID), with user-annotated sections collapsed into tree nodes. The **Pipeline State** panel inspects the entire graphics pipeline at the selected event — which shaders are bound, which textures, which vertex buffers, which rasterizer state — with drill-downs to the raw contents of every resource.\n\nThe original contribution is **pixel history**: click any pixel on the final framebuffer and get a list of every modification to that pixel across the frame. Which draw call wrote it, pre- and post-depth-test results, which fragment passed overdraw, what color was blended in. From the pixel history, launch the **shader debugger** on any contributing fragment and step through HLSL source-level with local variables and callstack (not just disassembly). This is pure observational debugging of an unobservable execution model — the GPU is never paused, but its effects are fully reconstructible.\n\nShader debug information is handled by stripping the debug blob at compile time (shader code bloats otherwise) and correlating by hash at capture load time. RenderDoc reverse-engineered PIX's undocumented debug-info search algorithm to stay compatible with the ecosystem of shader-compiler toolchains, under \"principle of least surprise.\"\n\nThe design lesson is **temporal separation**: record cheaply, inspect expensively, offline. Pernosco (`data/record-and-replay#pernosco-omniscient`) applies the same principle to CPU execution. For any execution model whose *live* observation is prohibitive — GPU shaders, massively parallel kernels, production regressions — capture-and-inspect beats attach-and-step.",
+      "sources": [
+        {
+          "url": "https://renderdoc.org/docs/how/how_debug_shader.html"
+        },
+        {
+          "url": "https://docs.nvidia.com/nsight-graphics/UserGuide/shader-debugger-setup.html"
+        }
+      ]
+    },
+    {
+      "id": "xstate-inspector",
+      "title": "XState Inspector — Live State-Machine Debugger",
+      "tags": [
+        "domain:debugging",
+        "family:live-visualization",
+        "granularity:per-event",
+        "javascript"
+      ],
+      "content": "XState state machines are both a JavaScript/TypeScript library and a visual formalism (Harel statecharts). The Stately Inspector (`@statelyai/inspect`) debugs them in their natural notation: **the chart itself, animated with the current state highlighted.**\n\nThe mechanism is an **inspection event stream**. A running actor system emits events — `@xstate.actor` on creation, `@xstate.event` on sent events, `@xstate.snapshot` on state changes, `@xstate.microstep` on internal transitions, `@xstate.action` on action execution — over a WebSocket to an inspector. `createBrowserInspector()` opens a browser window; `createInspectorServer` relays events from a headless Node.js process to a browser UI. The inspector ingests the stream and renders three views simultaneously: the chart with the current node highlighted, a chronological event log, and **auto-generated sequence diagrams** for actor-to-actor communication derived from the event pairs.\n\nThe inspection API is **language-neutral at the protocol level**. Any runtime that emits the five event types can drive the inspector without depending on XState — the Stately docs show a non-XState Node.js harness calling `inspector.actor()` / `inspector.event()` / `inspector.snapshot()` directly. This is the state-machine analogue to DAP (`data/debugger-protocols#debug-adapter-protocol`) or CDP (`data/debugger-protocols#chrome-devtools-protocol`): a thin inspection protocol decoupled from the UI.\n\nThe design lesson is **the notation is the debugger UI**. When the language's primary artifact is already a diagram (state chart, dataflow graph, proof tree), the debugger should render the diagram, not a textual stack. This extends the Whyline's philosophy (`data/automated-fault-isolation#whyline-interrogative`) — debug in the user's mental model, not the machine's — from interrogation to visualization.",
+      "sources": [
+        {
+          "url": "https://stately.ai/docs/inspector"
+        },
+        {
+          "url": "https://github.com/statelyai/inspect"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://whitebox.systems/"
+    },
+    {
+      "url": "https://vimeo.com/36579366"
+    },
+    {
+      "url": "http://lighttable.com/"
+    },
+    {
+      "url": "https://witheve.com/deepdives/lighttable.html"
+    },
+    {
+      "url": "https://observablehq.com/documentation/debugging/minimap"
+    },
+    {
+      "url": "https://support.microsoft.com/en-us/office/display-the-relationships-between-formulas-and-cells-a59bef2b-3701-46bf-8ff1-d3518771d507"
+    },
+    {
+      "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/using-the-gameplay-debugger-in-unreal-engine"
+    },
+    {
+      "url": "https://renderdoc.org/docs/how/how_debug_shader.html"
+    },
+    {
+      "url": "https://docs.nvidia.com/nsight-graphics/UserGuide/shader-debugger-setup.html"
+    },
+    {
+      "url": "https://stately.ai/docs/inspector"
+    },
+    {
+      "url": "https://github.com/statelyai/inspect"
+    }
+  ]
+}

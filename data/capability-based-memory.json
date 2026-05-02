@@ -1,0 +1,354 @@
+{
+  "kind": "concept",
+  "name": "Capability-Based Memory",
+  "aliases": [
+    "memory-capabilities",
+    "object-capabilities",
+    "ocap"
+  ],
+  "summary": "Concept hub for memory-safety and authority models in which access to memory or mutation is controlled by explicit unforgeable capabilities — holding the reference *is* the permission — eliminating ambient authority across hardware (CHERI), Wasm components, ocap languages (Pony, Newspeak, E), verified kernels (seL4), and distributed systems (Cap'n Proto).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Capability-based memory uses explicit capabilities to control access, mutation, or reachability instead of relying on ambient authority. The same idea constrains aliasing, authority, and compartment boundaries at once.\n\nCapabilities are unforgeable tokens binding *designation* and *authority*: holding the reference *is* the permission. This differs fundamentally from ownership/borrow checking, which tracks aliasing discipline over already-accessible memory. Capabilities instead control *which memory exists at all* in a component's reachable graph, eliminating ambient authority.",
+      "refs": [
+        {
+          "target": "ownership#overview",
+          "type": "related"
+        },
+        {
+          "target": "ownership#ownership-versus-other-memory-models",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": [
+        "capabilities",
+        "comparative-design",
+        "authority"
+      ],
+      "content": "Capability-based designs vary along several orthogonal axes:\n\n- **Layer of enforcement**: hardware (CHERI's tagged 128-bit capabilities, CHERIoT's compartments), language type system (Pony rcaps, Austral linear capabilities, Joe-E / SES / Hardened JS taming subsets), runtime (E, Newspeak, Monte, Spritely Goblins), kernel (seL4, EROS), or wire protocol (Cap'n Proto / CapTP).\n- **Capability shape**: reference capabilities encoding read/write/transfer permissions on aliasing (Pony), authority-bearing handles for I/O resources (Austral, WASI), kernel-object names in a CSpace (seL4), separation-logic resources (Steel/F*), distributed object refs with promise pipelining (CapTP).\n- **Forgeability strategy**: type-system unforgeability (Pony, Austral), language-subset \"taming\" (Joe-E, SES), hardware tag bits (CHERI), kernel-mediated capability invocation (seL4), cryptographic sealing (Cap'n Proto's three-vat handoff).\n- **Compartment granularity**: per-process (seL4 IPC), per-component (Wasm Component Model), per-compartment cross-call (CHERIoT), per-actor turn (Spritely Goblins).",
+      "refs": [
+        {
+          "target": "pony",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "cheri",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "wasi-component-model",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "sel4",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "reference-capabilities-in-languages",
+      "title": "Reference capabilities in languages",
+      "tags": [
+        "capabilities",
+        "type-system",
+        "aliasing"
+      ],
+      "content": "Some languages encode permissions such as mutability, sharing, or transfer into the type of a reference itself. This lets capability systems serve not only as security or authority mechanisms but also as precise aliasing and concurrency disciplines.\n\nPony's six reference capabilities double as object capabilities — its `tag` (opaque, identity-only) is exactly an actor reference under ocap discipline, and the sendable subset `{iso, val, tag}` is the static foundation for object-capability message passing. Austral's linear types double as capabilities: the entrypoint receives a `RootCapability` and APIs require passing capability values, so supply-chain attacks become a type error since capabilities cannot be forged or stashed in globals. Both are examples of one mechanism doing both ownership and ocap work.",
+      "refs": [
+        {
+          "target": "pony",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "austral",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "ownership#language-examples",
+          "type": "related"
+        },
+        {
+          "target": "borrowing#shared-vs-exclusive-access",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "ocap-language-traditions",
+      "title": "Ocap language traditions",
+      "tags": [
+        "capabilities",
+        "authority",
+        "languages"
+      ],
+      "content": "Mark Miller's \"All Authority Accessed Only by References\" thesis: authority is conveyed *only* by holding object references; no global namespace, no static state, no ambient ability to do I/O — every effect requires receiving a reference from a creator.\n\nThe ocap tradition splits into three branches: *purpose-built ocap languages* (Newspeak's stateless module classes that take a `platform` parameter; E's sealer/unsealer pairs and Granovetter operator; Monte; Spritely Goblins's transactional ocap actors), *taming subsets of existing languages* (Joe-E for Java, SES → Hardened JS for JavaScript, now a TC39 proposal with `Compartment` + `lockdown()` shipping in Node, Endo, Agoric, MetaMask LavaMoat), and *capabilities-as-reference-capabilities-or-linear-types* (Pony, Austral — covered above). The taming-subset technique generalises: any memory-unsafe-by-default language can be retrofitted with ocap by removing ambient-authority constructs.",
+      "refs": [
+        {
+          "target": "newspeak-language",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "e-language",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "joe-e",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "monte-language",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "spritely-goblins",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "hardware-and-architectural-capabilities",
+      "title": "Hardware and architectural capabilities",
+      "tags": [
+        "hardware",
+        "memory-safety",
+        "capabilities"
+      ],
+      "content": "Hardware capability systems tie memory references to bounds and permissions enforced by the machine. This is especially relevant where language-level safety, compartmentalization, and low-level interoperability must coexist.\n\nCHERI tags every 128-bit capability with provenance and bounds at the cache line, enforcing them on every access; CHERIoT extends the model with first-class compartment annotations distinguishing intra-compartment direct calls, library calls without security boundaries, and cross-compartment calls through sealed entry capabilities. CHERIoT's `CHERIOT_NO_AMBIENT_MALLOC` switch removes implicit allocator authority — pure ocap discipline at the C level — possible because CHERIoT made compartments a first-class hardware-checked boundary.",
+      "refs": [
+        {
+          "target": "cheri",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "cheriot",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "cheri-lite",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "llvm#overview",
+          "type": "relevant-to"
+        }
+      ]
+    },
+    {
+      "id": "wasi-and-component-capabilities",
+      "title": "WASI and component capabilities",
+      "tags": [
+        "capabilities",
+        "wasm",
+        "components"
+      ],
+      "content": "The WebAssembly Component Model (WASIp2, launched January 2024) is the most consequential modern deployment of ocap principles in industry tooling. Modules have *zero ambient authority* and receive every system resource as explicit capability handles passed through typed component-model worlds; resource handles are first-class typed references; the canonical ABI prohibits raw memory sharing across components; host grants like `--dir /data::readonly` are positive enumerations at instantiation, not ACL lookups at use; and a virtualization component implementing `wasi:filesystem` can intercept and constrain another component's file access — capabilities compose like reference attenuation in E.",
+      "refs": [
+        {
+          "target": "wasi-component-model",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "webassembly",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "verified-and-research-systems",
+      "title": "Verified capability kernels and research systems",
+      "tags": [
+        "capabilities",
+        "verification",
+        "operating-system"
+      ],
+      "content": "The verified-systems strand demonstrates that capability discipline can extend through the kernel/userland boundary and even down to a formally proven implementation:\n\n- **seL4 / EROS**: capability kernels where every kernel object is named only by a capability stored in a CSpace; user-level retypes untyped memory into kernel objects; formal proof of authority confinement carries to the C implementation. Reply capabilities make RPC exactly-once and revocation-safe.\n- **Singularity / Midori**: type-safe-language isolation replaces hardware MMU; objects-as-capabilities means even `DateTime.Now` requires holding a `Clock`; Sing# channel contracts statically verify message-passing protocols.\n- **Steel / F\\***: capabilities encoded as separation-logic resources (`slprop`) representing exclusive ownership of memory regions, threaded through Hoare quintuples, used in HACL\\*, EverParse, EverCrypt.",
+      "refs": [
+        {
+          "target": "sel4",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "eros-os",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "singularity-midori",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "steel-fstar",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "fstar",
+          "type": "related"
+        },
+        {
+          "target": "verus",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "distributed-capabilities",
+      "title": "Distributed capabilities",
+      "tags": [
+        "capabilities",
+        "rpc",
+        "distributed"
+      ],
+      "content": "Distributed object capabilities preserve the ocap invariant across the network: interface refs are first-class wire types and *promise pipelining* lets dependent calls travel in one round trip, equivalent to E's eventual-send composition. Three-vat introduction handoffs let capability A move from vat A to C via B without B gaining authority; cross-vat ref counting plus distributed acyclic GC preserves the ocap invariant in collected systems.\n\nThe lesson generalises: object-capability RPC is now economically deployable at the wire level (Cap'n Proto / OCapN) and on browser-and-server JavaScript (Cap'n Web).",
+      "refs": [
+        {
+          "target": "capn-proto",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "spritely-goblins",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and design implications",
+      "tags": [
+        "authority",
+        "security",
+        "design-guidance"
+      ],
+      "content": "Capability systems matter because they make access rights explicit and non-ambient. In memory terms, this means mutation and reachability can become modular, reviewable, and compositional rather than silently inherited from global authority.\n\nFor language designers: (1) is the goal full ocap from the start (Pony, Austral, E, Newspeak), or a taming subset of an existing language (Joe-E, SES)? (2) does the language enforce capabilities at the type level (Pony rcaps, Austral linear), at the runtime (E, Monte), or at a hardware boundary (CHERI, CHERIoT)? (3) is there a module-system / import-semantics integration so module composition becomes capability passing (Newspeak, WASI Component Model)? (4) does the design extend to RPC (Cap'n Proto) and distributed actors (Spritely Goblins)? Capabilities are unusually composable: the same primitive can serve aliasing discipline, concurrency boundaries, security review, and distributed authority transfer.",
+      "refs": [
+        {
+          "target": "ownership#tradeoffs",
+          "type": "related"
+        },
+        {
+          "target": "module-systems",
+          "type": "related"
+        },
+        {
+          "target": "import-semantics",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "per-technology-records",
+      "title": "Per-technology records",
+      "tags": [
+        "capabilities",
+        "index",
+        "languages"
+      ],
+      "content": "Capability mechanisms with their own per-technology records:\n\n- **Reference-capability languages**: Pony (six rcaps doubling as ownership and ocap), Austral (linear-types-as-capabilities).\n- **Hardware capabilities**: CHERI, CHERIoT, CHERI-Lite.\n- **Component / Wasm capabilities**: WASI Component Model resource handles.\n- **Ocap language traditions**: Newspeak (stateless module classes), E-language (sealer/unsealer, Granovetter), Joe-E (Java taming subset), SES / Hardened JS (JavaScript taming subset, TC39 proposal), Monte, Spritely Goblins (Racket/Guile CapTP + transactional ocap actors).\n- **Verified-systems capabilities**: seL4 (formally verified capability kernel), EROS (its predecessor), Singularity / Midori (objects-as-capabilities at the language level), Steel / F\\* (capabilities-as-separation-logic-resources).\n- **Distributed capabilities**: Cap'n Proto (CapTP-derived RPC, including Cap'n Web).\n- **Cross-related concepts**: module-systems and import-semantics for the language-composition angle; webassembly for the runtime substrate; verus and fstar for verified-systems neighbours.",
+      "refs": [
+        {
+          "target": "pony",
+          "type": "per-technology"
+        },
+        {
+          "target": "austral",
+          "type": "per-technology"
+        },
+        {
+          "target": "cheri",
+          "type": "per-technology"
+        },
+        {
+          "target": "cheriot",
+          "type": "per-technology"
+        },
+        {
+          "target": "cheri-lite",
+          "type": "per-technology"
+        },
+        {
+          "target": "newspeak-language",
+          "type": "per-technology"
+        },
+        {
+          "target": "e-language",
+          "type": "per-technology"
+        },
+        {
+          "target": "wasi-component-model",
+          "type": "per-technology"
+        },
+        {
+          "target": "singularity-midori",
+          "type": "per-technology"
+        },
+        {
+          "target": "sel4",
+          "type": "per-technology"
+        },
+        {
+          "target": "eros-os",
+          "type": "per-technology"
+        },
+        {
+          "target": "capn-proto",
+          "type": "per-technology"
+        },
+        {
+          "target": "joe-e",
+          "type": "per-technology"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "per-technology"
+        },
+        {
+          "target": "monte-language",
+          "type": "per-technology"
+        },
+        {
+          "target": "spritely-goblins",
+          "type": "per-technology"
+        },
+        {
+          "target": "steel-fstar",
+          "type": "per-technology"
+        },
+        {
+          "target": "module-systems",
+          "type": "related-concept"
+        },
+        {
+          "target": "import-semantics",
+          "type": "related-concept"
+        },
+        {
+          "target": "webassembly",
+          "type": "related-mechanism"
+        },
+        {
+          "target": "verus",
+          "type": "related-mechanism"
+        },
+        {
+          "target": "fstar",
+          "type": "related-mechanism"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Capability-based security overview",
+      "url": "https://en.wikipedia.org/wiki/Capability-based_security"
+    }
+  ]
+}

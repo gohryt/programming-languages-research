@@ -1,0 +1,54 @@
+{
+  "kind": "tool",
+  "name": "V8 irregexp",
+  "aliases": [
+    "V8 regex engine"
+  ],
+  "summary": "V8's tiered regex engine: bytecode interpreter at startup, native tier-up for hot patterns, restricted-linear-fallback path for safe-subset regexes. Full ECMAScript regex semantics including backtracking; the linear path is only available when the pattern doesn't use backreferences or lookbehind.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**irregexp** is V8's regex engine, used by Chrome, Node.js, and any embedded V8. The architecture is tiered: a bytecode interpreter handles initial executions of any pattern; hot patterns tier up to native code; a restricted-linear path is available for ECMAScript-regex subsets that don't require backtracking semantics.\n\nirregexp implements full ECMAScript regex including lookaround, backreferences, named groups, and Unicode-mode features. The full feature set forces backtracking semantics — patterns can produce exponential time on adversarial input — but the tiered design speeds up the common case.",
+      "refs": [
+        {
+          "target": "pcre-jit#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "re2-rust-regex#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "V8 regexp tier up",
+          "url": "https://v8.dev/blog/regexp-tier-up"
+        }
+      ]
+    },
+    {
+      "id": "linear-fallback",
+      "title": "Restricted linear fallback",
+      "tags": [
+        "regex",
+        "v8"
+      ],
+      "content": "V8 added a restricted-linear path for regexes that don't require backtracking: patterns without backreferences, lookbehind, or recursive subpatterns can be compiled to an NFA-style linear-time matcher. For workloads where such patterns are common (most server-side input validation), the linear path provides RE2-style guarantees within an ECMAScript-compatible API.\n\nThe fallback is automatic: V8 checks whether a pattern is in the linear-eligible subset and chooses the linear engine if so; otherwise the standard backtracking engine runs. This is the regex equivalent of V8's tiered-JIT design — common cases pay no penalty for the exotic-features support.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "V8 regexp engine",
+          "url": "https://v8.dev/blog/jsregexp"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "V8 regexp tier up",
+      "url": "https://v8.dev/blog/regexp-tier-up"
+    }
+  ]
+}

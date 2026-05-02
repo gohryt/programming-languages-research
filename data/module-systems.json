@@ -1,0 +1,75 @@
+{
+  "kind": "concept",
+  "name": "Module Systems",
+  "aliases": [],
+  "summary": "Cross-language hub for source-level modularity connecting namespace structure, visibility, imports, dependency graphs, and tooling behavior; design axes are file-based vs declared, flat vs hierarchical, static vs runtime imports, explicit vs convention-based exports, and cycle policy.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Module systems structure source code into named units with visibility rules and import relationships. In this repository, they act as a central bridge between language architecture, source organization, incremental analysis, and editor tooling rather than as a purely syntactic feature.\n\nProduction module-system designs span: **static compile-time graph systems** (Rust crates+modules, Zig `@import`, Go package DAGs, Odin package-per-directory) where imports are dependency edges; **runtime import systems** (Python module objects, JavaScript ESM live bindings, CommonJS `require`, Ruby/Lua loaders) where importing is execution; **typed and phase-aware systems** (ML signatures and functors, Racket phases); **JVM and .NET module systems** (JPMS, OSGi, .NET assemblies); **C++20 modules**; and the **Wasm Component Model** with capability-scoped modules.",
+      "refs": [
+        { "target": "rust#modules-and-visibility", "type": "related" },
+        { "target": "go#packaging", "type": "related" },
+        { "target": "language-server#overview", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "core-design-axes",
+      "title": "Core design axes",
+      "tags": ["modules", "design-guidance", "comparative-design"],
+      "content": "Module systems differ along axes such as file-based versus declaration-based structure, flat versus hierarchical namespaces, explicit versus implicit exports, and how strongly module identity is tied to package or filesystem structure. These choices shape the entire developer and tooling experience of a language.\n\n**File-based vs declared modules**: a fully file-based design buys simplicity and fast tooling bootstrapping (Python, Go directories, OCaml compilation units, Zig); a declared model buys flexibility and future abstraction power (ML modules, Java packages, C# namespaces, C++20 module interface units). Most practical systems mix the two — Rust's `mod` declarations create logical modules, but the filesystem still constrains where out-of-line module bodies are found. The real design variable is *how authoritative the filesystem is*.\n\n**Flat vs hierarchical namespaces**: Erlang is the classic flat example; Rust crates, Go packages, and Zig std hierarchies are nested trees. Hierarchies help organize large APIs and encode conceptual structure, but a hierarchy is useful only if users can reliably predict what kind of hierarchy it is — filesystem tree, declared module path, package path, or several only approximately aligned.\n\n**Static imports vs import-time execution** is one of the most consequential distinctions in the entire space. A static import primarily says \"make these names available and add an edge in the compile/build graph\" (Rust, Zig, Go); an import-time execution system performs work on import (Python, CommonJS, Ruby's `require`). For a language designer, this may be one of the highest-leverage decisions: refusing import-time execution by default sharply simplifies the compiler, tooling, and initialization model.\n\n**Explicit exports vs public-by-default vs convention-based** (Go's capitalization). Rust offers `pub`, `pub(crate)`, `pub(super)`, `pub(self)`, and `pub(in path)` — an unusually rich visibility lattice.",
+      "refs": [
+        { "target": "module-identity#overview", "type": "related" },
+        { "target": "visibility-and-exports#overview", "type": "related" },
+        { "target": "import-semantics#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "modules-files-and-packages",
+      "title": "Modules, files, and packages — Rust, Go, Python",
+      "tags": ["modules", "packaging", "identity"],
+      "content": "One of the most important design questions is whether source files, declared modules, and package identities align or remain distinct layers. Languages and ecosystems vary sharply here, and much downstream complexity comes from hiding or blurring those boundaries rather than naming them explicitly.\n\nRust is canonical for **layered identity**: package (Cargo's build/publish concept) → crate (compiler's compilation unit) → module tree (formed by `mod` declarations). The three-level distinction is one of Rust's most important design choices because it prevents \"what gets compiled together?\", \"what gets published together?\", and \"what is a namespace boundary?\" from collapsing into one concept.\n\nGo aligns module path strongly with package import identity: a Go module is \"a collection of packages that are released, versioned, and distributed together\"; a Go package is the compilation and namespace unit. Imports combine these worlds: the module path supplies the prefix, and the package directory supplies the suffix.\n\nPython takes the opposite approach: import system and packaging ecosystem are loosely coupled. The import system reasons in terms of fully qualified names, `sys.path`, `__path__`, finders, loaders; packaging tools reason in terms of distribution metadata. The cost is that \"what can be imported?\" and \"what dependency was declared?\" are not the same question.",
+      "refs": [
+        {
+          "target": "package-management#module-identity-vs-package-identity",
+          "type": "related"
+        },
+        { "target": "module-identity#identity-models", "type": "related" }
+      ]
+    },
+    {
+      "id": "dependency-graphs-and-cycles",
+      "title": "Dependency graphs and cycles",
+      "tags": ["modules", "dependency-graph", "cycles"],
+      "content": "Imports form dependency graphs that affect compilation, caching, architecture, and initialization semantics. Languages differ sharply on whether cycles are forbidden, tolerated, or mediated by special rules, making cycle policy one of the load-bearing module-system design choices.\n\nThree answers exist. **Hard prohibition** makes the dependency graph a DAG (Go is canonical) — yields cleaner compilation scheduling, simpler initialization semantics, and easier tooling, but pushes programmers toward interfaces, refactoring, or graph restructuring. **Tolerance with partial initialization** permits cycles but the language must specify what is visible when a module is imported before its body has finished executing (Python, JavaScript ESM). **Structured mediation** means the language provides a higher-order abstraction layer — signatures, functors, interfaces — so cycles are broken not by runtime tolerance but by architectural indirection (ML-family systems).\n\nGo's import-cycle prohibition is one of the cleanest examples in language design of a restriction that is painful locally but beneficial globally. Programmers dislike import cycles because the compiler rejects code that could be made to work with a loader. But Go's tooling and compile-speed story are stronger precisely because the language refuses that complexity.",
+      "refs": [
+        { "target": "go#package-dag-and-cycles", "type": "example" },
+        {
+          "target": "import-semantics#cycles-and-initialization",
+          "type": "related"
+        },
+        { "target": "package-resolution#resolution-models", "type": "related" }
+      ]
+    },
+    {
+      "id": "tooling-implications",
+      "title": "Tooling implications",
+      "tags": ["tooling", "language-server", "modules"],
+      "content": "Predictable module structure improves indexing, rename, jump-to-definition, documentation, and auto-import tooling. Module systems with dynamic or environment-sensitive resolution are harder for language servers and incremental analyzers because the meaning of an import can no longer be recovered from source structure alone.\n\nThe common thread across static module systems (Rust, Zig, Go, Odin) is that **the compiler and tools can usually construct the module graph without executing user code**. That property has large consequences: it makes unused-import detection easy, code indexing and jump-to-definition reliable, incremental invalidation more local, and cycle handling a structural property instead of a runtime hazard.\n\nThe likely common baseline among modern systems languages: static imports, no import-time execution, deterministic resolution, explicit or strongly legible exports, and a module graph simple enough for the compiler and IDE to trust.",
+      "refs": [
+        { "target": "language-server#design-constraints", "type": "related" },
+        {
+          "target": "language-server#resolution-and-identity-constraints",
+          "type": "related"
+        },
+        {
+          "target": "import-semantics#import-time-execution",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Import Semantics",
+  "aliases": [],
+  "summary": "Determines whether imports are purely static dependency edges or runtime events with initialization, side effects, and partial state; the static-vs-import-time-execution choice is one of the highest-leverage module-system decisions a language designer makes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Import semantics describe what it means to import or load another module. In some systems this is primarily a compile-time name-binding operation, while in others it also triggers runtime loading, execution, or initialization behavior.\n\nThis is one of the most consequential distinctions in module-system design. A static import primarily says \"make these names available and add an edge in the compile/build graph.\" An import-time execution system performs work on import — Python executes module top-level code, CommonJS executes the body of the required file, JavaScript ESM has static syntax but module instantiation and evaluation are runtime events that can observe ordering, trigger side effects, and expose partially initialized state in cycles.",
+      "refs": [{ "target": "module-systems#overview", "type": "related" }]
+    },
+    {
+      "id": "static-imports",
+      "title": "Static imports — Rust, Zig, Go",
+      "tags": ["modules", "static-analysis", "tooling"],
+      "content": "Static import models are friendly to compilers, analyzers, and IDEs because they make dependency graphs more explicit and deterministic. They also simplify invalidation, dead import analysis, and architectural reasoning.\n\n**Rust** uses `use` paths to bring names into scope, optionally rename, support selective imports, grouped imports, glob imports, and re-exports via `pub use`. **Zig**'s `@import(...)` takes a file path or package name and yields a namespace-like struct containing the imported file's public declarations — import is not presented as a special statement that mutates scope through hidden language machinery; it is a compile-time construct that produces a value-like namespace object. **Go**'s imports are fully static; the compiler and `go` tool read import paths from source files, resolve them through the module graph, and build a DAG of package dependencies.\n\nThe common pattern: importing does not mean \"run this module body now and cache its object\" — it means \"make these declarations available at compile time under this namespace.\" That keeps indexing, dead-import detection, and dependency analysis simple. It also fits the broader systems-language philosophy: no hidden control flow, no hidden allocation, no hidden work.",
+      "refs": [
+        { "target": "go#compiler", "type": "example" },
+        { "target": "language-server#overview", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "import-time-execution",
+      "title": "Import-time execution — Python, JS ESM, CommonJS",
+      "tags": ["modules", "runtime", "initialization"],
+      "content": "Some module systems execute top-level code during import, making imports into stateful runtime events rather than pure dependency declarations. This can increase expressiveness, but it also complicates predictability, tooling, and initialization behavior.\n\n**Python**'s import system is the clearest mainstream example of modules as runtime objects. Importing performs two operations — finding/loading a module and binding it into the importing scope — but the visible effect is that `import x` executes code if `x` has not been imported yet. A Python module is therefore not just a namespace in the abstract sense; it is a cached object produced by executing top-level code.\n\n**JavaScript ESM** occupies a hybrid position. The syntax is static — `import` and `export` forms are known to the parser and usable by bundlers and compilers — but module loading, instantiation, and evaluation are still runtime semantics. **Live bindings** are ESM's most important design choice: an importer does not receive a copy of an exported value; it receives access to the exporter's binding slot.\n\n**CommonJS** is older and represents a different point. The primary abstraction is not live bindings but a **loader function**: `require(...)` executes the target module the first time, caches the resulting module object, and returns its exports. This makes CommonJS dynamic but much less statically transparent than ESM — `require` is an ordinary function call, so it can be conditional, data-driven, or path-manipulated.\n\nThe design lesson: static syntax does not automatically imply static semantics. A language can have parse-time-known imports and still inherit complex runtime initialization, cycle, and environment-resolution behavior.",
+      "refs": [
+        { "target": "language-server#design-constraints", "type": "related" },
+        { "target": "module-systems#tooling-implications", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Python import reference", "url": "https://docs.python.org/3/reference/import.html" }
+      ]
+    },
+    {
+      "id": "cycles-and-initialization",
+      "title": "Cycles and initialization semantics",
+      "tags": ["cycles", "runtime", "modules"],
+      "content": "When imports are runtime events, cycles become questions about partial initialization and observable intermediate state. Static-only systems often forbid cycles, while dynamic systems must define what is visible when initialization is incomplete.\n\nCyclic imports illustrate the cost of import-time execution. In Python, modules are created and cached before their execution finishes, so one module can observe another in a **partially initialized** state. This is not merely an annoying edge case; it is an unavoidable consequence of executable imports. The programmer must understand not just the dependency graph, but the evaluation order of top-level code and when specific names become available.\n\nESM's cycle semantics are more principled: cycles are tolerated, but if two modules depend on one another and access each other's bindings only after both have completed the relevant initialization, execution can succeed. If one accesses a still-uninitialized binding too early, evaluation fails. The binding exists before evaluation completes, but its value may remain uninitialized until the exporter runs.\n\nGo refuses the entire problem: import-cycle prohibition makes the dependency graph a DAG. This is one of the cleanest examples in language design of a restriction that is painful locally but beneficial globally. Programmers dislike import cycles because the compiler rejects code that \"obviously\" could be made to work with a loader. But Go's tooling and compile-speed story are stronger precisely because the language refuses that complexity.",
+      "refs": [
+        {
+          "target": "module-systems#dependency-graphs-and-cycles",
+          "type": "related"
+        },
+        { "target": "go#packaging", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": []
+}

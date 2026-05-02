@@ -1,0 +1,52 @@
+{
+  "kind": "tool",
+  "name": "VFX Forth",
+  "aliases": [
+    "MPE VFX"
+  ],
+  "summary": "MPE's commercial Forth, usually named when peak desktop performance matters. Native code generation, aggressive stack-traffic optimisation, inlining; vendor claims within ~25% of hand-written assembler on their published examples. Commercial closed-source.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "If the question is \"which Forth is usually named when people want the *fastest desktop production compiler*?\", the conservative answer is **VFX Forth**. MPE's own material claims it has long been the fastest Windows Forth, emphasises **native code generation**, **aggressive stack-traffic optimisation**, and **inlining**, and says the result gets within roughly 25% of hand-written assembler on their published examples.\n\nThis should be read as a **vendor claim**, not a neutral standards-body ranking, but it lines up with the reputation VFX has in practitioner discussions: if peak speed matters and commercial tooling is acceptable, VFX is usually in the first sentence.",
+      "refs": [
+        {
+          "target": "gforth#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "swiftforth#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "VFX Forth common features",
+          "url": "https://www.mpeforth.com/software/pc-systems/vfx-forth-common-features/"
+        }
+      ]
+    },
+    {
+      "id": "position",
+      "title": "Position",
+      "tags": [
+        "forth",
+        "compiler"
+      ],
+      "content": "Native code, a serious optimiser, and large-codebase credibility make VFX the usual top pick for \"fastest serious desktop Forth,\" with the caveat that it is commercial/closed and much of the public benchmark evidence is uneven and vendor-hosted.\n\nA 1.4M-line Forth codebase moved onto VFX Forth was reported (HN anecdote) to run ~10× faster than the earlier threaded-code build — anecdotal but consistent with the vendor's claims.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "VFX Forth",
+      "url": "https://vfxforth.com/"
+    },
+    {
+      "label": "VFX features",
+      "url": "https://www.mpeforth.com/software/pc-systems/vfx-forth-common-features/"
+    }
+  ]
+}

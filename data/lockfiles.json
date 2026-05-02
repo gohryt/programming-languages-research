@@ -1,0 +1,56 @@
+{
+  "kind": "concept",
+  "name": "Lockfiles",
+  "aliases": [],
+  "summary": "Records the exact resolved dependency graph so builds remain reproducible across machines and over time; modern lockfiles pin not just version strings but content hashes (Cargo.lock, go.sum, pnpm-lock.yaml, Nix flake.lock).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lockfiles capture a concrete resolved dependency graph so that future builds do not have to rediscover it from open-ended version constraints. They are one of the most important practical tools for reproducibility in mainstream package ecosystems.\n\nA lockfile records the exact versions of every transitively-resolved dependency at a moment in time, so that subsequent builds reproduce the same resolution regardless of subsequent registry changes. The lockfile is committed to source control alongside the project's manifest, and the package manager uses it as the authoritative source of truth in CI and on other developers' machines.",
+      "refs": [
+        { "target": "cargo#dependency-resolution", "type": "example" },
+        { "target": "package-resolution#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "what-lockfiles-capture",
+      "title": "What lockfiles capture",
+      "tags": ["lockfiles", "reproducibility", "packaging"],
+      "content": "Lockfiles usually capture the chosen versions, transitive dependency graph shape, and sometimes content hashes or artifact identities. They complement package manifests rather than replacing them, because manifests express intent while lockfiles record concrete resolution outcomes.\n\nThe dominant lockfile families:\n\n- **`Cargo.lock`** (Rust) — TOML-formatted, listing every crate and version with content checksums.\n- **`package-lock.json`** / **`yarn.lock`** / **`pnpm-lock.yaml`** (Node) — three competing formats from npm, Yarn, and pnpm. They differ in resolution algorithms (npm and Yarn use nested-dependency trees historically; pnpm uses a flat content-addressed store with symlinks).\n- **`go.sum`** (Go) — content hashes for every module version used, validated against a checksum database (`sum.golang.org`) to detect tampering.\n- **`Pipfile.lock`** / **`poetry.lock`** / **`uv.lock`** (Python) — multiple competing formats with overlapping but not identical scope.\n- **`Manifest.toml`** (Julia) — records the resolved versions of all packages in an environment.\n- **`composer.lock`** (PHP), **`Gemfile.lock`** (Ruby), **`mix.lock`** (Elixir).",
+      "refs": [
+        { "target": "package-resolution#resolution-outputs", "type": "related" }
+      ]
+    },
+    {
+      "id": "content-hashes-and-trust",
+      "title": "Content hashes and trust",
+      "tags": ["lockfiles", "supply-chain", "reproducibility"],
+      "content": "Content hashes strengthen lockfiles by pinning bytes rather than only names and versions. This makes lockfiles relevant not only to build repeatability but also to ecosystem trust, tamper detection, and supply-chain reasoning.\n\nThe identity-relevant design question is whether the lockfile pins by version-string only or by content hash. The **content-hash approach** (Cargo, Go, Nix, pnpm) is increasingly the consensus: a lockfile entry pins not just a version number but the bytes of the dependency, so tampering or registry compromise is detectable. **Go's checksum database** (`sum.golang.org`) goes further by maintaining a public log of every known module version's hash, defending against retroactive registry changes.\n\n**Nix flakes** take this to its limit: every input is content-addressed via *narHash* (a hash of the unpacked filesystem tree, not just the tarball). Two builds against the same `flake.lock` produce identical outputs byte for byte, regardless of when or where they run. **Subresource integrity by default** (Deno): an import that resolves to bytes whose hash does not match the lock file is rejected at load. This defends against registry compromise and man-in-the-middle attacks without requiring users to opt in.",
+      "refs": [
+        { "target": "reproducible-builds#main-mechanisms", "type": "related" },
+        { "target": "go#packaging", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Go go.sum", "url": "https://go.dev/ref/mod#go-sum-files" }
+      ]
+    },
+    {
+      "id": "library-vs-application-policy",
+      "title": "Library vs application policy",
+      "tags": ["lockfiles", "ecosystem-policy", "packaging"],
+      "content": "Ecosystems differ on whether lockfiles should be committed for libraries, applications, or both. This is partly a technical question and partly an ecosystem policy question about who is expected to control the final dependency graph.\n\nCargo recommends committing `Cargo.lock` for binary projects but not for libraries — the binary's lockfile is what ultimately determines the build, while a library's lockfile is informational at best (downstream consumers will pick their own resolved graph). Node's `package-lock.json` historically followed similar conventions but newer guidance is to commit it everywhere. Go's `go.sum` is always committed because it serves the dual role of lockfile and content-hash database.",
+      "refs": [
+        { "target": "cargo#dependency-resolution", "type": "related" },
+        { "target": "package-management#design-lessons", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Cargo book",
+      "url": "https://doc.rust-lang.org/cargo/"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "kind": "language",
+  "name": "Zig",
+  "aliases": [
+    "zig-lang"
+  ],
+  "summary": "Systems language with @import as a compile-time function returning namespace-as-struct values, deep build-system integration via build.zig, comptime metaprogramming, manual memory management, and an explicit-control philosophy of no hidden control flow / allocation / work; transparency-over-abstraction module model.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Zig (Andrew Kelley, 2015+) is a systems programming language emphasising explicit control, no-magic semantics, and tooling-first design. The language reached a stable beta plateau as of v0.13+ (2024) but is intentionally pre-1.0 with breaking changes accepted across releases. Compiler-side concerns live in `data/zig-zir-air` (IR), `data/zig-comptime` (compile-time evaluation), `data/zig-allocator-api` (memory). This record covers the module-system surface.",
+      "refs": [
+        {
+          "target": "module-systems#core-design-axes",
+          "type": "example"
+        }
+      ]
+    },
+    {
+      "id": "import-as-namespace-value",
+      "title": "@import — namespaces as values",
+      "tags": [
+        "zig",
+        "module-systems",
+        "imports"
+      ],
+      "content": "Zig's module/import story is austere. The built-in function `@import(...)` takes a file path or package name and yields a namespace-like struct containing the imported file's public declarations. This is one of Zig's most distinctive design moves: import is not presented as a special statement that mutates scope through hidden language machinery; it is a compile-time construct that produces a value-like namespace object.\n\nIn practice, Zig code usually binds this namespace to a local constant:\n\n- `const std = @import(\"std\");`\n- `const foo = @import(\"foo.zig\");`\n\nand then accesses declarations through that namespace. This gives imports a strong *lexical explicitness*. Names do not silently appear in scope just because a file imported something. The programmer chooses the local binding, and later uses are visibly qualified unless manually aliased.",
+      "refs": [
+        {
+          "target": "import-semantics#static-imports",
+          "type": "example"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Zig @import",
+          "url": "https://ziglang.org/documentation/master/#import"
+        }
+      ]
+    },
+    {
+      "id": "build-system-integration",
+      "title": "build.zig and the build-system-shaped module surface",
+      "tags": [
+        "zig",
+        "build-systems",
+        "package-resolution"
+      ],
+      "content": "The standard library import `@import(\"std\")` is compiler-recognized, while other imports resolve by file path or configured package names. The build system is deeply relevant here. Zig's `build.zig` constructs the artifact graph explicitly, and root modules are provided to executables and libraries through build declarations. This means that source-level module resolution and build-graph formation are not separate, loosely synchronized systems; they are intentionally close.\n\nLike Rust and Go, Zig's imports are primarily static dependency edges. Importing a Zig source file does not mean \"run this module body now and cache its object.\" It means \"make these declarations available at compile time under this namespace.\" That keeps indexing, dead-import detection, and dependency analysis simple. It also fits Zig's broader philosophy: no hidden control flow, no hidden allocation, no hidden work.\n\nThe main trade-off is that package and dependency ergonomics can become build-system-shaped. Because `@import` and the build graph are closely related, package exposure and dependency naming are partly configured outside the source file.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Zig build system",
+          "url": "https://ziglang.org/learn/build-system/"
+        }
+      ]
+    },
+    {
+      "id": "transparency-over-abstraction",
+      "title": "Transparency over abstraction",
+      "tags": [
+        "zig",
+        "module-systems",
+        "design-guidance"
+      ],
+      "content": "Zig's module system is comparatively weak as an abstraction mechanism and comparatively strong as a transparency mechanism. It does not try to be a typed module calculus. It does not provide a large visibility lattice. Its strength is that the programmer can usually answer \"where did this name come from?\" and \"what file or package defines this?\" by local inspection.\n\nZig is an especially valuable reference for languages that prioritize: deterministic static imports, no import-time execution, explicit namespace usage, and a module system that stays easy for tools to reason about. The language pays for this with reduced expressive power compared with ML-family modules or Rust's visibility lattice — but the benefit is that the resulting code stays uniformly readable without external tooling explanations."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Zig @import",
+      "url": "https://ziglang.org/documentation/master/#import"
+    },
+    {
+      "label": "Zig build system",
+      "url": "https://ziglang.org/learn/build-system/"
+    },
+    {
+      "label": "Zig packages",
+      "url": "https://ziglang.org/documentation/master/#Packages"
+    }
+  ]
+}

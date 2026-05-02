@@ -1,0 +1,34 @@
+{
+  "kind": "runtime",
+  "name": "Wasmer",
+  "aliases": ["Wasmer Wasm runtime"],
+  "summary": "Multi-backend WebAssembly runtime: SinglePass (fast compile, low quality), Cranelift (mid-tier), and LLVM (peak quality, slow compile) backends are swappable per workload. The runtime's design philosophy is pick-compile-vs-quality per use case rather than committing to one tier.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Wasmer is a multi-backend WebAssembly runtime designed to let users pick their compile-time-versus-code-quality trade-off per workload. The available backends are:\n\n- **SinglePass**: a fast streaming compiler that produces machine code with minimal optimisation. Compile time is near-instant; code quality is roughly at the level of Wasm-baseline JIT output.\n- **Cranelift**: the same Cranelift used by Wasmtime — moderate compile time, good code quality, well-tested register allocator.\n- **LLVM**: full LLVM optimisation pipeline. Highest peak performance, multi-second compile times per module.\n\nThe choice is per-use-case: for an edge platform serving short-lived requests, SinglePass minimises cold-start latency; for a long-running server processing many requests through the same Wasm module, LLVM's optimisation pays off.",
+      "refs": [
+        { "target": "cranelift#overview", "type": "uses-as-backend" },
+        { "target": "llvm#overview", "type": "uses-as-backend" },
+        { "target": "wavm#overview", "type": "compared-with" },
+        { "target": "wamr#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Wasmer", "url": "https://wasmer.io/" }
+      ]
+    },
+    {
+      "id": "production-and-tradeoffs",
+      "title": "Production and trade-offs",
+      "tags": ["wasm", "production"],
+      "content": "Wasmer is used in commercial deployments at Wasmer Edge, several CDN serverless platforms, and various plug-in systems for desktop applications. The multi-backend design is its distinctive feature versus other Wasm runtimes (which typically commit to one backend choice).\n\nThe trade-off is **triple maintenance burden**: every change to the runtime must work across SinglePass, Cranelift, and LLVM backends, with their differing capability sets and bugs. The benefit is that users can evaluate compile-time-vs-quality trade-offs without changing runtimes.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Wasmer", "url": "https://wasmer.io/" },
+    { "label": "Wasmer repository", "url": "https://github.com/wasmerio/wasmer" }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "Type-Based Taint Checking and Inference",
+  "aliases": ["taint-types", "source-sink-typing", "security-type-checking"],
+  "summary": "Source/sink/propagation security policies encoded into a type-based taint discipline, with inference reducing the annotation burden. Less expressive than arbitrary refinement logic but more operationally deployable: many security policies are exactly 'untrusted input must not reach this sink without a sanitizer.' Taint qualifiers can be inferred across APIs and library stubs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Practical type-based taint checking and inference (Karimipour, Das, Sridharan, Hassanshahi — ECOOP 2025) is the security-refinement counterpart to general refinement types: source/sink/propagation policies are encoded into a type-based taint discipline, with inference reducing the annotation burden.\n\nTaint is less expressive than arbitrary refinement logic but more operationally deployable: many security policies are exactly \"untrusted input must not reach this sink without a sanitizer.\" The important design point is that taint qualifiers can be inferred across APIs and library stubs, making the checker usable on existing code rather than only greenfield programs.",
+      "refs": [
+        { "target": "refinement-types#overview", "type": "specialized-form" },
+        { "target": "pluggable-type-systems#overview", "type": "deployable-as" }
+      ],
+      "sources": [
+        { "label": "Practical Type-Based Taint Checking and Inference", "url": "https://arxiv.org/abs/2504.18529" },
+        { "label": "Practical Type-Based Taint Checking and Inference (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.18" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — narrow-but-inferable beats broad-but-annotation-heavy",
+      "tags": ["security", "type-system"],
+      "content": "Taint checking is a strong example of the engineering trade-off in refinement-style typing: a *narrow* predicate language (taint qualifiers form a small lattice) admits **inference**, which makes the checker deployable on existing codebases. Broader refinement logics (LiquidHaskell-style with arbitrary SMT predicates) need user-written annotations and are harder to retrofit.\n\nFor language designers contemplating security-typed APIs, the lesson is that **a small qualifier lattice with good inference is more deployable than a rich predicate language with manual annotation**. Taint qualifiers, sensitivity levels, and capability sets all fit this pattern."
+    }
+  ],
+  "sources": [
+    { "label": "Practical Type-Based Taint Checking and Inference (arXiv)", "url": "https://arxiv.org/abs/2504.18529" },
+    { "label": "Practical Type-Based Taint Checking and Inference (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.18" }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "kind": "language",
+  "name": "Raku",
+  "aliases": ["raku-lang", "perl6"],
+  "summary": "Multi-dispatch as a core semantic model: candidate selection depends on arity, parameter types, names, declaration order, where clauses, and subset refinements. Pairs subset types (a base type plus a where-style predicate) with runtime-inspectable type objects via the metaobject protocol. Counter-example to clean nominal-vs-structural and static-vs-dynamic dichotomies.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Raku is a useful counterexample to the clean nominal-vs-structural and static-vs-dynamic dichotomies. It elevates **multi-dispatch** into a core semantic model of routine calls — candidate selection depends on arity, parameter types, names, declaration order, `where` clauses, and subset refinements — and pairs it with **subset types** (a base type plus a `where`-style predicate, described in the docs as an attempt toward gradual typing) and runtime-inspectable type objects via the **metaobject protocol** (MOP).\n\nThe design lesson is that a language can expose a rich *runtime* type world — type objects, roles, coercions, subsets — without making all of it statically decidable. RakuAST as a class-hierarchy AST that exposes the same metaobject machinery to the compiler frontend is treated in `data/rakuast`.",
+      "refs": [
+        { "target": "static-dynamic-gradual-typing#overview", "type": "atypical-instance" },
+        { "target": "rakuast#overview", "type": "compiler-of" },
+        { "target": "raku-grammar#overview", "type": "parser-of" }
+      ],
+      "sources": [
+        { "label": "Raku type system", "url": "https://docs.raku.org/language/typesystem" },
+        { "label": "Raku functions and multi-dispatch", "url": "https://docs.raku.org/language/functions" }
+      ]
+    },
+    {
+      "id": "multi-dispatch",
+      "title": "Multi-dispatch as core semantics",
+      "tags": ["type-system", "raku"],
+      "content": "Raku's `multi` declaration registers a routine as a candidate in a multi-dispatch table. Calls dispatch to the most specific matching candidate, where specificity is determined by:\n\n- arity (number of arguments matched);\n- parameter types (subtype-ordered);\n- named-parameter constraints;\n- `where` clauses (predicate refinements);\n- subset constraints;\n- declaration order as a tiebreaker.\n\nThis is unusual in production: most languages reserve multi-dispatch for double-dispatch idioms; Raku makes it the routine-call semantics. The cost is dispatch-table complexity and runtime cost; the benefit is that overload resolution is a first-class language feature rather than a bolt-on.",
+      "sources": [
+        { "label": "Raku structures and subsets", "url": "https://docs.raku.org/language/structures" }
+      ]
+    },
+    {
+      "id": "subset-types-and-mop",
+      "title": "Subset types and the metaobject protocol",
+      "tags": ["type-system", "metaobject"],
+      "content": "**Subset types** in Raku are the production realisation of refinement-by-predicate over base types: `subset Even of Int where * %% 2`. Subset checks happen at runtime; the type system records the predicate but does not statically discharge it. This is closer to occurrence typing (`data/occurrence-typing`) than to refinement types (`data/refinement-types`) in spirit — the predicate is a runtime check that produces a proposition the rest of the program can rely on.\n\nThe **metaobject protocol** (MOP) makes type objects, role compositions, method tables, and class hierarchies inspectable and modifiable at runtime. Combined with multi-dispatch and subsets, the MOP gives Raku a programmable type system at the cost of static decidability — many type-related operations are runtime-evaluated.",
+      "sources": [
+        { "label": "Raku metaobject protocol", "url": "https://docs.raku.org/language/mop" }
+      ]
+    },
+    {
+      "id": "concurrency",
+      "title": "Concurrency — continuation-based await",
+      "tags": ["concurrency", "raku", "continuations"],
+      "content": "Raku is a useful counterexample to both stackless-future systems and goroutine/virtual-thread systems: Rakudo implements `await` on promises and channels using **one-shot stackful continuations**, so the awaiting computation can be resumed later without blocking a thread and without forcing async coloring up the call stack. Continuation-based languages such as Raku take the same uncoloured-await stance that virtual-thread runtimes (`data/virtual-threads`) achieve through mount/unmount machinery — both reject the API-coloring trade-off async/await imposes.\n\nThe `Channel` type complements this picture as a non-blocking, effectively unbounded queue — convenient for producers but lacking built-in backpressure, which has to be added at a higher layer.",
+      "refs": [
+        { "target": "virtual-threads#blocking-style-programming", "type": "comparable-to" },
+        { "target": "async-await#api-coloring-and-propagation", "type": "contrasts-with" },
+        { "target": "channels#backpressure-and-overload", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Raku concurrency overview", "url": "https://docs.raku.org/language/concurrency" },
+        { "label": "Rakudo continuations explanation", "url": "https://stackoverflow.com/questions/62817878/what-are-the-specifics-about-the-continuations-upon-which-rakudo-relies/62819961" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Raku functions and multi-dispatch", "url": "https://docs.raku.org/language/functions" },
+    { "label": "Raku type system", "url": "https://docs.raku.org/language/typesystem" },
+    { "label": "Raku structures and subsets", "url": "https://docs.raku.org/language/structures" },
+    { "label": "Raku metaobject protocol", "url": "https://docs.raku.org/language/mop" }
+  ]
+}

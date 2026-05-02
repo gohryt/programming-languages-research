@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "Struct-of-Arrays Layout",
+  "aliases": ["SoA", "data-oriented design", "columnar layout"],
+  "summary": "Instead of an array of structs (`[{kind, span, lhs, rhs}, ...]`), store parallel arrays (`kinds[]`, `spans[]`, `lhss[]`, `rhss[]`). Improves cache locality on field-at-a-time traversals and enables SIMD; cost is more complex per-node access patterns.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The default object layout in most languages is array-of-structs (AoS): a contiguous array of records, each holding all of an entity's fields together. Struct-of-arrays (SoA) inverts this: parallel arrays, one per field, each holding the same field across all entities.\n\nFor a workload that touches one field across many entities — `iterate over all AST nodes and collect every function declaration`, `mark every IR instruction's basic-block index` — SoA is dramatically better for cache locality. The CPU streams through one densely-packed column rather than skipping over the other fields in each record. SIMD becomes possible because the column is a uniform array of one element type. Alignment padding waste shrinks because each column packs its own type without per-record padding.\n\nThe cost is more complex access when *all* fields of one node are needed simultaneously: that becomes N independent loads from N arrays rather than one prefetchable record load. The technique is therefore most effective for traversals that access only one or two fields per node and that visit many nodes.",
+      "refs": [
+        { "target": "flat-ast-representations#overview", "type": "applies-to" },
+        { "target": "arena-allocation#bump-pointer-mechanism", "type": "complementary-technique" }
+      ]
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["compiler", "production"],
+      "content": "The Zig compiler stores its AST as a struct-of-arrays via `std.MultiArrayList`: parallel arrays of `tag`, `data`, `main_token` rather than an array of node structs. The performance improvement on whole-AST traversals is substantial — typical compiler workloads traverse the tag column, then dereference data only for matching tags.\n\nECS (Entity Component System) game engines popularised SoA outside compilers: each component type is a column, each entity is an index, and systems iterate by column. Database column stores (Parquet, Arrow, ClickHouse) take the same approach for analytical queries.\n\nThe Accelerated-Zig-Parser project takes SoA further by sizing each column to its actual data range — token lengths in a `u8[]` array (4× smaller than the `u32[]` offset array) — exploiting the fact that almost all tokens are short. This is layout co-design: pick the column type to match the column's value distribution.",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs"],
+      "content": "Costs: more complex access patterns when the workload needs all fields of one node, more arrays to manage as separate allocations or sub-regions of an arena, and harder to add or remove fields after the fact (every column must be migrated). Code that treats nodes as cohesive objects (`node.kind`, `node.span`, `node.children`) becomes index-juggling (`kinds[i]`, `spans[i]`, `children_starts[i]`).\n\nFor compilers, SoA pays off when whole-AST passes dominate (which they do — type inference, name resolution, lints, code generation all sweep the tree). For interactive editor workloads where a few nodes are inspected at depth, AoS is usually better.\n\nA hybrid approach is common: SoA for the bulk of the AST, AoS for hot-path data structures where per-node coherence matters. Zig's MultiArrayList itself supports both shapes through the same API, so callers can choose per traversal.",
+      "refs": []
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "family-concurrency-aware",
+  "tag": "family:concurrency-aware",
+  "name": "Family: concurrency-aware debuggers",
+  "description": "Race detection (TSan), schedule exploration (CHESS, loom, FoundationDB), and wait-graph deadlock reasoning.",
+  "axis": "family"
+}

@@ -1,0 +1,86 @@
+{
+  "kind": "runtime",
+  "name": "Steel Bank Common Lisp (SBCL)",
+  "aliases": [
+    "Steel Bank Common Lisp"
+  ],
+  "summary": "Long-lived production aggressive optimiser in the Lisp family — descended from CMUCL's Python compiler. Block compiler with whole-function-level type inference, type-directed open coding, and direct native code generation. Hybrid REPL-style interactivity and aggressive AOT optimisation. ITA Software's QPX (Google Flights) is the canonical large deployment.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Steel Bank Common Lisp** (SBCL, derived from CMUCL since 2000) is one of the longest-lived production aggressive optimisers in any language family — a Common Lisp implementation with whole-function-level type inference, automatic specialisation based on inferred types, and direct native code generation without an intermediate IR family in the LLVM/Cranelift sense. The compiler is itself written in Common Lisp and is the descendant of CMUCL's *Python* compiler (no relation to the language Python).",
+      "refs": [
+        {
+          "target": "stalin-scheme#overview",
+          "type": "related-to"
+        },
+        {
+          "target": "mlton#overview",
+          "type": "related-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Steel Bank Common Lisp",
+          "url": "https://www.sbcl.org/"
+        }
+      ]
+    },
+    {
+      "id": "block-compiler-architecture",
+      "title": "Block compiler architecture",
+      "tags": [
+        "compiler",
+        "common-lisp"
+      ],
+      "content": "SBCL compiles top-level forms incrementally as they are read, accumulating a type environment across the program. A `(defun foo ...)` form compiles immediately to native code with the types known at that point; later definitions extend the environment and may trigger recompilation hints. This makes SBCL a hybrid of **REPL-style interactivity and aggressive AOT optimisation** — every interactive session is silently type-inferring across thousands of definitions.\n\n**Type-directed open coding**: when the inferred type of a Lisp value is sufficiently constrained (a known integer range, a fixed-shape array, a specific class), SBCL replaces generic dispatch with direct machine instructions. `(+ x y)` where both operands are inferred fixnum becomes a single `addq` on x86-64; `(aref vec i)` where `vec` is a typed `(simple-array (unsigned-byte 8))` becomes a direct array load with type-elided bounds checking.",
+      "refs": []
+    },
+    {
+      "id": "no-jit-tier",
+      "title": "No separate JIT tier",
+      "tags": [
+        "compiler",
+        "aot"
+      ],
+      "content": "SBCL is fully AOT — all code is compiled before execution — but the compilation is incremental and integrated into the REPL. The lesson is that \"compile aggressively at function definition time\" can substitute for tiered JIT for languages with sufficient type-inference discipline at the function boundary.\n\n**Fully self-hosted**: the SBCL compiler is written in Common Lisp; bootstrapping reproducibility is checked via cross-comparison across host implementations (SBCL, CCL, ECL, CLISP). The bootstrap chain is closer to Forth metacompilation than to mrustc-style alternative-compiler bootstrap.",
+      "refs": []
+    },
+    {
+      "id": "production-deployments",
+      "title": "Production deployments",
+      "tags": [
+        "common-lisp",
+        "production"
+      ],
+      "content": "Production deployment includes ITA Software's QPX search engine (acquired by Google for Google Flights), Genworks GDL (CAD), Mirai (animation), several quantitative trading firms, and various scientific-computing pipelines. Performance is competitive with C on numeric kernels with proper type declarations.\n\nThe CMUCL→SBCL→CCL lineage is one of the most mature production-FP-compiler stories outside the ML family, and a useful counterweight to the JIT-everywhere assumption common in modern dynamic-language compiler design.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "SBCL manual",
+          "url": "https://sbcl.org/manual/index.html"
+        },
+        {
+          "label": "SBCL manual (sourceforge mirror)",
+          "url": "https://sbcl.sourceforge.net/manual/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "SBCL home",
+      "url": "https://www.sbcl.org/"
+    },
+    {
+      "label": "SBCL manual",
+      "url": "https://sbcl.org/manual/index.html"
+    },
+    {
+      "label": "SBCL manual (sourceforge mirror)",
+      "url": "https://sbcl.sourceforge.net/manual/"
+    }
+  ]
+}

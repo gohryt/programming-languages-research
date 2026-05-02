@@ -1,0 +1,9 @@
+{
+  "id": "allocator",
+  "tag": "allocator",
+  "name": "Allocator",
+  "description": "Sections tagged with the Allocator concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "allocators"
+  ]
+}

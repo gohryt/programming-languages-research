@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "IonMonkey MIR/LIR",
+  "aliases": ["spidermonkey-ionmonkey-ir"],
+  "summary": "SpiderMonkey's IonMonkey JIT uses two IR levels: MIR (Mid-level, SSA-form, JS-aware: MAdd, MGuardShape, MCall) and LIR (Low-level, for register allocation and machine-code emission). Pointer-rich SSA, deopt snapshots at every guard.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "SpiderMonkey's IonMonkey uses two IR levels: a **MIR** (Mid-level IR, unrelated to Rust's MIR or LLVM's MIR) of SSA-form with JS-aware operations (`MAdd`, `MGuardShape`, `MCall`), and a lower **LIR** (Low-level IR) for register allocation and machine-code emission. MIR carries deopt snapshots at every guard so a failed speculation can resume into baseline code.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ],
+      "sources": [
+        { "label": "SpiderMonkey IonMonkey wiki", "url": "https://wiki.mozilla.org/IonMonkey" }
+      ]
+    },
+    {
+      "id": "two-ir-split",
+      "title": "Two-IR split",
+      "tags": ["compiler-ir", "jit"],
+      "content": "The two-IR split predates V8's Turboshaft and addresses the same separation between high-level transformation and target-specific scheduling. MIR carries operation semantics in JS terms; LIR carries operation semantics in machine terms. MIR optimisations work at the operation level; LIR handles allocation, scheduling, and emission.\n\nThe trade-off is the standard one between abstraction power (MIR) and codegen efficiency (LIR). IonMonkey accepts the translation cost as the price of clean JS-aware optimisations on the upper IR.",
+      "refs": [
+        { "target": "v8-maglev#overview", "type": "compares-to" }
+      ]
+    },
+    {
+      "id": "deopt-snapshots",
+      "title": "Deopt snapshots at every guard",
+      "tags": ["jit", "deoptimization"],
+      "content": "Speculative operations carry deopt snapshots — descriptions of how to reconstruct interpreter state if the speculation fails. Tier orchestration (when the speculation falls back to lower tiers) is in `data/tiered-compilation`. Snapshots in MIR are the data substrate that the OSR/deopt mechanism consumes; their layout shapes how aggressively MIR can speculate.",
+      "refs": [
+        { "target": "osr-deoptimization#overview", "type": "feeds" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "SpiderMonkey IonMonkey wiki", "url": "https://wiki.mozilla.org/IonMonkey" }
+  ]
+}

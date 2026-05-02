@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Rust HIR → THIR → MIR Cascade",
+  "aliases": ["rustc IR pipeline", "Rust IR cascade"],
+  "summary": "rustc's three-stage cascade: HIR (desugared, name-resolved) for type checking and lints, THIR (typed, coercion-explicit) for pattern exhaustiveness, MIR (CFG, drop-elaborated) for borrow checking and codegen. Each stage discards information the next does not need — the canonical multi-level IR architecture.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "rustc's IR cascade is the canonical \"moderate-complexity language with a multi-level IR\" example. AST → **HIR** (desugared, name-resolved) → **THIR** (typed, coercion-explicit) → **MIR** (CFG, borrow-check substrate) → LLVM IR. Each stage discards information the next stage doesn't need; each stage runs analyses appropriate to its level.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "mid-level-ir#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "rustc MIR Guide", "url": "https://rustc-dev-guide.rust-lang.org/mir/index.html" }
+      ]
+    },
+    {
+      "id": "hir-thir-mir-roles",
+      "title": "Per-stage roles",
+      "tags": ["rust", "compiler", "ir"],
+      "content": "**HIR (High-Level IR)**: the desugared, name-resolved form of the AST. Macro expansion has run; `for` loops have become `loop` + `match`; type annotations are still expressions, not yet checked. HIR is the IR most type-checking, lints, and trait resolution operate on. Tree-shaped, with stable IDs assigned to every body and every binding.\n\n**THIR (Typed HIR)**: HIR with all types explicit, all coercions made concrete, all method calls resolved to specific function bodies, and pattern matching desugared to a decision-tree form. THIR exists primarily as a stepping stone to MIR — most analyses don't operate on THIR directly. Pattern exhaustiveness checking happens here.\n\n**MIR (Mid-Level IR)**: rustc's CFG-form IR; the borrow checker's native substrate. Every variable has explicit drop semantics, every borrow has a region, every reference carries the lifetime that reaches it. Pattern matching is fully desugared to chains of comparisons. Borrow checking, drop elaboration, const evaluation, and miri all operate on MIR.",
+      "refs": [],
+      "sources": [
+        { "label": "rustc-dev-guide — HIR", "url": "https://rustc-dev-guide.rust-lang.org/hir.html" },
+        { "label": "rustc-dev-guide — THIR", "url": "https://rustc-dev-guide.rust-lang.org/thir.html" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — cascade pays off at moderate complexity",
+      "tags": ["compiler-architecture", "language-design"],
+      "content": "The lesson: even moderate-complexity languages benefit from multiple IRs. The cost is translation layers between them; the benefit is per-phase optimality. A two-level cascade (AST + final IR) loses the ability to run focused analyses at the right level; a four-level cascade (Rust's choice) keeps each pass's substrate appropriate for its work.\n\nFor language designers, the rule of thumb: if the language has substantial semantic complexity (ownership, effects, dependent types, advanced pattern matching), expect to need multiple IRs. The HIR → THIR → MIR shape generalises well — desugar early, type-explicit middle, CFG-form for analysis and codegen.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "rustc MIR Guide", "url": "https://rustc-dev-guide.rust-lang.org/mir/index.html" },
+    { "label": "Introducing MIR (Rust blog)", "url": "https://blog.rust-lang.org/2016/04/19/MIR.html" },
+    { "label": "rustc-dev-guide — HIR", "url": "https://rustc-dev-guide.rust-lang.org/hir.html" },
+    { "label": "rustc-dev-guide — THIR", "url": "https://rustc-dev-guide.rust-lang.org/thir.html" }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "kind": "concept",
+  "name": "Profiles vs Safe C++ Resolution",
+  "aliases": ["WG21 safety resolution", "C++ safety direction"],
+  "summary": "The June 2025 WG21 outcome where Profiles-style migration prevailed over Sean Baxter's Safe C++ proposal, with neither approach landing normatively in C++26. The committee instead created a non-normative language-safety white paper alongside C++26 and shifted the practical safety story onto standard-library hardening.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cpp", "wg21", "iso-cpp", "memory-safety", "cpp-safety"],
+      "content": "The C++ language-safety debate of 2024–2026 has shifted toward Profiles-style migration and library hardening, while Sean Baxter's Safe C++ proposal stopped being actively pursued in WG21. Profiles also failed to land in C++26 normatively — instead, the committee created a parallel language safety white paper (Sutter and Ažman, editors) alongside C++26, while standard-library hardening (`_LIBCPP_HARDENING_MODE`, MSVC STL hardening) provides the clearest normative bounds/precondition-checking safety addition. C++26 also ships hazard pointers, RCU, and contracts, which are safety-relevant but address different classes of problems from language-level memory-safety profiles.\n\nThe approaches differ on *how aggressively the migration story preserves existing C++ semantics*: from Lifetime Profile and Stroustrup Profiles (recompile, fix flagged code) through cppfront (alternative syntax, transpile) to Safe C++ (Rust-style borrow check, viral `safe`) and Fil-C (runtime capabilities, full transparency).",
+      "refs": [
+        { "target": "cpp-stroustrup-profiles", "type": "related" },
+        { "target": "cpp-lifetime-profile", "type": "related" },
+        { "target": "safe-cpp", "type": "contrasts-with" },
+        { "target": "cppfront", "type": "related" },
+        { "target": "fil-c", "type": "contrasts-with" },
+        { "target": "cpp-hardened-stl", "type": "related" }
+      ]
+    },
+    {
+      "id": "june-2025-resolution",
+      "title": "The June 2025 resolution",
+      "tags": ["wg21", "iso-cpp", "cpp-safety", "cpp26"],
+      "content": "Status (as of 2026-04): in June 2025 Sean Baxter publicly described Profiles as having prevailed in the committee discussion and indicated Safe C++ (P3390) was no longer being continued. SG23 voted to prioritize Profiles over Safe C++. Profiles themselves also failed to forward to CWG for C++26 at Hagenberg (February 2025); the committee instead created a non-normative language-safety white paper targeting compiler implementations behind flags before C++29.",
+      "refs": [
+        { "target": "safe-cpp", "type": "contrasts-with" },
+        { "target": "cpp-stroustrup-profiles", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Safe C++ proposal withdrawn (The Register)", "url": "https://www.theregister.com/2025/09/16/safe_c_proposal_ditched/" }
+      ]
+    },
+    {
+      "id": "technical-fault-lines",
+      "title": "Technical fault lines",
+      "tags": ["cpp-safety", "borrow-check", "lifetime-profile", "wg21"],
+      "content": "The Profiles camp argues annotations should be exceptional and that most existing C++ can be made safer by recompilation plus restrictions plus library hardening, with viral `safe`/lifetime annotations rejected as unacceptable disruption. The Safe C++ camp argues that without language-level aliasing/exclusivity information, sound lifetime safety is impossible and Profiles risk replicating existing static analyzers without verifiable guarantees. The argument is whether soundness can be approximated through restriction-plus-recompilation, or whether nothing short of borrow-check-grade aliasing analysis suffices.",
+      "refs": [
+        { "target": "borrowing#overview", "type": "related" },
+        { "target": "ownership#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "P3586 Plethora of Problems with Profiles", "url": "https://wg21.link/P3586" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "P2759 Profiles direction (Stroustrup et al.)", "url": "https://open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2759r0.pdf" },
+    { "label": "P3586 Plethora of Problems with Profiles", "url": "https://wg21.link/P3586" },
+    { "label": "Safe C++ proposal withdrawn (The Register)", "url": "https://www.theregister.com/2025/09/16/safe_c_proposal_ditched/" }
+  ]
+}

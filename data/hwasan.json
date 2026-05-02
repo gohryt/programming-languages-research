@@ -1,0 +1,65 @@
+{
+  "kind": "tool",
+  "name": "HWASan — Hardware-Assisted AddressSanitizer",
+  "aliases": [
+    "Hardware-Assisted AddressSanitizer"
+  ],
+  "summary": "Compiler-instrumented MTE-style tagging using AArch64 Top-Byte-Ignore (8-bit tag in pointer upper byte) with software-managed shadow tag memory — works without MTE hardware. Software-tagged predecessor and design analogue of MTE. Smaller shadow than ASan (1/16 vs 1/8 memory). Default for Android system-image fuzzing pipeline.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "memory-tag",
+        "software-tagging",
+        "pointer-tagging",
+        "aarch64",
+        "memory-safety",
+        "exploit-mitigation"
+      ],
+      "content": "**Hardware-Assisted AddressSanitizer** is compiler-instrumented MTE-style tagging using AArch64 Top-Byte-Ignore (8-bit tag in pointer upper byte) with software-managed shadow tag memory — works without MTE hardware. It is the software-tagged predecessor and design analogue of MTE rather than a silicon-enforced mechanism.\n\nKey properties:\n- Smaller shadow than ASan (1/16 vs 1/8 memory)\n- Per-allocation tagged pointers\n- Stack-tagging IR pass\n- Outlined check sequences with custom calling convention to keep code small\n- Higher cost than MTE (everything is software) but lower than ASan",
+      "refs": [
+        {
+          "target": "arm-mte",
+          "type": "precursor"
+        },
+        {
+          "target": "shadow-memory",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment and toolchain status",
+      "tags": [
+        "aarch64",
+        "production",
+        "memory-safety"
+      ],
+      "content": "Ships in Clang/LLVM upstream; default for Android system-image fuzzing pipeline; precursor to MTE deployments. Widely used in Android system builds for fuzzing and debug.\n\nThe full ASan/MSan/TSan/UBSan family — of which HWASan is the AArch64-specialised tagging variant — is documented in the broader sanitizer survey under shadow-memory diagnostics.",
+      "refs": [
+        {
+          "target": "shadow-memory",
+          "type": "related"
+        },
+        {
+          "target": "arm-mte",
+          "type": "predecessor-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "HWASan design",
+          "url": "https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "HWASan design",
+      "url": "https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html"
+    }
+  ]
+}

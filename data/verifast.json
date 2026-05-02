@@ -1,0 +1,91 @@
+{
+  "kind": "tool",
+  "name": "VeriFast — Symbolic Execution for C, Java, Rust",
+  "aliases": [],
+  "summary": "Bart Jacobs's VeriFast is a modular symbolic-execution-based separation-logic verifier for sequential and multithreaded C, Java, and (recently) Rust. Predicate-based heap layouts with explicit fold/unfold ghost commands; users write predicates, lemmas, and contracts inline. Higher-order ghost code including lemma function pointers for fine-grained concurrency. Featherweight VeriFast: Coq-mechanized soundness of the symbolic-execution core.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "formal-verification",
+        "deductive-verification",
+        "separation-logic",
+        "c-verifier",
+        "rust-verifier"
+      ],
+      "content": "Bart Jacobs's **VeriFast** is a modular symbolic-execution-based separation-logic verifier for sequential and multithreaded C, Java, and (recently) Rust.\n\n**Predicate-based heap layouts** with explicit fold/unfold ghost commands; users write predicates, lemmas, and contracts inline. **Higher-order ghost code** including lemma function pointers for fine-grained concurrency. **Featherweight VeriFast**: Coq-mechanized soundness of the symbolic-execution core. Mature open-source tool used in industrial-scale case studies (JavaCard applets, OS components); user-facing trust includes the symbolic executor.",
+      "refs": [
+        {
+          "target": "rustbelt-lambda-rust#overview",
+          "type": "related"
+        },
+        {
+          "target": "compcert#overview",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "VeriFast site",
+          "url": "http://people.cs.kuleuven.be/~bart.jacobs/verifast/"
+        },
+        {
+          "label": "VeriFast docs",
+          "url": "https://verifast.github.io/verifast-docs/"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Symbolic execution and predicate folding",
+      "tags": [
+        "separation-logic",
+        "concurrent-separation-logic"
+      ],
+      "content": "VeriFast verifies a function by **symbolic execution**: starting from a symbolic state representing the precondition, it executes the function path-by-path, asserting at each branch that the verification conditions hold. Heap state is represented as a separation-logic assertion built from user-defined **predicates**; the verifier consumes and produces these predicates via explicit `open` and `close` ghost commands inserted by the user.\n\nThis design point is intentionally between automatic and interactive verification: the user writes the predicate definitions, the lemmas that manipulate them, and the explicit fold/unfold annotations, but the verifier handles the symbolic execution itself. The cost is that VeriFast specifications are more verbose than Prusti's or Verus's; the benefit is precise control over how separation-logic resources are managed, which makes verifying intricate concurrent data structures tractable.",
+      "refs": []
+    },
+    {
+      "id": "target-and-backend",
+      "title": "Targets and concurrency",
+      "tags": [
+        "c-verifier",
+        "rust-verifier",
+        "concurrency-safety-proof"
+      ],
+      "content": "VeriFast targets **C, Java, and Rust**. The C frontend is the longest-established and most production-tested; the Java frontend has been used to verify JavaCard applets (smart-card software with strict correctness requirements); the Rust frontend is recent and competes in the same niche as Prusti/Creusot/Verus.\n\nFor concurrent verification, VeriFast supports **higher-order ghost code** including **lemma function pointers** — a closure-like mechanism for parameterising lemmas over runtime values, used to verify fine-grained concurrent data structures (lock-free queues, hand-over-hand locking lists). This is more expressive than most auto-active verifiers, which restrict ghost code to first-order constructions.",
+      "refs": []
+    },
+    {
+      "id": "trust-base-and-status",
+      "title": "Trust base and case studies",
+      "tags": [
+        "mechanised-proof",
+        "industrial",
+        "smt-based"
+      ],
+      "content": "**Featherweight VeriFast** is a Coq mechanisation of VeriFast's symbolic-execution core, providing foundational soundness for the central inference rules. The full tool is not foundational — the symbolic executor and the SMT backend (Z3) are in the TCB — but the formal model gives a precise account of what VeriFast guarantees.\n\nStatus (as of 2026-04): mature open-source tool used in industrial-scale case studies (JavaCard applets, operating-system components, embedded controllers). User-facing trust includes the symbolic executor, which means VeriFast occupies a middle ground between foundational verifiers (RefinedRust, RustBelt) and pure SMT-backed auto-active verifiers (Verus, Prusti).",
+      "refs": [
+        {
+          "target": "refinedrust#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "prusti#overview",
+          "type": "compared-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "VeriFast site",
+      "url": "http://people.cs.kuleuven.be/~bart.jacobs/verifast/"
+    },
+    {
+      "label": "VeriFast docs",
+      "url": "https://verifast.github.io/verifast-docs/"
+    }
+  ]
+}

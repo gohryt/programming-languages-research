@@ -1,0 +1,7 @@
+{
+  "id": "family-time-travel",
+  "tag": "family:time-travel",
+  "name": "Family: time-travel debugging",
+  "description": "Omniscient/time-travel UX: ODB, Pharo, Common Lisp condition/restart, Racket marks, decorator tracers, managed-runtime omniscient debuggers, hot-replacement.",
+  "axis": "family"
+}

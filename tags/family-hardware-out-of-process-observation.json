@@ -1,0 +1,7 @@
+{
+  "id": "family-hardware-out-of-process-observation",
+  "tag": "family:hardware-out-of-process-observation",
+  "name": "Family: hardware and out-of-process observation",
+  "description": "Observers running in a separate process that read memory, intercept syscalls, or capture post-mortem snapshots without injecting code.",
+  "axis": "family"
+}

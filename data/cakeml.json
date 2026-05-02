@@ -1,0 +1,48 @@
+{
+  "kind": "language",
+  "name": "CakeML",
+  "aliases": [
+    "verified ML compiler"
+  ],
+  "summary": "Kumar et al. POPL 2014: a verified implementation of a Standard ML subset. Verification extends from source all the way down to machine code (CompCert stops at assembly), with the entire compiler verified in HOL4 plus a self-hosting bootstrap that produces the verified compiler binary from itself.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**CakeML** (Kumar, Myreen, Norrish, Owens, POPL 2014) is a verified implementation of a subset of Standard ML, differing from CompCert in two ways: (1) the proof extends all the way down to machine code — CompCert stops at assembly language — and (2) the entire compiler is verified in HOL4, with a bootstrapping story that produces a self-hosted verified compiler binary.\n\nThe bootstrapping trick is striking: the CakeML compiler is itself written in CakeML, and the verified compiler has compiled itself from source. This closes the loop of trusting-trust concerns within the formal system — the produced binary is provably faithful to the source, including the code of the compiler itself.",
+      "refs": [
+        {
+          "target": "compcert#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "trusting-trust#overview",
+          "type": "addresses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "CakeML",
+          "url": "https://cakeml.org/"
+        }
+      ]
+    },
+    {
+      "id": "scope-and-tradeoffs",
+      "title": "Scope and trade-offs",
+      "tags": [
+        "verified-compiler",
+        "research"
+      ],
+      "content": "CakeML targets ML-family languages (garbage-collected, higher-order), not C. The performance gap versus production ML compilers (MLton, OCaml) is larger than CompCert's gap versus GCC, but the research is aimed at pushing the verification frontier, not matching production speeds.\n\nThe project's deeper contribution is showing that **end-to-end verified self-hosting is achievable**. Every link in the bootstrap chain — from a small starting kernel to the full compiler — is mechanised and verified. For language designers contemplating high-assurance toolchains, CakeML demonstrates the upper bound on what verification can deliver.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "CakeML",
+      "url": "https://cakeml.org/"
+    }
+  ]
+}

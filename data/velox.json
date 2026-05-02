@@ -1,0 +1,46 @@
+{
+  "kind": "library",
+  "name": "Velox",
+  "aliases": ["Meta Velox", "Velox execution engine"],
+  "summary": "Pedreira et al. (Meta, VLDB 2022): a composable C++ vectorised execution engine distributed as a *library*. Powers Spark Gluten (Velox-accelerated Spark), Presto/Prestissimo, and several internal Meta systems. Arrow-shaped vectors, adaptive operator specialisation, first-class complex-type support.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Pedreira et al.'s **Velox** (Meta, VLDB 2022; open source 2022+) is a composable C++ vectorised execution engine — distributed as a *library* rather than as a complete database — designed to be reused across multiple data-processing engines. Where DuckDB and Photon ship as full systems with their own SQL frontends, Velox is the *backend half*: a pluggable execution engine that other systems integrate. As of 2026-04 it powers **Spark Gluten** (Velox-accelerated Spark via the Apache Gluten project), **Presto/Prestissimo** (the Velox-based Presto worker), and several internal Meta data-processing systems.",
+      "refs": [
+        { "target": "databricks-photon#overview", "type": "shares-design-with" },
+        { "target": "duckdb#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Velox repository", "url": "https://github.com/facebookincubator/velox" },
+        { "label": "Velox project home", "url": "https://velox-lib.io/" },
+        { "label": "Engineering at Meta — Velox open source announcement", "url": "https://engineering.fb.com/2023/03/09/open-source/velox-open-source-execution-engine/" }
+      ]
+    },
+    {
+      "id": "architectural-pillars",
+      "title": "Architectural pillars",
+      "tags": ["database", "library"],
+      "content": "- **Vector primitives over Arrow-shaped columnar data** — every operator is a function over `RowVector`, `FlatVector`, `DictionaryVector`, `ConstantVector`, `LazyVector` types. The same vector representations Apache Arrow defines, so Velox interoperates trivially with the broader Arrow ecosystem.\n- **Adaptive optimisation at runtime** — Velox specialises operator implementations based on observed data: if a column proves nullable-but-rarely-null, its kernel switches to a fast-path that handles nulls via branch prediction; if a join key proves to have low cardinality, the hash table morphs into a dictionary lookup.\n- **First-class support for complex types** — nested structs, lists, maps, and decimals get full vectorised treatment, where many SQL engines fall back to row-by-row processing for non-scalar columns.\n- **Separable from any one query language** — Velox accepts plans expressed in its own internal IR, and existing engines (Presto SQL, Spark SQL, Substrait) compile their query plans *to* that IR.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — execution engine as library",
+      "tags": ["database", "library", "ecosystem"],
+      "content": "The lesson generalises: **a column-vectorised engine designed as a library, not a system, can amortise across multiple frontends** — the same execution-engine design pattern that LLVM established for compiler backends, applied to query execution. The cost is that Velox cannot make end-to-end planning decisions (it sees the plan after the frontend's planner is done); the benefit is that one execution-engine investment serves many SQL dialects and several distributed-execution architectures.",
+      "refs": [],
+      "sources": [
+        { "label": "Velox VLDB 2022", "url": "https://research.facebook.com/publications/velox-metas-unified-execution-engine/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Velox repo", "url": "https://github.com/facebookincubator/velox" },
+    { "label": "Velox project home", "url": "https://velox-lib.io/" },
+    { "label": "Velox VLDB 2022", "url": "https://research.facebook.com/publications/velox-metas-unified-execution-engine/" },
+    { "label": "Engineering at Meta — Velox open source announcement", "url": "https://engineering.fb.com/2023/03/09/open-source/velox-open-source-execution-engine/" }
+  ]
+}

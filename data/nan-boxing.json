@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "NaN Boxing",
+  "aliases": ["NaN tagging", "NaN-boxed values"],
+  "summary": "Encode pointers, integers, booleans, and other tagged values inside the unused bit patterns of IEEE 754 NaN doubles. Every value fits in a 64-bit register; doubles store directly without conversion. Used by SpiderMonkey, LuaJIT, and JavaScriptCore.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "NaN boxing exploits the IEEE 754 double-precision format: any value with all 11 exponent bits set and a non-zero mantissa is a NaN (Not a Number). There are 2^52 possible NaN bit patterns, but only one is needed for the canonical NaN. The remaining patterns can encode pointers, integers, booleans, nil, and other tagged values — all in 64 bits.\n\nFor dynamically typed languages, every runtime value must carry enough type information to dispatch correctly. NaN boxing fits that information into a single 64-bit machine word: doubles store directly, everything else encodes into the spare NaN payload.",
+      "refs": [
+        { "target": "tagged-pointers#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "encoding",
+      "title": "Encoding scheme",
+      "tags": ["value-representation", "vm"],
+      "content": "A 64-bit IEEE 754 double has the bit pattern `s eeeeeeeeeee mmmm…m` (1 sign + 11 exponent + 52 mantissa). A NaN sets all exponent bits and any non-zero mantissa. If the value's exponent bits are not all-set, the value is a real finite double and stored directly. If the exponent bits are all-set and the mantissa matches a chosen reserved NaN pattern, the value is canonical NaN. Otherwise, the high mantissa bits encode a type tag, and the remaining bits encode the payload — typically a 48-bit pointer (sufficient on current x86-64) or a small integer.\n\nThe payload-extraction operation is a mask. The fast path for arithmetic is: check whether both operands are real doubles by comparing the exponent against the all-set pattern; if so, do a hardware double-add directly. The slow path is dispatched only when the type check fails.",
+      "refs": []
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["vm", "production"],
+      "content": "SpiderMonkey (Firefox), LuaJIT, and JavaScriptCore use NaN boxing. The advantage: every value fits in a 64-bit register, enabling register-width operations and avoiding heap allocation for numbers. A double is stored directly; everything else is stored in the NaN mantissa bits with a type tag.\n\nThe disadvantage: extracting a pointer requires masking off tag bits, and storing a double requires checking for and avoiding the NaN range collisions when the user's code legitimately produces a NaN. Some operations need extra branches. Also, only 48-bit pointers fit in the NaN payload, which is sufficient on current x86-64 hardware but not future-proof for systems that extend the virtual address space.",
+      "refs": [],
+      "sources": [
+        { "label": "SpiderMonkey JS::Value (NaN boxing)", "url": "https://firefox-source-docs.mozilla.org/js/index.html" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs vs alternatives",
+      "tags": ["tradeoffs", "vm"],
+      "content": "NaN boxing optimises for the case where most values are floating-point doubles — typical of JavaScript and Lua workloads. Doubles are zero-overhead; integers and pointers pay a small mask. If most values are pointers, tagged-pointer schemes (which steal low bits from aligned pointers) are usually preferable, because they impose no penalty on the dominant case.\n\nThe ExBoxing hybrid bridges the two: tag pointers in the low bits for the pointer-heavy case, and reserve a tag value for an extended encoding of common doubles. Most NaN-boxing engines also include a Smi (small-integer) fast path that avoids the floating-point check entirely for integer-arithmetic-heavy code.",
+      "refs": [
+        { "target": "tagged-pointers#exboxing", "type": "hybridised-by" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "SpiderMonkey JS::Value", "url": "https://firefox-source-docs.mozilla.org/js/index.html" }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "kind": "runtime",
+  "name": "Mecrisp and Mecrisp-Stellaris",
+  "aliases": [
+    "Mecrisp-Stellaris",
+    "Mecrisp-Quintus"
+  ],
+  "summary": "Tiny embedded Forth that compiles directly into flash, performs constant folding, and (in the newer RA compiler path) adds automatic inlining and register allocation for the data stack. Notably elegant: keep the environment interactive but compile straight to native code in tiny memory budgets.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "For microcontrollers, **Mecrisp** and **Mecrisp-Stellaris** sit in a different league from desktop Forths. They compile **directly into flash**, perform **constant folding**, and in the newer RA compiler path add **automatic inlining** and even **register allocation for the data stack**. This is a notably elegant answer to embedded constraints: keep the environment interactive, but compile straight to native code in tiny memory budgets.\n\nThe design is especially original because it is not merely \"a small Forth.\" It combines tiny-system practicality with real compiler behavior instead of falling back to a purely interpreted core.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Mecrisp",
+          "url": "https://mecrisp.sourceforge.net/"
+        }
+      ]
+    },
+    {
+      "id": "mecrisp-quintus",
+      "title": "Mecrisp-Quintus and Acrobatics",
+      "tags": [
+        "forth",
+        "embedded",
+        "risc-v"
+      ],
+      "content": "**Mecrisp-Quintus** (Matthias Koch, with Krzysztof Klaus) is the RISC-V / MIPS sibling, and adds a distinctive twist: a loadable **\"Acrobatics\"** extension — an inlining + dual-stack register allocator *written in Forth itself*, loaded on top of the base RV32 native compiler. The compiler-as-loadable-Forth-program inverts the usual host/target relationship and is itself a piece of metacompilation.\n\nMecrisp delivers an excellent embedded story — tiny footprint, native code, direct-to-flash workflow, and an unusually strong fit for MCU work — offset by architecture-specificity and little relevance to large desktop-hosted applications.",
+      "refs": [
+        {
+          "target": "lbforth-metacompilation#overview",
+          "type": "instance-of"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Mecrisp-Quintus (Hans Baier port)",
+          "url": "https://github.com/hansfbaier/mecrisp-quintus"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Mecrisp",
+      "url": "https://mecrisp.sourceforge.net/"
+    }
+  ]
+}

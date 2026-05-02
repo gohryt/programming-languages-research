@@ -1,0 +1,27 @@
+{
+  "kind": "concept",
+  "name": "VBR — Version-Based Reclamation",
+  "aliases": ["VBR", "version-based reclamation"],
+  "summary": "Sheffi, Herlihy, Petrank (DISC 2021) use fully optimistic reclamation — both reads and writes are speculative. Each object carries a version stamp; operations validate version on read and CAS-with-version on write, abort/retry on mismatch. Eliminates hazard-pointer protection on writes; reuses freed memory immediately into a typed allocator. Outperforms EBR/HP/HE/IBR on linked-list, hash-table, skip-list benchmarks while remaining lock-free.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["safe-memory-reclamation", "version-based", "lock-free", "concurrent-reclamation"],
+      "content": "Sheffi, Herlihy, Petrank's **Version-Based Reclamation** (DISC 2021) uses *fully optimistic* reclamation — both reads *and* writes are speculative. Each object carries a version stamp; operations validate the version on read and use CAS-with-version on write, aborting and retrying on mismatch.\n\nThe key advance: prior optimistic schemes only optimised reads, still requiring HP-style protection on writes. VBR eliminates hazard-pointer protection on writes too, by tying every write's CAS to a version that detects the use-after-free race directly. Freed memory is **reused immediately into a typed allocator** — there is no quarantine period because a stale operation will simply observe a version mismatch on its next CAS and retry.\n\nOutperforms EBR/HP/HE/IBR on linked-list, hash-table, and skip-list benchmarks while remaining lock-free.",
+      "refs": [
+        { "target": "epoch-based-reclamation", "type": "compared-with" },
+        { "target": "hazard-pointers", "type": "compared-with" },
+        { "target": "hazard-eras", "type": "compared-with" },
+        { "target": "interval-based-reclamation", "type": "compared-with" },
+        { "target": "rrr-smr", "type": "related" }
+      ],
+      "sources": [
+        { "label": "VBR (DISC 2021)", "url": "https://arxiv.org/abs/2107.13843" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "VBR arXiv", "url": "https://arxiv.org/abs/2107.13843" }
+  ]
+}

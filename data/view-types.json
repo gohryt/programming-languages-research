@@ -1,0 +1,97 @@
+{
+  "kind": "concept",
+  "name": "Rust View Types (Work in Progress)",
+  "aliases": [
+    "rust-view-types",
+    "partial-types-rfc"
+  ],
+  "summary": "Proposed Rust extension to express partial/disjoint borrows of struct fields in function signatures, eliminating today's spurious inter-procedural borrow conflicts. Syntax &mut {f1, f2} self records multiple loans (one per named field) instead of a single whole-struct loan, so two methods accessing disjoint field sets compose. Niko Matsakis's maximally-minimal design pairs explicit field lists with potential row-polymorphism inference; the competing RFC #3736 (Partial Types) generalizes to nested products. Pre-RFC / design-space discussion as of 2026-04.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "view-types",
+        "borrowing",
+        "rust",
+        "lifetime",
+        "compile-time-safety"
+      ],
+      "content": "**View Types** are a proposed extension to Rust to express partial/disjoint borrows of struct fields in function signatures, eliminating today's spurious inter-procedural borrow conflicts.\n\nThe syntax `&mut {f1, f2} self` records *multiple* loans (one per named field) instead of a single whole-struct loan, so two methods accessing disjoint field sets compose. Today, callers can split a struct into disjoint field borrows inside a single function body, but the borrow checker cannot express \"this method only borrows fields `a` and `b`\" in a function signature, forcing callers either to inline the function or to refactor the data.",
+      "refs": [
+        {
+          "target": "borrowing",
+          "type": "extends"
+        },
+        {
+          "target": "non-lexical-lifetimes",
+          "type": "extends"
+        },
+        {
+          "target": "ownership",
+          "type": "related"
+        },
+        {
+          "target": "rust",
+          "type": "exemplified-by"
+        }
+      ],
+      "sources": [
+        {
+          "label": "View types max-min design",
+          "url": "https://smallcultfollowing.com/babysteps/blog/2026/03/21/view-types-max-min/"
+        },
+        {
+          "label": "Matsakis view-types series",
+          "url": "https://smallcultfollowing.com/babysteps/series/view-types/"
+        }
+      ]
+    },
+    {
+      "id": "design-space",
+      "title": "Design space — max-min vs Partial Types RFC",
+      "tags": [
+        "view-types",
+        "rust",
+        "language-design"
+      ],
+      "content": "Niko Matsakis's \"maximally minimal\" design pairs explicit field lists with potential row-polymorphism inference; the competing RFC #3736 (\"Partial Types\") generalizes to nested products. The two share the goal of letting function signatures describe sub-struct loans rather than whole-struct loans but pick different points on the inference / explicitness curve.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "RFC #3736 Partial Types",
+          "url": "https://github.com/rust-lang/rfcs/pull/3736"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": [
+        "view-types",
+        "rust"
+      ],
+      "content": "Status (as of 2026-04): design-space discussion / pre-RFC area rather than a stabilized Rust feature. The maximally-minimal write-up appeared in March 2026; adoption depends on Polonius progress and on consolidating the multiple competing RFC variants.",
+      "refs": [
+        {
+          "target": "polonius",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "View types max-min design",
+      "url": "https://smallcultfollowing.com/babysteps/blog/2026/03/21/view-types-max-min/"
+    },
+    {
+      "label": "Matsakis view-types series",
+      "url": "https://smallcultfollowing.com/babysteps/series/view-types/"
+    },
+    {
+      "label": "RFC #3736 Partial Types",
+      "url": "https://github.com/rust-lang/rfcs/pull/3736"
+    }
+  ]
+}

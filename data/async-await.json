@@ -1,0 +1,96 @@
+{
+  "kind": "concept",
+  "name": "Async/Await",
+  "aliases": ["async", "futures", "promises"],
+  "summary": "Stackless concurrency model where asynchronous computations are represented as futures and resumed at explicit suspension points; modern designs differ on lazy vs eager (Rust vs C#), API coloring, library-customisable state machines (C++20 coroutines), and value-level composition (C++26 senders/receivers).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Async/await is a mainstream stackless concurrency model in which asynchronous computations are represented as resumable tasks, futures, or promises. It is primarily a contract between language surface syntax, runtime scheduling, and the code that drives suspended work forward.\n\nA future represents a computation that may produce a value later. A promise is often the write side that completes a future. Some languages make futures **eager** (C# Tasks run the moment they are created); others make them **lazy** (Rust Futures run only when polled). Lazy gives zero runtime dependency in the standard abstraction but requires an executor and explicit wakeups; eager removes the \"forgot to await\" footgun but adds the \"fire-and-forget without awaiting\" footgun (exceptions disappear if not awaited).",
+      "refs": [
+        { "target": "virtual-threads#overview", "type": "contrasts-with" },
+        { "target": "go#concurrency", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "execution-model",
+      "title": "Execution model",
+      "tags": ["concurrency", "runtime", "futures"],
+      "content": "Async/await systems usually represent work as values that complete later and are driven by an executor or runtime. Polling, waking, callback bridging, and progress scheduling are the main runtime mechanisms beneath the surface syntax.\n\nIn Rust's poll/wake model, the `Future` trait's `poll` method receives `Pin<&mut Self>` and a `Context` containing a `Waker`; `poll` should return quickly and must not block. Asynchronous resources store the waker and call it when progress may be possible; the executor then polls the task again. Stackless async functions are typically compiled into state machines, with each suspension point storing local state in the future object — making allocation explicit at the cost of large state machines and pinning constraints when self-references are possible.",
+      "refs": [
+        {
+          "target": "structured-concurrency#nurseries-and-task-groups",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        { "label": "Rust Future trait", "url": "https://doc.rust-lang.org/stable/std/future/trait.Future.html" }
+      ]
+    },
+    {
+      "id": "csharp-eager-tasks",
+      "title": "C# eager Tasks and SynchronizationContext",
+      "tags": ["async", "csharp", "runtime"],
+      "content": "C# was the first mainstream language to ship `async`/`await` as a first-class language feature (.NET 4.5, 2012, designed by Hejlsberg, Torgersen, Toub). The compiler transforms an `async` method into a state machine implementing `IAsyncStateMachine`; `await expression` calls the awaiter's `GetAwaiter().GetResult()` if synchronously complete, or schedules continuation via `ICriticalNotifyCompletion.UnsafeOnCompleted` if asynchronous.\n\nThe distinguishing mechanism is **`Task<T>` plus `SynchronizationContext`**. A `Task` is the **eager, hot-by-default** future analogue. When code `await`s, the runtime captures the current `SynchronizationContext` (UI thread, ASP.NET request, custom domain) and posts the continuation back onto it after the async operation completes. This solves the \"I awaited a network call, now I'm on a thread-pool thread but my UI code expects the main thread\" problem at the language level.\n\nKey design points: **`ConfigureAwait(false)`** opts out of context capture, used pervasively in library code where context-capture overhead is unwanted. **`ValueTask<T>`** (added .NET Core 2.0) is a zero-allocation alternative for the synchronous-completion case. **`async` over `IAsyncEnumerable<T>` + `await foreach`** are language-level async iterators (.NET Core 3.0, 2019). The 2012 C# async/await is the design template most subsequent languages followed: Python `asyncio` (2014), Hack/PHP `await` (2014), JavaScript `async`/`await` (ES2017, 2017), Swift `async`/`await` (5.5, 2021), Rust `async fn` stable (1.39, 2019). Each made different lazy-vs-eager and context-capture choices. Status (as of 2026-04): production at massive scale across the entire ASP.NET Core ecosystem, Azure SDK, Roslyn, Visual Studio.",
+      "refs": [],
+      "sources": [
+        { "label": "How async/await really works", "url": "https://devblogs.microsoft.com/dotnet/how-async-await-really-works/" }
+      ]
+    },
+    {
+      "id": "cpp-coroutines-and-senders",
+      "title": "C++20 coroutines and C++26 senders/receivers",
+      "tags": ["async", "cpp", "library-customizable"],
+      "content": "C++20 added stackless coroutines via `co_await`, `co_yield`, and `co_return`. The compiler transforms any function containing one of these keywords into a state machine stored in a heap-allocated **coroutine frame**. The novelty: the language ships **no built-in task or generator type** — instead, a user-defined `promise_type` controls allocation, return-object construction, suspension behaviour, exception propagation, and completion semantics.\n\nThe trade-off is library expressivity vs ecosystem fragmentation. C++ exposes the entire state-machine transformation as customization points, enabling zero-allocation coroutines (custom allocators on the promise type), structured-concurrency frameworks (cppcoro `task`, asio awaitables, boost.cobalt), generators, lazy futures, channels, and async-iterators — all as ordinary library code. The cost is that every framework defines its own `task<T>` / `generator<T>` / `lazy<T>`, and they do not interoperate cleanly. Status (as of 2026-04): HALO (heap allocation elision optimisation) support varies across GCC, Clang, and MSVC; C++23 added `std::generator` as the first standardised coroutine type.\n\n**P2300 / `std::execution`** (Hoekstra, Niebler, Lemire et al., voted into C++26 in 2024) standardises a generic asynchronous-composition model independent of coroutines. **Senders** represent async operations as values; **receivers** consume their results; **schedulers** decide where work runs. Composition is via algorithms (`just`, `then`, `when_all`, `let_value`, `transfer`, `bulk`, `into_variant`) that build a **graph of senders** before any work starts. The graph runs only when a receiver is connected via `start(connect(sender, receiver))`. The model deliberately separates *what* (the sender graph) from *where* (the scheduler), so the same composition can run on a thread pool, single-threaded loop, GPU streams, system queues, or distributed runtimes. Cancellation flows through the graph as a first-class concern via stop tokens; structured concurrency falls out because senders compose hierarchically. The strongest current example of \"structured concurrency as a value-composition algebra\" rather than as a coroutine-transformation feature.",
+      "refs": [],
+      "sources": [
+        { "label": "C++ coroutines reference", "url": "https://en.cppreference.com/w/cpp/language/coroutines" },
+        { "label": "P2300 senders/receivers", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2300r10.html" }
+      ]
+    },
+    {
+      "id": "rust-async-fn-in-traits",
+      "title": "Rust — async fn in traits and RPITIT",
+      "tags": ["async", "rust", "type-system"],
+      "content": "Rust 1.75 (December 2023) stabilised two long-awaited features: **`async fn` in traits (AFIT)** and **return-position `impl Trait` in traits (RPITIT)**. Before 1.75, an `async fn` in a trait required the `async-trait` crate, which boxed the returned future via `Pin<Box<dyn Future>>` — adding heap allocation per call and obscuring the future type from the optimiser. With AFIT, `trait Service { async fn handle(&self, req: Request) -> Response; }` desugars natively without boxing.\n\nThe technical mechanism is **anonymous generic associated types**. An `async fn` in a trait desugars to a regular method returning `impl Future<Output = T>`, which itself desugars to a generic associated type — one anonymous `type` parameter on the trait, instantiated per implementor.\n\nThe Send-bound-polymorphism gap remains the open design question. A trait with `async fn handle(&self) -> Response` cannot directly express \"the returned future is `Send` if `Self: Sync`.\" **Return Type Notation (RTN)** is the experimental syntax addressing this: `T: Service<handle(): Send>` lets a generic constraint name the auto-traits of the returned future. Status (as of 2026-04): RTN is unstable behind `feature(return_type_notation)`, with stabilisation discussed for 2026.\n\nThe lesson generalises: stabilising `async fn` in traits requires the type system to express anonymous associated types and auto-trait propagation orthogonally. Languages designing async from scratch can avoid this by committing to one shape (Swift's Send by default; Go's mandatory mutex discipline) or by accepting boxed futures (C# Tasks, JS Promises).",
+      "refs": [],
+      "sources": [
+        { "label": "Rust 1.75 async fn in traits", "url": "https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits/" }
+      ]
+    },
+    {
+      "id": "api-coloring-and-propagation",
+      "title": "API coloring and propagation",
+      "tags": ["concurrency", "api-design", "tradeoffs"],
+      "content": "One of the major design consequences of async/await is API coloring: if a function must await, its callers often become async too. This makes suspension explicit but can spread through libraries and system interfaces in ways that strongly shape ecosystem design.\n\nVirtual-thread and fiber systems choose the opposite trade-off: blocking-looking APIs can suspend the logical task without requiring the caller to become async. The runtime and standard library must then ensure that blocking operations unmount or park only the logical task, not the carrier thread. Continuation-based languages such as Raku take a similar uncoloured-await stance.\n\nElm is an instructive contrast. A `Task` in Elm is a description of asynchronous work that can later be turned into a command. The standard sequencing primitives are intentionally simple, and the runtime keeps a tight grip on how effects enter the system. The lesson is that a functional language can deliberately under-express concurrency in order to preserve runtime simplicity and predictable UI semantics — the opposite of the \"maximally expressive substrate\" approach seen in GHC or effect-handler languages.",
+      "refs": [
+        {
+          "target": "virtual-threads#blocking-style-programming",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "blocking-hazards",
+      "title": "Blocking hazards",
+      "tags": ["concurrency", "runtime", "scheduling"],
+      "content": "Blocking operations inside async runtimes can starve unrelated work if the runtime expects tasks to suspend cooperatively. This means async systems need explicit offloading strategies, blocking pools, or runtime-aware I/O primitives.\n\nTokio's task docs explain that tasks should not perform blocking syscalls and provide APIs for running blocking work in an asynchronous context (`spawn_blocking`, `block_in_place`). Practical async runtimes provide escape hatches: blocking thread pools, dedicated blocking-task APIs, or annotations that let the scheduler compensate.",
+      "refs": [
+        {
+          "target": "cancellation#cleanup-and-resource-release",
+          "type": "related"
+        },
+        {
+          "target": "virtual-threads#pinning-and-blocking-hazards",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        { "label": "Tokio task documentation", "url": "https://docs.rs/tokio/latest/tokio/task/" }
+      ]
+    }
+  ],
+  "sources": []
+}

@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Tagged Pointers",
+  "aliases": ["pointer tagging", "low-bit tagging", "Smi tagging"],
+  "summary": "Store type information in the low (or high) bits of pointers, exploiting alignment guarantees that those bits are always zero. Used by V8, OCaml, Ruby. ExBoxing hybridises tagged pointers with floating-point payloads.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Tagged pointers store type information in the low bits of a pointer, exploiting alignment guarantees. If all heap objects are 8-byte aligned, the low 3 bits are always zero and can store a type tag with up to 8 possible values. Equivalent schemes use the high bits when the pointer width exceeds the architecture's address-space size.\n\nThe extraction cost is a mask (low-bit tagging) or a sign-extending shift (Smi-style integer tagging). Type checking is a low-bit comparison. The trade-off versus NaN boxing: tagged pointers are optimal when most values are pointers, while NaN boxing is optimal when most values are doubles.",
+      "refs": [
+        { "target": "nan-boxing#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "encoding-conventions",
+      "title": "Encoding conventions",
+      "tags": ["value-representation", "vm"],
+      "content": "Two conventions dominate. **Low-bit-zero pointers**: heap objects are aligned, so the low bits are 0 for pointers and non-zero for tagged immediates (small integers, booleans, nil). Extracting an integer is `value >> tag_width`; extracting a pointer is `value & ~tag_mask`.\n\n**Low-bit-one immediates** (OCaml's convention): the low bit distinguishes integers (bit 0 = 1) from pointers (bit 0 = 0). OCaml integers are 63 bits, not 64 — a trade-off for O(1) type checking on every value. Arithmetic on tagged integers requires a small adjustment because the low bit shifts the representation, but the adjustment fits in a single instruction.\n\nV8 uses pointer compression (since V8 7.7) to store 32-bit compressed pointers within a 4 GB heap reservation; the compression scheme reserves one low bit for the Smi/HeapObject distinction, bringing tagged-pointer compression and 32-bit Smi together.",
+      "refs": [],
+      "sources": [
+        { "label": "V8 pointer compression", "url": "https://v8.dev/blog/pointer-compression" },
+        { "label": "OCaml runtime value representation", "url": "https://ocaml.org/manual/5.2/runtime.html" }
+      ]
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["vm", "production"],
+      "content": "V8 (Chrome) tags the low bit to distinguish Smi (small integers) from HeapObject pointers; this is the dominant fast path for integer arithmetic in JavaScript. Ruby (CRuby) uses similar low-bit tagging. OCaml's tagged-integer convention is mandatory — every integer is bit-shifted by 1 and tagged with the low bit set, so the representation requires no separate type word.\n\nMore exotic schemes use multiple tag values: one bit for Smi, two bits for type-after-Smi-check, or stealing high bits when virtual address space allows. Some research languages used a three-way tag (pointer, integer, special) at the cost of arithmetic adjustment per integer op.",
+      "refs": []
+    },
+    {
+      "id": "exboxing",
+      "title": "ExBoxing — bridging tagged pointers and NaN boxing",
+      "tags": ["value-representation", "vm", "tradeoffs"],
+      "content": "Kannan Vijayan (SpiderMonkey team) proposed **ExBoxing** as a hybrid: use low-bit tagging (like V8) for the common case, but reserve a special tag for \"extended\" values that encode floating-point numbers using an exponent-biased scheme. The most commonly used doubles (small integers, common fractions) fit in the extended encoding; rare doubles fall back to heap allocation.\n\nThis captures most of NaN boxing's benefit (common numbers as immediates) while retaining tagged pointers' advantages: simpler pointer extraction, no NaN-range checks, natural null representation. The trade-off is that arbitrary doubles become slightly more expensive than under NaN boxing; the bet is that most numerical work uses small or rounded values.",
+      "refs": [
+        { "target": "nan-boxing#tradeoffs", "type": "hybrid-of" }
+      ],
+      "sources": [
+        { "label": "ExBoxing — Kannan Vijayan", "url": "https://medium.com/@kannanvijayan/exboxing-bridging-the-divide-between-tag-boxing-and-nan-boxing-07e39840e0ca" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "V8 pointer compression", "url": "https://v8.dev/blog/pointer-compression" },
+    { "label": "OCaml runtime values", "url": "https://ocaml.org/manual/5.2/runtime.html" },
+    { "label": "ExBoxing", "url": "https://medium.com/@kannanvijayan/exboxing-bridging-the-divide-between-tag-boxing-and-nan-boxing-07e39840e0ca" }
+  ]
+}

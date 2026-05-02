@@ -1,0 +1,38 @@
+{
+  "kind": "tool",
+  "name": "jemalloc",
+  "aliases": ["Jason Evans jemalloc"],
+  "summary": "Jason Evans's multi-arena allocator with explicit dirty/muzzy page state machine and decay-based purge — the long-tail-friendly choice for long-running servers (FreeBSD libc, Firefox, Redis, Cassandra, Meta).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "general-purpose-allocator", "production"],
+      "content": "Jason Evans's jemalloc is a multi-arena allocator (round-robin arena assignment, default 4x CPUs) with explicit dirty/muzzy page state machine and decay-based purge. The decay-purge model — pages transitioning dirty to muzzy (`MADV_FREE`) to retained over sigmoidal decay timers — is what gives jemalloc its excellent long-tail behaviour on long-running servers.\n\nIt is the FreeBSD libc allocator and was Rust's standard allocator from 2015 to 2018; Firefox, Redis, Cassandra, and Meta's server fleet all use it.",
+      "refs": [
+        { "target": "allocators#fleet-and-decay-allocators", "type": "part-of" },
+        { "target": "tcmalloc#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "decay-purge",
+      "title": "Decay-purge and multi-arena",
+      "tags": ["decay-purge", "madvise", "size-class"],
+      "content": "Two-stage decay: dirty pages transit to muzzy (via `MADV_FREE`, which lets the kernel reclaim only under pressure) and finally to retained (returned to the OS). Decay timers `dirty_decay_ms` and `muzzy_decay_ms` are tunable per arena and follow a sigmoidal schedule rather than a hard cliff, which smooths reclamation work over time and keeps the allocation hot path off the decay critical path. A background thread purges with a trylock pattern so foreground allocators are never blocked on decay.\n\nMulti-arena assignment defaults to 4x CPU count to reduce contention; a separate huge arena handles large allocations. Built-in heap profiling via `jeprof` and arena introspection via `mallctl` make jemalloc the most introspectable production allocator.",
+      "refs": [
+        { "target": "linux-folio-mthp#overview", "type": "context" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production"],
+      "content": "Production: FreeBSD libc, Firefox, Redis, Cassandra, Rust historically (2015 to 2018), Meta's server fleet. The decay-purge model is what gives jemalloc its excellent long-tail behaviour on long-running servers — pages that are temporarily idle return to the OS without paying eager-purge latency.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "jemalloc BSDCan 2006", "url": "https://people.freebsd.org/~jasone/jemalloc/bsdcan2006/jemalloc.pdf" },
+    { "label": "jemalloc GitHub", "url": "https://github.com/jemalloc/jemalloc" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "family-debugger-protocol",
+  "tag": "family:debugger-protocol",
+  "name": "Family: debugger protocol",
+  "description": "Transport+capability boundaries between debuggers and runtimes — DAP, JDWP, CDP, RemedyBG, gdbserver/lldb-server, mirrors.",
+  "axis": "family"
+}

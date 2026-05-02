@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Higher-Rank Polymorphism and Local Inference",
+  "aliases": ["higher-rank", "rank-n-types", "local-type-inference"],
+  "summary": "Polymorphism beyond ML's rank-1 fragment: functions that accept polymorphic functions as arguments or return them. Inference is not generally as simple as Hindley-Milner, so practical languages require annotations and use bidirectional checking. Pierce-Turner local inference synthesizes omitted type arguments without global inference.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Higher-rank polymorphism permits functions to accept polymorphic functions as arguments or return them in richer ways than ML's rank-1 fragment. The classic example is `runST :: (forall s. ST s a) -> a` — the `forall` is at rank 2 because it appears inside a function argument's type.\n\nInference is not generally as simple as Hindley-Milner: the position of `forall` matters, and reconstructing it from context is undecidable in general. Practical languages therefore require annotations at higher-rank positions and use bidirectional checking (`data/bidirectional-typing`) to propagate the annotation inward through the function body.",
+      "refs": [
+        { "target": "hindley-milner#costs-and-when-it-breaks", "type": "extends" },
+        { "target": "bidirectional-typing#design-applicability", "type": "depends-on" }
+      ]
+    },
+    {
+      "id": "local-type-inference",
+      "title": "Local type inference",
+      "tags": ["type-system", "inference"],
+      "content": "Local type inference (Pierce and Turner) became important for languages that wanted explicit polymorphism, subtyping, or higher-rank features without full global inference. It combines:\n\n- **local synthesis** of omitted type arguments — a call site infers the type arguments from the actual argument types when they uniquely determine them;\n- **bidirectional propagation** of expected types — when a function is called in a context with a known expected return type, that type flows back to fix any otherwise-ambiguous polymorphism.\n\nLocal type inference is what makes Scala, Java generics, and C# generics ergonomic in practice: programmers do not write `f<Int, String>(x, y)` for every call; the compiler synthesizes the type arguments from the call site. The same machinery scales to higher-rank positions: when the expected type is `(forall a. a -> a) -> Int`, a lambda passed in checking mode is checked against `forall a. a -> a` directly.",
+      "sources": [
+        { "label": "Pierce and Turner — Local Type Inference (TOPLAS)", "url": "https://www.cis.upenn.edu/~bcpierce/papers/lti-toplas.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Pierce and Turner — Local Type Inference", "url": "https://www.cis.upenn.edu/~bcpierce/papers/lti-toplas.pdf" }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "kind": "concept",
+  "name": "Cancellation",
+  "aliases": [],
+  "summary": "Coordination mechanism for stopping or winding down concurrent work through cooperative checkpoints, tokens, scopes, or stronger interruption models; the central trade-off is responsiveness vs preservation of invariants and cleanup guarantees.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Cancellation is a coordination mechanism for stopping, unwinding, or requesting the termination of concurrent work. It is a first-class part of concurrency semantics, not merely a secondary error-handling concern.",
+      "refs": [
+        { "target": "structured-concurrency#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "semantics",
+      "title": "Semantics",
+      "tags": ["concurrency", "cancellation", "runtime"],
+      "content": "Cancellation semantics vary between cooperative models, scope-driven propagation, and stronger interruption mechanisms. The central trade-off is usually responsiveness versus preservation of invariants and cleanup guarantees.\n\nCancellation may be: cooperative, observed at await/yield/checkpoint points; asynchronous, delivered by exception or signal; explicit through tokens; lexical through cancel scopes; implicit through parent failure; best-effort, advisory, or mandatory. Cooperative cancellation preserves cleanup and invariants but cannot stop CPU-bound or blocked code unless it checks cancellation. Asynchronous cancellation is more forceful but can violate invariants if it interrupts arbitrary code.\n\nC++26 senders/receivers carry cancellation through the graph as a first-class concern via stop tokens. Swift task cancellation propagates through child tasks cooperatively. Tokio and async-std use `CancellationToken`-style explicit signals plus dropping the future for cooperative cancellation. Java structured task scopes (JEP 428) propagate cancellation along the task tree.",
+      "refs": [{ "target": "async-await#execution-model", "type": "related" }]
+    },
+    {
+      "id": "propagation-through-task-structure",
+      "title": "Propagation through task structure",
+      "tags": ["concurrency", "structured-concurrency", "coordination"],
+      "content": "Structured task systems make cancellation more understandable by tying it to task trees and scope lifetimes. This reduces silent background work and makes failure propagation more explicit.\n\nIn structured-concurrency systems, parent failure typically implies child cancellation, and child failure is less likely to disappear into detached background execution. Trio nurseries, Swift task groups, Kotlin coroutine scopes, and Java structured task scopes all propagate cancellation along the spawn tree. The unstructured escape hatch — `Task.detached`, `tokio::spawn` without join, etc. — explicitly opts out of this discipline.",
+      "refs": [
+        {
+          "target": "structured-concurrency#failure-and-cancellation-propagation",
+          "type": "uses"
+        }
+      ]
+    },
+    {
+      "id": "cleanup-and-resource-release",
+      "title": "Cleanup and resource release",
+      "tags": ["concurrency", "cleanup", "runtime"],
+      "content": "Cancellation must interact safely with cleanup, joins, and resource release. This is where concurrency semantics connect most directly to broader resource and memory-management disciplines.\n\nLanguages with synchronous destructors struggle when cleanup itself needs to await: closing network connections, flushing buffers, joining tasks, or releasing distributed leases. The Rust async book notes that dropping futures can cancel owned child futures, but spawned tasks require explicit handles/signals; Rust's lack of async destructors complicates asynchronous cleanup. C++ RAII destructors are synchronous-only; coroutine cleanup happens through `final_suspend` and the promise's destructor, which can be customised but cannot themselves await without additional plumbing.",
+      "refs": [{ "target": "ownership#overview", "type": "related" }]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Cooperative cancellation is safer but depends on good checkpoints; stronger interruption improves responsiveness but risks broken invariants. A concurrency model should state its cancellation philosophy explicitly rather than leaving it implicit in library conventions.\n\nA tight CPU-bound loop with no `await` or yield will not respond to cooperative cancellation regardless of how the surrounding runtime tries to deliver the signal — a recurring pain point in async Rust, Tokio, and asyncio production code. Asynchronous cancellation via thread interruption (Java's `Thread.interrupt`, POSIX `pthread_cancel`) avoids this but exposes operations that cannot be safely interrupted (lock acquisition, atomic update sequences) and forces a complex \"safe points\" discipline.",
+      "refs": [
+        {
+          "target": "virtual-threads#pinning-and-blocking-hazards",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

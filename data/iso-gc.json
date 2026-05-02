@@ -1,0 +1,43 @@
+{
+  "kind": "runtime",
+  "name": "Iso — Request-Private Garbage Collection (PLDI 2025)",
+  "aliases": ["Iso", "Iso GC", "Request-Private GC"],
+  "summary": "Tianle Qiu and Stephen M. Blackburn's Iso (PLDI 2025; ANU/Google) is the first request-private garbage collector for Java with a competitive performance profile. Each request running on the JVM gets its own request-private heap region, reclaimed wholesale on completion.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "request-private-gc", "regional-gc", "jvm", "research"],
+      "content": "Tianle Qiu and Stephen M. Blackburn's **Iso** (PLDI 2025; ANU/Google) is the first request-private garbage collector for Java with a competitive performance profile.\n\nThe mechanism: each request running on the JVM gets its own *request-private heap region*; when the request completes, its private region is reclaimed wholesale without any thread-local-to-shared-heap promotion. This is the GC analogue to Erlang's per-process heaps — each request lives in its own GC universe — but adapted to Java's shared-mutable-heap reality through **opportunistic copying**: allocations stay request-private when no shared references reach them, and only escape to the shared heap when sharing is observed.",
+      "refs": [
+        { "target": "garbage-collection#actor-and-domain-collectors", "type": "instance-of" },
+        { "target": "immix-gc", "type": "extends" },
+        { "target": "beam-gc", "type": "design-inspired-by" },
+        { "target": "g1-gc", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "immix-substrate",
+      "title": "Immix block structure as substrate",
+      "tags": ["mark-region", "regional-gc", "request-private-gc"],
+      "content": "The architectural trick is using **Immix's mark-region heap structure** as the substrate. Immix already partitions the heap into 32 KB blocks; Iso assigns whole blocks to requests at allocation time and reclaims them on request completion.\n\nCross-request references force promotion of the source object to the shared heap, but in measurement on real Java workloads (microservices, REST handlers, Spring Boot apps) the vast majority of allocations remain request-local and are reclaimed with zero tracing."
+    },
+    {
+      "id": "results",
+      "title": "Empirical results and design lesson",
+      "tags": ["garbage-collection", "low-latency-gc", "request-private-gc"],
+      "content": "The reported result: for request-shaped workloads, Iso outperforms OpenJDK G1 by significant margins on both throughput and tail latency, because most allocation/reclamation cycles bypass the global GC entirely.\n\nThe lesson generalises: **for languages and runtimes serving request/response workloads, partitioning the heap by request is a more direct lever than tuning a global concurrent collector**. Web frameworks have approximated this with object pools and arena allocators per request; Iso brings it into the GC itself, transparently to the application."
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["research", "garbage-collection"],
+      "content": "Status (as of 2026-04): research-grade, with an artifact at the PLDI 2025 proceedings. Production deployment in OpenJDK or Azul Prime is the natural next step but not yet announced. The architectural pattern — request-scoped heap regions with opportunistic escape to a shared heap — is reusable beyond Java for any GC'd request-shaped runtime."
+    }
+  ],
+  "sources": [
+    { "label": "Qiu & Blackburn — Iso: Request-Private Garbage Collection (PLDI 2025)", "url": "https://www.steveblackburn.org/pubs/papers/iso-pldi-2025.pdf" },
+    { "label": "Iso ACM DL", "url": "https://dl.acm.org/doi/10.1145/3729285" },
+    { "label": "Iso PLDI 2025 details", "url": "https://pldi25.sigplan.org/details/pldi-2025-papers/36/Iso-Request-Private-Garbage-Collection" }
+  ]
+}

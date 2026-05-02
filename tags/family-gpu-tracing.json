@@ -1,0 +1,7 @@
+{
+  "id": "family-gpu-tracing",
+  "tag": "family:gpu-tracing",
+  "name": "Family: GPU tracing",
+  "description": "Cross-clock-domain GPU observation: NVTX, CUPTI, Nsight Systems, ROCm rocTracer, Perfetto GPU render-stage events.",
+  "axis": "family"
+}

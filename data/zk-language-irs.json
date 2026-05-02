@@ -1,0 +1,61 @@
+{
+  "kind": "concept",
+  "name": "ZK-Language IRs",
+  "aliases": ["zero-knowledge-irs", "cairo-noir-aiken"],
+  "summary": "Zero-knowledge programming languages compile to representations designed for proof generation, not for CPU execution. The constraint surface is unusual: the target is an arithmetic circuit a SNARK or STARK prover can encode as a polynomial identity. Cairo defines its own ISA; Noir defines a constraint-graph IR; Aiken targets an existing chain's representation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Zero-knowledge programming languages compile to representations designed for **proof generation**, not for CPU execution. The constraint surface is unusual: the target is not an instruction set with registers and memory but an *arithmetic circuit* — a graph of additions, multiplications, and lookup operations over a finite field — that a SNARK or STARK prover can encode as a polynomial identity.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Cairo language architecture", "url": "https://www.starknet.io/cairo-book/ch201-architecture.html" }
+      ]
+    },
+    {
+      "id": "cairo-casm",
+      "title": "Cairo CASM — custom ZK ISA",
+      "tags": ["zk", "compiler-ir", "blockchain"],
+      "content": "**Cairo** (StarkWare, 2018+) is the largest deployment, powering Starknet's L2 ZK rollup. The Cairo language compiles via **Sierra** (Safe Intermediate Representation) to **CASM** (Cairo Assembly), a custom **ZK-friendly ISA** designed from scratch for STARK proof generation rather than CPU execution.\n\nCairo's distinctive choice is to define its own ISA rather than compile to a general arithmetic circuit: the ISA's instruction set is small (~10 ops including `assert_eq`, `call`, `ret`, `jmp`, memory operations), and every program execution becomes a sequence of trace cells the prover can polynomial-encode efficiently. The Cairo VM executes CASM both for testing and as the substrate the prover proves about.",
+      "refs": [],
+      "sources": [
+        { "label": "Cairo language home", "url": "https://www.cairo-lang.org/about-cairo/" }
+      ]
+    },
+    {
+      "id": "noir-acir",
+      "title": "Noir ACIR — backend-agnostic constraint IR",
+      "tags": ["zk", "compiler-ir"],
+      "content": "**Noir** (Aztec Labs, 2022+) is a Rust-flavoured ZK DSL whose IR is **ACIR** (Abstract Circuit Intermediate Representation) — explicitly *not* an instruction set but a representation of arithmetic and bitwise constraints plus calls to predefined \"black-box\" gadgets (Pedersen hash, range checks, hash functions). ACIR is proving-system-agnostic: a Noir program compiles once to ACIR, and any ACIR-compatible proving backend (PLONK, Honk, UltraGroth, etc.) can consume it. This is closer in spirit to LLVM IR (one frontend, many backends) than to Cairo's bespoke ISA.",
+      "refs": [],
+      "sources": [
+        { "label": "Noir compiler repository", "url": "https://github.com/noir-lang/noir" }
+      ]
+    },
+    {
+      "id": "aiken-uplc",
+      "title": "Aiken UPLC — target an existing chain IR",
+      "tags": ["zk", "compiler-ir", "blockchain"],
+      "content": "**Aiken** (Cardano, 2023+) compiles to **UPLC** (Untyped Plutus Core), the Cardano blockchain's existing on-chain script representation. Aiken provides a typed, Rust-flavoured surface compiling to UPLC, which is itself a small lambda-calculus-based IR Cardano nodes execute and verify. The choice of UPLC as target rather than a custom ISA reflects ecosystem constraints (the chain's verifier must validate every script, so the language must compile to whatever the chain accepts).",
+      "refs": []
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": ["compiler-design"],
+      "content": "The design lesson cuts across blockchain/ZK design: **the IR target shapes the language frontend** more directly than in conventional compilers. Cairo defined a custom ISA to optimise proof costs; Noir defined a constraint-graph IR to be backend-agnostic; Aiken accepted an existing chain's IR and built a typed frontend on top. For a language designer in any constraint-target domain (ZK, FHE, MPC, hardware synthesis), these three points span the design space: define your own target ISA, define a target-agnostic constraint IR, or compile to an existing target's representation and add typing/ergonomics on top.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Cairo language architecture", "url": "https://www.starknet.io/cairo-book/ch201-architecture.html" },
+    { "label": "Cairo language home", "url": "https://www.cairo-lang.org/about-cairo/" },
+    { "label": "Noir language", "url": "https://noir-lang.org/" },
+    { "label": "Noir compiler repository", "url": "https://github.com/noir-lang/noir" },
+    { "label": "Aiken language", "url": "https://aiken-lang.org/" }
+  ]
+}

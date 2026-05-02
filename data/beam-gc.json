@@ -1,0 +1,36 @@
+{
+  "kind": "runtime",
+  "name": "Erlang/BEAM — Per-Process Heaps",
+  "aliases": ["BEAM GC", "Erlang GC", "Erlang/OTP GC"],
+  "summary": "Each lightweight process owns a private generational copying (Cheney-style) heap; messages are deep-copied across heaps so no inter-process references exist, eliminating any global GC pause.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "actor-local-gc", "generational-gc", "copying-gc", "cheney", "erlang", "beam", "production"],
+      "content": "Each lightweight Erlang process owns a private generational copying (Cheney-style) heap; messages are deep-copied across heaps so no inter-process references exist, eliminating any global GC pause.\n\nProduction for decades; the model many actor/ML runtimes (Pony, Akka tuning) emulate. Per-process heaps make the generational hypothesis *less* relevant: the dominant reclamation mechanism is process death, not generational age.",
+      "refs": [
+        { "target": "garbage-collection#actor-and-domain-collectors", "type": "instance-of" },
+        { "target": "actors", "type": "complements" },
+        { "target": "iso-gc", "type": "design-inspired" },
+        { "target": "crgc", "type": "complements" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Per-process generational copying",
+      "tags": ["copying-gc", "cheney", "generational-gc", "actor-local-gc"],
+      "content": "Per-process generational semi-space copying with `fullsweep_after` counter (default 65535) — major collections almost never run; **process death reclaims memory in O(1) with no scan/compaction**.\n\nHeap binaries (≤64 B) live on the process heap; **large refc binaries** live in a globally reference-counted heap shared across processes. `on_heap` / `off_heap` message-queue tuning trades sender-side fragment allocation against receiver-side young-heap pressure.\n\nThe key property: because no inter-process reference can exist (messages are deep-copied), there is no global root scan and no synchronisation between collectors of different processes."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Process lifecycle as memory management primitive",
+      "tags": ["actor-local-gc", "isolation", "beam"],
+      "content": "Per-process heaps make the generational hypothesis *less* relevant: the dominant reclamation mechanism is process death, not generational age. The lesson: **if a runtime owns the actor model, it can build memory management around process lifecycles instead of object lifecycles**.\n\nThis is the architectural pattern that Iso (request-private GC, PLDI 2025) brought to Java: each request gets its own heap region, reclaimed wholesale on completion. The same pattern shows up in OCaml 5's per-domain minor heaps (with a shared major heap as the fallback for cross-domain data) and in research like CRGC's actor-local heaps with fault recovery."
+    }
+  ],
+  "sources": [
+    { "label": "BEAM garbage collection", "url": "https://www.erlang.org/doc/apps/erts/garbagecollection.html" },
+    { "label": "Erlang efficiency guide — processes", "url": "https://erlang.org/doc/efficiency_guide/processes.html" }
+  ]
+}

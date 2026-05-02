@@ -1,0 +1,48 @@
+{
+  "kind": "language",
+  "name": "Cyclone — Safe C with Explicit Regions",
+  "aliases": ["cyclone-language", "cyclone-c"],
+  "summary": "Grossman, Morrisett, Jim, Hicks, Wang, Cheney's Cyclone (PLDI 2002) is a safe C dialect with explicit, lexically-scoped region annotations on pointer types. Pointer types int*ρ are parameterised by region variables; a LIFO discipline on region lifetimes induces an outlives relation that becomes a sound subtyping rule. The canonical 'explicit regions, modest annotation cost' reference and direct ancestor of Rust's lifetime annotations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cyclone", "c-dialect", "region-based", "lifetime-region"],
+      "content": "Grossman, Morrisett, Jim, Hicks, Wang, Cheney's **Cyclone** (PLDI 2002) is a safe C dialect with explicit, lexically-scoped region annotations on pointer types. Pointer types `int*ρ` are parameterised by region variables; a LIFO discipline on region lifetimes induces an **outlives** relation that becomes a sound subtyping rule. Existential region bounds let closures and ADTs hide their captured region while still proving non-dangling.\n\nCyclone is the canonical \"explicit regions, modest annotation cost\" reference and the direct ancestor of Rust's lifetime annotations. Status (as of 2026-04): no longer actively developed as a language, but its design vocabulary (region variables, outlives, existential regions) is the lineage that lives on through Rust's borrow checker.",
+      "refs": [
+        { "target": "region-based-memory#overview", "type": "instance-of" },
+        { "target": "borrowing#lifetimes-and-scope", "type": "predecessor-of" }
+      ],
+      "sources": [
+        { "label": "Cyclone regions paper (PLDI 2002)", "url": "https://www.cs.umd.edu/projects/cyclone/papers/cyclone-regions.pdf" }
+      ]
+    },
+    {
+      "id": "annotation-burden",
+      "title": "Annotation burden and bidirectional checking",
+      "tags": ["cyclone", "type-system", "region-polymorphism", "outlives", "subtyping"],
+      "content": "The annotation burden was empirically tractable: porting legacy C, only ~6% of an 8% changed-line set were region annotations. Cyclone's algorithm is **bidirectional type-checking with effect inference** — not full Hindley-Milner reconstruction. A LIFO region stack supports static reasoning about which pointer types may safely outlive which scopes; existential region bounds let library types abstract over the region of captured data without exposing it to clients.\n\nThe fact that ~94% of changed lines were not region-related is one of the data points cited by language designers when arguing that explicit lifetime annotations need not dominate code.",
+      "refs": [],
+      "sources": [
+        { "label": "Cyclone online manual — regions chapter", "url": "https://www.cs.cornell.edu/Projects/cyclone/online-manual/main-screen008.html" }
+      ]
+    },
+    {
+      "id": "tracked-pointers",
+      "title": "Unique and reference-counted tracked pointers (2006)",
+      "tags": ["cyclone", "ownership", "reference-counting"],
+      "content": "Tracked unique/RC pointers were added in the 2006 Science of Computer Programming follow-up paper, extending Cyclone beyond pure region-based reasoning. **Unique pointers** carry a one-of-a-kind ownership obligation — closer in spirit to a linear/affine type — and **reference-counted pointers** add a runtime owner-count for cases where lexical region scope is too restrictive.\n\nThis combination — explicit regions for the common case, tracked unique pointers for the cases that don't fit — anticipates the design point Rust later adopted: lifetimes for stack-shaped data, `Box`/`Rc`/`Arc` for cases that need a non-lexical owner.",
+      "refs": [
+        { "target": "ownership#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Cyclone tracked pointers (SCP 2006)", "url": "https://www.cs.umd.edu/projects/PL/cyclone/scp.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Cyclone regions paper (PLDI 2002)", "url": "https://www.cs.umd.edu/projects/cyclone/papers/cyclone-regions.pdf" },
+    { "label": "Cyclone tracked pointers (SCP 2006)", "url": "https://www.cs.umd.edu/projects/PL/cyclone/scp.pdf" },
+    { "label": "Cyclone online manual", "url": "https://www.cs.cornell.edu/Projects/cyclone/online-manual/main-screen008.html" }
+  ]
+}

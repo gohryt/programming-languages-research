@@ -1,0 +1,44 @@
+{
+  "kind": "framework",
+  "name": "XLA and StableHLO",
+  "aliases": ["XLA", "StableHLO", "Accelerated Linear Algebra"],
+  "summary": "TensorFlow XLA: an MLIR-based compiler for tensor computations targeting CPUs, GPUs, TPUs. StableHLO: the portable, versioned operator set that frontend frameworks (JAX, PyTorch via torch.export, TensorFlow, ONNX) target as a stable interchange. SPIR-V's role for GPU shaders, applied to ML compilers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**XLA (Accelerated Linear Algebra)** is TensorFlow's compiler for tensor computations: takes a graph of tensor operations and emits optimised code for CPUs, GPUs, and TPUs. Originally tightly coupled to TensorFlow, XLA was rebuilt on MLIR and decoupled into the OpenXLA project.\n\n**StableHLO** is the portable successor to XLA's HLO: a versioned, MLIR-defined operator set that frontend frameworks (JAX, PyTorch via `torch.export`, TensorFlow, ONNX) can target as a stable interchange format, decoupling them from XLA backend evolution. StableHLO is to AI compilers what SPIR-V is to GPU compilers: a portable IR that lets frontend and backend evolve independently.",
+      "refs": [
+        { "target": "mlir#overview", "type": "uses" },
+        { "target": "spir-v#overview", "type": "analogous-to" }
+      ],
+      "sources": [
+        { "label": "TensorFlow XLA", "url": "https://www.tensorflow.org/xla" }
+      ]
+    },
+    {
+      "id": "stablehlo-design",
+      "title": "StableHLO design",
+      "tags": ["mlir", "ai", "ir"],
+      "content": "The op set is small (~150 ops), each with a precise spec covering shape inference, broadcasting semantics, and numerical behaviour. Operations are tensor-shaped: most are element-wise or reduction operations on multi-dimensional arrays, with broadcasting rules that the spec defines precisely.\n\nStatus (as of 2026-04): StableHLO is the OpenXLA-blessed exchange format, with `torch.export` to StableHLO emerging as the canonical PyTorch-to-XLA path; JAX produces StableHLO directly via `jax.export`. The frontend-decoupling matters for ecosystem health: framework releases can ship with their preferred StableHLO version, and backend releases can support a range of versions, without coordinating timelines.",
+      "refs": [],
+      "sources": [
+        { "label": "StableHLO project (OpenXLA)", "url": "https://openxla.org/stablehlo" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — versioned IR for ecosystem evolution",
+      "tags": ["compiler-architecture", "ecosystem"],
+      "content": "The lesson generalises beyond AI: **a domain with rapid hardware evolution and many frontend frameworks needs a stable mid-level IR with versioned operator semantics**, separating frontend concerns (autodiff, dynamic shapes, model authorship) from backend concerns (codegen, scheduling, kernel fusion, hardware targeting).\n\nThe split mirrors LLVM IR's role for general-purpose compilation but is specialised for tensor-graph workloads and shaped by the AI hardware diversity (NVIDIA, AMD, Apple, Google TPU, AWS Trainium, Cerebras, Groq) that no single backend can serve well.",
+      "refs": [
+        { "target": "triton#overview", "type": "complementary-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "TensorFlow XLA", "url": "https://www.tensorflow.org/xla" },
+    { "label": "StableHLO", "url": "https://openxla.org/stablehlo" }
+  ]
+}

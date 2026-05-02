@@ -1,0 +1,143 @@
+{
+  "kind": "concept",
+  "name": "Trace storage and visualization",
+  "aliases": [
+    "trace viewers",
+    "timeline rendering",
+    "flame graphs"
+  ],
+  "summary": "Downstream storage, query, and viewer layer for trace and event data — implicit in-order forests for billion-event timelines, Perfetto and Fuchsia Trace Format as universal viewers, Brendan Gregg's flame graphs and their off-CPU dual.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The downstream half of tracing: once events are captured, what data structure holds them, what wire format carries them, and what UI makes them comprehensible. The recurring design pattern across entries is **level-of-detail aggregation** — a billion events must render at 60fps when zoomed out and precisely at zoom-in, which forces pre-aggregation at write time rather than post-hoc work at read time. Flame graphs (`data/trace-storage-and-visualization#flame-graphs`) and off-CPU flame graphs (`data/trace-storage-and-visualization#off-cpu-flame-graphs`) are included here because they are visualization techniques with specific data-shape requirements, not captures in their own right.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:visualization-trace-interchange`\n- **domain**: `domain:observability`, `domain:profiling`\n- **off-cost**: `off-cost:always-on`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-sample`\n"
+    },
+    {
+      "id": "implicit-in-order-forests",
+      "title": "Implicit In-Order Forests — Billion-Event Trace Visualization",
+      "tags": [
+        "domain:observability",
+        "family:visualization-trace-interchange",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Tristan Hume developed a data structure called \"implicit in-order forests\" for rendering billion-event trace timelines at 60fps. The problem: a standard trace viewer must draw millions of rectangles when zoomed out, which overwhelms both the CPU and GPU.\n\nThe solution: pre-aggregate trace events into a tree structure where each level represents a different zoom level. When zoomed out, only the aggregated nodes at the appropriate level are drawn. When zoomed in, individual events are drawn. The tree is implicit (stored in a flat array with computed indices, no pointers) and in-order (events are arranged depth-first, matching the temporal order), giving excellent cache locality.\n\nCombined with a virtual-memory-based growable array, appends have O(log N) worst-case latency instead of O(N) for standard dynamic arrays. This makes the structure suitable for live trace recording — events can be appended in real time while the viewer renders the accumulated data.\n\nThe general principle: trace data structures should be designed for the access pattern of visualization (zoom = level-of-detail query), not for the access pattern of recording (sequential append). Pre-aggregation at write time eliminates work at read time.",
+      "sources": [
+        {
+          "url": "https://thume.ca/2021/03/14/iforests/"
+        }
+      ]
+    },
+    {
+      "id": "perfetto-fuchsia-trace-format",
+      "title": "Perfetto, Fuchsia Trace Format, and the Universal-Viewer Pattern",
+      "tags": [
+        "domain:observability",
+        "family:visualization-trace-interchange",
+        "granularity:per-event",
+        "off-cost:always-on",
+        "on-cost:medium"
+      ],
+      "content": "**Perfetto** (Google, 2018, open-source) is a production system-wide tracing platform with three layers: an instrumentation SDK, a tracing service that multiplexes producers into buffers, and a web UI that renders protobuf-formatted traces. Because the wire format is documented, kernel ftrace converters, eBPF probes, runtime events, and custom application instrumentation can all land in the same zoomable timeline.\n\nThe **Fuchsia Trace Format (FTF)** illustrates the producer-side half of the universal-viewer pattern: use a compact emission format where hot-path cost matters, then convert into Perfetto `TracePacket` or another interchange format for storage and visualization. Chrome trace JSON remains the older import-friendly path. The important distinction is capture format vs viewer format; they do not have to be identical.\n\nThe meta-insight is architectural: the tracing ecosystem is fragmented across dozens of capture tools, but they become composable if they can export to a common viewer or wire format. Perfetto plays that role for timelines, much as pprof (`data/continuous-profiling#pprof-profile-proto`) does for profiles and CTF (`data/runtime-event-pipelines#lttng-ctf`) does for structured event streams. The SQL/query side of Perfetto is covered from the debugger-analysis angle in `data/record-and-replay#perfetto-traceprocessor-perfettosql`.",
+      "sources": [
+        {
+          "url": "https://perfetto.dev/"
+        },
+        {
+          "url": "https://perfetto.dev/docs/reference/trace-packet-proto"
+        },
+        {
+          "url": "https://thume.ca/2023/12/02/tracing-methods/"
+        }
+      ]
+    },
+    {
+      "id": "flame-graphs",
+      "title": "Flame Graphs — Brendan Gregg's Alphabetical-Merge Trick",
+      "tags": [
+        "domain:profiling",
+        "family:visualization-trace-interchange",
+        "granularity:per-sample",
+        "off-cost:always-on",
+        "on-cost:medium"
+      ],
+      "content": "A flame graph (Brendan Gregg, 2011; formalized in ACM Queue / CACM 2016) renders a set of sampled stack traces as a tree of horizontal bars — leaf frames at the top, root at the bottom, bar width proportional to sample count. The visualization has become ubiquitous in profilers (perf, pprof, async-profiler, Pyroscope, Datadog), and the reason is one specific design choice: **frames at each depth are sorted alphabetically, not temporally**. This is not a default, it *is* the trick. Alphabetical ordering means that identical call paths arriving from different samples merge into one wide bar, so width becomes a direct visual analog of sample count. Without the merge, 2 million samples landing in `memcpy` via 17 different call chains would appear as 17 narrow columns you cannot see; with it, they appear as one dominant bar.\n\nThe trade-off is explicit: **temporal information is discarded**. Flame *charts* (Chrome DevTools style) keep time on the x-axis and lose the merging benefit. For \"which function dominated this trace?\" flame graphs win overwhelmingly; for \"what was the sequence of operations?\" flame charts and timeline views (`data/trace-storage-and-visualization#implicit-in-order-forests`, `data/trace-storage-and-visualization#perfetto-fuchsia-trace-format`) are the right tool.\n\nThree Gregg variants add substantial diagnostic power without changing the rendering pipeline:\n\n- **Differential flame graphs** compute two profiles (before/after), render using profile B, and color each frame by the signed delta in sample count vs profile A. Red = grew, blue = shrank. This turns regression hunting into visual diff — much more scalable than comparing two `perf report` outputs side-by-side.\n- **Icicle graphs** flip the root to the top and the leaves to the bottom. Same data, inverted orientation; useful when the dominant signal is near the root (which subsystem's entry point consumes the most time).\n- **Sandwich view** (popularized by speedscope): pick a function, render all *callers* above and all *callees* below. Derived from the same folded-stack data as the main flame graph.\n\nModern renderers (speedscope, pprof `-http`, flamegraph.com, Grafana Phlare, Perfetto) all re-implement the same stack-collapse + alphabetical-sort + SVG-or-Canvas-rectangle recipe. The input to every one of them is Gregg's \"folded stack\" format — one stack per line, frames separated by semicolons, trailing count. That this plain-text format survived for 15 years as the interchange standard is itself a design insight.",
+      "sources": [
+        {
+          "url": "https://www.brendangregg.com/flamegraphs.html"
+        },
+        {
+          "url": "https://queue.acm.org/detail.cfm?id=2927301"
+        },
+        {
+          "url": "https://github.com/brendangregg/FlameGraph"
+        },
+        {
+          "url": "https://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html"
+        }
+      ]
+    },
+    {
+      "id": "off-cpu-flame-graphs",
+      "title": "Off-CPU Flame Graphs — The Dual of On-CPU Sampling",
+      "tags": [
+        "domain:profiling",
+        "ebpf",
+        "family:visualization-trace-interchange",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "On-CPU flame graphs (`data/trace-storage-and-visualization#flame-graphs`) sample *running* threads at a fixed frequency, so they show where a program *spends* CPU. They cannot see anything blocked: lock contention, synchronous I/O waits, scheduler latency, `select`/`epoll` stalls. These are invisible because a blocked thread is not on a CPU to be sampled.\n\n**Off-CPU analysis** (Brendan Gregg) swaps the data source. Instead of sampling running threads, it instruments the scheduler's context-switch path and records *blocked* time. The canonical eBPF implementation attaches to `finish_task_switch()` — which runs in the context of the *next* thread, so you have the departing thread's TID plus a high-resolution timestamp, and the departing thread's stack hasn't moved since it blocked. A single probe captures both the off-CPU duration and the stack that caused the block. In-kernel aggregation into a BPF map (key = stack-id, value = summed nanoseconds) keeps only summaries — essential because scheduler events scale with load (100K–1M/s on a busy machine) and dumping every event is prohibitive.\n\nThe resulting \"off-CPU flame graph\" uses the same rendering as `data/trace-storage-and-visualization#flame-graphs` but with width = blocked nanoseconds, not CPU nanoseconds. The two visualizations are duals: together, they account for every moment in every thread's life — either on-CPU doing work, or off-CPU waiting for something. A common production finding is that a service's p99 latency is dominated by off-CPU time (a single slow-acquired lock or a `read()` that unexpectedly blocked), which a traditional on-CPU profiler reports as nothing at all.\n\nThe caveat Gregg emphasizes: off-CPU and on-CPU widths are not directly comparable. On-CPU time has a fixed budget of N seconds × M cores per wall-clock second; off-CPU time is unbounded (a thread can be blocked for arbitrary duration). The two flame graphs should be read independently, not subtracted or merged. Wakeup-stack analysis (who unblocked this thread?) is the natural follow-up and remains an active area.",
+      "sources": [
+        {
+          "url": "https://www.brendangregg.com/offcpuanalysis.html"
+        },
+        {
+          "url": "https://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html"
+        },
+        {
+          "url": "http://brendangregg.com/blog/2016-01-20/ebpf-offcpu-flame-graph.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://thume.ca/2021/03/14/iforests/"
+    },
+    {
+      "url": "https://perfetto.dev/"
+    },
+    {
+      "url": "https://perfetto.dev/docs/reference/trace-packet-proto"
+    },
+    {
+      "url": "https://thume.ca/2023/12/02/tracing-methods/"
+    },
+    {
+      "url": "https://www.brendangregg.com/flamegraphs.html"
+    },
+    {
+      "url": "https://queue.acm.org/detail.cfm?id=2927301"
+    },
+    {
+      "url": "https://github.com/brendangregg/FlameGraph"
+    },
+    {
+      "url": "https://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html"
+    },
+    {
+      "url": "https://www.brendangregg.com/offcpuanalysis.html"
+    },
+    {
+      "url": "https://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html"
+    },
+    {
+      "url": "http://brendangregg.com/blog/2016-01-20/ebpf-offcpu-flame-graph.html"
+    }
+  ]
+}

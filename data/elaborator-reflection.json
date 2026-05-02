@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Elaborator Reflection and Tactics",
+  "aliases": ["elab-reflection", "tactics", "metaprogramming-reflection"],
+  "summary": "Exposes parts of the elaboration engine to user code so tactics can construct terms, inspect goals, and manipulate proof states. Idris and Lean are the canonical references: the proof state exposed to tactics includes goal types, incomplete proof terms, context, and open unification problems.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Elaborator reflection exposes parts of the elaboration engine to user code so tactics can construct terms, inspect goals, and manipulate proof states.\n\nIdris documentation describes elaboration as desugaring surface Idris into a smaller TT core, with holes and guesses that elaboration programs can control; the proof state exposed to tactics includes goal types, incomplete proof terms, context, and open unification problems. Lean's metaprogramming framework exposes APIs to internal structures and tactic state, enabling tactics to synthesize expressions.",
+      "refs": [
+        { "target": "dependent-types#overview", "type": "extends" },
+        { "target": "typed-holes#overview", "type": "manipulates" },
+        { "target": "typed-elaboration#overview", "type": "extends" }
+      ],
+      "sources": [
+        { "label": "Idris elaborator reflection", "url": "https://docs.idris-lang.org/en/latest/elaboratorReflection/elabReflection.html" },
+        { "label": "Idris tactics and proof state", "url": "https://docs.idris-lang.org/en/latest/elaboratorReflection/tactics.html" },
+        { "label": "Lean metaprogramming framework", "url": "https://lean-lang.org/papers/tactic.pdf" }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": ["dependent-types", "metaprogramming"],
+      "content": "Elaborator reflection turns the type checker into a *programmable* interface: a tactic can introspect the current proof state, run heuristics, attempt unifications, and synthesize the missing term. This is what lets dependently-typed languages support proof automation without baking every heuristic into the kernel.\n\nFor language designers, the trade-off is **stability versus extensibility**: a reflected elaborator API is a public surface that user-written tactics depend on, so kernel changes must consider tactic compatibility. Idris's elaborator reflection went through several iterations as the language stabilised; Lean's `MetaM`/`TacticM` monads are an active area of redesign across the Lean 4 transition. The lesson is that exposing the elaborator is powerful but commits to keeping the API stable."
+    }
+  ],
+  "sources": [
+    { "label": "Idris elaborator reflection", "url": "https://docs.idris-lang.org/en/latest/elaboratorReflection/elabReflection.html" },
+    { "label": "Lean metaprogramming framework", "url": "https://lean-lang.org/papers/tactic.pdf" }
+  ]
+}

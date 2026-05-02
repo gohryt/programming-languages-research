@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Kotlin K2 / FIR",
+  "aliases": ["k2-compiler", "kotlin-fir"],
+  "summary": "JetBrains' K2 compiler (stable in Kotlin 2.0, May 2024) is a complete frontend rewrite. Where K1 used IntelliJ's PSI, K2 introduces FIR (Frontend Intermediate Representation) — a purpose-built IR for the compiler frontend separate from IDE PSI. 1.7×–2× faster compilation, better inference, dramatically improved smart casts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "JetBrains' **K2 compiler** (stable in Kotlin 2.0, May 2024; available behind a flag since Kotlin 1.7) is a complete frontend rewrite of Kotlin's compiler. Where the original frontend (henceforth \"K1\") was structured around IntelliJ's PSI (Program Structure Interface) — a syntax-tree-with-resolved-bindings shape inherited from IntelliJ's general-purpose Java/Kotlin tooling — K2 introduces **FIR (Frontend Intermediate Representation)** as a purpose-built IR for the compiler frontend, separate from the IDE's PSI. JetBrains reports 1.7×–2× faster compilation on average, with substantially better type-inference precision and dramatically improved smart-cast behaviour.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "abstract-syntax-trees#overview", "type": "succeeds" }
+      ],
+      "sources": [
+        { "label": "Kotlin K2 compiler migration guide", "url": "https://kotlinlang.org/docs/k2-compiler-migration-guide.html" }
+      ]
+    },
+    {
+      "id": "compiler-vs-ide-split",
+      "title": "Separating compiler IR from editor PSI",
+      "tags": ["compiler-ir", "ide", "design"],
+      "content": "The architectural change worth recording is the *separation of editor PSI from compiler IR*. Pre-K2 Kotlin used PSI throughout the compiler frontend, which meant compiler-internal data structures were inherited from IDE concerns: nodes carry editor-tracking metadata, are mutable, and have lifecycles tied to editor sessions.\n\nK2 introduces an immutable, build-tool-friendly FIR with explicit phases (raw FIR → resolved FIR → IR for backend), each stage adding semantic information without modifying earlier stages. The compiler's inference algorithms — historically the slowest part of K1 because they re-traversed the PSI graph — operate on the FIR's denser representation directly.",
+      "refs": [
+        { "target": "salsa-incremental#overview", "type": "shares-pattern-with" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Lesson: avoid sharing data structures with editor tooling",
+      "tags": ["compiler-design", "tooling"],
+      "content": "The lesson generalises: **compiler frontends shared with IDE tooling pay an architectural tax that an IDE-independent compiler IR can avoid**. K2's separation mirrors a similar move in rust-analyzer's architecture (`data/salsa-incremental`) where the IDE has its own data structures for navigation while the type checker runs against a separate query graph. For language designers, the relevant question is whether to share data structures with editor tooling (lower upfront cost, accumulates pain) or design an IR-first frontend with editor support layered on top (higher upfront cost, scales better).\n\nStatus (as of 2026-04): K2 is the default Kotlin compiler for all builds since 2.0; K1 is deprecated. JetBrains is migrating IntelliJ's own Kotlin support to K2 incrementally — IDE-side adoption lagged the compiler-side rollout because IntelliJ's existing PSI consumers (refactoring, find-usages, navigation) had to be updated for FIR-derived data.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Kotlin K2 compiler migration guide", "url": "https://kotlinlang.org/docs/k2-compiler-migration-guide.html" },
+    { "label": "JetBrains blog — The K2 Compiler Is Going Stable in Kotlin 2.0", "url": "https://blog.jetbrains.com/kotlin/2023/02/k2-kotlin-2-0/" },
+    { "label": "Baeldung — K2 compiler guide", "url": "https://www.baeldung.com/kotlin/k2-compiler-guide" }
+  ]
+}

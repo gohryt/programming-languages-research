@@ -1,0 +1,38 @@
+{
+  "kind": "language",
+  "name": "Ruby",
+  "aliases": [],
+  "summary": "Dynamic object-oriented language with lightweight runtime loading: require/load executes a file, classes and modules are open and reopenable, and monkey-patching is normal; module boundaries function more as convention than hard encapsulation, weakening static analyzability in exchange for REPL-friendly flexibility.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ruby is a dynamic object-oriented language designed by Yukihiro Matsumoto, with lightweight runtime loading and culturally permissive open-class semantics. The reference implementation is MRI/CRuby; alternatives include JRuby and TruffleRuby. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "require-load-and-soft-boundaries",
+      "title": "require / load and soft module boundaries",
+      "tags": ["ruby", "module-systems", "imports"],
+      "content": "Ruby's `require` and `load` model encourages a culture where module boundaries are relatively soft. Files are loaded, classes and modules are opened or reopened, and **monkey patching** is normal enough that visibility boundaries often function more as convention than hard encapsulation. `require 'foo'` executes `foo.rb` once and remembers it; `load 'foo.rb'` re-executes every time (used for dev workflows). `require_relative` resolves relative to the calling file rather than the load path.\n\nRuby's `module` keyword declares a namespace and mixin source; `class` declares a class. Both are open — re-declaring `class String` or `module Enumerable` adds methods to the existing object. This is productive in small systems and REPL-heavy workflows, but it weakens the guarantees that tooling and architecture can rely on.",
+      "refs": [
+        { "target": "import-semantics#import-time-execution", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Ruby Kernel#require", "url": "https://docs.ruby-lang.org/en/master/Kernel.html#method-i-require" }
+      ]
+    },
+    {
+      "id": "tradeoffs-and-design-lessons",
+      "title": "Trade-offs and design lessons",
+      "tags": ["ruby", "design-guidance", "tradeoffs"],
+      "content": "Ruby is a useful cautionary reference point for language design. It shows that a language can survive with highly flexible runtime loading, but that such flexibility tends to weaken the compiler and toolchain's ability to reason about program structure in advance.\n\nFor a language designer, the lesson is that **monkey-patching and open classes are downstream consequences of the loader model**. If imports are runtime events with no enforced visibility, then any loaded code can reach into and modify any other loaded code's state. Closing this off requires either a stricter import semantics (Rust, Go) or an explicit visibility-and-encapsulation discipline (Ada packages, ML signatures, Swift access controls)."
+    }
+  ],
+  "sources": [
+    { "label": "Ruby Kernel#require", "url": "https://docs.ruby-lang.org/en/master/Kernel.html#method-i-require" }
+  ]
+}

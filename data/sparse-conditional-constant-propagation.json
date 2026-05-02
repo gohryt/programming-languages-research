@@ -1,0 +1,65 @@
+{
+  "kind": "concept",
+  "name": "Sparse Conditional Constant Propagation",
+  "aliases": [
+    "SCCP",
+    "Wegman-Zadeck SCCP"
+  ],
+  "summary": "Wegman and Zadeck (TOPLAS 1991) combined constant propagation with dead-branch elimination in a single lattice-based analysis. By propagating lattice values *through* conditional branches and pruning unreachable sides when the condition is a known constant, SCCP discovers constants that conventional analyses miss.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Wegman and Zadeck (TOPLAS 1991) combined constant propagation with dead-branch elimination in a single lattice-based analysis. The key insight: traditional constant propagation analyses *all* branches, even those provably unreachable. By propagating lattice values *through* conditional branches and marking one side unreachable when the condition is a known constant, SCCP discovers constants that conventional analysis misses.\n\nThe analysis operates on a three-point lattice (⊥ \"undef\" → constant → ⊤ \"overdefined\") with a worklist. When a constant condition selects a branch, the unselected branch is pruned from consideration, potentially making more instructions dead. LLVM's `-sccp` pass is a direct implementation and runs early in the optimisation pipeline because it feeds so many downstream passes.",
+      "refs": [
+        {
+          "target": "ssa#overview",
+          "type": "operates-on"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Wegman-Zadeck SCCP (TOPLAS 1991)",
+          "url": "https://dl.acm.org/doi/10.1145/103135.103136"
+        }
+      ]
+    },
+    {
+      "id": "lattice-and-worklist",
+      "title": "Lattice and worklist",
+      "tags": [
+        "compiler",
+        "optimization",
+        "dataflow"
+      ],
+      "content": "Each SSA value receives a lattice element: ⊥ (undef, not yet visited), `c` (a known constant), or ⊤ (overdefined, not provably constant). Each CFG edge is marked reachable or unreachable.\n\nThe algorithm maintains two worklists: instructions to re-evaluate, and edges to mark reachable. Initialisation: all instructions and edges are at ⊥/unreachable except the entry block's edges and parameters of the entry block (which are ⊤ unless callers are known).\n\nWhen an instruction is evaluated and its inputs are all constant, the output is the computed constant. When a branch's condition is a known constant, only the selected outgoing edge is marked reachable. When a φ-function's input arrives along a newly reachable edge, the φ may be re-evaluated and its output may transition to constant or to ⊤.\n\nFixed point is reached when no further transitions are possible. The result: every value is annotated with its lattice element, and every dead branch is identified for removal by a follow-up pass.",
+      "refs": []
+    },
+    {
+      "id": "interaction-with-other-passes",
+      "title": "Interaction with other optimisation passes",
+      "tags": [
+        "compiler",
+        "pass-ordering"
+      ],
+      "content": "SCCP runs early because the constants and dead branches it finds enable many other optimisations. Removed branches simplify the CFG, which improves dominator tree quality, which improves LICM and GVN. Folded constants enable strength reduction. Dead-branch elimination shrinks the program, reducing later-pass cost.\n\nThe combined-analysis design is the lesson: doing constant propagation and unreachable-branch detection in lockstep finds more than running each separately and iterating. The same principle motivates more elaborate combined analyses (e.g., conditional propagation + value-range analysis + induction-variable analysis), each surfacing facts the others can use.",
+      "refs": [
+        {
+          "target": "global-value-numbering#production-usage",
+          "type": "feeds"
+        },
+        {
+          "target": "licm#overview",
+          "type": "feeds"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "SCCP — Wegman-Zadeck",
+      "url": "https://dl.acm.org/doi/10.1145/103135.103136"
+    }
+  ]
+}

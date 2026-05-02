@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Nim ARC / ORC — Hooks, Sink/Lent, YRC Threadsafe Cycle Collector",
+  "aliases": ["nim-arc", "nim-orc", "nim-yrc"],
+  "summary": "Nim's `--gc:arc` desugars `ref` into hook-driven RC + move semantics; `--gc:orc` adds a Bacon-style trial-deletion cycle collector. Hooks (`=destroy`, `=copy`, `=sink`, `=trace`, `=deepcopy`) plus `sink`/`lent` parameters drive copy-elision and ownership transfer. The proposed YRC threadsafe cycle collector (PR #25495) is an active design effort.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["reference-counting", "automatic-rc", "arc", "cycle-collector", "nim", "production"],
+      "content": "Nim's `--gc:arc` desugars `ref` into hook-driven RC + move semantics; `--gc:orc` adds a Bacon-style cycle collector running on suspected cyclic types. `.cursor` and `.acyclic` annotations let the user statically prove an edge can't form a cycle, removing it from ORC's trial-deletion roots — a hand-written escape hatch.\n\nARC alone leaks cycles; ORC catches them via Bacon trial-deletion. ARC is competitive with manual C in seq-heavy code; ORC adds latency-stable cycle scans. The pair give Nim a unified RC-with-optional-cycle-collection model that is configurable per-build.\n\nStatus (as of 2026-04): ARC and ORC are production for several Nim 1.x and 2.x releases; YRC (PR #25495) is an active design effort, not established Nim behaviour.",
+      "refs": [
+        { "target": "reference-counting#nim-arc-orc-yrc", "type": "covered-by" }
+      ],
+      "sources": [
+        { "label": "Nim destructors", "url": "https://nim-lang.github.io/Nim/destructors.html" },
+        { "label": "Nim RFC #177 ARC/ORC design", "url": "https://github.com/nim-lang/RFCs/issues/177" }
+      ]
+    },
+    {
+      "id": "hooks-and-sink-lent",
+      "title": "Hooks, sink and lent parameters",
+      "tags": ["compile-time-rc", "inc-elision", "in-place-update", "nim", "borrow-inference"],
+      "content": "Type-bound hooks let the programmer customise RC traffic without touching the compiler:\n\n- `=destroy(x)` — runs at end-of-life; default frees the memory and recurses into fields.\n- `=copy(dst, src)` — runs for assignments that cannot be rewritten as moves; default does a deep `inc`-bumping copy.\n- `=sink(dst, src)` — runs for assignments where `src` is a last use; default moves the bits and skips `inc`.\n- `=trace(x, env)` — for ORC, walks reachable references during cycle scans.\n- `=deepcopy(x)` — explicit user-requested deep copy.\n\nControl-flow `lastReadOf` analysis converts copies to moves wherever possible, so the `=sink` hook fires far more often than `=copy` in idiomatic code. Parameter modes complete the picture: `sink T` parameters take ownership (the callee must `=destroy` or move-out), and `lent T` returns a hidden borrow that emits no destructor at the call site. The combination gives Nim a full move/borrow vocabulary on top of the RC substrate.",
+      "refs": [
+        { "target": "borrowing#overview", "type": "related" },
+        { "target": "ownership#tradeoffs", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Nim destructors", "url": "https://nim-lang.github.io/Nim/destructors.html" }
+      ]
+    },
+    {
+      "id": "orc-cycle-collector-and-yrc",
+      "title": "ORC trial-deletion and the YRC threadsafe proposal",
+      "tags": ["cycle-collector", "thread-safe-cycle-collector", "atomic-rc", "non-atomic-rc", "nim", "experimental"],
+      "content": "ORC adds a Bacon-style trial-deletion cycle collector. Suspected-cyclic types (those whose `=trace` hook is non-trivial and whose graph cannot be statically proved acyclic) accumulate roots when their RC drops without reaching zero; periodically the collector runs trial deletion: tentatively remove each root's contribution, walk the subgraph, and reclaim everything that becomes unreachable. `.cursor` and `.acyclic` annotations exclude edges from the suspect set, shrinking the work the collector has to do.\n\nThe proposed **YRC threadsafe cycle collector** (PR #25495) extends ORC to multi-threaded heaps. It explores striped per-thread queues for acyclic atomic RC plus a single global Bacon collector for cyclic refs, with deferred RC updates and TLA+ model-checked invariants. The TLA+ work is notable: Nim's mainline ARC/ORC is heavily tested but not formally modelled, and YRC's authors are using model checking to convince themselves the deferred-update protocol is race-free before merging.\n\nStatus (as of 2026-04): YRC is active design / implementation effort, not established Nim behaviour. If it lands, Nim will join Lean 4 and Roc in the small group of languages with a thread-safe compile-time-RC story; the alternative — atomic ops on every inc/dec everywhere — is what Swift pays.",
+      "refs": [
+        { "target": "reference-counting#nim-arc-orc-yrc", "type": "related" },
+        { "target": "garbage-collection#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Nim YRC threadsafe cycle collector PR", "url": "https://github.com/nim-lang/Nim/pull/25495" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Nim destructors", "url": "https://nim-lang.github.io/Nim/destructors.html" },
+    { "label": "Nim RFC #177 ARC/ORC design", "url": "https://github.com/nim-lang/RFCs/issues/177" },
+    { "label": "Nim YRC threadsafe cycle collector PR", "url": "https://github.com/nim-lang/Nim/pull/25495" }
+  ]
+}

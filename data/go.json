@@ -1,0 +1,83 @@
+{
+  "kind": "language",
+  "name": "Go",
+  "aliases": ["golang"],
+  "summary": "Statically typed language designed for simplicity, compilation speed, concurrency (G/M/P goroutines), and operational clarity; canonical reference for DAG-enforced packages, capitalization-determines-export, Semantic Import Versioning, hybrid-barrier tricolor concurrent GC, and unconditional frame pointers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Go is a statically typed programming language designed around simplicity, fast builds, explicit dependency structure, and practical concurrency. It is frequently studied as a language that intentionally trades expressive power for operational clarity and toolability.\n\nGo 1.0 shipped in March 2012, designed by Robert Griesemer, Rob Pike, and Ken Thompson at Google. Status (as of 2026-04): Go 1.25+ is production-stable; deployed at huge scale across Docker, Kubernetes, Hugo, Caddy, Terraform, Prometheus, etcd, CockroachDB, Cloudflare's edge infrastructure, Twitch, and most cloud-native infrastructure. The release cadence is 6-month semver, with backwards compatibility prioritized so heavily that the Go 1 compatibility promise has held for 13+ years.",
+      "refs": []
+    },
+    {
+      "id": "compiler",
+      "title": "Compiler and build model",
+      "tags": ["compiler", "tooling", "incrementality"],
+      "content": "Go emphasizes straightforward compilation, deterministic builds, and a relatively simple dependency structure. Its ecosystem is notable for tightly integrating the language, compiler, standard tooling, and module workflow.\n\nThe `gc` compiler (the standard Go compiler) is a native-code compiler (not LLVM-based) with its own SSA backend. Compile speed is a first-class concern — Go programs typically compile orders of magnitude faster than equivalent C++ code, partly because the language design eschews features that demand expensive compilation (no templates, no header preprocessing, simple module graph). `gccgo` is an alternative GCC-based frontend; **TinyGo** targets embedded platforms via LLVM. The `go` command is the integrated tool: `go build`, `go test`, `go vet`, `go fmt`, `go doc`, `go install`, `go run` all share one CLI.",
+      "refs": []
+    },
+    {
+      "id": "concurrency",
+      "title": "Concurrency model",
+      "tags": ["concurrency", "runtime"],
+      "content": "Go is widely referenced for its goroutine-and-channel concurrency model, which couples lightweight runtime scheduling with language-level communication primitives. It provides a strong comparison point for languages choosing between threads, tasks, channels, and actor-style isolation.\n\nThe **G/M/P scheduling model** is canonical: goroutines are Gs, OS threads are Ms, and Ps represent the resources and right to execute Go code (`GOMAXPROCS` Ps). M:N scheduling with work-stealing across Ps. Go 1.14 (February 2020) added asynchronous preemption via SIGURG so SIGPROF samples can land anywhere, not just at cooperative safepoints — sidestepping the safepoint-bias problem older managed runtimes face. Channels are CSP-style: unbuffered for rendezvous, bounded for backpressure, unbuffered/buffered/`select` patterns for coordination. The Go race detector (`go build -race`) is ThreadSanitizer with Go-specific happens-before rules. **Go 1.25's `FlightRecorder` API** (released 2025-08) provides a fixed-size in-memory circular buffer holding the last ~N seconds of runtime events.",
+      "refs": [
+        { "target": "ownership#tradeoffs", "type": "contrasts-with" },
+        { "target": "channels#overview", "type": "example" },
+        { "target": "virtual-threads#mn-scheduling-model", "type": "related" },
+        { "target": "work-stealing#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "packaging",
+      "title": "Modules and packaging",
+      "tags": ["packaging", "modules", "tooling"],
+      "content": "Go's module and package system is a strong example of a language where import structure, build determinism, and distribution identity are deliberately aligned. It is often used as a reference point in discussions about cycle policy, module identity, and reproducibility.\n\nThe split: a **module** is a collection of packages released, versioned, and distributed together; a **package** is the compilation and namespace unit. Imports combine them: the module path supplies the prefix, the package directory supplies the suffix. Imports are fully static — the compiler reads import paths from source and builds a DAG of package dependencies. **No central registry**: module paths are URLs (typically `github.com/user/repo`); the Go tool fetches directly from the version-control host or a configured proxy (`proxy.golang.org`). **`sum.golang.org`** maintains a public log of every known module version's hash. **`go mod vendor`** is the most mature vendoring story in any major ecosystem.",
+      "refs": [
+        { "target": "package-management#overview", "type": "example" },
+        { "target": "module-identity#identity-models", "type": "example" }
+      ]
+    },
+    {
+      "id": "package-dag-and-cycles",
+      "title": "Package DAG and cycle policy",
+      "tags": ["modules", "dependency-graph", "cycles"],
+      "content": "Go is a strong example of a language that treats dependency acyclicity as a major design constraint. Its package DAG policy is frequently discussed because it affects architecture, build performance, and the shape of refactoring strategies.\n\n**Import-cycle prohibition** is structural: the package graph must be acyclic. Programmers dislike cycles being rejected, but the discipline pays off: cleaner compilation scheduling, simpler initialization semantics, easier tooling, and faster builds. Visibility is convention-based — identifiers beginning with an uppercase letter are exported; lowercase are package-private. Lightweight, but depends on naming convention rather than explicit declarations.",
+      "refs": [
+        {
+          "target": "module-systems#dependency-graphs-and-cycles",
+          "type": "example"
+        }
+      ]
+    },
+    {
+      "id": "module-path-and-identity",
+      "title": "Module path and identity — Semantic Import Versioning",
+      "tags": ["identity", "packaging", "modules"],
+      "content": "Go is also a strong comparative case because import paths and module identity are deliberately close to distribution identity. This makes it a useful reference point whenever repository location, namespace, and package resolution are discussed together.\n\n**Semantic Import Versioning (SIV)** (Russ Cox, 2018) bakes major version into the module path itself for v2+. So `github.com/foo/bar/v2/baz` is a different import than `github.com/foo/bar/baz`. The upside is reproducibility and clarity; the downside is that package-manager policy leaks into source identity. **Minimal Version Selection (MVS)** is Go's resolution algorithm: each module specifies the minimum version of each dependency it needs; the resolver picks the minimum version that satisfies every requirement. No SAT solver, no version range arithmetic. Builds are reproducible by construction.",
+      "refs": [
+        { "target": "module-identity#overview", "type": "example" },
+        { "target": "package-resolution#resolution-models", "type": "related" }
+      ]
+    },
+    {
+      "id": "runtime-and-gc",
+      "title": "Runtime and garbage collection",
+      "tags": ["runtime", "gc", "performance"],
+      "content": "Go's GC is concurrent non-generational, non-compacting tricolor mark-sweep with a hybrid Yuasa+Dijkstra-style write barrier (Go 1.8+) that eliminated the stack-rescan STW phase. The most consequential design choice is *not having generations* — Go bet the generational hypothesis would not hold for its actual workloads, and the bet held. `GOMEMLIMIT` (Go 1.19) added a soft absolute heap cap with a GC-CPU governor. Trade-off is no compaction (potential fragmentation), every GC is full-heap, but excellent tail latency.\n\n**Go made frame pointers a default-on runtime policy** for its most important production architectures, starting with amd64 in Go 1.7. There is no `-fno-omit-frame-pointer` style user knob. Felix Geisendörfer's 2023 work on Go's execution tracer reduced its runtime overhead from ~20% to under 1% almost entirely by switching to frame-pointer walks. For a new language: \"always emit frame pointers\" is the single most consequential profilability decision.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Official Go site",
+      "url": "https://go.dev"
+    },
+    {
+      "label": "Go modules reference",
+      "url": "https://go.dev/ref/mod"
+    }
+  ]
+}

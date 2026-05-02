@@ -1,0 +1,26 @@
+{
+  "kind": "concept",
+  "name": "Incremental Type Checking",
+  "aliases": ["incremental-typing", "demand-driven-typing"],
+  "summary": "Dependency tracking at finer granularity than files: parsed file, module interface, symbol table, import graph, type of declaration, body check result, trait obligations, macro expansion result, diagnostics. Edits in public signatures invalidate dependents; edits in bodies may not invalidate interfaces; macro expansion may change scopes and types.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Incremental semantic analysis needs dependency tracking at a finer granularity than files. Useful keys include parsed file, module interface, symbol table, import graph, type of declaration, body check result, trait obligations, macro expansion result, and diagnostics.\n\nThe distinguishing axis across designs is *what level of granularity invalidates*: a whole module (coarse, simple), a single declaration (medium), a single inference fact (fine, sophisticated). rust-analyzer and Salsa target the fine end; rustc batch mode is at the coarse end.",
+      "refs": [
+        { "target": "salsa-incremental#overview", "type": "implemented-by" },
+        { "target": "language-server#frontend-architecture-requirements", "type": "consumed-by" },
+        { "target": "name-resolution#symbols-and-stable-identity", "type": "depends-on" },
+        { "target": "typescript-incremental#overview", "type": "instance" }
+      ]
+    },
+    {
+      "id": "challenges",
+      "title": "Challenges",
+      "tags": ["compiler-architecture", "incrementality"],
+      "content": "Challenges:\n\n- edits in public signatures invalidate dependents;\n- edits in bodies may not invalidate interfaces;\n- implicit search can depend on visible instances;\n- macro expansion may change scopes and types;\n- generated code should have stable identities;\n- stale diagnostics must be withdrawn precisely.\n\nThe practical engineering trade-off is between coarse invalidation (re-typecheck the file or module on any change — simple, slow) and fine invalidation (re-typecheck only the affected facts — fast, requires sophisticated dependency tracking). Most production language servers use Salsa-style demand-driven memoization to land in the middle: facts are computed lazily and invalidated on a graph of dependencies."
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "kind": "concept",
+  "name": "Cooperative safepoints and managed handoff",
+  "aliases": [
+    "safepoints",
+    "managed-runtime tracing handoff"
+  ],
+  "summary": "Tracing handoff mechanisms where the runtime arranges for threads to notice an observation request at points already safe for the implementation — loop back-edges, method boundaries, existing branches the interpreter already takes — instead of trapping at arbitrary instructions.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The runtime does not trap at arbitrary instructions; instead it arranges for threads to notice a handoff request at points already safe for the implementation — a loop back-edge, a method boundary, an existing branch the interpreter already takes. The cost axis is the size of the hot-path check, weighed against what it enables: GC, low-intrusion attach, profiler coordination, or runtime-owned sampling. Debugger attach is one consumer; the tracing concern is how to add cooperative observation without biasing profiles or taxing every instruction.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:cooperative-safepoints`\n- **domain**: `domain:profiling`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:medium`\n- **granularity**: `granularity:per-safepoint`, `granularity:per-sample`\n"
+    },
+    {
+      "id": "hotspot-safepoint-polling-page",
+      "title": "HotSpot JVM — Safepoint Polling Page",
+      "tags": [
+        "domain:tracing",
+        "family:cooperative-safepoints",
+        "granularity:per-safepoint",
+        "jvm",
+        "off-cost:low",
+        "on-cost:high"
+      ],
+      "content": "HotSpot JIT-compiles Java methods into native x86 code. At certain \"safepoint\" locations (method returns, loop back-edges), the compiled code includes a load from a fixed \"polling page\" address:\n\n```\ntest eax, [polling_page]\n```\n\nDuring normal execution the page is readable, the load succeeds silently (~1 cycle, always predicted to not fault), and execution continues. When the JVM needs to pause all threads (for GC, deoptimization, or debugger attachment), it calls `mprotect(polling_page, PROT_NONE)`. Every thread's next safepoint poll triggers a SIGSEGV. The JVM's signal handler recognizes the faulting address as the polling page and suspends the thread.\n\nA cached memory load is very cheap on modern CPUs, and the \"should I stop?\" check is not a branch at all — it is a load that either succeeds silently or faults. The hardware handles the rare case (fault) outside the common execution path. This makes polling-page safepoints a classic low-overhead design on x86, though exact performance depends on microarchitecture and HotSpot implementation details.\n\nThe downside: signal handling is expensive when it fires (~microseconds per thread). But since it only fires for rare events (GC, debugger attach), the amortized cost is negligible.",
+      "sources": [
+        {
+          "url": "https://shipilev.net/jvm/anatomy-quarks/22-safepoint-polls/"
+        }
+      ]
+    },
+    {
+      "id": "cpython-pep-768",
+      "title": "CPython 3.14 — PEP 768 Safe External Debugger Interface",
+      "tags": [
+        "cpython",
+        "domain:tracing",
+        "family:cooperative-safepoints",
+        "granularity:per-safepoint",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "CPython's traditional `sys.settrace()` has measurable overhead even when idle, because the interpreter's evaluation loop must check tracing state on every instruction. PEP 768 introduces a lower-overhead handoff path: a pending-call flag is checked through the existing `eval_breaker` branch, which the interpreter already uses for signals and periodic work.\n\nThe tracing lesson is the piggybacked safepoint check. Instead of adding a new branch to every bytecode dispatch or injecting code at arbitrary PCs, the runtime exposes a cooperative rendezvous point that external tools can arm. The interpreter then performs the requested work at the next safe opportunity. PyPy independently adopted the same shape, suggesting the pattern generalizes beyond CPython.",
+      "sources": [
+        {
+          "url": "https://peps.python.org/pep-0768/"
+        }
+      ]
+    },
+    {
+      "id": "rust-zerogc",
+      "title": "Rust `zerogc` — Compile-Time Root Tracking via the Borrow Checker",
+      "tags": [
+        "domain:tracing",
+        "family:cooperative-safepoints",
+        "granularity:per-safepoint",
+        "off-cost:zero",
+        "on-cost:medium",
+        "rust"
+      ],
+      "content": "`zerogc` is an experimental Rust project that offloads GC root tracking to the compiler: lifetimes and the borrow checker enforce safepoints and root visibility statically, so pointer mutation has zero steady-state cost and tracing overhead between safepoints is strictly zero. The broader compile-time GC-root-tracking discipline overlaps with ownership/borrowing in `data/ownership` and `data/borrowing`; this entry stays self-contained for now and is recorded here because the resulting safepoint shape is the cooperative-handoff pattern of this chapter.",
+      "sources": [
+        {
+          "url": "https://docs.rs/zerogc"
+        },
+        {
+          "url": "https://github.com/DuckLogic/zerogc"
+        }
+      ]
+    },
+    {
+      "id": "safepoint-bias-async-get-call-trace",
+      "title": "Safepoint Bias and `AsyncGetCallTrace`",
+      "tags": [
+        "domain:profiling",
+        "family:cooperative-safepoints",
+        "granularity:per-sample",
+        "jvm",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Safepoint polling (`data/cooperative-safepoints#hotspot-safepoint-polling-page`) is elegant as a stop-the-world mechanism, but it quietly breaks sampling profilers. Mytkowicz et al. (\"Evaluating the Accuracy of Java Profilers\", PLDI 2010) showed that four commercial Java profilers (hprof, xprof, JProfiler, YourKit) *disagree with each other* on which method is hottest, and traced the disagreement to a shared root cause: the standard JVMTI `GetStackTrace` API can only sample threads parked at safepoints. A SIGPROF tick queues a \"please come to a safepoint\" request; the next safepoint-reaching instruction is what gets sampled. Tight inner loops that don't cross a safepoint never appear in the profile — their time is attributed to whichever method *did* reach a safepoint next. The sampling distribution is structurally non-uniform.\n\n**`AsyncGetCallTrace` (AGCT)** is Sun's undocumented back-door, exported so their own Studio profiler could sample outside safepoints. It walks Java frames directly from a signal handler, *without* the safepoint handshake — hence *async*, hence can crash if the JVM mutates the stack mid-walk. Andrei Pangin's **async-profiler** productionized it by installing a SIGSEGV handler, catching AGCT's failure cases, and chaining to the JVM's own deoptimization handler. Its other design trick is merging two sources: `perf_events` gives the native stack (kernel → libjvm → JIT code); AGCT gives the Java frames (including inlined methods). async-profiler walks the native stack until it hits JIT territory, then hands off to AGCT — one unified flame graph across kernel, JNI, JVM internals, and Java.\n\n**JEP 509 \"JFR CPU-Time Profiling\" (JDK 25, 2025)** is OpenJDK's supported path toward reducing this reliance on unsupported internals. Status (JDK 25, 2025): experimental and Linux-focused, not a universal replacement for every AGCT use case. JFR grows a CPU-time sampler driven by `SIGEV_THREAD_ID` POSIX per-thread CPU timers and reports failed/lost samples explicitly, so an incomplete profile is *visibly* incomplete rather than silently biased. The JEP explicitly names async-profiler's reliance on unsupported internals as motivation.\n\nFor a new language: design the async-safe stack-walk API *up front*. Retrofitting it cost OpenJDK roughly 15 years of tool-author workarounds. Go (`data/runtime-event-pipelines#go-runtime-trace-flight-recorder`) sidestepped the same problem by pairing unconditional frame pointers with Go 1.14's asynchronous preemption — SIGPROF samples can now land anywhere, not just at cooperative safepoints.\n\nSafepoint bias is the *software* instance of a more general pattern: *the sample's reported PC is not the PC that caused the event*. The *hardware* instance is PMU interrupt skid, where the pipeline has moved on by the time a counter-overflow interrupt fires — addressed by PEBS / IBS / SPE (`data/hardware-tracing#precise-pmu-sampling`). A new language needs both problems solved: async-safe stack walks above, precise PMU records below.",
+      "sources": [
+        {
+          "url": "https://plv.colorado.edu/papers/mytkowicz-pldi10.pdf"
+        },
+        {
+          "url": "https://github.com/async-profiler/async-profiler"
+        },
+        {
+          "url": "https://openjdk.org/jeps/509"
+        },
+        {
+          "url": "http://psy-lob-saw.blogspot.com/2016/02/why-most-sampling-java-profilers-are-fucking-terrible.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://shipilev.net/jvm/anatomy-quarks/22-safepoint-polls/"
+    },
+    {
+      "url": "https://peps.python.org/pep-0768/"
+    },
+    {
+      "url": "https://docs.rs/zerogc"
+    },
+    {
+      "url": "https://github.com/DuckLogic/zerogc"
+    },
+    {
+      "url": "https://plv.colorado.edu/papers/mytkowicz-pldi10.pdf"
+    },
+    {
+      "url": "https://github.com/async-profiler/async-profiler"
+    },
+    {
+      "url": "https://openjdk.org/jeps/509"
+    },
+    {
+      "url": "http://psy-lob-saw.blogspot.com/2016/02/why-most-sampling-java-profilers-are-fucking-terrible.html"
+    }
+  ]
+}

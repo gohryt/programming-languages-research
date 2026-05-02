@@ -1,0 +1,118 @@
+{
+  "kind": "concept",
+  "name": "Async and coroutine debugging",
+  "aliases": [
+    "async stack",
+    "tokio-console",
+    "stitched async stacks",
+    "parallel coroutine stacks"
+  ],
+  "summary": "Reconstructing meaningful logical execution history across suspension points, callbacks, and scheduler-managed tasks; tools span Go's runtime/trace + Delve goroutine awareness, Kotlin's parallel stacks, V8's stitched async stack traces, and Rust's tokio-console.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Async/await, coroutines, goroutines, and effect handlers all break the assumption that the call stack is the logical call chain — once a coroutine suspends and resumes, the physical stack no longer reflects who called whom. Reconstructing the logical async chain therefore depends on whatever metadata the runtime preserves across suspension points. Entries in this chapter differ on **how much runtime cooperation** the debugger can assume: Go's built-in scheduler events (`data/async-debugging#go-runtime-trace-delve`), Kotlin's coroutine objects carrying continuation state (`data/async-debugging#kotlin-coroutine-parallel-stacks`), V8's stitched async stacks recorded at each `await` (`data/async-debugging#v8-stitched-async-stacks`), and Rust's `tokio-console` runtime introspection (`data/async-debugging#rust-tokio-console`) each represent a different point on the spectrum from designed-in metadata to retrofitted introspection.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:async-stack-reconstruction`\n- **domain**: `domain:debugging`\n"
+    },
+    {
+      "id": "async-stack-problem",
+      "title": "The Async Stack Problem",
+      "tags": [
+        "domain:debugging",
+        "family:async-stack-reconstruction"
+      ],
+      "content": "Traditional debuggers show the call stack — the chain of function calls leading to the current point. For async/await, coroutines, and goroutines, the call stack is misleading: it shows the executor/scheduler's stack, not the logical chain of `await` calls that led to the current suspension point.\n\nThe core challenge: when a coroutine suspends and later resumes, the physical stack frame that created the coroutine may no longer exist. The \"parent\" in the async sense is not the caller in the stack sense. Debugging an async Python program with GDB shows `_selector.poll()` at the top of every stack — the event loop — with no indication of which coroutine is stuck or why.\n\nThe design lesson framing the rest of this chapter: **async debugging requires runtime cooperation**. The runtime must record enough metadata (parent task, spawn site, await site) to reconstruct logical call chains. Languages that design async runtimes with debugging metadata from the start (Go, Kotlin) provide dramatically better debugging experiences than languages where async was added later (Python, Rust). The four following subsections trace this spectrum from heaviest first-class support to most retrofitted."
+    },
+    {
+      "id": "go-runtime-trace-delve",
+      "title": "Go — `runtime/trace` + Delve Goroutine Awareness",
+      "tags": [
+        "domain:debugging",
+        "family:async-stack-reconstruction",
+        "go"
+      ],
+      "content": "Go's runtime emits **scheduler events** — goroutine creation, blocking on channels/mutexes/syscalls, unblocking, GC pauses, system-monitor activity — into a per-thread ring buffer enabled by `runtime/trace.Start`. The result is a structured event stream that `go tool trace` visualizes as a per-goroutine timeline, with synchronization edges connecting senders to receivers across the goroutine graph. The mechanism is the same one `data/runtime-event-pipelines#go-runtime-trace-flight-recorder` covers from the always-on observability angle; for *debugging*, the same trace tells the operator which goroutine got stuck where.\n\n**Delve** is the Go debugger's runtime-aware front-end. `goroutines` lists every live goroutine with its current state (running, runnable, waiting on chan/syscall/mutex/io), the user-level function it last entered, and the blocked-on resource. `goroutine N` switches the debugger context to goroutine N so subsequent `bt`, `frame`, `print` commands operate on its stack rather than the current OS thread's executor stack. This is the cleanest production realization of \"the debugger natively understands the runtime's concurrency primitive\" — Delve is built knowing about `g`, `m`, `p` structures and walks them directly.\n\nThe design takeaway is that Go's day-one investment in scheduler-event metadata pays compounding dividends for tooling. Async debugging in Go does not require stitching, post-hoc reconstruction, or third-party introspection libraries — the runtime just hands over the information.",
+      "sources": [
+        {
+          "url": "https://github.com/go-delve/delve"
+        },
+        {
+          "url": "https://pkg.go.dev/runtime/trace"
+        }
+      ]
+    },
+    {
+      "id": "kotlin-coroutine-parallel-stacks",
+      "title": "Kotlin — Coroutine Object Metadata + Parallel Stacks",
+      "tags": [
+        "domain:debugging",
+        "family:async-stack-reconstruction",
+        "kotlin"
+      ],
+      "content": "Kotlin coroutines are not OS threads; they are state machines compiled from `suspend fun` source, with each suspension point capturing the continuation (the \"rest of the function\") plus the local variables it needs. The compiler emits debug metadata describing this transformation, and IntelliJ's coroutine debugger reads that metadata to reconstruct logical call chains across `await`/`suspend` boundaries.\n\nThe **Parallel Stacks plugin** (Google, GSoC 2023) builds a visual graph of coroutine relationships from this metadata: which coroutine spawned which, what each coroutine is currently waiting on, and how cancellation propagates through the tree. Where Delve presents Go's flat goroutine list (`data/async-debugging#go-runtime-trace-delve`), the Kotlin tooling presents a *graph* — appropriate because Kotlin coroutines are structured (parent–child by `coroutineScope`) in a way Go's flat goroutines are not.\n\nThe pattern: **structured concurrency in the language gives the debugger a richer object to render**. A flat list of goroutines can only be a list; a tree of structured-concurrency scopes can be a graph.",
+      "sources": [
+        {
+          "url": "https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/"
+        }
+      ]
+    },
+    {
+      "id": "v8-stitched-async-stacks",
+      "title": "JavaScript — V8 Stitched Async Stack Traces",
+      "tags": [
+        "browser",
+        "domain:debugging",
+        "family:async-stack-reconstruction",
+        "javascript"
+      ],
+      "content": "V8 and Chrome DevTools maintain \"async stack traces\" by **recording the call stack at each `await` / `.then` / `setTimeout` callback boundary** and stitching them together when an exception fires or the debugger pauses. The user sees a synthetic stack showing the full chain of asynchronous resumptions, even though the physical stacks at each link were already discarded by the event loop. The stitching is bounded — typically the last 10 async hops are kept — to keep memory cost predictable.\n\nThe mechanism is **runtime cooperation paid at every suspension point**: each await pushes its current stack into a side data structure keyed by the resulting promise/microtask. Resumption reads the saved stack and stitches it as the \"async caller.\" For users this is invisible; for V8 the steady-state cost is real but bounded, and the design has been the de-facto template for every modern JavaScript runtime debugger.",
+      "sources": [
+        {
+          "url": "https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/"
+        },
+        {
+          "url": "https://developer.chrome.com/blog/devtools-modern-web-debugging/"
+        }
+      ]
+    },
+    {
+      "id": "rust-tokio-console",
+      "title": "Rust — `tokio-console` + Future Introspection",
+      "tags": [
+        "domain:debugging",
+        "family:async-stack-reconstruction",
+        "rust"
+      ],
+      "content": "Rust's async story is the most retrofitted of the four. Async functions desugar to opaque state machines (anonymous types implementing `Future`); the physical stack at any moment shows only the executor's poll loop, never the logical chain of `await`s that led to the current suspension. Worse, the futures themselves are user-defined types with no shared metadata layout — the debugger cannot generically inspect \"what is this future waiting on\" without the runtime providing structure.\n\n**`tokio-console`** is the runtime-introspection answer for Tokio. Built on `tracing` instrumentation that Tokio emits for task spawn/poll/wake/drop events, the console presents a per-task view: which task is running, which is waiting on which resource, how many times each has been polled, how long each poll took, and the source location where each task was spawned. The \"waker graph\" answers the unique-to-Rust-async question of *who would unblock this task* — typically a different task, identified by its waker.\n\nThe retrofit cost is visible in the architecture: tokio-console is a separate crate, requires opt-in instrumentation, and only works for Tokio (other Rust async runtimes — async-std, smol, glommio — need their own equivalents). Compare with Go (`data/async-debugging#go-runtime-trace-delve`) where every binary's runtime is debuggable by Delve out of the box. The lesson generalizes: **a language that retrofits async pays the debugger tax for years afterward in the form of fragmented, runtime-specific tooling**.",
+      "sources": [
+        {
+          "url": "https://github.com/tokio-rs/console"
+        },
+        {
+          "url": "https://tokio.rs/blog/2021-12-announcing-tokio-console"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/go-delve/delve"
+    },
+    {
+      "url": "https://pkg.go.dev/runtime/trace"
+    },
+    {
+      "url": "https://kotlinfoundation.org/news/gsoc-2023-parallel-stacks/"
+    },
+    {
+      "url": "https://developer.chrome.com/blog/devtools-modern-web-debugging/"
+    },
+    {
+      "url": "https://github.com/tokio-rs/console"
+    },
+    {
+      "url": "https://tokio.rs/blog/2021-12-announcing-tokio-console"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "kind": "concept",
+  "name": "Hare Allocator API",
+  "aliases": ["Hare runtime heaps", "Hare setheap"],
+  "summary": "Hare is C-like: the runtime exposes `malloc`, `realloc`, `free_`, and `setheap` (swap the internal heap, with caller responsibility for matching `free`/`delete`). Freestanding programs supply their own allocation hooks for dynamic slice operations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "hare", "ergonomics"],
+      "content": "Hare takes the C-like position: the runtime exposes `malloc`, `realloc`, `free_`, and `setheap` (which swaps the internal heap, with caller responsibility for matching `free`/`delete`). Freestanding programs can supply their own `malloc`/`free`/`ensure`/`unensure` so the compiler's dynamic slice operations work without the full runtime.\n\nHare makes the heap replaceable at a small ABI boundary but does not attempt allocator plumbing through library APIs. This is the minimalist option in the chapter 7.12 family: less ergonomic than Odin or Beef, but with a smaller surface area for the runtime/allocator contract.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "zig-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "freestanding-and-setheap",
+      "title": "Freestanding hooks and setheap",
+      "tags": ["hare", "embedded"],
+      "content": "`setheap` swaps the runtime's internal heap implementation at runtime; allocations made before the swap must still be freed by the previous heap. Freestanding mode (no host libc) requires the program to provide `malloc`, `free`, `ensure`, and `unensure` so the compiler-generated code for dynamic slice growth and shrinkage links cleanly.\n\nThe API surface is small enough to retarget for embedded contexts (RTOSes, bare-metal microcontrollers) without rewriting library code. The trade-off is that there is no per-call or per-data-structure allocator override — the heap is global and replaceable but not parameterised.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Hare runtime heap API", "url": "https://docs.harelang.org/rt" },
+    { "label": "Hare freestanding runtime", "url": "https://harelang.org/documentation/usage/freestanding.html" }
+  ]
+}

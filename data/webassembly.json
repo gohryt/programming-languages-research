@@ -1,0 +1,47 @@
+{
+  "kind": "concept",
+  "name": "WebAssembly",
+  "aliases": ["wasm", "wasm-bytecode"],
+  "summary": "Stack-based bytecode designed for portability and verification. Operations push and pop typed values from a virtual stack; control flow is structured (block, loop, if/else, no arbitrary goto), which enables single-pass validation and one-pass compilation. Memory is a sandboxed linear array.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "WebAssembly is a stack-based bytecode designed for portability and verification. Operations push and pop typed values from a virtual stack; control flow is *structured* (`block`, `loop`, `if`/`else`, no arbitrary `goto`), which enables single-pass validation and one-pass compilation. Memory is a linear array of bytes; the program's address space is sandboxed.\n\nWasm's structured control flow is the design choice that distinguishes it from JVM bytecode. JVM allows arbitrary jump targets within a method, requiring stackmap frames for verification; Wasm's structured form makes verification single-pass and decoder-friendly.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "jvm-bytecode#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "WebAssembly Specification — Core", "url": "https://webassembly.github.io/spec/core/" }
+      ]
+    },
+    {
+      "id": "wasm-3-and-gc",
+      "title": "Wasm 3.0 and GC reference types",
+      "tags": ["bytecode", "wasm", "gc"],
+      "content": "Status (as of 2026-04): the **Wasm GC reference types proposal** has shipped cross-browser. WasmGC adds typed `struct` and `array` heap types managed by the host's GC, plus `funcref`/`externref` reference types and downcast/upcast operations — sufficient for Java, Kotlin, Dart, Scheme, OCaml, and other GC-required languages to compile to Wasm without bundling their own GC into linear memory. Cross-browser baseline as of 2025; the substrate for Kotlin/Wasm, Dart Web, and Scala.js' experimental Wasm backend.\n\n**WebAssembly 3.0** (completed September 2025) consolidates GC, multiple-memories, tail calls, exception handling with `exnref`, 64-bit memory addressing, threads, SIMD, and JS string builtins into a single specification milestone. The stack-switching proposal — relevant to language-runtime concurrency — did not land in 3.0 and continues toward a subsequent milestone.",
+      "refs": [
+        { "target": "garbage-collection#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "WebAssembly GC proposal", "url": "https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md" },
+        { "label": "State of WebAssembly 2026", "url": "https://devnewsletter.com/p/state-of-webassembly-2026/" }
+      ]
+    },
+    {
+      "id": "as-target-ir",
+      "title": "Wasm as compilation target",
+      "tags": ["target-ir", "compiler"],
+      "content": "As a *target*, Wasm's design constraints — structured control flow, type validation, bounded linear memory — propagate back into source-language compilers (Rust, C/C++ via Emscripten, Go via TinyGo, AssemblyScript, Zig): a function compiled to Wasm cannot use arbitrary `goto`, read uninitialized memory, or escape Wasm's type system. This makes Wasm both a runtime substrate and an effective backend ABI constraint.",
+      "refs": [
+        { "target": "object-file-formats#overview", "type": "alternative-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "WebAssembly Specification — Core", "url": "https://webassembly.github.io/spec/core/" },
+    { "label": "WebAssembly GC proposal", "url": "https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md" }
+  ]
+}

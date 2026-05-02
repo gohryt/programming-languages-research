@@ -1,0 +1,56 @@
+{
+  "kind": "concept",
+  "name": "Type-and-Effect Systems",
+  "aliases": ["effect-types", "effect-rows", "capability-typing", "algebraic-effects"],
+  "summary": "Extends a type to describe both the result of an expression and the side effects, capabilities, or control transfers it may perform. Effects may represent I/O, exceptions, allocation, mutation, async suspension, nondeterminism, region access, capabilities, or user-defined algebraic operations. Algebraic effects and handlers generalize exceptions; row-shaped or capability-shaped representations track which effects are in scope.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A type-and-effect system gives expressions both a result type and an effect description. Effects may represent I/O, exceptions, allocation, mutation, async suspension, nondeterminism, region access, capabilities, or user-defined algebraic operations.\n\nThe distinguishing axis across designs is *what shape effects take in the type*: a fixed set of marker classes (Java checked exceptions, Rust `?` boundaries), a row of named operations (Koka, OCaml polymorphic variants over effects), a capability set (Effekt, Pony, Wyvern), or implicit propagation by structural typing rules (Frank's bidirectional discipline). Each shape has predictable consequences for inference, error messages, and runtime cost.\n\nRuntime scheduling and execution-strategy concerns belong in concurrency records; effect handlers realised as a concurrency substrate (delimited continuations, fibers, scheduler integration) are owned by `data/effect-handler-lowering` and `data/virtual-threads#ocaml-effect-handlers`. This record focuses on type rules.",
+      "refs": [
+        { "target": "effect-handler-lowering#overview", "type": "lowered-via" },
+        { "target": "evidence-passing#overview", "type": "lowered-via" },
+        { "target": "row-polymorphism#overview", "type": "underlies" },
+        { "target": "koka#overview", "type": "exemplified-by" },
+        { "target": "effekt-language#overview", "type": "exemplified-by" },
+        { "target": "frank-language#overview", "type": "exemplified-by" },
+        { "target": "verse-language#overview", "type": "exemplified-by" },
+        { "target": "effectful-object-calculi#overview", "type": "specialised-by" }
+      ]
+    },
+    {
+      "id": "what-effect-systems-can-support",
+      "title": "What effect systems can support",
+      "tags": ["type-system", "effect-system"],
+      "content": "Effect systems can support:\n\n- pure/effectful distinction;\n- checked exceptions;\n- capability-controlled APIs;\n- algebraic effects and handlers;\n- async/await as a user-level effect;\n- optimization by knowing which code is pure;\n- safe embedding and sandboxing.\n\nThe practical engineering trade-off is between *expressive precision* (every effect is reflected in every signature, leading to large effect annotations) and *programmer ergonomics* (most code can be written with implicit or inferred effects, with rows surfaced only at boundaries)."
+    },
+    {
+      "id": "algebraic-effects-and-handlers",
+      "title": "Algebraic effects and handlers",
+      "tags": ["effect-system", "handlers"],
+      "content": "Algebraic effects expose operations whose meaning is supplied by handlers. They generalize exceptions and can express control abstractions such as coroutines, backtracking, async, generators, and cooperative threads.\n\nProduction designs span:\n\n- **Koka** (`data/koka`) — row-polymorphic effect types, type-directed selective-CPS compilation;\n- **Flix** (`data/flix`) — primitive + algebraic effects, sub-effecting, effect exclusion, purity reflection;\n- **Unison** (`data/unison`) — abilities and ability handlers, content-addressed code substrate;\n- **OCaml 5** — runtime-level effect module with effect handlers, *no* static effect safety at the type level (effects are unchecked at the type level even when handled at runtime);\n- **Effekt** (`data/effekt-language`) — lexical second-class capabilities, multi-handlers;\n- **Frank** (`data/frank-language`) — bidirectional effect typing without effect variables in source.\n\nEach makes a different choice on row variables, polymorphism, capability scope, and runtime cost.",
+      "refs": [
+        { "target": "koka#overview", "type": "instance" },
+        { "target": "flix#overview", "type": "instance" },
+        { "target": "unison#overview", "type": "instance" },
+        { "target": "effekt-language#overview", "type": "instance" },
+        { "target": "frank-language#overview", "type": "instance" }
+      ]
+    },
+    {
+      "id": "effect-rows",
+      "title": "Effect rows and capability sets",
+      "tags": ["effect-system", "row-polymorphism"],
+      "content": "Effect rows use row-polymorphism-like machinery (`data/row-polymorphism`) to express extensible sets of effects. Capability sets can be treated similarly, but with an authority interpretation: a function may only perform operations for capabilities in its environment.\n\nDesign choices:\n\n- closed versus open effect rows;\n- inferred versus explicit effects;\n- lexical versus dynamic handler lookup;\n- single-shot versus multi-shot continuations;\n- effect polymorphism;\n- how effects appear in public APIs;\n- whether unhandled effects are compile errors or runtime errors.\n\nThe Dagnino, Giannini, and Zucca **Monadic type-and-effect soundness** (ECOOP 2025) supplies a meta-theory: effects are represented in the semantics by monadic structure, and soundness is stated analogously to ordinary progress/preservation while accounting for effectful rewriting. This gives implementers a reusable route to proving effect-system soundness without encoding each effect as a bespoke small-step extension.",
+      "sources": [
+        { "label": "Monadic type-and-effect soundness", "url": "https://arxiv.org/abs/2504.10159" },
+        { "label": "Monadic type-and-effect soundness (ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.7" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Monadic type-and-effect soundness", "url": "https://arxiv.org/abs/2504.10159" }
+  ]
+}

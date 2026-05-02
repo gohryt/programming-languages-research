@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "Hot Module Replacement",
+  "aliases": ["hmr"],
+  "summary": "Build-tool mechanism in JavaScript bundlers (Vite, webpack, esbuild, Parcel) that swaps changed module instances into a running browser application without page reload, preserving component state via runtime cooperation primitives like import.meta.hot.accept.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Hot Module Replacement (HMR) is a development-time technique for bundlers and dev servers in the JavaScript ecosystem: when a source file changes, the dev server pushes only the changed module to the running browser application, which swaps the new module instance in place of the old one *without* a full page reload. Component state, scroll position, form input, and live WebSocket connections are preserved across the swap — provided every module along the dependency chain has indicated it can accept the update.\n\nDistinct from runtime hot-reload mechanisms in production (`data/erlang-hot-reload`, `data/julia-revise`, `data/dotnet-edit-and-continue`, `data/lisp-incremental-redefinition`, `data/dlopen-live-reload`): HMR is a development-experience concern, not a production code-replacement strategy. It runs in dev servers, depends on bundler-specific protocols, and is not generally safe to deploy to production.",
+      "refs": [
+        { "target": "erlang-hot-reload#overview", "type": "contrasts-with" },
+        { "target": "julia-revise#overview", "type": "contrasts-with" },
+        { "target": "dotnet-edit-and-continue#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "import-meta-hot-protocol",
+      "title": "import.meta.hot — the runtime cooperation primitive",
+      "tags": ["hmr", "javascript", "build-tools"],
+      "content": "Modern HMR systems (Vite, esbuild) standardise on the `import.meta.hot` runtime API. A module that wants to participate writes:\n\n```js\nif (import.meta.hot) {\n  import.meta.hot.accept((newModule) => {\n    // run cleanup, install newModule's exports\n  });\n  import.meta.hot.dispose((data) => {\n    // hand state forward to the next instance\n  });\n}\n```\n\nThe dev server tracks which modules have an `accept` handler and only pushes updates that can be absorbed without a full reload. If a changed module has no `accept`, the update propagates upward to the importer; if no module along the chain accepts, the page reloads.\n\nWebpack's older HMR API uses `module.hot.accept` with similar semantics. The convergence on `import.meta.hot` (an ESM-native form) is part of Vite's appeal: it works without webpack-specific wrappers and integrates cleanly with native ESM dev servers.",
+      "refs": [
+        { "target": "javascript#esm", "type": "uses" }
+      ]
+    },
+    {
+      "id": "module-system-preconditions",
+      "title": "Module-system preconditions",
+      "tags": ["hmr", "module-systems", "design-guidance"],
+      "content": "HMR is feasible because the JavaScript module system has the right preconditions:\n\n- **Stable module identity** — a URL or file path is a deterministic key for swapping.\n- **Individually loadable artifacts** — ESM modules are independent records, not flattened into one binary.\n- **Live bindings** — ESM importers see the exporter's binding slot, so swapping the slot updates downstream consumers.\n- **First-class runtime cooperation** — `import.meta.hot` is part of the runtime, not just a build-tool concept.\n\nLanguages that lack one of these (statically-linked binaries, modules-as-singleton-objects with copied exports, no runtime introspection) cannot easily support HMR. The lesson generalises: **a module system that wants HMR must declare runtime cooperation primitives explicitly**.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "depends-on" }
+      ]
+    },
+    {
+      "id": "production-implementations",
+      "title": "Production implementations",
+      "tags": ["hmr", "production"],
+      "content": "**Vite** (Evan You, 2020) is the most influential modern HMR implementation, built around native ESM in dev mode and Rollup in build mode. **webpack** (Tobias Koppers, 2012) shipped HMR as the original popular implementation; its `module.hot.accept` API predates `import.meta.hot` and remains supported. **esbuild** offers HMR via plugins. **Parcel** ships HMR as a default. **Turbopack** (Vercel, Tobias Koppers's successor to webpack) has HMR as a first-class concern.\n\nFramework-level HMR (React Fast Refresh, Vue HMR, Svelte HMR) sits one layer above bundler HMR: framework-aware updates preserve component state across module swaps, going beyond the bundler's generic accept/dispose hooks. Status (as of 2026-04): React Fast Refresh and Vue HMR are de facto standards; framework integration is what makes HMR feel seamless rather than mechanical.",
+      "refs": []
+    }
+  ]
+}

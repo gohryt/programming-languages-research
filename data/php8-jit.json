@@ -1,0 +1,45 @@
+{
+  "kind": "runtime",
+  "name": "PHP 8 JIT and IR Framework",
+  "aliases": ["PHP JIT", "Stogov IR", "PHP 8.4 IR"],
+  "summary": "PHP 8.0 (2020) shipped a tracing JIT designed by Dmitry Stogov, originally on DynASM. PHP 8.4 (2024) replaced it with a standalone IR framework — an SSA-based mid-level IR with curated optimisations and multi-target backend. Designed for sub-millisecond JIT compile budgets where LLVM is impossible.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "PHP 8.0 (2020) added a tracing JIT designed by Dmitry Stogov, originally built on **DynASM**. The first version targeted x86-64 only and emitted machine code per traced bytecode sequence.\n\nPHP 8.4 (2024) incorporates a second-generation JIT based on a **standalone IR framework** (Stogov's IR, an SSA-based mid-level IR with a small set of optimisation passes) that replaces direct DynASM emission with a compiler-style IR + multi-target backend. This is the same architectural shift V8 made from TurboFan to Turboshaft and from Cranelift's pre-2022 backend to its e-graph mid-end: a typed mid-level IR makes optimisations composable and additional targets (ARM64, RISC-V) tractable.",
+      "refs": [
+        { "target": "dynasm#overview", "type": "predecessor" },
+        { "target": "ssa#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "PHP RFC: JIT IR Framework", "url": "https://wiki.php.net/rfc/jit-ir" }
+      ]
+    },
+    {
+      "id": "ir-framework",
+      "title": "Standalone IR framework",
+      "tags": ["php", "jit", "compiler-architecture"],
+      "content": "The PHP IR framework is independent of PHP and is being explored as a substrate by other dynamic-language runtimes. Its design point is between QBE (~14K lines, no IR-level optimisations) and LLVM (millions of lines, every optimisation): a mid-sized IR with a curated optimisation set, designed for short compilation budgets typical of JITs.\n\nThe architectural lesson: **for languages whose JIT compile times must stay sub-millisecond, a small SSA-IR framework with a hand-curated pass list is the natural middle point** between DynASM-style direct emission (no analysis budget) and LLVM-style full pipeline (impossible budget). PHP's experience scaling its JIT from a single-file DynASM emitter to an IR + multi-target backend is one of the cleanest production case studies of this transition.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ],
+      "sources": [
+        { "label": "PHP JIT in depth", "url": "https://php.watch/articles/jit-in-depth" }
+      ]
+    },
+    {
+      "id": "tracing-vs-method-jit",
+      "title": "Tracing JIT design choice",
+      "tags": ["php", "tracing-jit"],
+      "content": "PHP's JIT is tracing rather than method-based: the runtime records hot paths through bytecode (sequences of basic blocks executed together) and compiles those traces to machine code. Failed speculations exit traces back to the interpreter via deoptimisation.\n\nThe tracing approach fits PHP's workload well: web request handling typically runs hot paths through framework dispatch logic that benefit from inlining across module boundaries. The trade-off versus method-based JITs (Cinder, V8 TurboFan) is that traces capture cross-procedure patterns naturally but generate more code per hot path due to inlining.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "PHP JIT-IR RFC", "url": "https://wiki.php.net/rfc/jit-ir" },
+    { "label": "PHP JIT in depth", "url": "https://php.watch/articles/jit-in-depth" },
+    { "label": "PHP 8.4 — Zend blog", "url": "https://www.zend.com/blog/php-8-4" }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "regions",
+  "tag": "regions",
+  "name": "Regions",
+  "description": "Sections tagged with the Regions concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "region"
+  ]
+}

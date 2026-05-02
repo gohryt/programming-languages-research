@@ -1,0 +1,40 @@
+{
+  "kind": "runtime",
+  "name": "Go — Hybrid-Barrier Tricolor Concurrent Mark-Sweep",
+  "aliases": ["Go GC", "Go runtime GC", "golang GC"],
+  "summary": "Go's GC is concurrent non-generational, non-compacting tricolor mark-sweep with a hybrid Yuasa+Dijkstra-style write barrier; design is explicitly latency-first ('minimize latency, not maximize throughput').",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "concurrent-gc", "non-generational", "non-compacting", "mark-sweep", "tricolor", "go", "default-collector"],
+      "content": "Go's GC is **concurrent non-generational, non-compacting tricolor mark-sweep** with a hybrid write barrier; the design is explicitly latency-first (\"minimize latency, not maximize throughput\"). The most consequential design choice is *not having generations* — Go bet that the generational hypothesis would not hold for its actual workloads, and the bet has held up.\n\nTrade-off is no compaction (potential fragmentation), no generations (every GC is full-heap), but excellent tail latency and predictable behaviour.",
+      "refs": [
+        { "target": "garbage-collection#throughput-collectors", "type": "instance-of" },
+        { "target": "hotspot-cms", "type": "design-inspired-by" }
+      ]
+    },
+    {
+      "id": "hybrid-barrier",
+      "title": "Hybrid Yuasa+Dijkstra barrier",
+      "tags": ["write-barrier", "hybrid-barrier", "yuasa-barrier", "dijkstra-barrier", "tricolor"],
+      "content": "The hybrid Yuasa+Dijkstra-style write barrier was introduced around **Go 1.8** to eliminate the stack-rescan STW phase. Yuasa's snapshot-at-the-beginning component shades the *overwritten* reference; Dijkstra's incremental-update component shades the *new* reference. Combining both lets the collector avoid both stack rescans and double-precision marking.\n\nLater releases continued refining pacing, assists, and latency behavior. STW phases (mark/sweep termination) typically stay short."
+    },
+    {
+      "id": "memory-limits",
+      "title": "GOMEMLIMIT and pacing",
+      "tags": ["go", "garbage-collection"],
+      "content": "**`GOMEMLIMIT`** (Go 1.19) — soft absolute heap cap with a GC-CPU governor preventing thrashing; complements the ratio-based `GOGC`. Pacer redesign work and assist-credit accounting; **allocate-black** + size-segregated 8 KB spans per-P eliminate locks in the common path.\n\nThe combination of `GOGC` (relative trigger) + `GOMEMLIMIT` (absolute cap) + GC-CPU governor (prevents pathological thrashing) is the operational latency story: services can opt into a memory ceiling without risking GC livelock when allocation pressure exceeds the heap cap."
+    },
+    {
+      "id": "design-tradeoff",
+      "title": "No-compaction, no-generations design lesson",
+      "tags": ["non-compacting", "non-generational", "go"],
+      "content": "Trade-off is no compaction (potential fragmentation), no generations (every GC is full-heap), but excellent tail latency and predictable behaviour. The most consequential design choice is *not having generations* — Go bet that the generational hypothesis would not hold for its actual workloads, and the bet has held up.\n\nThe lesson generalises: **the generational hypothesis is workload-specific**. Go workloads (network services, request handlers, heavy struct allocation) do not necessarily follow the \"most allocations die young\" pattern that justifies generational GC overhead in JVM workloads."
+    }
+  ],
+  "sources": [
+    { "label": "Go GC guide", "url": "https://go.dev/doc/gc-guide" },
+    { "label": "Go runtime mgc.go", "url": "https://go.dev/src/runtime/mgc.go" }
+  ]
+}

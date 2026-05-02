@@ -1,0 +1,118 @@
+{
+  "kind": "concept",
+  "name": "Work Stealing",
+  "aliases": [
+    "work-stealing-scheduler"
+  ],
+  "summary": "Scheduler architecture in which workers execute local tasks from deques and idle workers steal work from others to balance parallel load; introduced in Cilk (1998) and adopted by Java ForkJoinPool, Tokio, Go runtime, OpenMP, and Intel TBB.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Work stealing is a scheduler design in which workers primarily execute local tasks while idle workers steal tasks from others to improve load balance. It is one of the most important practical scheduling strategies for fork-join and task-parallel runtimes.\n\nCilk (Frigo, Leiserson, Randall, PPoPP 1998) made work-stealing scheduling a practical and theoretically grounded basis for fork-join parallelism. Cilk's **work-first principle** moved overhead from the common local execution path to the less common stealing path. This led to low spawn overhead and provable bounds for well-structured computations: time-bounds on the order of T₁/P + T∞ for a P-processor execution of work T₁ with critical-path span T∞.",
+      "refs": [
+        {
+          "target": "go#concurrency",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Cilk-5 (PPoPP 1998)",
+          "url": "https://dl.acm.org/doi/10.1145/277652.277725"
+        }
+      ]
+    },
+    {
+      "id": "deque-based-scheduling",
+      "title": "Deque-based scheduling",
+      "tags": [
+        "runtime",
+        "scheduling",
+        "parallelism"
+      ],
+      "content": "Work-stealing systems typically use deques so that the owning worker can push and pop cheaply while thieves take work from the opposite end. This balances locality and synchronization cost in a way that makes the scheduler viable at scale.\n\nThe owner usually pushes and pops from one end (LIFO-like, for cache locality) while thieves steal from the other end (FIFO-like, to reduce contention and grab oldest/larger work units). Java's `ForkJoinPool` documentation explicitly identifies work stealing as the main difference from ordinary executors. The Go runtime's scheduler also uses per-P work-stealing deques, with global run queue spillover for fairness.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Java ForkJoinPool",
+          "url": "https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/util/concurrent/ForkJoinPool.html"
+        }
+      ]
+    },
+    {
+      "id": "production-runtimes",
+      "title": "Production work-stealing runtimes",
+      "tags": [
+        "runtime",
+        "production",
+        "scheduler"
+      ],
+      "content": "**Java's `ForkJoinPool`** remains the JDK's core work-stealing executor. It backs both `parallelStream()` and `CompletableFuture` execution by default; sized at hardware concurrency.\n\n**Tokio** (Rust async runtime) uses work-stealing across its multi-threaded scheduler. Each worker has a local run queue; idle workers attempt to steal half of another worker's queue when their own is empty. Pure single-threaded Tokio runtimes don't steal; they're closer to event-loop schedulers.\n\n**Cilk-5 / OpenCilk** (the original) introduced the work-first / help-first dichotomy and continues development as OpenCilk for research. **Intel oneTBB** (`data/onetbb`) is a C++ task-parallelism library that schedules tasks via work-stealing across worker queues. **OpenMP** (`data/openmp`) runtime libraries (`libgomp`, `libomp`) use work-stealing among threads in the parallel pool for `task` directives.\n\nA distinctive Rust subfamily — **Glommio** (`data/glommio`) and **Monoio** (`data/monoio`) — deliberately rejects work-stealing in favour of pinning futures to one core for their lifetime, eliminating cross-core synchronisation on the hot path. Full treatment of those event-loop-shaped runtimes lives in `data/event-loop-scheduling`.",
+      "refs": [
+        {
+          "target": "virtual-threads#overview",
+          "type": "related"
+        },
+        {
+          "target": "openmp#overview",
+          "type": "uses"
+        },
+        {
+          "target": "onetbb#overview",
+          "type": "uses"
+        },
+        {
+          "target": "glommio#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "monoio#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "fork-join-fit",
+      "title": "Fork-join fit",
+      "tags": [
+        "parallelism",
+        "runtime",
+        "scheduler"
+      ],
+      "content": "Work stealing is especially effective for recursively decomposed or fork-join style workloads. It is less obviously ideal for actor mailboxes, event loops, or strongly affinity-bound systems where movement between workers is itself expensive.\n\nGHC's runtime separates work-stealing from thread scheduling: ordinary Haskell threads run on capabilities one at a time, while a separate **sparks** mechanism represents speculative parallel work created by `par` and is placed on per-HEC work-stealing queues. This is a useful design pattern: not every concurrent execution unit in a runtime must be scheduled by the same policy or inhabit the same queue. BEAM takes a different approach with one scheduler per core balancing actor work via run-queue migration rather than per-actor steals.",
+      "refs": [
+        {
+          "target": "virtual-threads#overview",
+          "type": "related"
+        },
+        {
+          "target": "actors#reentrancy-and-scheduling",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "fairness-and-locality-tradeoffs",
+      "title": "Fairness and locality trade-offs",
+      "tags": [
+        "runtime",
+        "performance",
+        "tradeoffs"
+      ],
+      "content": "The design of a work-stealing scheduler is a trade-off between local execution for cache locality and work migration for load balance. The resulting system rarely optimizes perfect fairness; instead it aims for good throughput under realistic parallel work distributions.\n\nThe canonical knobs: steal granularity (single task vs half the deque), steal frequency (back-off when no work is found), affinity hints (NUMA-aware placement), priority queues (high-priority work bypasses normal stealing). Tokio's scheduler explicitly randomises steal targets to avoid pathological convoying. The interaction with the kernel scheduler (`data/linux-cfs-eevdf`) matters because all M:N runtimes ride on top — a tight-loop goroutine cannot starve other goroutines on the same Go process, but it *can* starve other Linux processes if the runtime's worker count exceeds available CPUs and `cpu.shares` aren't tuned.",
+      "refs": [
+        {
+          "target": "tiered-compilation#mechanisms-and-costs",
+          "type": "related"
+        },
+        {
+          "target": "linux-cfs-eevdf#language-runtime-implications",
+          "type": "underlies"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

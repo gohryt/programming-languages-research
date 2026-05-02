@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Cuik Postfix-Encoded AST",
+  "aliases": ["cuik-postfix"],
+  "summary": "Cuik (RealNeGate) stores expression trees as a flat Subexpr array in reverse-Polish order. Child references are implicit from position, not explicit pointers — to traverse, walk the array right-to-left.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Cuik (RealNeGate) stores expression trees as a flat `Subexpr` array in reverse-Polish order. Child references are *implicit from position*, not explicit pointers — to traverse, walk the array right-to-left. From the project documentation: \"to represent a metric shitload of expressions in Cuik we compact them using a postfix notation. Instead of using pointers to refer to inputs it's implicit.\"",
+      "refs": [
+        { "target": "abstract-syntax-trees#overview", "type": "instance-of" },
+        { "target": "flat-ast-representations#overview", "type": "extreme-form-of" }
+      ],
+      "sources": [
+        { "label": "Cuik (RealNeGate)", "url": "https://github.com/RealNeGate/Cuik" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["ast", "memory-layout", "performance"],
+      "content": "Trade-offs: excellent cache locality (sequential access), no per-node pointer overhead, trivial serialization. Random access to a specific subexpression requires walking from the start, which is acceptable for a compiler that processes expressions sequentially during evaluation or codegen. Statement-level structure still uses a more conventional representation; only expression interiors are postfix.\n\nThis is the most extreme \"flat-arena\" AST in the survey: even the parent-child relationship is implicit, packed into linear order rather than carried as edges.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Cuik (RealNeGate)", "url": "https://github.com/RealNeGate/Cuik" }
+  ]
+}

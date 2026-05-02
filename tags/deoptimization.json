@@ -1,0 +1,9 @@
+{
+  "id": "deoptimization",
+  "tag": "deoptimization",
+  "name": "Deoptimization",
+  "description": "Sections tagged with the Deoptimization concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "deoptimisation"
+  ]
+}

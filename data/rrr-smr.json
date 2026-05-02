@@ -1,0 +1,92 @@
+{
+  "kind": "concept",
+  "name": "RRR-SMR — Reduce, Reuse, Recycle",
+  "aliases": [
+    "Reduce Reuse Recycle SMR"
+  ],
+  "summary": "Nikolaev, Boyle et al. (PLDI 2025): existing SMR schemes only allow reclamation (return to allocator), not reuse (in-place rebirth as a different node of the same type). RRR adds generation tags and tombstone discipline so retired nodes can be safely recycled in-place under HE/IBR/Hyaline-class SMR. Outperforms classical SMR-based data structures on contention-heavy workloads where allocation pressure dominates.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "safe-memory-reclamation",
+        "concurrent-reclamation",
+        "lock-free",
+        "research"
+      ],
+      "content": "Nikolaev, Boyle et al.'s **RRR-SMR** (\"Reduce, Reuse, Recycle: Better Methods for Practical Lock-Free Data Structures\", PLDI 2025) addresses a fundamental limitation of every prior SMR scheme in this catalogue (`data/hazard-pointers`, `data/rcu`, `data/qsbr`, `data/epoch-based-reclamation`, `data/hazard-eras`, `data/interval-based-reclamation`, `data/wait-free-eras`, `data/hyaline-reclamation`, `data/stamp-it`, `data/vbr-reclamation`, `data/nbr-reclamation`, `data/folly-hazptr`): existing safe-memory-reclamation methods only allow *reclamation* of retired memory (return to the allocator), not *reuse* (in-place rebirth as a different node of the same type within the data structure).\n\nReuse is dramatically more efficient than reclaim-and-reallocate because it avoids allocator round-trips, but unsafe under naive SMR — a stale reader holding a pointer to the old value would see the new value and break invariants.",
+      "refs": [
+        {
+          "target": "hazard-eras",
+          "type": "extends"
+        },
+        {
+          "target": "interval-based-reclamation",
+          "type": "extends"
+        },
+        {
+          "target": "hyaline-reclamation",
+          "type": "extends"
+        },
+        {
+          "target": "vbr-reclamation",
+          "type": "related"
+        },
+        {
+          "target": "hazard-pointers",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "RRR-SMR (PLDI 2025)",
+          "url": "https://dl.acm.org/doi/10.1145/3729337"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Generation tags and tombstone discipline",
+      "tags": [
+        "lock-free-data-structures",
+        "research"
+      ],
+      "content": "The RRR contribution is a general method of **constructing data structures whose nodes can be safely recycled** under SMR by reasoning about which fields must be left untouched while a stale reader could observe them.\n\nThe mechanism uses *generation tags* in node headers that retired nodes carry into reuse, plus a discipline ensuring reuses are visible to stale readers as inert *tombstone* states rather than as inconsistent live nodes. Combined with HE/IBR/Hyaline-class SMR schemes (`data/hazard-eras`, `data/interval-based-reclamation`, `data/hyaline-reclamation`), RRR-recycled data structures outperform classical SMR-based ones on contention-heavy workloads where allocation pressure dominates.\n\nThe lesson generalises: **SMR research has converged on bounded retention; the next frontier is bounded reuse-vs-reclaim cycles**. For language designers building lock-free data structures into a language runtime (channels, lock-free queues, work-stealing deques), RRR-SMR is the current best technique for combining safe reader-side discipline with allocation-pressure-friendly reuse.",
+      "refs": [
+        {
+          "target": "epoch-based-reclamation",
+          "type": "compared-with"
+        },
+        {
+          "target": "hyaline-reclamation",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "RRR-SMR PLDI 2025 abstract",
+          "url": "https://pldi25.sigplan.org/details/pldi-2025-papers/88/RRR-SMR-Reduce-Reuse-Recycle-Better-Methods-for-Practical-Lock-Free-Data-Structur"
+        },
+        {
+          "label": "RRR-SMR Zenodo artifact",
+          "url": "https://zenodo.org/records/15110373"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "RRR-SMR PLDI 2025",
+      "url": "https://dl.acm.org/doi/10.1145/3729337"
+    },
+    {
+      "label": "RRR-SMR abstract",
+      "url": "https://pldi25.sigplan.org/details/pldi-2025-papers/88/RRR-SMR-Reduce-Reuse-Recycle-Better-Methods-for-Practical-Lock-Free-Data-Structur"
+    },
+    {
+      "label": "RRR-SMR Zenodo",
+      "url": "https://zenodo.org/records/15110373"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "kind": "language",
+  "name": "Whiley",
+  "aliases": ["whiley-lang"],
+  "summary": "Standalone refinement-typed systems language (David J. Pearce). Refinement types are first-class in the language design rather than layered on top; the type checker integrates SMT discharge with ordinary type checking, so verified properties travel through compilation as part of every value's type.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Whiley (David J. Pearce) is a standalone refinement-typed systems language. Where LiquidHaskell layers refinement on top of Haskell and Stainless on top of Scala, Whiley *is* a refinement-typed language — the integration of refinement and ordinary typing is part of the language semantics rather than a tooling overlay.\n\nThe practical consequence is that every Whiley type carries refinement information by default, the compiler can use refinement facts in optimisation, and there is no separate \"verified\" subset to opt into.",
+      "refs": [
+        { "target": "refinement-types#overview", "type": "first-class-implementation" }
+      ],
+      "sources": [
+        { "label": "Whiley language", "url": "https://whiley.org/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Whiley language", "url": "https://whiley.org/" }
+  ]
+}

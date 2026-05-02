@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "AutoFDO — Sampling-Based PGO",
+  "aliases": [
+    "sampling PGO"
+  ],
+  "summary": "Google CGO 2016: replace PGO's instrumentation phase with hardware sampling profiles collected from production binaries via `perf`. Samples mapped back to source lines via DWARF; the compiler converts them to a synthetic profile and uses them in re-compilation. Closes the loop without requiring developers to set up explicit profiling runs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Google's **AutoFDO** (Chen, Li, Hundt, CGO 2016) eliminates the instrumentation phase by using **sampling profiles** collected from production binaries via `perf` (hardware performance counters). A production binary running on real workloads produces samples; the compiler converts these to a synthetic profile and uses them in re-compilation just like instrumented PGO data.",
+      "refs": [
+        {
+          "target": "pgo-instrumentation#overview",
+          "type": "alternative-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "AutoFDO (Chen, Li, Hundt, CGO 2016)",
+          "url": "https://research.google/pubs/pub45290/"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Source-line mapping",
+      "tags": [
+        "compiler",
+        "profiling"
+      ],
+      "content": "The key trick is *source line mapping*: samples are collected against machine addresses, and AutoFDO maps them back to source lines via DWARF debug info. The compiler then attributes the samples to IR instructions during the next build.\n\nAutoFDO is the default PGO mechanism at Google; production binaries routinely ship with AutoFDO-optimised builds, refreshed from the prior day's sample data. This closes the loop without requiring developers to set up explicit profiling runs.\n\nFor production deployments at scale, AutoFDO is dramatically more practical than instrumentation PGO: no separate profile build, no representative-workload curation, just continuous profile collection from the running binaries themselves.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "AutoFDO Google research",
+      "url": "https://research.google/pubs/pub45290/"
+    }
+  ]
+}

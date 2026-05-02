@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "Zig Allocator API",
+  "aliases": ["std.mem.Allocator", "Zig allocator parameter convention"],
+  "summary": "Zig's convention that there is no default global allocator: data structures accept a `std.mem.Allocator` parameter and allocation failure is an ordinary `error.OutOfMemory` path. The strictest mainstream example of explicit allocator plumbing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "zig", "ergonomics"],
+      "content": "Zig is the strictest mainstream example of language-level allocator plumbing: there is no default global allocator. Data structures accept a `std.mem.Allocator` parameter, allocation failure is an ordinary `error.OutOfMemory` path on the return type, and libraries do not secretly pick a heap policy. The cost is allocator parameters percolating through call graphs; the benefit is full transparency — at every line of Zig code that allocates, you can see *which* allocator it goes to.\n\nThis is one of seven complementary models in the chapter 7.12 family (Odin, C3, Jai, Beef, Hare, D), each making allocation policy visible at the language/library boundary rather than treating `malloc` as ambient global state.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "odin-allocator-api#overview", "type": "compared-with" },
+        { "target": "c3-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "standard-palette",
+      "title": "Standard allocator palette and calling convention",
+      "tags": ["zig", "language-design", "allocator"],
+      "content": "The standard palette is deliberately small: `page_allocator` (raw `mmap`), `FixedBufferAllocator` (bump on a caller-provided buffer), `ArenaAllocator` (bulk-free arena), debug/general-purpose allocator with leak/UAF detection, `SmpAllocator` (multithreaded), `c_allocator` (libc malloc shim). User code allocating a `std.ArrayList` writes `try std.ArrayList(T).initCapacity(allocator, 100)` — the allocator is a value passed alongside other arguments.\n\nZig chooses verbosity over hidden allocation: testing routines often take an allocator parameter so test setup can pin a `FailingAllocator` to deterministically exercise OOM paths. The same source can drive a debug build with leak detection, a release build with `c_allocator`, and an embedded build with `FixedBufferAllocator` purely by choice of the allocator passed in at the entry point.",
+      "refs": [
+        { "target": "arena-allocation#language-allocator-api-relation", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Zig Guide: Allocators", "url": "https://zig.guide/standard-library/allocators/" },
+    { "label": "Zig std.heap source", "url": "https://github.com/ziglang/zig/blob/master/lib/std/heap.zig" }
+  ]
+}

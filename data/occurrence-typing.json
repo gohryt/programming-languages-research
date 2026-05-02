@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Occurrence Typing and Flow-Sensitive Refinement",
+  "aliases": ["flow-sensitive-typing", "type-narrowing", "logical-propositions-on-predicates"],
+  "summary": "Refines the type of a variable based on predicates and control flow. Especially useful for languages where programmers naturally inspect values at runtime. Typed Racket assigns logical propositions to predicates so the checker can know, for example, that a successful string-predicate test narrows a union to string. Can be extended with solver-backed refinement over arithmetic and bitvectors.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Occurrence typing refines the type of a variable based on predicates and control flow. It is especially useful for languages where programmers naturally inspect values at runtime — exactly the dynamic-language idioms a gradual type system needs to model.\n\nTyped Racket's occurrence typing assigns logical propositions to predicates so the checker can know, for example, that a successful `string?` predicate narrows a union to `String`. The proposition language is the type checker's interface to runtime-inspectable predicates: every predicate carries a positive and negative proposition, applied to the branches of the surrounding `if`.",
+      "refs": [
+        { "target": "union-intersection-types#production-narrowing", "type": "exemplifies" },
+        { "target": "static-dynamic-gradual-typing#typed-racket-and-migratory-typing", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "Typed Racket occurrence typing", "url": "https://docs.racket-lang.org/ts-guide/occurrence-typing.html" }
+      ]
+    },
+    {
+      "id": "smt-extensions",
+      "title": "SMT and theory-aware extensions",
+      "tags": ["type-system", "smt"],
+      "content": "Occurrence typing can be extended with solver-backed refinement over external theories such as arithmetic and bitvectors. The 2016 \"Occurrence Typing Modulo Theories\" line extends the proposition language so that branches can carry constraints like `x > 0` or `x mod 2 == 0`, with an SMT solver checking that a function call inside the branch satisfies its precondition.\n\nThis is the bridge between occurrence typing (flow-sensitive narrowing of union types) and refinement types (arbitrary predicates over base types). The trade-off is solver dependence: theory-aware narrowing can be slow on large branches and produces solver-shaped diagnostics that may surprise programmers used to syntactic narrowing.",
+      "refs": [
+        { "target": "refinement-types#overview", "type": "generalizes-to" }
+      ],
+      "sources": [
+        { "label": "Occurrence typing modulo theories", "url": "https://dl.acm.org/doi/10.1145/2908080.2908091" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Typed Racket occurrence typing", "url": "https://docs.racket-lang.org/ts-guide/occurrence-typing.html" },
+    { "label": "Occurrence typing modulo theories", "url": "https://dl.acm.org/doi/10.1145/2908080.2908091" }
+  ]
+}

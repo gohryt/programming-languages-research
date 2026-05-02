@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "Polyhedral Optimisation",
+  "aliases": ["polyhedral compilation", "polyhedral model", "Polly"],
+  "summary": "Represents loop nests as integer polyhedra, then applies tiling, interchange, fusion, and skewing transformations as polyhedral operations. Restricted to affine loop bounds and array accesses but devastating where it applies — 2–10× speedups over -O3 on scientific code. Polly (LLVM), Tiramisu, Triton.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The polyhedral model represents loop nests as **integer polyhedra**: each loop iteration is a point in an integer lattice, the loop bounds define a polytope of valid iterations, and array accesses are affine functions over loop indices. This algebraic formulation lets a compiler apply transformations — tiling, interchange, fusion, skewing — as operations on the polyhedra rather than as ad-hoc loop rewrites.\n\nThe model is restricted: it requires affine loop bounds and affine array accesses. When those constraints hold (typical of scientific code, dense linear algebra, image processing), polyhedral compilation finds optimal-or-near-optimal loop schedules that conventional optimisers cannot match. Speedups of 2–10× over LLVM -O3 are routine.",
+      "refs": [
+        { "target": "auto-vectorization#overview", "type": "complementary-to" }
+      ],
+      "sources": [
+        { "label": "polyhedral.info — survey", "url": "http://polyhedral.info/" }
+      ]
+    },
+    {
+      "id": "polly",
+      "title": "Polly — polyhedral analysis in LLVM",
+      "tags": ["llvm", "compiler"],
+      "content": "**Polly** (Grosser, Zheng, Aloor et al.) brings polyhedral analysis into mainline LLVM as an optional optimisation layer. It detects regions of code that fit the polyhedral model (affine loop bounds, affine array accesses), represents them as Integer Set Library (ISL) polyhedra, applies tiling / interchange / fusion transformations, and lowers back to LLVM IR.\n\nPolly is not enabled by default because polyhedral analysis can be slow and the classical polyhedral model doesn't handle non-affine loops. But for scientific code that fits the model, speedups of 2–10× over stock LLVM -O3 are routine. The practical lesson: polyhedral optimisation is a specialised tool that pays off massively on a narrow class of code, and modern compilers increasingly treat it as an optional pass rather than a mainstream transformation.",
+      "refs": [],
+      "sources": [
+        { "label": "Polly project", "url": "https://polly.llvm.org/" }
+      ]
+    },
+    {
+      "id": "domain-specific-descendants",
+      "title": "Domain-specific descendants — Halide, Tiramisu, Triton",
+      "tags": ["compiler", "ai", "gpu"],
+      "content": "Outside general-purpose compilers, the polyhedral model underpins several domain-specific compilers. **Halide** (Ragan-Kelley et al., 2012) separates algorithm specification from scheduling, with the schedule expressing tiling, fusion, and parallelism choices in a declarative DSL — polyhedral transformations made explicitly user-controlled. **Tiramisu** (Baghdadi et al.) is a polyhedral compiler for high-performance code generation across CPUs, GPUs, and distributed systems. **Triton** (OpenAI) is a GPU kernel DSL whose backend uses polyhedral techniques to schedule tile-level operations on tensor cores.\n\nThe shift visible across these projects: pure compiler-driven polyhedral optimisation has limited reach because users want to control the schedule explicitly for predictable performance. The DSL-with-explicit-schedule model has become dominant in domains where polyhedral transformations matter most (image processing, deep learning, dense linear algebra).",
+      "refs": [
+        { "target": "auto-vectorization#tuning-and-vplan", "type": "shares-tradeoff-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "polyhedral.info", "url": "http://polyhedral.info/" },
+    { "label": "Polly project", "url": "https://polly.llvm.org/" }
+  ]
+}

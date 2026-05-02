@@ -1,0 +1,29 @@
+{
+  "kind": "concept",
+  "name": "Jai Allocator API",
+  "aliases": ["Jai context allocator", "push_allocator"],
+  "summary": "Jai's implicit context carrying allocator + temp allocator, threaded through calls, with `push_allocator` (or double-comma shorthand) to rebind allocator policy for a subtree of calls without manual parameter threading.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "jai", "ergonomics"],
+      "content": "Jai (closed beta; public descriptions are community-derived) is included as historical influence: an implicit context carrying allocator + temp allocator, threaded through calls, with `push_allocator` or double-comma shorthand to rebind allocator policy for a subtree of calls without manual parameter threading. Odin's context allocator design is publicly documented as Jai-inspired.\n\nFor the Jai language as a whole — closed-beta status, custom x64 + LLVM dual backend, compiler-as-library design — see the dedicated `jai-language` record.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "odin-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "push-allocator",
+      "title": "push_allocator and temporary storage",
+      "tags": ["jai", "language-design"],
+      "content": "Within a function, `push_allocator(my_allocator) { ... }` swaps the implicit context allocator for the duration of the block; on exit the previous allocator is restored. The double-comma shorthand `foo(args,, my_allocator)` rebinds for a single call. Temporary storage (`temp` or `__temporary_storage`) is a built-in arena reset at user-controlled frame boundaries; library data structures consult it implicitly.\n\nStatus (as of 2026-04): Jai remains in closed beta; the allocator API design is documented through community wiki resources rather than first-party reference. Influence is still significant — Odin's context allocator and several other languages cite Jai as source.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "The Way to Jai: Memory Allocators and Temporary Storage", "url": "https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/21A_Memory_Allocators_and_Temporary_Storage.md" },
+    { "label": "Jai Community Wiki: Advanced", "url": "https://github.com/Jai-Community/Jai-Community-Library/wiki/Advanced" }
+  ]
+}

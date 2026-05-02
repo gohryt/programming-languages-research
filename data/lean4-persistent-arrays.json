@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Lean 4 Persistent Arrays as Compiler IR",
+  "aliases": ["lean4-persistent-state"],
+  "summary": "Lean 4's compiler uses persistent arrays (HAMT-style tries with a tail buffer that can be mutated in place under unique reference count) pervasively in its elaborator and tactic engine. The compiler's intermediate state lives in persistent arrays that share structure across versions.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lean 4's compiler uses *persistent arrays* (HAMT-style tries with a tail buffer that can be mutated in place under unique reference count) pervasively in its elaborator and tactic engine. The compiler's intermediate state — the list of declared definitions, the tactic-mode goals, the elaborator's metavariable assignments — lives in persistent arrays that share structure across versions.",
+      "refs": [
+        { "target": "persistent-ir#overview", "type": "instance-of" },
+        { "target": "perceus#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Lean 4 lean.h source", "url": "https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h" }
+      ]
+    },
+    {
+      "id": "fast-undo",
+      "title": "Fast undo via reference",
+      "tags": ["compiler-ir", "persistent-data-structures", "tactics"],
+      "content": "This makes Lean's IR fast to update and trivially undoable: rolling back a tactic is just dropping a reference to the new persistent state. Combined with Lean's compile-time RC, in-place mutation happens whenever the persistent array is provably unique-referenced.\n\nThe persistent-array-as-compiler-state pattern is what makes Lean 4's tactic engine perform well — every `intro`, `apply`, `rewrite` produces a new state that shares structure with the previous one, and undo is constant-time.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Lean 4 lean.h source", "url": "https://github.com/leanprover/lean4/blob/master/src/include/lean/lean.h" }
+  ]
+}

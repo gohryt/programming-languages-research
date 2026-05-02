@@ -1,0 +1,49 @@
+{
+  "kind": "concept",
+  "name": "Linux Folio and Multi-size THP",
+  "aliases": ["Linux folio", "mTHP", "multi-size transparent huge pages", "struct folio"],
+  "summary": "Two parallel Linux kernel efforts (folio refactoring 2022+, mTHP 2023+) that reshape the OS-level memory substrate every userspace allocator sits on: explicit-size folios replacing ambiguous `struct page`, plus intermediate huge-page sizes filling the 4 KiB-to-2 MiB gap.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["kernel", "linux", "huge-page", "transparent-huge-page"],
+      "content": "Every userspace allocator in chapter 7 sits on top of OS page allocation. Two parallel Linux kernel efforts have reshaped that substrate in 2022-2026 and matter for any language runtime targeting Linux: the folio refactoring of `struct page` and multi-size Transparent Huge Pages.\n\nThe runtime-design implication is unified: allocator designs that explicitly cooperate with the OS page-size hierarchy (4 KiB to multi-size mTHP to 2 MiB THP to 1 GiB hugepages) outperform allocators that assume one page size everywhere. TCMalloc + Temeraire is the production existence proof; jemalloc has hugepage hints in the same direction.",
+      "refs": [
+        { "target": "allocators#specialised-allocators", "type": "part-of" },
+        { "target": "tcmalloc#per-cpu-and-hugepage", "type": "exploited-by" },
+        { "target": "jemalloc#decay-purge", "type": "exploited-by" }
+      ]
+    },
+    {
+      "id": "folio-refactoring",
+      "title": "Folio refactoring (Linux 5.16+, 2022+)",
+      "tags": ["kernel", "linux"],
+      "content": "Matthew Wilcox et al.'s folio refactoring (merged starting Linux 5.16, 2022) replaces uses of `struct page` (the kernel's per-page metadata) with `struct folio` — a typed handle representing a contiguous physically-aligned run of pages. Where `struct page` conflated single-page and multi-page (compound) cases ambiguously, requiring runtime checks throughout the kernel, `struct folio` makes the typing explicit at compile time.\n\nThe 2025 milestone is moving `struct folio` to be allocated independently of `struct page`, eliminating a long-standing memory-management ambiguity. The lesson for language runtime designers: the OS-level page metadata you allocate on top of is moving from \"single page or maybe compound\" to \"explicit-size folio,\" which makes huge-page-aware allocators cleaner to implement.",
+      "refs": []
+    },
+    {
+      "id": "multi-size-thp",
+      "title": "Multi-size Transparent Huge Pages (Linux 6.6+, 2023+)",
+      "tags": ["transparent-huge-page", "hugetlb", "huge-page"],
+      "content": "Multi-size Transparent Huge Pages (mTHP) (merged Linux 6.6+, 2023+) extends Transparent Huge Pages (THP) — which previously gave only PMD-sized 2 MiB pages — to allocate folios of *intermediate* sizes (16 KiB, 32 KiB, 64 KiB, 128 KiB, 256 KiB, 512 KiB, 1 MiB) called \"anonymous mTHP.\" This is critical because the binary choice between 4 KiB pages (no TLB benefit) and 2 MiB pages (memory waste, allocation pressure) was poor for many workloads. mTHP fills the middle.\n\nUEK8 documentation reports 5-20% performance improvements on mixed workloads from mTHP enablement; ARM64 work in Linux 6.17 (2025) optimised khugepaged for batched PTE operations on large folios. Status (as of 2026-04): merged and enabled in modern distros; allocator-level adoption is still rolling out, with TCMalloc + Temeraire and jemalloc-with-hugepage-hints the early adopters.",
+      "refs": []
+    },
+    {
+      "id": "implications",
+      "title": "Implications for allocator design",
+      "tags": ["allocator", "language-design"],
+      "content": "For new language runtimes, exposing explicit large-allocation paths (such as `std.mem.Allocator` policy hints in Zig or allocator zones in C3) lets runtime code request mTHP-friendly sizes when allocation patterns warrant. The era of \"every allocation is 4 KiB-page-backed and the runtime ignores hugepages\" is ending; new language allocator APIs (see the chapter 7.12 records on Zig, Odin, C3, and the rest) sit at the right abstraction layer to surface page-size policy without baking it into the language.",
+      "refs": [
+        { "target": "zig-allocator-api#overview", "type": "related" },
+        { "target": "c3-allocator-api#overview", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Oracle Linux blog: Introduction to Folios", "url": "https://blogs.oracle.com/linux/intro-to-folios" },
+    { "label": "LWN: The state of the page in 2025", "url": "https://lwn.net/Articles/1015320/" },
+    { "label": "Oracle UEK8 mTHP notes", "url": "https://blogs.oracle.com/linux/uek8-a-few-notable-changes-in-the-core-kernel" },
+    { "label": "Linux Transparent Huge Pages admin guide", "url": "https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html" }
+  ]
+}

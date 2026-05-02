@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Polymorphic Inline Caches",
+  "aliases": [
+    "PIC",
+    "Hölzle PIC"
+  ],
+  "summary": "Hölzle, Chambers, Ungar (ECOOP 1991): cache multiple type-dispatch results per call site, with a small linear search through cached cases. Originally for Self; descended into V8 ICs, SpiderMonkey caches, Julia method tables. O(1) for <10 types; megamorphic cliff for more.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Urs Hölzle, Craig Chambers, and David Ungar (ECOOP 1991) introduced **Polymorphic Inline Caches**: cache multiple type-dispatch results per call site, with a small linear search through cached cases. Originally developed for the Self language, the technique propagated to every modern dynamic-language JIT.\n\nThe mechanism extends monomorphic inline caching: instead of one cached `(type, target)` pair, the cache holds a small list. On each call, walk the list; if the current type matches a cached entry, dispatch to the cached target. The list is bounded (typically 4–10 entries); when the list fills, the cache transitions to megamorphic mode and falls back to dynamic-lookup slow path.",
+      "refs": [
+        {
+          "target": "hidden-classes-ic#overview",
+          "type": "extended-by"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Polymorphic Inline Caches (Hölzle, Chambers, Ungar, ECOOP 1991)",
+          "url": "https://bibliography.selflanguage.org/_static/pics.pdf"
+        }
+      ]
+    },
+    {
+      "id": "production",
+      "title": "Production usage",
+      "tags": [
+        "jit",
+        "production"
+      ],
+      "content": "PICs descended into V8 ICs, SpiderMonkey caches, JavaScriptCore inline caches, and Julia's method table dispatch. The technique is the standard solution to \"dynamic dispatch in a statically-traced JIT\": observe a few common types, generate fast paths for them, fall back to dispatch when types diverge.\n\nThe size of the cache list matters. Too small (3 or fewer): polymorphic code falls megamorphic too quickly. Too large (20+): linear search becomes expensive enough that the cached fast path doesn't pay off. Production engines tune this size empirically per call-site type, with smaller caches for types that are usually monomorphic and larger ones for types known to be naturally polymorphic.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Hölzle PICs ECOOP 1991",
+      "url": "https://bibliography.selflanguage.org/_static/pics.pdf"
+    }
+  ]
+}

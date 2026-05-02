@@ -1,0 +1,58 @@
+{
+  "kind": "tool",
+  "name": "CompCert — Verified Optimising C Compiler",
+  "aliases": [
+    "Leroy CompCert"
+  ],
+  "summary": "Xavier Leroy's verified C compiler (POPL 2006+, commercially available). Each optimisation pass is mechanically proven correct in Coq against a formal C semantics. Independent CSmith fuzzing found *zero* middle-end miscompilation bugs in CompCert, while every other evaluated C compiler had many. Production use at Airbus for safety-critical avionics.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Xavier Leroy's **CompCert** (started 2006, first paper POPL 2006; commercially available) is a C compiler whose correctness is proven in Coq. The chain of proofs shows that for every well-defined C program, the generated PowerPC, x86, ARM, or RISC-V assembly preserves the source's observable behaviour. Optimisations (constant propagation, CSE, register allocation, function inlining) are each verified against a formal semantics of the intermediate language.",
+      "refs": [
+        {
+          "target": "cakeml#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "vellvm#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "CompCert",
+          "url": "https://compcert.org/"
+        }
+      ]
+    },
+    {
+      "id": "empirical-correctness",
+      "title": "Empirical correctness",
+      "tags": [
+        "verified-compiler",
+        "production"
+      ],
+      "content": "The practical outcome: CompCert-compiled code has been shown in independent evaluation (CSmith fuzzing by Regehr et al.) to have *zero* middle-end miscompilation bugs — while every other evaluated C compiler (GCC, Clang, commercial) had many. Airbus uses CompCert for safety-critical avionics code; the proof discharges entire categories of certification requirements.\n\nThe cost is performance: CompCert-compiled code runs ~15–20% slower than GCC -O2, because many aggressive but unverified optimisations are omitted. For safety-critical systems where verification is mandatory, this is an acceptable trade; for general use it usually isn't.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "The CompCert Verified Compiler (Leroy, CACM)",
+          "url": "https://xavierleroy.org/publi/compcert-CACM.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "CompCert home",
+      "url": "https://compcert.org/"
+    },
+    {
+      "label": "Leroy CACM",
+      "url": "https://xavierleroy.org/publi/compcert-CACM.pdf"
+    }
+  ]
+}

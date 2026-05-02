@@ -1,0 +1,9 @@
+{
+  "id": "operating-system",
+  "tag": "operating-system",
+  "name": "Operating System",
+  "description": "Sections tagged with the Operating System concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "operating-systems"
+  ]
+}

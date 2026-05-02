@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Type Classes, Traits, Protocols, and Concepts",
+  "aliases": ["type-classes", "traits", "protocols", "concepts", "associated-types", "coherence"],
+  "summary": "Bounded polymorphism mechanisms that turn operations on type parameters into obligations solved by instance/implementation search. Spans Haskell type classes, Rust traits, Swift protocols, Scala implicits, C++ concepts. Design axes: global coherence vs local search, orphan rules, associated types vs generic parameters, specialization, and whether solving is syntax-directed, logic-programming-based, or ad hoc.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Type classes and trait-like systems turn operations on type parameters into obligations solved by instance/implementation search. The compiler usually elaborates these obligations into dictionaries, witnesses, vtables, or statically selected methods; lowering and IR-level representation of evidence are covered in `data/evidence-passing`.\n\nThe distinguishing axes across designs are:\n\n- **global coherence versus local implicit search**;\n- **orphan rules and package boundaries**;\n- **associated types versus generic parameters**;\n- **specialization and overlapping instances**;\n- **negative reasoning and specialization**;\n- **whether solving is syntax-directed, logic-programming-based, or ad hoc**.\n\nEach axis has predictable consequences for the type checker, the IR, and what the optimizer can specialize.",
+      "refs": [
+        { "target": "parametric-polymorphism#overview", "type": "extends" },
+        { "target": "evidence-passing#overview", "type": "lowered-via" },
+        { "target": "chalk-trait-solver#overview", "type": "exemplifies" },
+        { "target": "constraint-based-typing#overview", "type": "uses" }
+      ]
+    },
+    {
+      "id": "associated-types",
+      "title": "Associated types and projection equality",
+      "tags": ["type-system", "trait-solving"],
+      "content": "Associated types attach type-level results to trait/protocol implementations. They improve abstraction but complicate equality because a projection such as `Iterator.Item` may not normalize until the implementing type is known.\n\nChalk models associated type normalization with predicates such as normalization and alias equality; unification involving projections may produce subgoals rather than immediately deciding equality. This is the architectural trade-off that distinguishes \"associated types\" from \"extra generic parameters\": associated types let trait implementations *commit* to a specific type, but the cost is that equality involving the projection may need to wait for instance selection.\n\nFor language designers, the choice between associated types and additional generic parameters is mostly an ergonomics question: associated types give cleaner signatures (`fn collect<I: Iterator>(it: I) -> Vec<I::Item>`) at the cost of implementer flexibility; generic parameters give callers more control (`fn collect<I: Iterator<Item=T>, T>(it: I) -> Vec<T>`) at the cost of signature noise.",
+      "refs": [
+        { "target": "chalk-trait-solver#overview", "type": "implemented-by" }
+      ],
+      "sources": [
+        { "label": "Chalk type equality and unification", "url": "https://rust-lang.github.io/chalk/book/clauses/type_equality.html" }
+      ]
+    },
+    {
+      "id": "coherence-and-ambiguity",
+      "title": "Coherence and ambiguity",
+      "tags": ["type-system", "trait-solving"],
+      "content": "Coherence means the same overloaded expression has a unique meaning independent of compilation order or search strategy. Haskell, Rust, Swift, and Scala-like systems make different trade-offs around global uniqueness, associated types, implicits, and path-dependent typing.\n\n- **Haskell**: global coherence enforced by orphan rules — an instance must live in either the trait's defining module or the type's defining module.\n- **Rust**: similar global coherence, with strict orphan-rule enforcement; impl conflicts are compile errors.\n- **Swift**: protocol conformances follow nominal types but allow conditional conformance; coherence is local to the conformance hierarchy.\n- **Scala**: implicit search is *local* — the in-scope implicits at a call site decide the resolution. Different parts of a program can resolve the same type-class method to different implementations.\n\nA 2025 comparative paper on type-class coherence in Swift, Rust, Scala, and Haskell notes that mainstream non-dependent systems often rely on coherence, while Scala-like dependent typing supports more flexible implicit resolution at the cost of intricate disambiguation policies.",
+      "sources": [
+        { "label": "Type-class coherence comparison (arXiv 2025)", "url": "https://arxiv.org/pdf/2502.20546" }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": ["type-system", "language-design"],
+      "content": "For a new language considering trait-like polymorphism:\n\n- **Decide coherence policy first**: global (Haskell/Rust) or local (Scala). Retrofitting is hard because users build mental models around the rule.\n- **Plan orphan rules with the package system**: the orphan rule interacts with package identity (`data/module-identity`, `data/package-management`). Design them together.\n- **Pick a solver architecture**: syntax-directed (simpler, less expressive) or logic-programming-based (more expressive, harder to debug). Chalk's approach (`data/chalk-trait-solver`) is the canonical logic-programming reference.\n- **Decide whether instances can overlap or specialize**: overlapping instances allow specialization but break coherence guarantees; closed type families are a sound alternative.\n- **Consider dependent path-dependent alternatives**: if the language has dependent types, type-class evidence can become explicit value-level dictionaries (Idris, Lean) — simpler semantics, more programmer work."
+    }
+  ],
+  "sources": [
+    { "label": "Chalk book", "url": "https://rust-lang.github.io/chalk/book/" },
+    { "label": "Type-class coherence comparison", "url": "https://arxiv.org/pdf/2502.20546" }
+  ]
+}

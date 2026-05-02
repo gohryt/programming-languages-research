@@ -1,0 +1,37 @@
+{
+  "kind": "tool",
+  "name": "Checker Framework for Java",
+  "aliases": ["checker-framework", "java-checker-framework", "jsr-308-checkers"],
+  "summary": "Mernst et al. (ISSTA 2008+): longest-running production pluggable-type-system. Java compiler exposes JSR 308 type-annotation hooks; the Checker Framework registers as a javac plug-in to enforce additional disciplines on annotated code: nullness, tainting, units of measurement, array-index bounds, regex syntax validity, initialization, interning, format strings, internationalization, and many more — each shipped as an independent checker module.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Java's Checker Framework** (Mernst et al., ISSTA 2008+) is the longest-running production example of pluggable typing. The Java compiler exposes JSR 308 type-annotation hooks, and the Checker Framework registers as a `javac` plug-in to enforce additional disciplines on annotated code: nullness (`@Nullable`, `@NonNull`), tainting (`@Tainted`, `@Untainted`), units of measurement (`@m`, `@s`, `@kg`), array index bounds (`@IndexFor(\"array\")`, `@LTLengthOf`), regex syntax validity (`@Regex`), initialization (`@UnderInitialization`), interning, format strings, internationalization (`@Localized`), and many more — each shipped as an independent checker module that runs alongside the standard Java type system.\n\nNone are part of Java itself; all are pluggable disciplines whose enforcement happens at compile time only.",
+      "refs": [
+        { "target": "pluggable-type-systems#overview", "type": "implements" }
+      ],
+      "sources": [
+        { "label": "Checker Framework manual", "url": "https://checkerframework.org/manual/" },
+        { "label": "Mernst et al. — Practical Pluggable Types for Java (ISSTA 2008)", "url": "https://homes.cs.washington.edu/~mernst/pubs/pluggable-checkers-issta2008.pdf" }
+      ]
+    },
+    {
+      "id": "deployment-pattern",
+      "title": "Deployment pattern",
+      "tags": ["pluggable-types", "production"],
+      "content": "Each Checker Framework discipline is a separate JAR, loaded by `javac` via the `-processor` flag. Programmers write Java with annotations (`@NonNull String name`, `@Tainted byte[] input`); the relevant checker validates the annotations against a discipline-specific type system layered on top of standard Java.\n\nThe deployment pattern is what makes pluggable types practical: a project can adopt one checker (nullness) at a time, leave others off, and migrate code gradually. Each checker has its own annotation vocabulary, its own subtype rules, and its own diagnostic format. Multiple checkers can run in the same compilation but do not share inference state — each runs an independent analysis."
+    },
+    {
+      "id": "lesson-and-tradeoffs",
+      "title": "Production lesson — modularity beats coherence at this scale",
+      "tags": ["pluggable-types", "language-design"],
+      "content": "The Checker Framework demonstrates that pluggable typing is a viable production architecture at scale: hundreds of organizations use checkers like the Nullness Checker in CI, often without the broader engineering organization knowing the framework is present.\n\nThe trade-offs are also clear: the analyses do not share inference machinery, so running multiple checkers simultaneously can slow compilation; cross-checker interactions (a `@NonNull` value flowing through a `@Tainted` interface) are not always sound by composition; and the annotation vocabulary across checkers is not unified, so programmers learn a separate idiom per discipline. Despite these costs, the modularity payoff has made the Checker Framework a long-running success — Mernst's group has been publishing checker designs for nearly two decades, and several disciplines (nullness, units of measure, regex) are de-facto standard in their domains."
+    }
+  ],
+  "sources": [
+    { "label": "Checker Framework manual", "url": "https://checkerframework.org/manual/" },
+    { "label": "Mernst et al. — Practical Pluggable Types for Java (ISSTA 2008)", "url": "https://homes.cs.washington.edu/~mernst/pubs/pluggable-checkers-issta2008.pdf" }
+  ]
+}

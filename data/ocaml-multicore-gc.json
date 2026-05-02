@@ -1,0 +1,45 @@
+{
+  "kind": "runtime",
+  "name": "OCaml 5 — Multicore Domain GC",
+  "aliases": ["OCaml multicore GC", "OCaml 5 GC", "Multicore OCaml GC"],
+  "summary": "OCaml 5.0 (December 2022) shipped a stop-the-world parallel minor copying collector + mostly-concurrent mark-sweep major collector, with one private minor heap per domain and a shared major heap.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "generational-gc", "parallel-gc", "mostly-concurrent-gc", "copying-gc", "ocaml", "production"],
+      "content": "OCaml 5.0 (December 2022) shipped a stop-the-world parallel minor copying collector + mostly-concurrent mark-sweep major collector, with one private minor heap per *domain* and a shared major heap.\n\nThe cleanest example of retrofitting multicore onto a previously single-threaded GC.",
+      "refs": [
+        { "target": "garbage-collection#actor-and-domain-collectors", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "minor-heap",
+      "title": "Per-domain minor heap and parallel collection",
+      "tags": ["copying-gc", "stop-the-world", "parallel-gc", "generational-gc"],
+      "content": "**STW parallel minor collection**: all domains promote in parallel; conflicting promotions of the same object are serialized via interrupts. Each domain has its own minor heap (fast bump allocation; copying collection on minor-heap full).\n\nThe \"parallel\" property is per-collection: when a minor GC fires, all domains stop, but each domain processes its own minor heap in parallel with the others. No domain blocks on another domain's GC work."
+    },
+    {
+      "id": "major-heap",
+      "title": "Shared major heap with idempotent marking",
+      "tags": ["mark-sweep", "concurrent-marking", "concurrent-sweep", "mostly-concurrent-gc"],
+      "content": "**Idempotent marking + disjoint sweeping** on the shared major heap — domains can mark the same object redundantly and each sweeps only its own pool slice; tiny STW only at major-cycle end.\n\nThe idempotent-marking design is the key insight: instead of synchronising domains during marking (which would force expensive coordination), let each domain mark whatever it sees, accepting redundant work in exchange for lock-free progress. Disjoint sweeping is partition-by-domain so no two domains touch the same major-heap pool slice during reclamation."
+    },
+    {
+      "id": "fibers",
+      "title": "Dirty-stack tracking for fibers",
+      "tags": ["concurrent-marking", "tricolor"],
+      "content": "**Dirty-stack tracking** for fibers: stacks not currently running may temporarily violate the strong tricolor invariant, cleaned at minor GCs. This is necessary because OCaml 5 fibers are first-class continuations whose stacks can be paused, resumed, and migrated between domains; the GC marks must converge regardless of which domain runs the fiber next."
+    },
+    {
+      "id": "compatibility",
+      "title": "Compatibility and design lesson",
+      "tags": ["ocaml", "garbage-collection"],
+      "content": "Backwards-compatible with single-domain code and the C API. The **cleanest example of retrofitting multicore onto a previously single-threaded GC**.\n\nLessons for new language designers: a minor-heap-per-domain + shared-major-heap structure is a workable middle point between Erlang's strict process isolation (BEAM) and the JVM's fully shared heap. Idempotent marking is the technique that makes mostly-concurrent multicore GC tractable without per-edge synchronisation."
+    }
+  ],
+  "sources": [
+    { "label": "OCaml 5 multicore GC slides (FUN OCaml 2024)", "url": "https://fun-ocaml.com/2024/slides/multicore-gc.pdf" },
+    { "label": "OCaml 5 design notes", "url": "https://github.com/ocaml-multicore/docs/blob/main/ocaml_5_design.md" }
+  ]
+}

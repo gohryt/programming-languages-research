@@ -1,0 +1,75 @@
+{
+  "kind": "concept",
+  "name": "Error Recovery",
+  "aliases": ["parser-error-recovery", "resilient-parsing"],
+  "summary": "Techniques for keeping a usable syntax tree on invalid input — essential once a parser runs on every keystroke; designs span panic-mode skipping, tree-sitter parallel forks, Röhrich insertion-only correction, Hazel's typed holes, Marpa Ruby Slippers, HTML5's recovery-as-specification, CPCT+ minimum-distance repair, and resilient LL.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Error recovery is essential once a parser has to run on every keystroke in an editor rather than once per clean file. Designs differ on where recovery authority lives: in a synchronization-token skip loop (panic mode), in the parser algorithm itself (tree-sitter's parallel forks, Röhrich insertion-only), in the language design (Hazel's typed holes), in a programmable handler called by the parser (Marpa's Ruby Slippers), or in a prose specification that enumerates every recovery action (HTML5).",
+      "refs": [
+        { "target": "tree-sitter#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Princeton COS 320 — error recovery notes", "url": "https://www.cs.princeton.edu/courses/archive/spr04/cos320/notes/error-recovery.pdf" },
+        { "label": "TU Delft thesis — error recovery (van der Gun)", "url": "https://repository.tudelft.nl/record/uuid:5f796ca0-1b65-4d28-9255-6cb4b6810817" }
+      ]
+    },
+    {
+      "id": "panic-mode-and-parallel-recovery",
+      "title": "Panic mode and parallel recovery",
+      "tags": ["parser", "error-recovery", "tooling"],
+      "content": "**Panic mode** is the simplest recovery: when the parser encounters an unexpected token, skip tokens until reaching a synchronization point (typically a semicolon, closing brace, or keyword that starts a new statement). The advantage: trivially simple to implement, predictable behavior, prevents cascading errors. The disadvantage: potentially skips large amounts of valid code, producing a sparse AST. For editor use cases where every keystroke may produce a syntax error, panic mode is too destructive.\n\n**Tree-sitter** forks the parser state at the error point, races insert/delete/`ERROR`-wrap strategies, and keeps whichever consumes the most subsequent input. One fork inserts a missing token and proceeds, another deletes the offending token, and a third wraps the surrounding region in an `ERROR` node so that valid sibling subtrees survive. The cost (multiple parallel parse attempts) buys structurally useful trees on broken input.\n\n**Röhrich (1980)** showed that for LL(k) and LR(k) parsers, error correction can be achieved by inserting terminal symbols to the right of the error location, never deleting. The output always corresponds to a syntactically valid program. The correction algorithm requires only one character per parser state, making it extremely cheap in space.",
+      "refs": [],
+      "sources": [
+        { "label": "Röhrich 1980", "url": "https://link.springer.com/article/10.1007/BF00263989" }
+      ]
+    },
+    {
+      "id": "language-level-recovery",
+      "title": "Language-level recovery — Hazel typed holes, HTML5",
+      "tags": ["parser", "language-design", "error-recovery"],
+      "content": "**Hazel** inserts \"typed holes\" wherever the parser encounters incomplete or missing expressions. Unlike traditional error recovery which produces error nodes, holes are semantically meaningful — they have types, so downstream phases can still operate on the incomplete program. This turns error recovery from a hack into a language feature: every intermediate editor state is a valid program with holes. The trade-off: it requires the entire language and type system to be designed around the possibility of holes.\n\n**HTML5** takes error recovery further than any other approach: the specification itself *is* the recovery algorithm. Every byte sequence, valid or not, must produce a well-defined DOM tree, and two conformant parsers must produce spec-equivalent DOM structure on identical input. The tree construction algorithm is a state machine of \"insertion modes\" alongside a stack of open elements and a list of active formatting elements; auxiliary algorithms (adoption agency, foster parenting) and a long list of named parse errors each carry a mandated recovery action. The takeaway is that the spec *is* the algorithm — the parser has no choices left to make. Categorically different from tree-sitter or panic mode: there are no error nodes; every byte contributes to the tree under rules as tight as the grammar itself.",
+      "refs": [],
+      "sources": [
+        { "label": "Hazel", "url": "https://hazel.org/" },
+        { "label": "HTML Standard parsing", "url": "https://html.spec.whatwg.org/multipage/parsing.html" }
+      ]
+    },
+    {
+      "id": "programmable-and-minimum-distance",
+      "title": "Programmable recovery and minimum-distance repair",
+      "tags": ["parser", "error-recovery", "tooling"],
+      "content": "**Marpa's Ruby Slippers parsing**: rather than recovering only *after* the parser has fallen over, Marpa exposes what it is expecting at any input position and lets the surrounding application inject, substitute, or adjust tokens to keep the parse moving. The interface flips error recovery from a fixed generator-side heuristic into a programmable callback — the host program decides which \"expected\" token to synthesise, on what evidence, and the parser resumes as if the input had always contained it.\n\n**Burke–Fisher** repair backs up a bounded number of tokens from the detected error point, tries single-token repairs around that window, reparses, and chooses the repair that gets furthest. This matters because the true mistake is often before the token where the LR automaton finally gets stuck.\n\n**CPCT+** (\"Don't Panic! Better, Fewer, Syntax Errors for LR Parsers\") searches for the complete set of minimum-cost repair sequences at an error location, merges compatible configurations for speed, and uses the set of repairs to reduce cascading diagnostics. Diekmann and Tratt report CPCT+ repaired 98.37% of 200,000 invalid Java files within a 0.5s timeout and produced far fewer cascading error locations than panic mode.",
+      "refs": [
+        { "target": "marpa#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "CPCT+ paper", "url": "https://arxiv.org/abs/1804.07133" }
+      ]
+    },
+    {
+      "id": "resilient-parsing-for-tooling",
+      "title": "Resilient parsing for interactive tooling",
+      "tags": ["parser", "error-recovery", "tooling"],
+      "content": "Interactive tooling changes the parser's success condition. A batch compiler may reasonably stop once it has emitted one high-quality syntax error. An IDE, formatter, refactoring engine, or semantic-completion service usually cannot. It needs a tree — often a best-effort one — for *every* intermediate editor state, including incomplete declarations, half-written expressions, and mismatched delimiters.\n\nThis shifts the parser's job from \"accept or reject\" toward producing the most useful structurally sound tree possible under invalid input. Specific mechanisms vary: local recovery with explicit `ERROR` or placeholder nodes; resilient recursive-descent strategies that parse a correct prefix and quarantine the broken region; phrase-level repair and token synchronization; AST placeholders that let later phases continue operating.\n\nMatklad's **resilient LL parsing** work is the clearest hand-written parser formulation: instead of propagating failure upward, each production consumes what it can, inserts localized error nodes, and preserves unaffected siblings so later tooling remains meaningful. Hylo's 2025 work on error-tolerant parsing makes the same point from a language-implementation perspective.\n\nThe practical design question for a new language: ship one parser optimized for compiler throughput and a separate resilient parser for tooling, or one parser deliberately engineered to satisfy both batch compilation and interactive editing.",
+      "refs": [
+        { "target": "language-server#design-constraints", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Resilient LL Parsing Tutorial", "url": "https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Röhrich 1980", "url": "https://link.springer.com/article/10.1007/BF00263989" },
+    { "label": "Hazel", "url": "https://hazel.org/" },
+    { "label": "HTML Standard parsing", "url": "https://html.spec.whatwg.org/multipage/parsing.html" },
+    { "label": "CPCT+ paper", "url": "https://arxiv.org/abs/1804.07133" },
+    { "label": "Resilient LL Parsing Tutorial", "url": "https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html" },
+    { "label": "Princeton COS 320 — error recovery notes", "url": "https://www.cs.princeton.edu/courses/archive/spr04/cos320/notes/error-recovery.pdf" },
+    { "label": "TU Delft thesis — error recovery (van der Gun)", "url": "https://repository.tudelft.nl/record/uuid:5f796ca0-1b65-4d28-9255-6cb4b6810817" }
+  ]
+}

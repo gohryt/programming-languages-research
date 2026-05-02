@@ -1,0 +1,69 @@
+{
+  "kind": "concept",
+  "name": "Recursive Descent",
+  "aliases": ["hand-written parser"],
+  "summary": "Hand-written parser style: one host-language function per grammar production. Dominant choice for production compilers that need contextual lookahead, custom recovery, and hot-path tuning beyond what generators provide.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Recursive descent deserves an explicit entry because it is not merely an implementation detail behind Pratt parsing or PEG. In its simplest form, each grammar production becomes a host-language function, and the parser advances through the token stream by calling these functions directly.\n\nVariants form a spectrum: predictive recursive descent chooses alternatives from lookahead tokens; backtracking recursive descent tries alternatives speculatively; resilient recursive descent (the rust-analyzer / Matklad pattern) deliberately consumes a well-formed prefix and emits error nodes instead of failing globally.",
+      "refs": [
+        { "target": "parser-combinators#overview", "type": "contrasts-with" },
+        { "target": "pratt-parsing#overview", "type": "commonly-used-with" },
+        { "target": "deterministic-ll-lr#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        {
+          "label": "Tratt — Which Parsing Approach?",
+          "url": "https://tratt.net/laurie/blog/2020/which_parsing_approach.html"
+        },
+        {
+          "label": "Matklad — Resilient LL Parsing Tutorial",
+          "url": "https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html"
+        }
+      ]
+    },
+    {
+      "id": "grammar-mapping",
+      "title": "Grammar mapping",
+      "tags": ["parser", "grammar-design"],
+      "content": "Each production typically becomes a parsing function. Expression parsing is delegated to Pratt parsing or precedence climbing so that operator logic does not force excessive grammar layering. The usual pattern in production compilers is: parse declarations and statements with recursive descent, parse expressions with Pratt or precedence climbing, and reserve ad-hoc lookahead for the few places where the grammar is intentionally not LL(1).",
+      "refs": [
+        { "target": "precedence-climbing#overview", "type": "uses-for-expressions" },
+        { "target": "pratt-parsing#overview", "type": "uses-for-expressions" }
+      ]
+    },
+    {
+      "id": "strengths",
+      "title": "Strengths and production usage",
+      "tags": ["parser", "design-guidance", "diagnostics"],
+      "content": "The production appeal is control. A hand-written recursive-descent parser can special-case ambiguous constructs, attach targeted diagnostics, perform context-sensitive recovery, avoid table indirection, and keep hot paths allocation-free.\n\nStatus (as of 2026-04): production compilers and toolchains using hand-written recursive descent — typically combined with Pratt or precedence climbing for expressions — include GCC, Clang, Go, rustc, V8, Zig, Ruff, and rust-analyzer. The usual reasons are custom error recovery, contextual lookahead, incremental reparsing, and hot-path tuning that outweigh the convenience of grammar-driven generation.",
+      "refs": [
+        { "target": "pratt-parsing#strengths", "type": "compose-with" },
+        { "target": "language-server#design-constraints", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["parser", "tradeoffs", "left-recursion"],
+      "content": "The cost is that ambiguity detection moves from generator to author. An LR generator will report a shift/reduce conflict; a recursive-descent parser may silently prefer whichever branch its code checks first. Good recursive-descent implementations compensate with tests, explicit grammar comments, debug traces, and carefully named helper functions such as `at_item_start`, `recover_until`, and `expect_contextual_keyword`.\n\nLeft recursion typically requires explicit handling, predictive parsing constraints, and grammar refactoring. In larger systems, grammar maintenance may become more ad hoc than in strongly grammar-driven parser-generator workflows.",
+      "refs": [
+        { "target": "deterministic-ll-lr#overview", "type": "contrasts-with" },
+        { "target": "antlr4#tradeoffs", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Tratt — Which Parsing Approach?",
+      "url": "https://tratt.net/laurie/blog/2020/which_parsing_approach.html"
+    },
+    {
+      "label": "Matklad — Resilient LL Parsing Tutorial",
+      "url": "https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html"
+    }
+  ]
+}

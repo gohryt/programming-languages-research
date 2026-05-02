@@ -1,0 +1,39 @@
+{
+  "kind": "concept",
+  "name": "V8 Turboshaft IR",
+  "aliases": ["Turboshaft", "V8 linear IR", "Sea-of-Nodes replacement"],
+  "summary": "V8's replacement for TurboFan's Sea-of-Nodes IR. Operations live in straight-line basic blocks with dense indexed operand references — closer to LLVM IR than to SoN. 30–40% compile-time reduction on migrated pipelines with parity-or-better code quality on JS workloads.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Turboshaft is V8's replacement for TurboFan's Sea-of-Nodes IR. Where TurboFan stored operations in a graph with implicit ordering (every instruction's position determined by its data dependencies), Turboshaft keeps operations in **straight-line basic blocks** with dense indexed operand references — closer to LLVM IR than to Sea-of-Nodes.\n\nOperations live in a flat buffer with fixed-size slots; operands are 32-bit indices rather than pointers. The data layout is cache-friendly and amenable to per-pass linear iteration.",
+      "refs": [
+        { "target": "sea-of-nodes#overview", "type": "replaces" }
+      ],
+      "sources": [
+        { "label": "V8 Turboshaft blog", "url": "https://v8.dev/blog/turboshaft" }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design trade-offs vs Sea-of-Nodes",
+      "tags": ["jit", "compiler-architecture"],
+      "content": "Status (as of 2026-04): the V8 team reports a **30–40% compile-time reduction** relative to TurboFan with parity-or-better code quality on the migrated pipelines. Debugging is easier because program order is explicit and cache locality improved by removing pointer-chasing.\n\nTurboshaft's linear shape eliminates global scheduling per pass and gives pass authors predictable iteration behaviour. The cost is less optimisation freedom — instructions cannot freely move across blocks the way Sea-of-Nodes allows. For JIT compilation budgets where compile time dominates, this is the right trade-off; for ahead-of-time optimisation where peak code quality matters more, Sea-of-Nodes still has merit.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ]
+    },
+    {
+      "id": "industry-trend",
+      "title": "Industry trend toward linear IRs",
+      "tags": ["compiler-architecture", "industry"],
+      "content": "The V8 migration from TurboFan to Turboshaft is part of a broader pattern: linear IRs with explicit ordering have become the dominant choice for JIT and many AOT compilers. LLVM's IR is linear; Cranelift's CLIF is linear; PHP 8.4's IR framework is linear. Sea-of-Nodes (HotSpot C2, original TurboFan, GraalVM) remains the outlier — powerful for AOT optimisation but operationally expensive at JIT scale.\n\nThe lesson: cache locality and predictable per-pass iteration matter more in practice than the maximum scheduling freedom Sea-of-Nodes offers. For new compiler designs, linear IR is the safer default unless the workload specifically benefits from global scheduling.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "V8 Turboshaft", "url": "https://v8.dev/blog/turboshaft" }
+  ]
+}

@@ -1,0 +1,409 @@
+{
+  "kind": "concept",
+  "name": "Allocators",
+  "aliases": [
+    "memory-allocators",
+    "malloc"
+  ],
+  "summary": "Concept hub for the implementation layer that determines how memory is obtained, organised, reused, and returned; collects the design axes (throughput, fleet TLB efficiency, decay-tuned tail latency, security hardening, footprint, real-time predictability, language-level allocator ergonomics) and indexes per-allocator implementations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Allocators manage heap layout, size classes, reuse, and fragmentation behaviour. They sit below tracing GC and above raw `mmap`, and they strongly shape the runtime cost and locality profile of higher-level memory strategies — but they are an implementation layer, not a full language memory model.\n\nThe modern userspace-allocator design space is dominated by the choice of *what to optimize for*: raw throughput, TLB efficiency at fleet scale, tail latency under decay, security hardening, footprint, hard real-time predictability, or language-level allocator ergonomics. A separate axis above the allocator implementation is **how the language exposes allocation authority** — explicit allocator parameters (Zig), implicit context allocators (Odin, Jai), per-scope temp pools (C3, Beef), composable building blocks (D), or compile-time memory-mode flags (V).",
+      "refs": [
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": [
+        "allocator",
+        "comparative-design",
+        "runtime"
+      ],
+      "content": "Allocator designs vary along several orthogonal axes:\n\n- **Optimisation target**: throughput (mimalloc, snmalloc, rpmalloc), fleet TLB efficiency (TCMalloc + Temeraire), tail latency under decay (jemalloc), security hardening (Scudo, hardened_malloc, PartitionAlloc), footprint (Mesh), hard real-time bounded-time alloc/free (TLSF), academic provable bounds (Hoard).\n- **Threading model**: thread-local caches (mimalloc, jemalloc), per-CPU caches with `rseq` (TCMalloc), MPSC remote-deallocation queues (snmalloc), per-processor heaps with global fallback (Hoard).\n- **OS interaction**: simple `mmap` + size classes; cooperative with the OS page-size hierarchy (4 KB, multi-size mTHP, 2 MB THP, 1 GB hugepages); `mremap`-based virtual-memory tricks (Mesh's compaction without relocation).\n- **Language-level allocator surface**: ambient `malloc` (most C-family); explicit allocator parameters and no global default (Zig); implicit context allocator (Odin, Jai); per-scope temp pools (C3, Beef); composable building blocks (D); compile-time memory-mode flag (V); allocator-aware `new` (Beef); runtime heaps (Hare).\n- **Locality/safety hooks**: tag bits with hardware enforcement (Scudo + ARM MTE); type-confusion mitigation by partitioning (PartitionAlloc); refcount-on-allocation (BackupRefPtr / MiraclePtr).",
+      "refs": [
+        {
+          "target": "mimalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "tcmalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "jemalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "scudo",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "throughput-allocators",
+      "title": "Throughput-oriented allocators",
+      "tags": [
+        "runtime",
+        "allocation",
+        "performance"
+      ],
+      "content": "Throughput-oriented allocators (mimalloc, snmalloc, rpmalloc) target raw allocation/free CPU cost using thread-local fast paths and lock-free remote-deallocation handling. mimalloc's page-local sharded free lists enforce a temporal cadence; snmalloc replaces thread-local caches with an MPSC message-passing queue for foreign-thread frees; rpmalloc uses fixed 64 KiB span alignment so the free path masks address bits to find the span header. The family converges on \"branchless fast path, batched cross-thread maintenance\" but disagrees on whether the slow path is per-page (mimalloc), per-MPSC-queue (snmalloc), or per-span (rpmalloc).",
+      "refs": [
+        {
+          "target": "mimalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "snmalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "rpmalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "region-based-memory#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "fleet-and-decay-allocators",
+      "title": "Fleet-scale and decay-tuned allocators",
+      "tags": [
+        "runtime",
+        "tlb",
+        "tail-latency"
+      ],
+      "content": "Fleet-scale and decay-tuned allocators target *aggregate* CPU cost across many machines and tail latency on long-running servers, not per-allocation throughput. TCMalloc's per-CPU (not per-thread) caches with `rseq` plus the Temeraire hugepage-aware backend maximise 2 MiB-page coverage for TLB efficiency at fleet scale; jemalloc's multi-arena allocator with two-stage decay (dirty → muzzy → retained) and sigmoidal decay timers keeps purge off the allocation hot path. Hoard is the foundational scalable malloc that *provably* bounds memory blowup to a constant under producer-consumer workloads; most subsequent allocators cite it as ancestor.",
+      "refs": [
+        {
+          "target": "tcmalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "jemalloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "hoard",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "hardened-allocators",
+      "title": "Hardened and exploit-mitigation allocators",
+      "tags": [
+        "security",
+        "runtime",
+        "memory-safety"
+      ],
+      "content": "Hardened allocators treat allocator metadata as a security boundary. Scudo (LLVM, default in Android 11+ and Fuchsia) integrates ARM MTE for per-granule random tagging and probabilistic UAF detection; hardened_malloc (GrapheneOS) is 64-bit-only with all mutable allocator state behind guard pages and randomly-sized guard pages around every large allocation; PartitionAlloc (Chrome and Chromium-derived browsers) uses type/size-aware partitions plus BackupRefPtr / MiraclePtr to turn UAFs into leaks rather than security crashes. The framing across the family is \"hardening, not detection\" — make bugs unexploitable, not visible.",
+      "refs": [
+        {
+          "target": "scudo",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "hardened-malloc",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "partitionalloc",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "specialised-allocators",
+      "title": "Specialised allocators — Mesh, TLSF, Linux mTHP",
+      "tags": [
+        "runtime",
+        "footprint",
+        "real-time"
+      ],
+      "content": "Specialised allocators occupy points the throughput / fleet / hardened families don't reach. Mesh (PLDI 2019) implements compaction without relocation via `mremap`-based physical-page merging while keeping virtual addresses unchanged — provably breaking Robson's worst-case fragmentation bound with high probability. TLSF gives bounded-time *O(1)* malloc/free for hard real-time systems via two bitmap-indexed segregated-fit levels, with ~4-byte overhead per allocation and fragmentation under 25%. Linux's folio refactoring + multi-size Transparent Huge Pages closes the gap between 4 KB pages and 2 MB hugepages with intermediate folio sizes, illustrating the OS-cooperation axis that every allocator sits on.",
+      "refs": [
+        {
+          "target": "mesh-allocator",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "tlsf",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "linux-folio-mthp",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "common-allocator-strategies",
+      "title": "Common allocator strategies",
+      "tags": [
+        "runtime",
+        "allocation",
+        "performance"
+      ],
+      "content": "Common building blocks include bump allocation (cheap monotonic increment, freed only en bloc), free lists (per-size-class), slabs, arenas (region-like bulk-lifetime), segregated fits (TLSF's two-level bitmap-indexed lists), and mark-region heaps. Which strategy works best depends heavily on object sizes, lifetime patterns, concurrency, and whether movement or compaction is allowed.\n\nArena allocation is especially interesting as a hybrid point with regions: arenas reclaim en bloc rather than per object, and the language can expose them as first-class objects (Zig's `ArenaAllocator`, Odin's temp allocator, C3's `@pool`).",
+      "refs": [
+        {
+          "target": "region-based-memory#overview",
+          "type": "related"
+        },
+        {
+          "target": "arena-allocation",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "fragmentation-locality-and-reclamation",
+      "title": "Fragmentation, locality, and reclamation",
+      "tags": [
+        "fragmentation",
+        "locality",
+        "runtime"
+      ],
+      "content": "Allocator policy affects locality and fragmentation as much as raw allocation speed. Reclamation strategy, object movement, quarantine behaviour, and page reuse all determine whether memory management remains predictable under real workloads. The design axis crosses with the OS-cooperation axis: every userspace allocator sits on top of OS page allocation, and allocators that explicitly cooperate with the OS page-size hierarchy outperform allocators that assume one page size everywhere.\n\nA recent Linux-side counterexample is the folio refactoring + multi-size Transparent Huge Pages: typed folio handles plus intermediate-sized huge pages (16 KB through 1 MB) close the gap between 4 KB pages (no TLB benefit) and 2 MB pages (memory waste).",
+      "refs": [
+        {
+          "target": "garbage-collection#tracing-vs-reference-counting",
+          "type": "related"
+        },
+        {
+          "target": "reference-counting#determinism-cycles-and-weak-references",
+          "type": "related"
+        },
+        {
+          "target": "linux-folio-mthp",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mesh-allocator",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "concurrency-and-safety",
+      "title": "Concurrency and safety",
+      "tags": [
+        "concurrency",
+        "runtime",
+        "memory-safety"
+      ],
+      "content": "Modern allocators rely on thread-local fast paths, careful metadata integrity, and cross-thread free handling. This makes allocator design part of both the performance story and the memory-safety story rather than an isolated implementation detail.\n\nHardened allocators (Scudo, hardened_malloc, PartitionAlloc) push the safety story further by treating allocator metadata as a security boundary: out-of-band metadata, randomized guard pages, double quarantine with write-after-free clearing, and refcount-on-allocation make UAF and type-confusion exploits harder or non-exploitable. The hardware-cooperation point is ARM MTE, which gives Scudo per-granule tags for probabilistic UAF detection at near-zero CPU cost.",
+      "refs": [
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "related"
+        },
+        {
+          "target": "arm-mte",
+          "type": "related"
+        },
+        {
+          "target": "cheri",
+          "type": "related"
+        },
+        {
+          "target": "memory-protection-keys",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "language-level-allocator-apis",
+      "title": "Language-level allocator APIs",
+      "tags": [
+        "language-design",
+        "ergonomics",
+        "runtime"
+      ],
+      "content": "A separate design axis from allocator internals is **how a language routes allocation authority through ordinary code**. Several modern systems languages make allocation policy visible at the language/library boundary rather than treating `malloc` as ambient global state: explicit allocator parameters (Zig), implicit context allocators with built-ins routed through them (Odin, Jai), per-scope temp pools with optional virtual-memory protection on escape (C3), allocator-aware `new` syntax (Beef), composable allocator building blocks as a stdlib (D), runtime heaps (Hare), and compile-time memory-mode flags that swap the whole strategy without source changes (V/Vlang).\n\nThe lesson generalises: a language can make memory-management strategy a *parameter* of programs rather than a hard commitment, with the per-language choice between explicitness, ergonomics, and safety determining how that parameter is exposed.",
+      "refs": [
+        {
+          "target": "zig-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "odin-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "c3-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "jai-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "beef-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "hare-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "d-allocator-api",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "vlang-memory-mode",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and design implications",
+      "tags": [
+        "allocator",
+        "tradeoffs",
+        "design-guidance"
+      ],
+      "content": "For a language designer the practical questions are: (1) is allocation ambient (one global `malloc`) or parameterised (Zig-style allocator-passing)? (2) is the goal raw throughput, security hardening, footprint, or real-time bound? (3) does the language want a temp/scope idiom (C3, Odin, Beef) for the common short-lived case? (4) can the language afford to switch allocators per build (V's memory modes), or must one strategy serve everywhere?\n\nFor a runtime designer: which allocator family matches the workload — fleet-scale TLB-aware (TCMalloc), decay-tuned long-running server (jemalloc), per-page sharded throughput (mimalloc), MPSC-batched producer/consumer (snmalloc), real-time bounded (TLSF), security-hardened (Scudo, hardened_malloc, PartitionAlloc)?",
+      "refs": [
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "per-technology-records",
+      "title": "Per-technology records",
+      "tags": [
+        "allocator",
+        "index",
+        "implementations"
+      ],
+      "content": "Allocators and language-allocator APIs with their own per-technology records:\n\n- **Throughput-oriented**: mimalloc (page-local sharded free lists), snmalloc (MPSC remote-deallocation queue), rpmalloc (lock-free per-thread caches), tcmalloc (per-CPU caches + Temeraire hugepage backend), jemalloc (multi-arena + decay-tuned purge), Hoard (foundational scalable malloc).\n- **Hardened**: Scudo (LLVM hardened malloc + ARM MTE), hardened_malloc (GrapheneOS, OpenBSD-malloc successor), PartitionAlloc (Chrome's type/size-aware partitioning + MiraclePtr).\n- **Specialised**: Mesh (compaction without relocation via `mremap`), TLSF (bounded-time real-time allocator), Linux folio + mTHP (OS-cooperation point).\n- **Arena / region hybrid**: arena allocation as a strategy.\n- **Language-level allocator APIs**: Zig (explicit allocator parameters, no default global), Odin (implicit `context.allocator` + `temp_allocator`), C3 (heap/temp split with `@pool` and virtual-memory protection), Jai (similar context allocator), Beef (allocator-aware `new` syntax), Hare (runtime heaps), D (composable allocator building blocks), V/Vlang (compile-time memory-mode flags: GC, autofree, prealloc, manual).\n- **Cross-related concepts**: garbage collection and reference counting for higher-level memory strategies that build on top; ARM MTE, CHERI, and memory-protection keys for hardware safety mechanisms that allocators integrate with.",
+      "refs": [
+        {
+          "target": "mimalloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "snmalloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "tcmalloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "jemalloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "scudo",
+          "type": "per-technology"
+        },
+        {
+          "target": "hardened-malloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "partitionalloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "mesh-allocator",
+          "type": "per-technology"
+        },
+        {
+          "target": "rpmalloc",
+          "type": "per-technology"
+        },
+        {
+          "target": "tlsf",
+          "type": "per-technology"
+        },
+        {
+          "target": "hoard",
+          "type": "per-technology"
+        },
+        {
+          "target": "linux-folio-mthp",
+          "type": "per-technology"
+        },
+        {
+          "target": "arena-allocation",
+          "type": "per-technology"
+        },
+        {
+          "target": "zig-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "odin-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "c3-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "jai-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "beef-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "hare-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "d-allocator-api",
+          "type": "per-technology"
+        },
+        {
+          "target": "vlang-memory-mode",
+          "type": "per-technology"
+        },
+        {
+          "target": "garbage-collection",
+          "type": "related-concept"
+        },
+        {
+          "target": "reference-counting",
+          "type": "related-concept"
+        },
+        {
+          "target": "arm-mte",
+          "type": "related-mechanism"
+        },
+        {
+          "target": "cheri",
+          "type": "related-mechanism"
+        },
+        {
+          "target": "memory-protection-keys",
+          "type": "related-mechanism"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Allocator overview",
+      "url": "https://en.wikipedia.org/wiki/Memory_allocator"
+    }
+  ]
+}

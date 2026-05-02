@@ -1,0 +1,7 @@
+{
+  "id": "family-visualization-trace-interchange",
+  "tag": "family:visualization-trace-interchange",
+  "name": "Family: visualization and trace interchange",
+  "description": "Downstream layers — implicit forests, Perfetto/CTF/pprof wire formats, flame graphs and their off-CPU dual.",
+  "axis": "family"
+}

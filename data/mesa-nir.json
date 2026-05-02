@@ -1,0 +1,30 @@
+{
+  "kind": "tool",
+  "name": "Mesa NIR",
+  "aliases": ["NIR", "Mesa NIR shader IR"],
+  "summary": "Mesa's GPU shader intermediate representation: SSA-based, used as the optimisation substrate for Vulkan/OpenGL drivers across the Mesa stack. SPIR-V → NIR → vendor-specific lowering. Where SPIR-V is the portable interchange, NIR is the optimisation IR each Mesa driver works with.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Mesa NIR** (the New Intermediate Representation, despite the name now being old) is Mesa's GPU shader IR. SSA-based and used as the optimisation substrate for Vulkan/OpenGL drivers across the Mesa stack. The flow is: SPIR-V (or GLSL via glslang) → NIR → vendor-specific lowering → target GPU ISA.\n\nWhere SPIR-V is the portable interchange that frontends emit and drivers consume, NIR is the *optimisation IR* each Mesa driver works with. NIR's design supports common GPU shader optimisations: dead-code elimination, copy propagation, loop unrolling, vectorisation/devectorisation, and the texture-coordinate manipulation that GPU compilers spend most of their time on.",
+      "refs": [
+        { "target": "spir-v#overview", "type": "lowers-from" }
+      ],
+      "sources": [
+        { "label": "Mesa NIR", "url": "https://docs.mesa3d.org/nir/" }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Design and pipeline position",
+      "tags": ["gpu", "compiler", "mesa"],
+      "content": "NIR sits between language frontends (GLSL, SPIR-V) and the vendor-specific backends (Intel, AMD, freedreno, Mali). Frontends translate to NIR; optimisation passes are written against NIR; backends lower NIR to their target ISA.\n\nThe shape is similar to LLVM IR but specialised for GPU shaders: NIR supports vector operations natively, has primitives for texture operations, and includes the kinds of metadata GPU compilers need (uniform/varying distinctions, texture binding indices). It is not designed for general-purpose CPU code.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Mesa NIR docs", "url": "https://docs.mesa3d.org/nir/" }
+  ]
+}

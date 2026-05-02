@@ -1,0 +1,52 @@
+{
+  "kind": "language",
+  "name": "R",
+  "aliases": ["r-lang"],
+  "summary": "Statistical-computing language whose module/package model is shaped by S3/S4 method dispatch: a flat NAMESPACE file declares export, importFrom, S3method, exportPattern; method registration is independent from name export; CRAN provides the strictest pre-publication review of any major registry.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "R is the dominant statistical-computing language, with packages as both the unit of distribution and the unit of namespace. This record covers the language-level module-system surface and its distinctive interaction with S3 / S4 method dispatch.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "namespace-file-format",
+      "title": "NAMESPACE file format",
+      "tags": ["r", "modules", "exports"],
+      "content": "A NAMESPACE file is line-oriented:\n\n```\nexport(my_function)\nexport(another_function)\nexportPattern(\"^[^.]\")    # export everything not starting with a dot\nimport(stats)             # import all names from stats\nimportFrom(utils, head, tail)\nS3method(print, my_class)\nS3method(summary, my_class)\n```\n\nThe distinctive features:\n\n- **Flat declarative form**, not tied to source-code annotations. Unlike Nim's `*` marker, R requires the package author to maintain a separate NAMESPACE file.\n- **`exportPattern`** uses regex to declare exports, making \"everything not prefixed with a dot\" expressible as a single line.\n- **`useDynLib(packagename)`** registers compiled C/Fortran shared libraries shipped with the package.",
+      "refs": [
+        { "target": "visibility-and-exports#export-models", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Writing R Extensions — Package namespaces", "url": "https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Package-namespaces" }
+      ]
+    },
+    {
+      "id": "s3method-decoupled-from-export",
+      "title": "S3method decoupled from name export",
+      "tags": ["r", "method-dispatch", "modules"],
+      "content": "**`S3method(generic, class)`** is the critical line: it registers an S3 method for dispatch. **Method registration is separate from name export** — a `print.my_class` function can be exported (callable by name) and registered (called by `print()` dispatch on objects of `my_class`), or registered without export (called via dispatch but not directly), or exported without registration (callable but not dispatched).\n\nThe lesson: **method-dispatch registration and name export are independent operations**, and a language with method dispatch has to decide whether they're coupled (Java: implicit method visibility tracks class visibility) or decoupled (R: explicit registration, separate from name export). The decoupling is more verbose but lets package authors expose dispatch behavior without exposing the implementing functions by name.",
+      "refs": []
+    },
+    {
+      "id": "cran-strictest-registry",
+      "title": "CRAN — strictest registry in the survey",
+      "tags": ["r", "cran", "registries"],
+      "content": "The DESCRIPTION file is the manifest (`Package:`, `Version:`, `Depends:`, `Imports:`, `Suggests:`). **CRAN** is the central registry, with strict pre-publication review (manual vetting plus automated checks) — the strictest registry in the survey, more rigorous than crates.io, npm, or PyPI.\n\nFor a language designer, CRAN demonstrates that **manual pre-publication review is feasible at multi-thousand-package scale** if the audience accepts longer publication latency in exchange for higher trust. The trade-off is that contribution friction is higher, which limits ecosystem growth velocity but raises baseline quality.",
+      "refs": [],
+      "sources": [
+        { "label": "R Packages — namespace", "url": "https://r-pkgs.org/namespace.html" },
+        { "label": "CRAN policies", "url": "https://cran.r-project.org/web/packages/policies.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Writing R Extensions — namespaces", "url": "https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Package-namespaces" },
+    { "label": "R Packages — namespace", "url": "https://r-pkgs.org/namespace.html" },
+    { "label": "CRAN policies", "url": "https://cran.r-project.org/web/packages/policies.html" }
+  ]
+}

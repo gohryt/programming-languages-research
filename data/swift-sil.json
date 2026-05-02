@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "Swift SIL",
+  "aliases": ["swift-intermediate-language"],
+  "summary": "Unusually high-level for an IR: preserves Swift-specific constructs (existentials, generic specialization markers, witness tables, ARC retain/release pairs) that LLVM IR cannot represent. SSA-form with Swift-aware operations rather than generic LLVM ones.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Swift's SIL is unusually high-level for an IR: it preserves Swift-specific constructs (existentials, generic specialization markers, witness tables, ARC retain/release pairs, devirtualization opportunities) that LLVM IR cannot represent. SIL is SSA-form but with Swift-aware operations rather than generic LLVM ones — it has `apply` (function call), `partial_apply` (closure construction), `class_method`, `witness_method`, and so on.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "llvm#overview", "type": "lowered-to" }
+      ],
+      "sources": [
+        { "label": "Swift SIL specification", "url": "https://github.com/swiftlang/swift/blob/main/docs/SIL.rst" }
+      ]
+    },
+    {
+      "id": "design-rationale",
+      "title": "Why a Swift-specific IR exists",
+      "tags": ["compiler-ir", "swift", "abstraction"],
+      "content": "Swift's optimizations (specialization, devirtualization, ARC elision, escape analysis) need representation power that LLVM lacks, and lowering to LLVM IR before running them would lose information. SIL is the optimization substrate; lowering to LLVM IR happens only after SIL-level optimizations have run.\n\nThis is a multi-level architecture without using MLIR — Swift built a bespoke high-level SSA IR before MLIR existed and continues to use it because the Swift-specific operations carry semantics that MLIR-style dialects could express but at higher engineering cost.",
+      "refs": [
+        { "target": "mlir#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "arc-and-specialization",
+      "title": "ARC and generic specialization in SIL",
+      "tags": ["compiler-ir", "memory", "generics"],
+      "content": "ARC retain/release pairs appear as explicit SIL operations, which lets the optimizer reason about reference-counting traffic at the IR level — eliding redundant pairs, sinking releases, and identifying unique-reference paths for in-place mutation. This is the SIL-level analog of LLVM's `nounwind`/`noreturn` attribute reasoning, specialised for ARC semantics.\n\nGeneric specialization is similarly first-class at SIL level: SIL marks generic instantiations explicitly, lets the optimizer choose which ones to specialize, and records witness-table dispatch points that can later be devirtualized when the concrete type is known.",
+      "refs": [
+        { "target": "reference-counting#overview", "type": "implements" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Swift SIL specification", "url": "https://github.com/swiftlang/swift/blob/main/docs/SIL.rst" }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Swift ARC — SIL-Level RC Optimisation",
+  "aliases": ["swift-automatic-reference-counting", "swift-arc-optimization"],
+  "summary": "Swift compiler-inserts strong/weak/unowned RC ops on every assignment, with aggressive SIL-level optimisation passes that elide redundant retain/release pairs. Three-counter side-table model; `is_unique` / COW primitive; cycles handled programmatically via `weak` and `unowned`.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["reference-counting", "automatic-rc", "arc", "swift", "production"],
+      "content": "Swift compiler-inserts strong/weak/unowned RC ops on every assignment, with aggressive SIL-level optimisation passes that elide redundant retain/release pairs. The runtime uses a three-counter side-table model (strong/unowned/weak in `RefCount.h`): an inline atomic word that escapes to a side table only when weak refs form, overflow occurs, or associated objects are needed — keeping the common case to one cache line.\n\nCycles are not collected — the programmer uses `weak` (zeroing) or `unowned` (trap-on-use). Steady CPU overhead is ~10–30% in pointer-heavy code; weak refs are 2–3× more expensive than strong because of side-table indirection. Swift's broader ownership story (`__shared`/`__owned`/`__consuming`, move-only types, the borrow-checker direction) builds on top of this RC substrate rather than replacing it.\n\nStatus (as of 2026-04): production for over a decade; remains the default object-lifetime mechanism for Swift classes even as the language adds explicit ownership annotations.",
+      "refs": [
+        { "target": "reference-counting#runtime-vs-compile-time-rc", "type": "instance-of" },
+        { "target": "swift-sil#arc-and-specialization", "type": "lowered-via" }
+      ],
+      "sources": [
+        { "label": "Swift RefCount.h", "url": "https://github.com/swiftlang/swift/blob/main/stdlib/public/SwiftShims/RefCount.h" },
+        { "label": "Swift ARC Optimization", "url": "https://apple-swift.readthedocs.io/en/latest/ARCOptimization.html" }
+      ]
+    },
+    {
+      "id": "sil-level-optimisation",
+      "title": "SIL-level optimisation passes",
+      "tags": ["compile-time-rc", "inc-elision", "dec-elision", "swift", "in-place-update"],
+      "content": "ARC retain/release pairs appear as explicit SIL operations, which lets the optimiser reason about reference-counting traffic at the IR level rather than at the LLVM level where the semantics would be lost. Key passes:\n\n- **ARC code motion** — retain sinking + release hoisting via iterative dataflow in `ARCCodeMotion.cpp`.\n- **Epilogue-release matching** — pairs each retain with a matching release at function return so trivially-balanced pairs cancel.\n- **`TempRValueElimination`** — collapses temporary copies of value-typed wrappers around classes.\n- **Devirtualised-release stripping** — removes releases on stack-promoted classes whose lifetime ends with the stack frame.\n\nThe `is_unique` / COW primitive lowers to `Builtin.isUnique`, enabling `Array`/`Set`/`String` value semantics to mutate in place when RC == 1; the optimiser treats `is_unique` as a write to preserve a +1 retain across it, so the unique-check is not optimised away. ObjC bridge forces atomic ops on bridged classes; Swift-native classes use non-atomic fast paths when statically provable single-threaded.",
+      "refs": [
+        { "target": "swift-sil#arc-and-specialization", "type": "lowered-via" }
+      ],
+      "sources": [
+        { "label": "Swift ARC Optimization", "url": "https://apple-swift.readthedocs.io/en/latest/ARCOptimization.html" }
+      ]
+    },
+    {
+      "id": "weak-references-and-cycles",
+      "title": "Weak references, unowned, and cycle handling",
+      "tags": ["weak-reference", "atomic-rc", "non-atomic-rc", "swift"],
+      "content": "Swift does not collect cycles. The programmer breaks them with `weak` (zeroing reference, becomes `nil` when target deallocates) or `unowned` (trap-on-use after target deallocates). Both consult the side table to find the strong-count word; weak refs additionally need atomic zeroing so concurrent reads see either the live target or `nil`, never a torn pointer.\n\nThe weak-reference design is documented in `WeakReferences.md` in the Swift repo. The trade-off is well-understood: `weak` costs a side-table indirection on every load, `unowned` costs one only on the rare deallocation path. Swift's broader move toward explicit ownership (`__shared`, `__owned`, `__consuming` parameter conventions, move-only types) reduces the situations where ARC traffic is needed in the first place rather than replacing the RC discipline.",
+      "refs": [
+        { "target": "reference-counting#determinism-cycles-and-weak-references", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Swift WeakReferences design", "url": "https://github.com/swiftlang/swift/blob/main/docs/WeakReferences.md" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Swift RefCount.h", "url": "https://github.com/swiftlang/swift/blob/main/stdlib/public/SwiftShims/RefCount.h" },
+    { "label": "Swift ARC Optimization", "url": "https://apple-swift.readthedocs.io/en/latest/ARCOptimization.html" },
+    { "label": "Swift WeakReferences design", "url": "https://github.com/swiftlang/swift/blob/main/docs/WeakReferences.md" }
+  ]
+}

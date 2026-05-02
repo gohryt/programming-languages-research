@@ -1,0 +1,96 @@
+{
+  "kind": "runtime",
+  "name": "seL4 — Verified Capability Microkernel",
+  "aliases": [
+    "sel4-kernel"
+  ],
+  "summary": "Klein et al. (NICTA / Data61 / Trustworthy Systems): the first general-purpose OS kernel with formal proof of authority confinement (Isabelle/HOL refinement down to C). Every kernel object (TCB, CNode, frame, endpoint) is named only by a capability stored in a CSpace; user-level *retypes* untyped memory into kernel objects. Production deployment in safety-critical and defence systems.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "sel4",
+        "kernel-capability",
+        "verified",
+        "ocap",
+        "no-ambient-authority",
+        "binary-capability"
+      ],
+      "content": "**seL4** (Klein et al., NICTA / Data61, now Trustworthy Systems / UNSW Sydney) is a third-generation L4 microkernel with a formally verified capability-based authority discipline. It is the first general-purpose OS kernel with a machine-checked proof of authority confinement: the Isabelle/HOL proof refines an abstract specification down to the C implementation (and an executable binary).\n\nEvery kernel object — TCBs (thread control blocks), CNodes (capability containers), memory frames, endpoints, IRQ handlers — is named only by a **capability stored in a CSpace** (capability space). There is no kernel-side global object table accessible by name; an operation invokes a capability the caller holds, and the kernel checks the rights bits before performing the requested action.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "eros-os",
+          "type": "descended-from"
+        }
+      ],
+      "sources": [
+        {
+          "label": "seL4 capabilities tutorial",
+          "url": "https://docs.sel4.systems/Tutorials/capabilities.html"
+        },
+        {
+          "label": "seL4 CACM paper",
+          "url": "https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/"
+        }
+      ]
+    },
+    {
+      "id": "untyped-and-retype",
+      "title": "Untyped capabilities and retype",
+      "tags": [
+        "sel4",
+        "kernel-capability",
+        "unforgeable-handle",
+        "capability-confinement"
+      ],
+      "content": "**Untyped capabilities + retype**: the kernel never allocates implicitly. All in-kernel memory consumption is *authorised* by an Untyped capability, which a user-level component can `Retype` into kernel objects (a TCB, a CNode, a frame, etc.). After retype, the Untyped capability shrinks to cover the unused remainder; the new typed capabilities are placed into the caller's CSpace.\n\nThis pushes memory-allocation policy entirely outside the verified kernel: the kernel has no malloc, no global free list, no allocator. The proof of confinement is correspondingly simpler — there is no kernel-managed memory pool that could leak between principals.\n\n**Reply capabilities**: a single-use return token, generated at IPC call time and consumed on reply. This makes RPC exactly-once and revocation-safe — a server cannot accidentally reply twice, and a caller cannot use a stale reply capability.",
+      "refs": [
+        {
+          "target": "eros-os",
+          "type": "shares-discipline-with"
+        }
+      ]
+    },
+    {
+      "id": "verification-and-deployment",
+      "title": "Verification and production deployment",
+      "tags": [
+        "sel4",
+        "verified",
+        "production"
+      ],
+      "content": "**Formal proof**: Isabelle/HOL refinement chain from an abstract specification through an executable specification to the actual C implementation, with binary verification connecting C to optimised ARM/RISC-V binary. Take-grant-style authority bound proven on the actual implementation — a take-grant graph derivable from the static configuration is the upper bound on authority that any execution can attain.\n\nStatus (as of 2026-04): seL4 deployed in safety-critical and defence systems (Boeing autonomous drones, DARPA HACMS demonstrators, the Trustworthy Systems' SeL4 Foundation members include Cisco, HENSOLDT Cyber, NIO automotive, etc.). Production-grade for the niche but not a general-purpose desktop kernel.\n\nseL4 is the canonical citation for \"verified capability microkernel\" and the existence proof that authority-confinement proofs scale to a real OS kernel. Coyotos was an attempted successor (Shapiro et al., 2006) that did not reach production; seL4 won.",
+      "refs": [
+        {
+          "target": "verus",
+          "type": "related"
+        },
+        {
+          "target": "fstar",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "seL4 CACM paper",
+          "url": "https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "seL4 capabilities tutorial",
+      "url": "https://docs.sel4.systems/Tutorials/capabilities.html"
+    },
+    {
+      "label": "seL4 CACM paper",
+      "url": "https://cacm.acm.org/research/sel4-formal-verification-of-an-operating-system-kernel/"
+    }
+  ]
+}

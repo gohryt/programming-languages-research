@@ -1,0 +1,208 @@
+{
+  "kind": "concept",
+  "name": "Dynamic binary instrumentation",
+  "aliases": [
+    "DBI",
+    "binary rewriting tracing",
+    "load-time instrumentation"
+  ],
+  "summary": "Techniques that translate every basic block before execution, rewrite instructions in place, or replace bytecode at class-load time — inserting instrumentation into unmodified binaries or managed artifacts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Techniques that translate every basic block before execution, rewrite instructions in place, or replace bytecode at class-load time — inserting instrumentation into unmodified binaries or managed artifacts. The cost is substantial (5–50× slowdown for full DBI, lower for specialized cases), but the visibility and the portability are unmatched: any binary, any architecture, no source, no recompilation, and in the case of APM agents (`data/dynamic-binary-instrumentation#wastrumentation`), an entire industry built on load-time bytecode rewriting.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`, `family:direct-execution-interposition`, `family:heavyweight-instrumentation`\n- **domain**: `domain:observability`, `domain:tracing`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:dominant`, `on-cost:high`, `on-cost:medium`\n- **granularity**: `granularity:per-function`, `granularity:per-instruction`\n"
+    },
+    {
+      "id": "frida-stalker",
+      "title": "Frida Stalker — Scriptable Dynamic Binary Instrumentation",
+      "tags": [
+        "domain:tracing",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:high"
+      ],
+      "content": "Frida is a dynamic binary instrumentation toolkit that lets you hook into and rewrite running processes using JavaScript. Its \"Stalker\" engine does full dynamic recompilation: as each basic block is about to execute, Stalker copies it to a scratch buffer, inserts your instrumentation, and runs the instrumented copy. This is the same technique QEMU and Rosetta use for emulation, but exposed as a scriptable API.\n\nYou can:\n- Trace every instruction, call, or return.\n- Rewrite assembly as it runs (e.g., change branch targets, NOP out instructions).\n- Attach JS callbacks to specific addresses.\n- Follow execution across threads and even across processes.\n\nThe overhead is substantial (5–50x depending on the workload and density of instrumentation), but the power is unmatched: any binary, any architecture, no source code, no recompilation, scriptable in JavaScript.\n\nThe most creative use: fuzzing. fpicker attaches Frida Stalker to a target binary, instruments every basic block to update a coverage bitmap, and uses the coverage to guide a fuzzer — all without source code.",
+      "sources": [
+        {
+          "url": "https://frida.re/docs/stalker/"
+        }
+      ]
+    },
+    {
+      "id": "mambo-arm-riscv-dbi",
+      "title": "MAMBO — Low-Overhead DBI for ARM and RISC-V",
+      "tags": [
+        "arm",
+        "domain:tracing",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:high"
+      ],
+      "content": "MAMBO is a high-performance DBI tool specialized for ARM (AArch32, AArch64) and RISC-V. Unlike traditional instrumentation like DynamoRIO or PIN that often suffer from massive overhead, MAMBO utilizes dynamic recompilation interlaced with logging. It keeps the original code untouched (evading anti-debug tricks and checksums) while executing a heavily optimized cloned copy with tracing. It provides branch-level tracing capability with significantly lower overhead, ideal for embedded and RISC architectures.",
+      "sources": [
+        {
+          "url": "https://github.com/beehive-lab/mambo"
+        }
+      ]
+    },
+    {
+      "id": "e9patch-instruction-punning",
+      "title": "E9Patch — Instruction Punning for Binary Rewriting",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-instruction",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "E9Patch is a static binary rewriter for x86-64 that inserts trampolines into compiled binaries without needing to move any existing instructions. This is hard on x86 because instructions are variable-length: a 5-byte jump overwrites multiple instructions, and some of those might be jump targets.\n\nE9Patch solves this with three novel techniques:\n\n- **Instruction punning:** Find addresses in the binary whose raw byte values also happen to be valid x86 NOPs or traps. Jump to those addresses as trampoline targets. The bytes were already there; they just weren't being used as code.\n- **Padding:** Use `int3` padding between functions (common in compiled binaries) as trampoline space.\n- **Eviction:** When no punning or padding target is available, evict a short instruction by copying it to the trampoline and replacing it with a jump.\n\nThe result: any instruction in a binary can be instrumented with zero relocation of surrounding code. This enables tools like E9AFL (fuzzing), E9Tool (tracing), and custom binary analysis passes.\n\nThe general principle: \"patching\" doesn't require dedicated NOP slots if you're creative about using existing bytes — repurposing existing data as executable code is a form of steganographic instrumentation.",
+      "sources": [
+        {
+          "url": "https://pldi20.sigplan.org/details/pldi-2020-papers/12/Binary-Rewriting-without-Control-Flow-Recovery"
+        }
+      ]
+    },
+    {
+      "id": "cannoli-qemu-trace",
+      "title": "Cannoli — Multi-Core QEMU Trace Processing",
+      "tags": [
+        "domain:tracing",
+        "family:buffered-event-emission",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:high"
+      ],
+      "content": "Cannoli patches QEMU's TCG (Tiny Code Generator) JIT to log execution and memory events to a high-performance ring buffer. A Rust extension compiled as a shared library reads the ring buffer on separate cores, spreading the trace processing load across the machine.\n\nUnlike single-threaded tracing tools, Cannoli can keep up with fast targets because the trace consumer runs in parallel with the traced program. The ring buffer acts as a decoupling layer: the traced program writes events without blocking, and the Rust consumer processes them at its own pace.\n\nThe trade-off: Cannoli is read-only — it observes but cannot modify execution. This simplifies the design enormously compared to full DBI frameworks like Frida. For tracing and analysis workloads (coverage, taint tracking, protocol reverse engineering), read-only is sufficient.",
+      "sources": [
+        {
+          "url": "https://thume.ca/2023/12/02/tracing-methods/",
+          "label": "\"Cannoli\" section."
+        }
+      ]
+    },
+    {
+      "id": "panda-replay-plugins",
+      "title": "PANDA — Whole-System Replay with Composable Offline Analysis",
+      "tags": [
+        "domain:tracing",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:dominant"
+      ],
+      "content": "QEMU record/replay is covered from a debugger angle in `data/record-and-replay#qemu-record-replay`. PANDA adds the most interesting missing layer: **analysis plugins designed to run on replayed executions**. PANDA is built on QEMU, but the crucial difference is that it couples whole-system record/replay with a reusable plugin ecosystem: `taint2` for dynamic taint analysis, `syscalls2` for syscall tracking, and `OSI` for guest OS introspection on Linux and Windows.\n\nThe original side is the plugin composition model. PANDA's plugin-to-plugin interface (PPP) lets plugins publish callbacks and APIs that other plugins consume. This means analyses are not monolithic; they are **assembled**. A file-taint analysis can reuse syscall tracking and OS introspection instead of re-implementing them. That is a much more scalable way to build deep analyses than the \"single enormous analysis pass\" style common in DBI research prototypes.\n\nThe other key design idea is temporal decoupling: record first with modest overhead, then run the expensive analysis offline on the replay. PANDA's own documentation explicitly recommends byte-level taint tracking on previously recorded systems because the live cost of such analyses is high. This is the same philosophy that makes rr/Pernosco powerful, but extended to the whole guest OS and packaged as a plugin platform.\n\nThe cost is the cost of emulation and whole-system setup. But as a design pattern — **record once, replay many times, compose heavyweight analyses on the replay** — PANDA is one of the best examples in the space.",
+      "sources": [
+        {
+          "url": "https://panda.re/"
+        },
+        {
+          "url": "https://www.ndss-symposium.org/wp-content/uploads/bar2021_23001_paper.pdf"
+        }
+      ]
+    },
+    {
+      "id": "wastrumentation",
+      "title": "Wastrumentation — Portable WebAssembly Dynamic Analysis with Intercession",
+      "tags": [
+        "domain:tracing",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:medium",
+        "on-cost:medium",
+        "webassembly"
+      ],
+      "content": "Munsters, Scull Pupo, and Gonzalez Boix's **Wastrumentation** (ECOOP 2025) is a general-purpose framework for dynamic analysis of WebAssembly modules. Its distinctive feature is **intercession**: instrumentation can mediate or alter behaviour, not only observe it. This puts it between read-only Wasm trace injection and full VM embedding.\n\nThe portability point matters. A Wasm analysis framework that rewrites modules at the Wasm level can run across engines and hosts instead of depending on V8-, Wasmtime-, or browser-specific internal hooks. The analysis surface is the Wasm instruction stream and module structure: function entries/exits, memory operations, table calls, indirect calls, imports/exports, and traps can be instrumented in a way that survives host changes.\n\nThe design lesson: **Wasm is not only a target IR but also a portable instrumentation substrate**. Languages targeting Wasm can get a cross-engine dynamic-analysis story by preserving enough source/debug metadata through Wasm lowering, then relying on module-level instrumentation instead of native DBI.",
+      "sources": [
+        {
+          "url": "https://github.com/aaronmunsters/wastrumentation"
+        },
+        {
+          "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.23"
+        }
+      ]
+    },
+    {
+      "id": "apm-auto-instrumentation",
+      "title": "APM Auto-Instrumentation Agents — Managed-Runtime DBI at Class-Load",
+      "tags": [
+        "domain:observability",
+        "dotnet",
+        "family:heavyweight-instrumentation",
+        "granularity:per-function",
+        "jvm",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "Status (as of 2026-04): commercial APM (DataDog, New Relic, Dynatrace, AppDynamics, Elastic APM) and open-source OpenTelemetry auto-instrumentation both rewrite application bytecode at class-load time to inject spans into unmodified third-party libraries. This is conceptually DBI at a coarser granularity than Frida Stalker (`data/dynamic-binary-instrumentation#frida-stalker`) or MAMBO (`data/dynamic-binary-instrumentation#mambo-arm-riscv-dbi`) — rewriting at the class-or-function boundary in managed runtimes instead of the basic block in native code.\n\nThe JVM entry point is **`java.lang.instrument`** via `-javaagent:foo.jar`. The agent JAR declares a `Premain-Class`, registers a `ClassFileTransformer` whose `transform(ClassLoader, String, Class, ProtectionDomain, byte[])` returns rewritten bytes before each class is defined, and optionally uses `retransformClasses` to patch already-loaded classes. The dominant rewriting library is **Byte Buddy** (Rafael Winterhalter), which wraps ASM the way LLVM wraps machine code: a declarative matcher DSL (`isPublic().and(named(\"someMethod\"))`) plus `@Advice.OnMethodEnter` / `@Advice.OnMethodExit` annotations. The advice class is **a template copied byte-for-byte into the target method** — it cannot call helper methods on itself because it is inlined. OpenTelemetry, DataDog, New Relic, Dynatrace, and Elastic APM all sit on Byte Buddy for this reason.\n\nThe .NET analogue is the **CLR Profiling API**: `ICorProfilerCallback::JITCompilationStarted` plus `GetILFunctionBody` / `SetILFunctionBody` to swap IL before JIT. Python has no VM-level hook — agents rely on `sitecustomize.py` or `-m opentelemetry-instrument` wrapping, then `wrapt.ObjectProxy` to replace functions in already-imported modules. Ruby and Node rely on `require` / `import` ordering plus monkey-patching. The granularity difference matters: JVM and CLR agents can instrument arbitrary third-party JARs or DLLs without source or restart, while Python / Ruby / Node agents need their wrappers installed before the target is first imported.\n\nThe production-safety story hinges on **Muzzle** (DataDog, adopted by OpenTelemetry): each instrumentation declares the external symbols it touches, and at agent startup a reference-matcher validates them against the actual user classpath, silently skipping instrumentations whose target version doesn't match. This is what makes these agents deployable by operators who do not know which library versions the application actually uses. Class-loader isolation is the mirror image of Frida's target-hiding (`data/dynamic-binary-instrumentation#frida-stalker`): the agent ships its own SDK and rewriter library in an isolated classloader so the application's own classloader cannot see them and cannot version-conflict with the application's own dependencies.\n\nThe design lesson: **span injection without source changes, via load-time bytecode rewriting in managed runtimes**, is the dominant production path for APM adoption. It is DBI (`data/dynamic-binary-instrumentation#frida-stalker`, `data/dynamic-binary-instrumentation#mambo-arm-riscv-dbi`) reframed for a world where the \"binary\" is `.class` / `.dll` / `.pyc` and the \"basic block\" is a method. Cross-link `data/cooperative-safepoints` Cooperative Safepoints (class retransformation in HotSpot uses safepoints for the swap) and `data/distributed-tracing#opentelemetry` OpenTelemetry (agents are where OTEL semantic conventions actually get populated for applications that weren't written with OTEL in mind).",
+      "sources": [
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.instrument/java/lang/instrument/Instrumentation.html"
+        },
+        {
+          "url": "https://bytebuddy.net/"
+        },
+        {
+          "url": "https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/contributing/javaagent-structure.md"
+        },
+        {
+          "url": "https://github.com/DataDog/dd-trace-java/blob/master/docs/how_instrumentations_work.md"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/profiling/icorprofilercallback-interface"
+        },
+        {
+          "url": "https://opentelemetry.io/docs/zero-code/python/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://frida.re/docs/stalker/"
+    },
+    {
+      "url": "https://github.com/beehive-lab/mambo"
+    },
+    {
+      "url": "https://pldi20.sigplan.org/details/pldi-2020-papers/12/Binary-Rewriting-without-Control-Flow-Recovery"
+    },
+    {
+      "url": "https://thume.ca/2023/12/02/tracing-methods/",
+      "label": "\"Cannoli\" section."
+    },
+    {
+      "url": "https://panda.re/"
+    },
+    {
+      "url": "https://www.ndss-symposium.org/wp-content/uploads/bar2021_23001_paper.pdf"
+    },
+    {
+      "url": "https://github.com/aaronmunsters/wastrumentation"
+    },
+    {
+      "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.23"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.instrument/java/lang/instrument/Instrumentation.html"
+    },
+    {
+      "url": "https://bytebuddy.net/"
+    },
+    {
+      "url": "https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/contributing/javaagent-structure.md"
+    },
+    {
+      "url": "https://github.com/DataDog/dd-trace-java/blob/master/docs/how_instrumentations_work.md"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/profiling/icorprofilercallback-interface"
+    },
+    {
+      "url": "https://opentelemetry.io/docs/zero-code/python/"
+    }
+  ]
+}

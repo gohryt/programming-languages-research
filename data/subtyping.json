@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Subtyping",
+  "aliases": ["subtype-relation", "variance"],
+  "summary": "A value of one type can be used where another is expected. Implementation concerns: variance, recursive types, object fields, method arguments, generics, lifetimes, and type aliases. Nominal subtyping caches well; structural subtyping requires recursive comparison and cycle handling. Mixed systems need clear rules for when names matter and when structure matters.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Subtyping allows a value of one type to be used where another is expected. Implementation concerns include variance, recursive types, object fields, method arguments, generics, lifetimes, and type aliases.\n\nThe distinguishing axis across subtyping designs is *what determines the relation*: declarations and explicit `extends` clauses (nominal), recursive comparison of members (structural), or a lattice of polar types and bounds (algebraic, `data/mlsub-algebraic-subtyping`). The choice cascades into caching strategy, diagnostic quality, and whether HM-style principal inference survives.",
+      "refs": [
+        { "target": "nominal-structural-path-dependent#overview", "type": "axis-of" },
+        { "target": "mlsub-algebraic-subtyping#overview", "type": "advanced-form" },
+        { "target": "union-intersection-types#overview", "type": "complementary" }
+      ]
+    },
+    {
+      "id": "variance-and-position",
+      "title": "Variance and position",
+      "tags": ["type-system", "subtyping"],
+      "content": "A type constructor's variance describes how subtyping passes through its type arguments:\n\n- **covariant**: `F<A> <: F<B>` if `A <: B`. Read positions, function return types.\n- **contravariant**: `F<A> <: F<B>` if `B <: A`. Function arguments, write-only references.\n- **invariant**: no relation between `F<A>` and `F<B>` regardless of `A` and `B`. Mutable references, type-level computation positions.\n- **bivariant**: both directions allowed; usually unsound but used pragmatically (TypeScript function parameters by default, with strict mode opting out).\n\nVariance is what lets subtyping compose: `Cat <: Animal` should imply `List<Cat> <: List<Animal>` *only if `List` is covariant in its element type*. Java's wildcards (`List<? extends Animal>`), Scala's variance markers (`+T`, `-T`), and Rust's lifetime variance rules all tackle this composition problem."
+    },
+    {
+      "id": "recursive-and-mixed",
+      "title": "Recursive types and mixed nominal/structural systems",
+      "tags": ["type-system", "subtyping"],
+      "content": "Nominal subtyping is easier to cache because declarations define edges. Structural subtyping requires recursive comparison of members and must guard against cycles — comparing two recursive types `mu X. {next: X}` requires either explicit unfolding bounded by a witness, or a coinductive equivalence check using a memoization set.\n\nMixed systems need clear rules for when names matter and when structure matters. Most production languages mix: nominal class hierarchies for public types, structural function types and intersection types for compositional reasoning, structural row types for records and effects."
+    }
+  ]
+}

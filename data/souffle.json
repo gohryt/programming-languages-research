@@ -1,0 +1,30 @@
+{
+  "kind": "tool",
+  "name": "Soufflé",
+  "aliases": ["souffle-datalog"],
+  "summary": "Compiles Datalog programs to efficient C++ for static analysis. The IR here is the Datalog program itself: rules declare what facts are derivable, and the engine derives all consequences. Pointer analysis, type inference, security analysis, and compiler optimisations have been encoded as Datalog programs over Soufflé.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Soufflé compiles Datalog programs to efficient C++ for static analysis. The \"IR\" here is *the Datalog program itself*: rules declare what facts are derivable, and the engine derives all consequences. Pointer analysis, type inference, security analysis, and compiler optimizations have all been encoded as Datalog programs over Soufflé.",
+      "refs": [
+        { "target": "e-graphs#overview", "type": "complements" }
+      ],
+      "sources": [
+        { "label": "Soufflé Datalog engine", "url": "https://souffle-lang.github.io/" }
+      ]
+    },
+    {
+      "id": "datalog-as-ir",
+      "title": "Datalog as program representation",
+      "tags": ["compiler-ir", "static-analysis", "datalog"],
+      "content": "Soufflé is the production-grade Datalog engine for compiler-related uses (the academic ancestor is Bddbddb). The contribution is showing that program analysis can be expressed declaratively as Datalog rules over a relational schema, and that the engine can derive consequences faster than hand-written analyses.\n\nThe lesson generalises: when the analysis is fundamentally about deriving facts from facts (e.g., \"may-alias\" from points-to information, \"reachable\" from call-graph edges, \"tainted\" from source/sink relationships), expressing the analysis as a Datalog program lets the engine optimise the deduction work — index choice, evaluation order, magic-set rewriting — without rewriting the analysis logic itself. Rust's next-generation borrow checker (Polonius) is the highest-profile example — it reformulates borrow-checking as Datalog rules.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Soufflé Datalog engine", "url": "https://souffle-lang.github.io/" }
+  ]
+}

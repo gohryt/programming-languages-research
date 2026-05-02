@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Cytron SSA Construction",
+  "aliases": ["dominance-frontier SSA construction", "Cytron-Ferrante-Rosen-Wegman-Zadeck"],
+  "summary": "The classical SSA construction algorithm (Cytron et al., TOPLAS 1991): compute dominance frontiers, place φ-functions at every block in the iterated dominance frontier of each variable's definition sites, then rename via DFS over the dominator tree. Produces minimal SSA. Used by GCC, LLVM, and most batch compilers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Cytron, Ferrante, Rosen, Wegman, and Zadeck (TOPLAS 1991) gave the classical SSA construction algorithm. The mechanical core is two-phase: compute **dominance frontiers** for each basic block, then place φ-functions at every block in the iterated dominance frontier of each variable's definition sites. Variables are renamed via a DFS over the dominator tree, maintaining per-variable version stacks.\n\nThe algorithm is correct, complete, and produces *minimal* SSA — the smallest set of φ-functions sufficient to meet the single-assignment invariant. Runtime is near-linear in practice. GCC, LLVM, and most classical AOT compilers use variants of it.",
+      "refs": [
+        { "target": "ssa#overview", "type": "produces" },
+        { "target": "braun-ssa-construction#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Efficient SSA Construction (Cytron et al., TOPLAS 1991)", "url": "https://dl.acm.org/doi/10.1145/115372.115320" }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "title": "Algorithm",
+      "tags": ["compiler", "ssa"],
+      "content": "Phase 1: compute the **dominator tree** and **dominance frontiers**. Block B is in the dominance frontier of block A if A dominates a predecessor of B but does not strictly dominate B itself. The dominance frontier identifies precisely the blocks where φ-functions are needed for variables defined in A.\n\nPhase 2: for each variable, compute the iterated dominance frontier of its definition sites and place φ-functions there. Then DFS the dominator tree, maintaining per-variable version stacks: at each definition, push a new version; at each use, read the top version; on entering a successor whose first instruction is a φ for the variable, set the φ's incoming value from this block to the current top version. Pop the version on backtrack.\n\nThe combination produces minimal SSA in near-linear time on typical CFGs, with the dominance-frontier computation being the dominant cost (still near-linear in practice with Lengauer-Tarjan dominator computation).",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "compiler-architecture"],
+      "content": "The drawback is that it requires a complete CFG plus dominator tree *before* construction can start. For batch compilers building IR from a parsed AST, this is fine — the CFG is available. For JITs that build the IR incrementally from a linear source like bytecode, this is awkward; either the JIT buffers the entire function before constructing SSA, or it uses a different algorithm.\n\nThe second drawback is implementation complexity. A correct dominance-frontier computation, iterated-frontier loop, and renaming pass take careful implementation. Braun's on-the-fly algorithm (CC 2013) trades minimal-SSA guarantees for simpler code and online construction; for JITs that is the better trade.",
+      "refs": [
+        { "target": "braun-ssa-construction#overview", "type": "alternative-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Cytron et al. — Efficient SSA Construction (TOPLAS 1991)", "url": "https://dl.acm.org/doi/10.1145/115372.115320" }
+  ]
+}

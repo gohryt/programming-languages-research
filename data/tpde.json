@@ -1,0 +1,31 @@
+{
+  "kind": "framework",
+  "name": "TPDE",
+  "aliases": ["TPDE backend framework", "adaptable single-pass backend"],
+  "summary": "Schwarz, Kamm & Engelke (2025): a compiler back-end framework that adapts to existing SSA-form IRs. Single pass combining instruction selection, register allocation, and instruction encoding. Built a new backend for LLVM IR targeting x86-64 and AArch64 — 10× faster than LLVM -O0 with comparable code quality.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "TPDE (Schwarz, Kamm & Engelke, 2025) is a compiler back-end framework that adapts to existing SSA-form code representations. Instead of requiring IR translation (a significant cost when targeting LLVM), TPDE performs compilation in a single pass — combining instruction selection, register allocation, and instruction encoding — using only an IR-specific adapter.\n\nTarget instructions are derived from code written in high-level language through LLVM's Machine IR, easing portability while enabling optimisations during code generation. The authors built a new back-end for LLVM IR from scratch targeting x86-64 and AArch64, showing compilation speeds an order of magnitude faster than LLVM -O0 while producing code with comparable quality.",
+      "refs": [
+        { "target": "llvm#overview", "type": "alternative-backend-for" },
+        { "target": "qbe#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "TPDE: A Fast Adaptable Compiler Back-End Framework", "url": "https://arxiv.org/abs/2505.22610" }
+      ]
+    },
+    {
+      "id": "design-position",
+      "title": "Design position",
+      "tags": ["compiler", "framework"],
+      "content": "TPDE represents a new point in the design space: the framework approach means you can bolt fast native codegen onto any existing SSA-based IR without inventing a new backend from scratch. For a language with its own IR, this could provide near-instant native compilation without LLVM dependency.\n\nWhere QBE is a complete from-scratch backend with its own IR, and Cranelift is a backend-and-IR pair tightly coupled to its own ISLE-driven instruction selection, TPDE positions itself as a *reusable backend kernel* that adapts to whatever SSA-form IR you bring to it. For languages already invested in an IR design but wanting a fast baseline native backend, TPDE is the closer fit.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "TPDE arXiv", "url": "https://arxiv.org/abs/2505.22610" }
+  ]
+}

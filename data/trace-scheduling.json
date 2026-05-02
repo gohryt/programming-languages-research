@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Trace Scheduling",
+  "aliases": ["Fisher trace scheduling", "superblock scheduling", "hyperblock scheduling"],
+  "summary": "Fisher (IEEE TC 1981): extends instruction scheduling across basic-block boundaries by selecting a likely-executed 'trace' through the CFG, scheduling it as straight-line code, then inserting compensation code at side exits and entries. The intellectual ancestor of trace-based JITs.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Fisher's **trace scheduling** (IEEE TC 1981) extends scheduling across basic block boundaries by selecting a likely-executed \"trace\" through the CFG, scheduling it as if it were a single straight-line block, then inserting compensation code at the side exits and entries to preserve correctness.\n\nThis was the foundation of the Multiflow TRACE VLIW compiler and the intellectual ancestor of modern trace-based JITs. The idea survives conceptually in superblock/hyperblock scheduling, if-conversion, trace formation, and profile-guided block layout, though modern LLVM backends do not generally expose a direct classical trace-scheduling pass.",
+      "refs": [
+        { "target": "list-scheduling#overview", "type": "extends" }
+      ],
+      "sources": [
+        { "label": "Fisher — Trace Scheduling (IEEE TC 1981)", "url": "https://ieeexplore.ieee.org/document/1675828" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["compiler", "scheduling", "vliw"],
+      "content": "Choose a *trace* through the CFG: a path through likely-executed basic blocks, identified by profile data or static heuristics. Schedule the trace as if it were straight-line code, ignoring side exits — this gives the scheduler much more reorder freedom because it can move instructions across what were originally branch boundaries.\n\nInsert *compensation code* at side exits and entries: when execution leaves the trace at a side exit, the compensation code restores any state that the aggressive scheduling violated; when execution enters the trace partway through, the compensation code initialises any state the trace assumed.\n\nThe payoff is highest on architectures with wide issue width (VLIW, superscalar with deep pipelines) where intra-block parallelism runs out. The cost is compensation code — each side exit may need fix-up instructions to account for operations scheduled past branches. Profile data helps pick the right traces; misplaced traces produce more compensation overhead than scheduling benefit.",
+      "refs": []
+    },
+    {
+      "id": "modern-descendants",
+      "title": "Modern descendants",
+      "tags": ["compiler", "jit"],
+      "content": "Trace scheduling survives in three lineages. **Superblock and hyperblock scheduling** restrict trace scheduling to traces with single entry points (superblock) or with predicated execution to merge multiple control paths (hyperblock); these lose some of trace scheduling's freedom in exchange for simpler compensation.\n\n**Trace-based JITs** (LuaJIT, PyPy) take the same idea to runtime: record a trace through hot bytecode, optimise it as straight-line code, install it as a fast-path entry. The classical trace scheduling problem of side exits becomes the JIT's *guard failure* problem.\n\n**Profile-guided block layout** (modern LLVM, GCC) uses profile data to lay out basic blocks so hot paths fall through naturally — a degenerate form of trace scheduling that doesn't reorder operations but does optimise for the trace's spatial layout in instruction memory.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Fisher — Trace Scheduling", "url": "https://ieeexplore.ieee.org/document/1675828" }
+  ]
+}

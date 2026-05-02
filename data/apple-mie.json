@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "Apple Memory Integrity Enforcement (MIE)",
+  "aliases": ["MIE", "Apple MIE", "Enhanced MTE", "EMTE"],
+  "summary": "Apple's production deployment of hardware-assisted memory safety: Enhanced MTE in synchronous mode plus secure typed allocators (kalloc_type, xzone malloc) plus Tag Confidentiality Enforcement against speculative side channels. One of the most aggressive consumer deployments of hardware memory tagging to date.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["memory-tag", "pointer-tagging", "aarch64", "apple-silicon", "production", "hardware-safety", "memory-safety", "exploit-mitigation"],
+      "content": "Apple's **MIE** is one of the most aggressive consumer deployments of hardware-assisted memory safety to date, combining **Enhanced MTE (EMTE)** in synchronous mode, secure typed allocators (`kalloc_type`, `xzone malloc`), and Tag Confidentiality Enforcement against speculative side channels.\n\nApple pushed Arm to specify EMTE (2022) so synchronous tag-check is cheap enough for production rather than debug-only. MIE is an important production existence proof that MTE-class safety can move beyond debug-only deployments.",
+      "refs": [
+        { "target": "arm-mte", "type": "derived-from" },
+        { "target": "hwasan", "type": "related" }
+      ]
+    },
+    {
+      "id": "tag-confidentiality-enforcement",
+      "title": "Tag Confidentiality Enforcement (TCE)",
+      "tags": ["memory-tag", "tag-mismatch-trap", "aarch64", "apple-silicon", "exploit-mitigation"],
+      "content": "**Tag Confidentiality Enforcement (TCE)** is the response to TIKTAG: pointer-offset clamping (<4 GB), Spectre-v1 hardening, poisoning patterns (`0x2BAD`), VA layout tricks to prevent speculative tag leakage. TCE addresses the speculative tag-disclosure attack class that affected earlier MTE deployments.",
+      "refs": [
+        { "target": "arm-mte", "type": "related" }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status and deployment",
+      "tags": ["production", "apple-silicon", "exploit-mitigation"],
+      "content": "Status (as of 2026-04): Apple announced production deployment on recent A-series devices with broad system coverage and an Enhanced Security path for third-party apps; exact device coverage, default-on scope, and third-party-app exposure are vendor- and release-specific and should be checked against current Apple platform documentation.\n\nThe combination of EMTE + secure typed allocators + TCE is currently the most ambitious production memory-safety stack on consumer silicon.",
+      "refs": [
+        { "target": "arm-mte", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Apple MIE blog", "url": "https://security.apple.com/blog/memory-integrity-enforcement/" },
+        { "label": "8ksec MIE kernel deep-dive", "url": "https://8ksec.io/mie-deep-dive-kernel/" },
+        { "label": "Apple developer — Meet with Apple session 206", "url": "https://developer.apple.com/videos/play/meet-with-apple/206/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Apple MIE blog", "url": "https://security.apple.com/blog/memory-integrity-enforcement/" },
+    { "label": "8ksec MIE kernel deep-dive", "url": "https://8ksec.io/mie-deep-dive-kernel/" },
+    { "label": "Apple developer — Meet with Apple session 206", "url": "https://developer.apple.com/videos/play/meet-with-apple/206/" }
+  ]
+}

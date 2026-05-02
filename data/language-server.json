@@ -1,0 +1,91 @@
+{
+  "kind": "concept",
+  "name": "Language Server",
+  "aliases": ["lsp"],
+  "summary": "Tooling architecture pattern in which language-aware editor features are provided by a separate long-lived analysis service; LSP (Microsoft, 2016) decoupled the IDE from the language analyzer via JSON-RPC, solving the N×M editor-language integration problem and feeding back into compiler frontend architecture.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A language server is a tooling architecture pattern in which semantic editor features are provided by a separate long-lived analysis service rather than being reimplemented independently in each editor. In practice, this makes language-server support a major driver of frontend and incremental-analysis architecture rather than just a UI integration concern.\n\nThe **Language Server Protocol (LSP)** was introduced by Microsoft in 2016 for VS Code and quickly became the industry standard. It decouples editors from language analyzers via a JSON-RPC protocol with framing similar to HTTP headers. Before LSP, every IDE had to implement custom integrations with every language — an N×M problem. LSP solved it: any LSP-compliant editor (VS Code, Neovim, Emacs, Helix, Zed, Sublime, IntelliJ via plugin) can use any LSP-compliant language server (rust-analyzer, gopls, pyright, clangd, hls, etc.).",
+      "refs": [
+        { "target": "tree-sitter#incrementality", "type": "related-tooling" },
+        { "target": "rust#tooling", "type": "used-by-ecosystem" },
+        { "target": "incremental-type-checking#overview", "type": "depends-on" },
+        { "target": "name-resolution#symbols-and-stable-identity", "type": "depends-on" },
+        { "target": "compiler-as-library#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "typed-syntax-and-semantic-models",
+      "title": "Typed syntax and semantic models",
+      "tags": ["tooling", "type-system", "language-server"],
+      "content": "A compiler can expose semantic information as typed syntax trees, symbol graphs, query results, or an API over compiler internals. IDE features need stable mappings between syntax nodes and semantic objects.\n\nTwo production language servers illustrate the type-checker-facing surface:\n\n- **gopls** exposes serializable indexes over type-checking results so editor queries do not retypecheck. The Go language server's `types/types.go` package is the canonical type representation, and gopls memoizes resolved types on the package level.\n- **rust-analyzer** documents that a performant language server avoids analysis unless necessary and needs bidirectional mapping between syntax and semantic elements for features like refactoring. The Salsa-based memoization (`data/salsa-incremental`) is what makes hover, completion, and rename O(edited-region) rather than O(file).\n\nThe lesson for new languages: **a typed-syntax model is as much a tooling commitment as a compiler concern**. If the compiler does not expose syntax-to-semantics mappings as a stable API, the language server has to compute them separately, doubling the engineering cost.",
+      "refs": [
+        { "target": "salsa-incremental#overview", "type": "implements" }
+      ],
+      "sources": [
+        { "label": "Gopls implementation design", "url": "https://go.googlesource.com/tools/+/refs/heads/master/gopls/doc/design/implementation.md" },
+        { "label": "Rust-analyzer, The Heart of a Language Server", "url": "https://rust-analyzer.github.io/blog/2023/12/26/the-heart-of-a-language-server.html" }
+      ]
+    },
+    {
+      "id": "editor-features",
+      "title": "Editor-facing capabilities",
+      "tags": ["tooling", "language-server", "editor-integration"],
+      "content": "Language servers are expected to provide diagnostics, navigation, references, hover information, completion, code actions, and semantic views of code. These capabilities matter because each one depends on stable syntax, semantic identity, and repeatable analysis under active editing.\n\nThe LSP feature surface includes: `textDocument/completion`, `textDocument/hover`, `textDocument/definition`, `textDocument/references`, `textDocument/rename`, `textDocument/publishDiagnostics`, `textDocument/codeAction`, `textDocument/signatureHelp`, `textDocument/formatting`, `textDocument/semanticTokens`, `textDocument/inlayHint`, `workspace/symbol`, `workspace/executeCommand`. The protocol is now standardized at version 3.18 with optional capability negotiation.",
+      "refs": [
+        {
+          "target": "incremental-parsing#editor-driven-constraints",
+          "type": "related"
+        },
+        {
+          "target": "high-level-ir#why-compilers-keep-this-layer",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "frontend-architecture-requirements",
+      "title": "Frontend architecture requirements",
+      "tags": ["tooling", "incrementality", "compiler-design"],
+      "content": "Language servers place strong pressure on frontend architecture: parsing must tolerate broken code, semantic layers must return partial results, references need stable identities, and recomputation must be incremental enough to keep editor latency acceptable. For many modern languages, this is one of the earliest non-optional architectural constraints.\n\nrust-analyzer (Aleksey Kladov, Lukas Wirth et al.) is the canonical example of a language server designed from scratch for editor responsiveness. It uses Salsa (a demand-driven incremental computation framework) to memoize derived facts at every layer of the analysis pipeline; when a user edits a single token, only the queries dependent on the changed input are re-evaluated. This is qualitatively different from running a batch compiler each keystroke. rust-analyzer's architecture has influenced subsequent language-server designs (gopls, ruff-lsp, pyright) toward demand-driven incrementality as the default.\n\ngopls (the Go language server, by the Go team) similarly invests heavily in incremental analysis. Its architecture treats every package as a node in a dependency graph; edits invalidate the minimum set of nodes needed to recompute affected diagnostics.",
+      "refs": [
+        { "target": "tree-sitter#incrementality", "type": "related" },
+        { "target": "high-level-ir#overview", "type": "related" },
+        { "target": "mid-level-ir#why-this-layer-exists", "type": "related" }
+      ]
+    },
+    {
+      "id": "design-constraints",
+      "title": "Design constraints",
+      "tags": ["tooling", "incrementality", "tradeoffs"],
+      "content": "A language server places pressure on the entire frontend architecture: parsing must tolerate broken code, semantic analysis must support partial results, references must be stable under edits, and diagnostics must be cheap enough to recompute continuously. In practice, this often drives design decisions far earlier than a batch compiler would require.\n\nKey requirements: error-resilient parsing (often via tree-sitter or a hand-written recursive-descent parser with explicit error recovery), stable IDs that survive edits (so references survive inserts/deletes), salsa-style or red-green-tree-style incremental memoization, and the ability to return *partial* results (a half-typed expression should still get hover info on the parts that are well-formed). Languages designed in 2026 tend to bake these requirements into their compiler architecture from day one rather than retrofitting them.",
+      "refs": [
+        { "target": "parser-combinators#tradeoffs", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "resolution-and-identity-constraints",
+      "title": "Resolution and identity constraints",
+      "tags": ["tooling", "modules", "packaging"],
+      "content": "Language servers depend heavily on deterministic module and package resolution. If imports, package identities, or build graphs are environment-sensitive or ambiguous, editor features such as navigation, rename, and auto-import become substantially harder to make reliable.\n\nPython is the canonical hard case: import resolution depends on `sys.path`, `__path__`, virtual environments, namespace packages, custom finders, and editable installs. pyright and pyright-derived tools spend significant engineering effort approximating loader behavior without executing user code. Rust and Go are at the easy end: deterministic, source-derivable module graphs let rust-analyzer and gopls produce reliable navigation even on partially-edited code.\n\nThe lesson: a language with deterministic module identity, static import semantics, and clean build-graph derivation gets a high-quality language server for relatively little tooling effort. A language with environment-sensitive resolution pays the language-server tax for years.",
+      "refs": [
+        { "target": "module-systems#tooling-implications", "type": "related" },
+        {
+          "target": "package-resolution#determinism-and-conflict-handling",
+          "type": "related"
+        },
+        { "target": "module-identity#design-implications", "type": "related" },
+        { "target": "workspaces#shared-state", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Language Server Protocol",
+      "url": "https://microsoft.github.io/language-server-protocol/"
+    }
+  ]
+}

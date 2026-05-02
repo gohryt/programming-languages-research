@@ -1,0 +1,50 @@
+{
+  "kind": "library",
+  "name": "Apache Arrow Gandiva",
+  "aliases": [
+    "Arrow expression compiler"
+  ],
+  "summary": "Dremio 2018: an LLVM-based expression compiler for Apache Arrow. Compiles expression trees (WHERE clauses, projections) to LLVM IR operating directly on Arrow's columnar memory, then caches native code keyed by expression signature. Pure compile-time-expression library — no joins or aggregations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Gandiva** (Dremio, 2018) is an LLVM-based expression compiler for Apache Arrow. Given an expression tree (e.g., a WHERE clause or projection expression), Gandiva generates LLVM IR that operates directly on Arrow's columnar memory layout, compiles via LLVM, and caches the resulting native code keyed by expression signature.\n\nThe architecture is a pure compile-time-expression library, not a full query engine — Gandiva handles expressions, not joins or aggregations. This narrow scope keeps it simple enough to embed in any Arrow-consuming system (Dremio, Python's PyArrow, Apache Drill).",
+      "refs": [
+        {
+          "target": "llvm#overview",
+          "type": "uses"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Apache Arrow Gandiva",
+          "url": "https://arrow.apache.org/docs/cpp/gandiva.html"
+        }
+      ]
+    },
+    {
+      "id": "design-pattern",
+      "title": "Design pattern — LLVM-backed expression compilation as library",
+      "tags": [
+        "library",
+        "compiler"
+      ],
+      "content": "Compilation is cached, so recurring expressions (typical in production workloads) pay the compile cost once. The pattern — \"LLVM-backed expression compilation as a library\" — is broadly useful. Any system that repeatedly evaluates data-dependent expressions can benefit from pre-compilation plus caching, whether it's a query engine, a streaming filter, or a rule-based alerting system.\n\nThe scope discipline matters: Gandiva does not try to be a full database engine. It does one thing — compile expressions over columnar data — and does it well. For systems that need expression compilation but already have their own join/aggregation/scheduling, Gandiva slots in cleanly.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Dremio Gandiva intro",
+          "url": "https://www.dremio.com/blog/introducing-gandiva-initiative-for-apache-arrow/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Gandiva",
+      "url": "https://arrow.apache.org/docs/cpp/gandiva.html"
+    }
+  ]
+}

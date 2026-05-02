@@ -1,0 +1,33 @@
+{
+  "kind": "tool",
+  "name": "ISLE",
+  "aliases": ["instruction-selection-lowering-expressions"],
+  "summary": "Cranelift's typed term-rewrite DSL for instruction selection. Each rule is a term-rewrite from CLIF input patterns to machine-instruction outputs. The ISLE compiler merges all rules into a decision tree, sharing matching work across rules.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ISLE (Instruction Selection / Lowering Expressions) is Cranelift's DSL for writing instruction-selection rules. Each rule is a typed term-rewrite from CLIF input patterns to machine-instruction outputs. The ISLE compiler merges all rules into a decision tree, sharing matching work across rules.",
+      "refs": [
+        { "target": "cranelift#overview", "type": "implements-for" },
+        { "target": "burg-burs#overview", "type": "compares-to" }
+      ],
+      "sources": [
+        { "label": "Cranelift ISLE README", "url": "https://github.com/bytecodealliance/wasmtime/blob/main/cranelift/codegen/src/isle/README.md" }
+      ]
+    },
+    {
+      "id": "rules-as-representation",
+      "title": "Rules as a representation in their own right",
+      "tags": ["compiler-ir", "instruction-selection", "dsl"],
+      "content": "The point: instruction selection rules are themselves a representation, and they should be readable, type-checked, and verifiable. Hand-written instruction selectors (LLVM SelectionDAG, GCC machine descriptions) are notoriously hard to maintain; ISLE makes them declarative.\n\nThe declarative rule shape opens the door to formal-verification work over instruction selection: rules can be model-checked, fuzzed against the underlying ISA semantics, and reasoned about as a term-rewrite system rather than a tangle of hand-written matchers.",
+      "refs": [
+        { "target": "selectiondag-globalisel#overview", "type": "alternative-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Cranelift ISLE README", "url": "https://github.com/bytecodealliance/wasmtime/blob/main/cranelift/codegen/src/isle/README.md" }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "kind": "concept",
+  "name": "Registries",
+  "aliases": ["package-registries"],
+  "summary": "Naming, discovery, hosting, and publication infrastructure for packages; production designs span flat global namespaces (crates.io, PyPI, Hex), scoped names (npm @scope, Maven groupId), URL-shaped no-central-registry (Go modules), and content-addressed (Deno).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Registries are the infrastructure layer for publishing, discovering, and fetching packages. They shape the social and technical structure of an ecosystem because package names, availability, and trust often flow through registry design.\n\nMost modern languages ship with an official public registry hosting community packages: **crates.io** (Rust), **npm** (JavaScript), **PyPI** (Python), **Hex** (Erlang/Elixir), **Hackage** (Haskell), **NuGet** (.NET), **Maven Central** (JVM), **CRAN** (R), **CocoaPods** + **Swift Package Index** (Swift). Go modules takes a different approach with no central registry — module paths are URLs (typically `github.com/user/repo`), the Go tool fetches directly from the version-control host or a configured proxy.",
+      "refs": [{ "target": "cargo#overview", "type": "example" }]
+    },
+    {
+      "id": "namespace-models",
+      "title": "Namespace models — flat, scoped, URL-shaped, coordinate-based",
+      "tags": ["registries", "identity", "ecosystem-design"],
+      "content": "Registry naming models range from flat global namespaces to scoped coordinates and URL-shaped identities. These choices affect ownership, discoverability, conflict handling, and the long-term maintainability of the ecosystem.\n\n- **Flat namespace** — crates.io, PyPI, Hex, Hackage. Single global string-keyed namespace, first-come-first-served names. Names like `tokio`, `serde`, `rand` are global. Has suffered from name-squatting, typo-squatting, and maintenance abandonment.\n- **Scoped names** — npm `@scope/name`. Defends against squatting but requires organizations to claim and maintain their scopes. npm's `@scope` introduction in 2014 left a long tail of unscoped legacy names.\n- **Convention-based hierarchical** — NuGet (`Microsoft.Extensions.Logging`). Names look hierarchical but the registry treats them as flat strings.\n- **Coordinate-based** — Maven Central uses `groupId:artifactId:version`, where `groupId` is conventionally a reverse-DNS-style organization identifier (`org.apache.commons`).\n- **No central registry, URL-shaped identity** — Go modules. By making module identity an arbitrary URL-shaped string, Go avoids registry-name-squatting entirely and aligns ecosystem identity with version-control identity. The cost is that there is no central place to discover packages or browse popularity; community-run tools like `pkg.go.dev` fill that gap.\n- **Content-addressed URL identity** — Deno. Module identity *is* an HTTPS URL, content-addressed via SHA-256 in a lockfile.\n\nThe **scoped vs flat namespace** decision is one of the most consequential choices for ecosystem health. Any new registry should commit to scoped names from the start; retrofitting is painful.",
+      "refs": [
+        { "target": "go#packaging", "type": "related" },
+        { "target": "module-identity#identity-models", "type": "related" }
+      ],
+      "sources": [
+        { "label": "npm scopes", "url": "https://docs.npmjs.com/about-scopes" }
+      ]
+    },
+    {
+      "id": "mirroring-and-availability",
+      "title": "Mirroring and availability",
+      "tags": ["registries", "availability", "enterprise"],
+      "content": "Public registries are convenient but also create supply-chain and uptime dependencies. Mirrors, internal proxies, and local caches matter because registry availability and governance become part of build reliability.\n\n**Vendoring** is the practice of committing copies of dependency source into the project's own repository, so builds do not depend on external registries at all. Go has the most mature vendoring story: `go mod vendor` writes all dependencies into `vendor/`, and the Go toolchain uses them transparently if present.\n\n**Mirroring** is the practice of running an internal copy of a public registry, often with content auditing or version pinning. Artifactory, Nexus, and self-hosted Verdaccio (npm), Sonatype Nexus (Maven, npm, PyPI), and Cloudsmith are commercial or open-source registry mirrors used by enterprises that cannot allow direct registry access from build infrastructure.\n\nThe design lesson is that **registry availability is a build-graph concern**. A build that depends on an external registry being reachable can fail for reasons unrelated to the project's code. Vendoring eliminates this; mirroring centralizes the failure mode.",
+      "refs": [
+        {
+          "target": "package-resolution#determinism-and-conflict-handling",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "discovery-vs-decentralization",
+      "title": "Discovery vs decentralization",
+      "tags": ["registries", "distribution", "tradeoffs"],
+      "content": "Central registries improve discovery and ecosystem coherence, while decentralized identity models reduce governance bottlenecks and naming centralization. Different ecosystems optimize differently across that trade-off.\n\nGo's choice is unusual and instructive: by making module identity URL-shaped, ecosystem identity aligns with version-control identity. The cost is that there is no central place to discover packages or browse popularity; community-run tools like `pkg.go.dev` fill that gap. Deno started with the same approach (URL-shaped imports, no central registry) but added **jsr.io** (a curated registry serving canonical URLs while still URL-shaped) in Deno 2.0 because the loss of central discovery proved more painful in practice.\n\n**Sigstore + SLSA-signed publishing** is increasingly the table-stakes layer above registries. npm enforces Sigstore-signed publishing for trusted packages since 2024; PyPI Trusted Publishing uses the same OIDC-to-Sigstore flow. The transparency log (Rekor) makes it possible to verify a package was signed by an authorised publisher.",
+      "refs": [
+        { "target": "package-management#design-lessons", "type": "related" }
+      ]
+    }
+  ],
+  "sources": []
+}

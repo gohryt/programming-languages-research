@@ -1,0 +1,37 @@
+{
+  "kind": "language",
+  "name": "Verse — Functional-Logic Programming with Failure-as-Effect",
+  "aliases": ["verse", "verse-lang", "uefn-verse"],
+  "summary": "Tim Sweeney and Simon Peyton Jones's Verse (Epic Games), deployed in Unreal Editor for Fortnite (UEFN) since 2023. Largest production deployment of functional-logic programming. Failure is a first-class effect: every expression has a success/failure outcome alongside its value. Effect specifiers (decides, varies, transacts, reads, writes, allocates, suspends) drive a deterministic execution semantics suitable for game runtimes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Tim Sweeney and Simon Peyton Jones's **Verse** (Epic Games, deployed in **Unreal Editor for Fortnite (UEFN)** since 2023) is the largest production deployment of **functional-logic programming** in any language — and the design point worth recording is that **failure is a first-class effect**.\n\nEvery Verse expression has a *success/failure* outcome alongside its value: `if (x > 0) { y } else { fail }` reads naturally because the failure context is part of the language's evaluation semantics, not an exception bolted on top. Failure backtracks across logical-and and propagates through logical-or, recovering the Mercury / Curry functional-logic tradition with deterministic execution semantics suitable for an authoritative game runtime.",
+      "refs": [
+        { "target": "type-and-effect-systems#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "Verse Language Reference (Epic Games / UEFN)", "url": "https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference" },
+        { "label": "Verse: A Functional-Logic Language with Failure-Effect (Peyton Jones et al.)", "url": "https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf" }
+      ]
+    },
+    {
+      "id": "failure-as-effect-row",
+      "title": "Failure as a typed effect",
+      "tags": ["effect-system", "type-system"],
+      "content": "The type-system contribution is treating **failure as an effect row** comparable to the algebraic-effects rows of Koka and the second-class capabilities of Effekt. A Verse function's signature includes which effect specifiers it may exhibit — `decides`, `varies`, `transacts`, `reads`, `writes`, `allocates`, `suspends` — and the type system rejects programs that invoke a stronger-effect callee from a weaker-effect context.\n\nThe `transacts` effect is particularly distinctive: a function in `transacts` context may roll back its mutations on failure, recovering software transactional memory at the language level rather than as a library."
+    },
+    {
+      "id": "deterministic-execution",
+      "title": "Deterministic execution for game runtimes",
+      "tags": ["language-design", "determinism", "effect-system"],
+      "content": "The **deterministic execution semantics** is the architectural complement: Verse evaluation in UEFN must produce identical outcomes on every client running the same simulation, so the language commits to a deterministic interleaving of failures, transactions, and effect handlers. This is rare for a production game-runtime language; most game scripting (Lua in Roblox via Luau, C# in Unity, GameplayTags in Unreal Blueprint) accepts non-determinism as the cost of dynamic dispatch and lets gameplay code paper over it.\n\nThe lesson generalises: **for languages whose primary use case demands deterministic re-execution** (game simulation, on-chain smart contracts, distributed-system state machines, time-travel debugging substrates), making failure a typed effect is structurally cleaner than retrofitting deterministic exception handling onto an effect-untyped core. Verse is the existence proof at production scale.\n\nStatus (as of 2026-04): Verse is shipping inside UEFN with millions of player-creators authoring Fortnite Islands; the language has not been published as a standalone toolchain outside Epic's ecosystem, and the formal semantics paper drafts circulate but have not appeared in a peer-reviewed venue. The cleanest production data point for \"functional-logic + deterministic execution + failure-as-effect\" as a language design choice, with the major caveat that documentation is partial and the language is not portable beyond UEFN today."
+    }
+  ],
+  "sources": [
+    { "label": "Verse Language Reference (Epic Games / UEFN)", "url": "https://dev.epicgames.com/documentation/en-us/uefn/verse-language-reference" },
+    { "label": "Verse: A Functional-Logic Language with Failure-Effect", "url": "https://simon.peytonjones.org/assets/pdfs/verse-conf.pdf" }
+  ]
+}

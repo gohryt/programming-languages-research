@@ -1,0 +1,55 @@
+{
+  "kind": "framework",
+  "name": "Akka",
+  "aliases": ["akka-actors", "lightbend-akka"],
+  "summary": "Production actor framework on the JVM with hierarchical supervision trees, typed Behavior[T] mailboxes (since 2.6), Cluster Sharding for location-transparent millions-of-entities deployments, and Akka Persistence for event sourcing; licensed under BSL since 2022 with Apache Pekko as the Apache-licensed fork.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lightbend's **Akka** (Scala/Java, Jonas Bonér et al., 2009+) is the dominant production actor system on managed runtimes. Each Akka actor is a lightweight object with a typed mailbox; actors are organised hierarchically through a **supervision tree** where a parent decides on each child's failure (restart, resume, stop, escalate). Akka's **Typed API** (since 2.6, 2019) enforces compile-time message-type contracts via `Behavior[T]`; the older untyped API exchanged untyped `ActorRef`s that accept `Any`.",
+      "refs": [
+        { "target": "actors#overview", "type": "instance-of" },
+        { "target": "structured-concurrency#failure-and-cancellation-propagation", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Akka", "url": "https://akka.io/" },
+        { "label": "Akka Typed actors documentation", "url": "https://doc.akka.io/docs/akka/current/typed/actors.html" }
+      ]
+    },
+    {
+      "id": "vs-beam-and-pony",
+      "title": "Contrast with BEAM and Pony",
+      "tags": ["actors", "jvm", "comparison"],
+      "content": "Distinct from BEAM actors (`data/beam-bytecode`, Erlang processes): Akka runs on the JVM with shared-heap memory, so actor isolation is by convention — actors are encouraged to keep state private but the language does not enforce it. Distinct from Pony (`data/pony`): no reference-capability discipline statically prevents data races across actor boundaries.\n\nThe compromise is that Akka inherits the JVM's GC, JIT, and ecosystem in exchange for requiring programmer discipline for race-freedom and immutability. For teams already on the JVM, this is often the practical winning trade-off; for green-field designs that want static data-race freedom, Pony or a Rust + actor library is a stronger choice.",
+      "refs": [
+        { "target": "pony#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "cluster-and-persistence",
+      "title": "Akka Cluster and Akka Persistence",
+      "tags": ["distributed", "actors", "production"],
+      "content": "**Akka Cluster** adds distribution: actors form a peer-to-peer cluster with gossip-based membership, leader election via Cluster Singleton, partitioning via **Cluster Sharding** (location-transparent actor names sharded by key over consistent hashing), and at-most/at-least/effectively-once delivery via **Akka Persistence** (event sourcing) and durable mailboxes. Cluster Sharding is the load-bearing primitive that lets a typical Akka deployment treat \"millions of independent stateful entities\" as a routing problem rather than a per-node-state problem.\n\n**Akka Streams** layers reactive streams over the Akka actor system, with materialisation to a graph-of-actors execution — covered as one of the major Reactive Streams implementations in `data/channels#reactive-streams`.",
+      "refs": [
+        { "target": "channels#reactive-streams", "type": "related" }
+      ]
+    },
+    {
+      "id": "licensing-and-pekko",
+      "title": "Licensing and the Pekko fork",
+      "tags": ["licensing", "ecosystem"],
+      "content": "Status (as of 2026-04): production at scale — Twitter/X infrastructure, PayPal, eBay, Norwegian Cruise Line, several telecom platforms.\n\nAkka 2.7+ moved to a Business Source License from Apache 2.0 in 2022, prompting **Apache Pekko** (Apache Incubator) to fork the last Apache-licensed release. The licensing change is the most consequential ecosystem event in the actor space since BEAM's open-source release. New deployments increasingly choose Pekko for its permissive licensing; existing Akka deployments often pay Lightbend for production support.",
+      "refs": [],
+      "sources": [
+        { "label": "Apache Pekko", "url": "https://github.com/apache/incubator-pekko" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Akka", "url": "https://akka.io/" },
+    { "label": "Akka Typed actors", "url": "https://doc.akka.io/docs/akka/current/typed/actors.html" },
+    { "label": "Apache Pekko", "url": "https://github.com/apache/incubator-pekko" }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Braun SSA Construction",
+  "aliases": ["simple SSA construction", "on-the-fly SSA"],
+  "summary": "Matthias Braun et al. (CC 2013): build SSA on the fly directly from a linear instruction stream, without computing dominance information upfront. Per-block per-variable current-definition map plus incomplete φ-functions for early reads. Used by Cranelift, Firm/libFirm, and several JIT backends.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Matthias Braun et al. (CC 2013) presented an algorithm that builds SSA on the fly, directly from a linear instruction stream, without computing dominance information upfront. The core idea is a per-block, per-variable *current definition* map plus **incomplete φ-functions** for variables read in a block before all its predecessors have been sealed. When a block is later sealed (all predecessors known), incomplete φ-functions are filled in and possibly optimised away.\n\nThe algorithm is dramatically simpler than Cytron's — a few hundred lines in practice — and crucially it plays well with JITs that build IR as they parse bytecode. Produces minimal SSA for reducible CFGs and near-minimal SSA for irreducible ones.",
+      "refs": [
+        { "target": "ssa#overview", "type": "produces" },
+        { "target": "cytron-ssa-construction#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Simple and Efficient Construction of SSA Form (Braun et al., CC 2013)", "url": "https://pp.ipd.kit.edu/uploads/publikationen/braun13cc.pdf" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Mechanism",
+      "tags": ["compiler", "ssa", "jit"],
+      "content": "For each variable in each block, maintain a *current definition* map. On a read, look up the current definition; if absent, recursively look up in predecessors. If predecessors are not all sealed yet (incomplete CFG), insert an *incomplete φ-function* — a placeholder that the algorithm will fill in once predecessors are known.\n\nWhen a block becomes *sealed* (all predecessors are known), every incomplete φ in that block is filled by reading the variable in each predecessor. The algorithm then attempts to optimise the φ: if all incoming values are the same (after the recursive read), the φ is trivial and can be replaced with that value; this may trigger further optimisation in users.\n\nThe entire algorithm is local: it does not need a dominator tree or dominance-frontier computation. The trade-off is that block sealing must be tracked carefully, and the resulting SSA is minimal only for reducible CFGs (irreducible CFGs may produce slightly more φ-functions than necessary).",
+      "refs": []
+    },
+    {
+      "id": "production-usage",
+      "title": "Production usage",
+      "tags": ["compiler", "production", "jit"],
+      "content": "**Cranelift**, **Firm/libFirm**, and several recent JIT backends use Braun's algorithm directly. The lesson generalises: for any compiler that constructs IR from a linear input (bytecode, source tokens) rather than from a complete pre-built CFG, Braun's algorithm avoids the front-end-heavy step of building dominance information just to construct SSA.\n\nFor a batch compiler with a stable CFG already in hand, Cytron's algorithm is fine and the tooling literature is richer. Both approaches are correct; the choice is dictated by when the CFG becomes complete relative to when SSA construction needs to run.",
+      "refs": [
+        { "target": "cranelift#fit-for-jit-and-tiered-compilation", "type": "deployed-in" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Braun et al. — Simple and Efficient SSA Construction", "url": "https://pp.ipd.kit.edu/uploads/publikationen/braun13cc.pdf" }
+  ]
+}

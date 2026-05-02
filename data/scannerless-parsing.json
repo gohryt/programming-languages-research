@@ -1,0 +1,50 @@
+{
+  "kind": "concept",
+  "name": "Scannerless Parsing",
+  "aliases": ["lexerless-parsing", "sglr"],
+  "summary": "Eliminates the traditional lexer/parser pipeline: a single grammar formalism describes both token structure and phrase structure from characters to syntax trees. The principled solution to embedded-language and string-interpolation lexer-composition conflicts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Scannerless (lexerless) parsing eliminates the traditional lexer/parser pipeline, using a single grammar formalism from characters to syntax trees. The grammar describes both token structure and phrase structure in one unified specification.\n\nScannerless GLR parsing (SGLR) has been used in the Spoofax language workbench and the Rascal meta-programming language for exactly this purpose — parsing real-world programs in languages with complex lexical interactions.",
+      "refs": [
+        { "target": "tree-sitter#parser-architecture", "type": "contrasts-with" },
+        { "target": "deterministic-ll-lr#overview", "type": "extends" }
+      ]
+    },
+    {
+      "id": "language-composition-motivation",
+      "title": "Why composition needs it",
+      "tags": ["parser", "language-composition", "extensibility"],
+      "content": "The primary advantage is compositional grammars. When two languages are embedded — SQL in Java, HTML in PHP, regex in any language, JSX in JavaScript — their token rules may conflict. A traditional lexer cannot handle multiple token grammars simultaneously. A scannerless parser treats everything as characters, avoiding the conflict entirely.\n\nAny language that supports string interpolation, heredocs, or embedded DSLs faces the same lexer-composition problem. Scannerless parsing is the principled solution; the alternative is per-context lexer modes, which are an ad-hoc fix for the same underlying issue.",
+      "refs": [{ "target": "syntax-parse#overview", "type": "related" }]
+    },
+    {
+      "id": "costs-and-ambiguity",
+      "title": "Cost: more ambiguity, more powerful machinery",
+      "tags": ["parser", "tradeoffs", "ambiguity"],
+      "content": "The cost is that scannerless grammars are more ambiguous than tokenized ones — character-level alternatives create more nondeterminism — requiring a more powerful and slower parsing algorithm.\n\nSRNGLR (Economopoulos et al., 2009) is on average 33% faster than SGLR, and 95% faster on highly ambiguous grammars. Even with that improvement, scannerless GLR is heavier than a traditional lexer-then-parser pipeline.",
+      "refs": [
+        { "target": "ambiguity-and-parse-forests#overview", "type": "produces" }
+      ],
+      "sources": [
+        {
+          "label": "One Parser to Rule Them All — Data-Dependent Grammars",
+          "url": "https://ir.cwi.nl/pub/24027/24027B.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Scannerless parsing (Wikipedia)",
+      "url": "https://en.wikipedia.org/wiki/Scannerless_parsing"
+    },
+    {
+      "label": "One Parser to Rule Them All — Data-Dependent Grammars",
+      "url": "https://ir.cwi.nl/pub/24027/24027B.pdf"
+    }
+  ]
+}

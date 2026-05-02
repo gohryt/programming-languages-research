@@ -1,0 +1,314 @@
+{
+  "kind": "concept",
+  "name": "Automated fault isolation",
+  "aliases": [
+    "delta debugging",
+    "program slicing",
+    "spectrum-based fault localization",
+    "symbolic execution",
+    "model checking"
+  ],
+  "summary": "Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause — delta debugging on inputs, program slicing on statements, Tarantula on lines, CBI on predicates, KLEE/CBMC on path/SMT formulae, Miri on MIR operations, Whyline on outputs, Daikon on invariants.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), aggregated value-histories (Daikon's dynamic invariants), or whole-program SMT formulae over bounded executions (CBMC). The debugger becomes an automated search engine with a domain-specific query.\n\nA unifying design lesson runs through §`data/automated-fault-isolation#whyline-interrogative`–8.11: **make values, computations, and intent observable at semantic program points**. Whyline reifies the connection from outputs back to the code that produced them (provenance); Shapiro's algorithmic debugging reifies the computation tree so the user can answer yes/no on each subgoal's intended result (semantic intent); Daikon mines invariants over instrumented runs (population-statistics intent). Each technique requires the compiler/runtime to expose more than raw memory reads — function entries/exits, loop heads, algebraic constructors, effect boundaries, output provenance — and rewards languages that emit such events with debuggers users do not have to translate from machine state into mental model.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:fault-isolation`\n- **domain**: `domain:debugging`\n"
+    },
+    {
+      "id": "delta-debugging",
+      "title": "Delta Debugging — Minimizing Failure-Inducing Input",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Andreas Zeller's delta debugging algorithm (1999) answers the question: \"what is the minimal input that still triggers this bug?\" Given a failing input, it systematically removes chunks — first large halves, then progressively smaller pieces — testing after each removal whether the failure persists. The result is a 1-minimal failing input: removing any single element causes the failure to disappear.\n\nThe algorithm extends beyond inputs. Applied to code changes, it answers \"which of these 1000 commits introduced the bug?\" by binary-searching the change history (this is the principle behind `git bisect`). Applied to program state, it can isolate the minimal state difference between a passing and failing execution.\n\nThe technique is fully automated — it requires only a test oracle (pass/fail) and a way to produce subsets of the input. No understanding of the program is needed. It is the canonical example of debugging-as-search: the bug is somewhere in a large space, and delta debugging narrows the space systematically.\n\nThe practical limitation: each test requires a full program execution. For programs that take seconds or minutes to run, minimizing a large input can take hours. But for programs that run in milliseconds (unit tests, parsers, compilers), delta debugging is transformative.",
+      "sources": [
+        {
+          "url": "https://www.debuggingbook.org/html/DeltaDebugger.html"
+        },
+        {
+          "url": "https://www.cs.purdue.edu/homes/xyzhang/fall07/Papers/delta-debugging.pdf"
+        }
+      ]
+    },
+    {
+      "id": "program-slicing",
+      "title": "Program Slicing — \"What Affects This Variable?\"",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Mark Weiser introduced program slicing in 1981: given a variable at a program point, compute the subset of the program that could affect that variable's value. This \"slice\" is itself a valid program — it computes the same value for the variable of interest while discarding everything irrelevant.\n\n**Static slicing** considers all possible executions: the slice includes every statement that *could* affect the variable on *any* input. Static slices tend to be large (often 30–50% of the program) but require no execution.\n\n**Dynamic slicing** considers a specific execution: the slice includes only statements that *actually* affected the variable on *this* input. Dynamic slices are much smaller and more useful for debugging, but require running the program with the failing input.\n\nThe practical application: when a variable has a wrong value, the dynamic backward slice tells you exactly which statements contributed to that value. This is a mechanical version of what programmers do mentally — \"where did this value come from?\" — but computed automatically.\n\nGranularity is the distinguishing axis from reverse dataflow tracking (see `data/record-and-replay#pernosco-omniscient`): program slicing operates on source statements, while Pernosco operates on individual memory writes and register transfers.",
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Program_slicing"
+        },
+        {
+          "url": "http://www0.cs.ucl.ac.uk/staff/mharman/sf.html"
+        }
+      ]
+    },
+    {
+      "id": "tarantula-fault-localization",
+      "title": "Tarantula — Fault Localization via Test Coverage Coloring",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Tarantula (Jones, Harrold, Stasko, 2002) is a spectrum-based fault localization technique. Given a test suite with some passing and some failing tests, it computes a \"suspiciousness\" score for each source line:\n\n```\nsuspiciousness(s) = (fail(s) / total_fail) / (fail(s) / total_fail + pass(s) / total_pass)\n```\n\nLines executed mostly by failing tests get high suspiciousness (close to 1.0). Lines executed mostly by passing tests get low suspiciousness (close to 0.0). Lines executed equally by both get 0.5.\n\nThe visualization colors each source line on a red-to-green gradient: red = highly suspicious (likely buggy), green = likely correct. The programmer reads the color-coded source and focuses on the red lines.\n\nThe remarkable property: Tarantula requires no program analysis, no symbolic execution, no formal methods. It requires only (a) a test suite with at least one failing test and (b) line-level coverage information for each test. Both are routinely available in modern development workflows.\n\nLater techniques (Ochiai, DStar, etc.) improved the suspiciousness formula, but Tarantula's contribution was showing that coverage × pass/fail is sufficient to localize faults with surprising accuracy. Empirically, Tarantula examines less than 20% of the code to find the fault in most cases.",
+      "sources": [
+        {
+          "url": "https://dl.acm.org/doi/10.1145/1101908.1101949"
+        },
+        {
+          "url": "https://faculty.cc.gatech.edu/~harrold/6340/cs6340_fall2009/Slides/class20.pdf"
+        }
+      ]
+    },
+    {
+      "id": "cooperative-bug-isolation",
+      "title": "Cooperative Bug Isolation — Statistical Debugging at Population Scale",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Ben Liblit's Cooperative Bug Isolation (CBI) — dissertation 2004, PLDI 2005, ICML 2006 — answers a different question than Tarantula (`data/automated-fault-isolation#tarantula-fault-localization`). Tarantula assumes a dense test suite with per-test coverage. CBI assumes *sparse, noisy feedback from thousands of end-user runs in the field* — and no per-run coverage information.\n\nThe instrumentation strategy is **random sampling of predicates**. Every branch, every return-value-sign check, every scalar-pair comparison the compiler can insert is a *predicate*. Rather than recording whether each predicate was true on every run, CBI samples: each predicate is observed with small probability, so per-run overhead stays low, but aggregated across many users the sampling is provably unbiased. What ships back from each user is a feedback report: a count of how many times each sampled predicate was observed true, plus the program outcome (success / crash / deadline miss).\n\nThe analysis is statistical. A predicate *P* is suspicious if *Pr(fail | P observed true)* exceeds *Pr(fail)* by enough margin to be unlikely under the null. The PLDI 2005 extension handles **multiple concurrent bugs**: an iterative voting procedure biclusters runs and predicates so that predictors for bug A are not drowned out by the more-common bug B. Case studies identified previously-unknown crashing bugs in MOSS, CCRYPT, and EXIF, all from sparse sampled feedback alone.\n\nThe design lesson: **when per-run observation is expensive or noisy, cross-run statistics recover what single-run tracing cannot**. CBI sits next to Tarantula as the distributed-population generalization — less per-run information, traded against vastly more runs. For a language runtime that can ship observations home (opt-in crash reporters, telemetry), the CBI machinery is directly applicable and fits neatly alongside the continuous-profiling infrastructure in `data/continuous-profiling`.",
+      "sources": [
+        {
+          "url": "https://pages.cs.wisc.edu/~liblit/dissertation/"
+        },
+        {
+          "url": "https://pages.cs.wisc.edu/~liblit/pldi-2005/"
+        }
+      ]
+    },
+    {
+      "id": "cause-effect-chains",
+      "title": "Isolating Cause-Effect Chains — Delta Debugging Over Program States",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Andreas Zeller's \"Isolating Cause-Effect Chains from Computer Programs\" (FSE 2002, Distinguished Paper) extends delta debugging (`data/automated-fault-isolation#delta-debugging`) from *inputs* to *program states*, and in doing so answers the question most debugging sessions are really asking: *what caused this bug, not just where is it.*\n\nThe setup requires a **passing run** and a **failing run** of the same program, frozen inside GDB at comparable execution points. The delta is a set of variable-value differences between the two states. Delta debugging is applied to this delta: flip half of the differences from the passing state into the failing state, resume, see if the outcome flips. Narrow recursively until a **1-minimal state difference** is reached — a minimal set of variables whose values are *causal* to the failure in the interventional sense: change them, and the failure disappears.\n\nRunning this at several execution points produces a **cause-effect chain**: a sequence \"at `main`, *v₁* differed; at `step_k`, that caused *v₂* to differ; at `step_m`, *v₂* caused *v₃*; at the crash, *v₃* was the immediate cause.\" The prototype found the chain for a real GCC crash: \"C input contained `1.0` → an addition appeared in RTL → a cycle formed in the RTL tree → GCC crashed.\"\n\nThe only tool dependency is a debugger that can **read and write variables in arbitrary frames of a live process**. Zeller used GDB. The output is what programmers construct by hand when they \"work backwards\" from a crash, except mechanically derived and explicitly causal under an interventional definition — not \"this variable correlates with failure\" (Tarantula) but \"changing this variable makes the failure go away.\"\n\nCause-effect chains are the *interventional* counterpart to Pernosco's *observational* reverse dataflow (`data/record-and-replay#pernosco-omniscient`).",
+      "sources": [
+        {
+          "url": "https://www.st.cs.uni-saarland.de/papers/fse2002/"
+        },
+        {
+          "url": "https://www.cs.umd.edu/~atif/zeller.pdf"
+        }
+      ]
+    },
+    {
+      "id": "klee-symbolic-execution",
+      "title": "KLEE — Symbolic Execution as Bug Finder and Test Generator",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation",
+        "verification"
+      ],
+      "content": "Symbolic execution turns inputs into *symbols* and runs the program on constraint-laden states rather than concrete values. KLEE (OSDI 2008, Cadar, Dunbar, Engler) is the archetypal LLVM-IR symbolic executor and sets the template for modern tools (angr, Manticore, S2E).\n\nThe execution model: every branch *forks* the state into two children, one with the branch condition added to its path condition and one with the negation. A constraint solver (STP, later Z3) prunes states whose path condition is unsatisfiable. On hitting a bug (OOB access, assertion, division by zero, free of invalid pointer) or reaching an exit, KLEE asks the solver to produce **concrete inputs satisfying the current path condition** — so every bug comes with a minimal, replayable test case. The resulting `.ktest` file is directly executable against the uninstrumented binary.\n\nThe originality is two-fold. First, **every bug report is reproducible by construction** — no \"cannot reproduce\" tickets. Second, path explosion is managed by **search heuristics** rather than bounded depth: NURS-MD2U biases selection toward the state closest to uncovered instructions, balancing coverage and depth; Random Path Selection weights paths by inverse subtree size.\n\nKLEE's empirical record: 56 bugs in 452 real applications, 10 fatal in GNU COREUTILS, 3 of them latent for over 15 years. The **cross-checking mode** compares two implementations that should agree (BUSYBOX vs COREUTILS) and symbolically searches for inputs where they differ — turning \"any two implementations of the same spec\" into test oracles for each other without writing a single assertion.\n\nThe trade-offs are the usual ones for symbolic execution: exponential path counts, solver cost on large constraints, weakness on code with opaque library calls, and the need to model the environment (KLEE ships a POSIX environment model). But as a **debugging** tool — \"I have a hypothesis that input *X* could cause *Y*; is there an *X* that does?\" — symbolic execution asks questions no other technique asks, and when the solver answers, the answer is concrete.",
+      "sources": [
+        {
+          "url": "https://klee.github.io/docs/"
+        },
+        {
+          "url": "https://llvm.org/pubs/2008-12-OSDI-KLEE.pdf"
+        }
+      ]
+    },
+    {
+      "id": "fuzzer-assisted-crash-triage",
+      "title": "Fuzzer-Assisted Crash Triage — `afl-tmin`, AFL `-C`, libFuzzer `-minimize_crash`",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Modern coverage-guided fuzzers are indirectly powerful debuggers. AFL, libFuzzer, honggfuzz, and their descendants produce crashes by the thousand; the debugger-relevant part is what happens *after* the crash, when the fuzzer is repurposed as a triage tool. These workflows are the automated dual of manual reproduce-and-simplify.\n\n**`afl-tmin`** is delta debugging (`data/automated-fault-isolation#delta-debugging`) packaged inside AFL. Given a crashing input and the instrumented target, it produces the minimum byte-level input that still triggers the same crash. It operates on raw bytes but uses the instrumentation coverage signature to ensure the reduced input triggers *the same* bug, not just *any* crash — solving the \"minimization landed on a different bug\" problem that plain delta debugging hits.\n\n**AFL's `-C` \"crash exploration mode\"** takes a crashing input and fuzzes forward from it, **maintaining the crash condition as an invariant** via coverage-based acceptance. The output is a corpus of crash variants that preserve the faulting state while varying surrounding memory and control flow — answering \"how much does the attacker control once the crash is reached?\" in minutes of automated search. **libFuzzer's `-minimize_crash=1`** is the in-process variant of the first tool — no separate orchestration, same algorithm.\n\n**`afl-collect`** (rc0r/afl-utils) deduplicates crashes by **backtrace hash** rather than input hash: different inputs that crash at the same backtrace collapse into one bug, addressing the \"one bug shows up as 10,000 crashes\" noise that otherwise overwhelms triage.\n\n**Hybrid concolic fuzzing** (Driller, angr's phuzzer) marries AFL with symbolic execution (`data/automated-fault-isolation#klee-symbolic-execution`): when AFL gets stuck on a magic-number check or checksum it cannot mutate past, symbolic execution computes an input that satisfies the check and injects it into AFL's corpus. The two techniques cover each other's weaknesses — fuzzer gets broad coverage cheaply, symbolic execution crosses constraint walls.\n\nThe debugging role is narrow but sharp: **given a crash, produce a minimal reproducer and a population of related crashes.** Humans doing this by hand spend hours to days; machines finish in seconds to minutes.",
+      "sources": [
+        {
+          "url": "https://afl-1.readthedocs.io/en/latest/fuzzing.html"
+        },
+        {
+          "url": "https://chromium.googlesource.com/chromium/src/+/main/testing/libfuzzer/reproducing.md"
+        }
+      ]
+    },
+    {
+      "id": "miri-mir-interpreter",
+      "title": "Miri — MIR Interpreter as UB Detector",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation",
+        "rust"
+      ],
+      "content": "Miri (Ralf Jung et al., 2017–) interprets Rust's MIR one operation at a time and, in doing so, detects **Undefined Behavior as it happens**, not as a statistical consequence of a downstream crash. It sits in `data/automated-fault-isolation` because its purpose is fault isolation: pinpoint the exact MIR statement and memory state where safety is violated.\n\nThe architecture reuses the compiler's `rustc_const_eval::interpret` engine — the same one that evaluates `const fn` at compile time — and extends it via a `Machine` trait whose `MiriMachine` implementation adds threading, file I/O, optional FFI, and per-allocation metadata. Every MIR operation goes through UB checks: out-of-bounds (allocation bounds check), use-after-free (`AllocId` marked dead on deallocation), read of uninitialized memory (per-byte initialization bitmask in the `Allocation` struct), misaligned access (symbolic or int alignment mode), invalid value (`ValidityVisitor` — a `bool` must be 0 or 1, a `&T` must be non-null and aligned, a `char` must be a valid scalar), and aliasing-model violations under Stacked Borrows or Tree Borrows (the latter experimental as of 2026-04). The Stacked Borrows / Tree Borrows model itself is owned by `data/stacked-borrows` and `data/tree-borrows` (aliasing rules and verification angle); this section covers only Miri's role as the runtime checker.\n\nThe original contribution, in this survey's frame, is: **the debugger is an interpreter that speaks the compiler's own IR**. Compiler and debugger share an engine. This is possible because Rust's MIR is an explicit, well-typed IR designed for analysis; the const-evaluator exists regardless of Miri. Extending it to full program execution with instrumentation was an *engineering* step, not a *design* one. No other mainstream language has this property today — although Zig's comptime evaluator and Koka's algebraic-effects interpreter are in the same family.\n\nMiri also leaks-detects at process exit: any allocation not reachable from a `static` is a leak. MIRIFLAGS (`-Zmiri-stacked-borrows`, `-Zmiri-tree-borrows`, `-Zmiri-disable-isolation`) dial in the check strictness.\n\nThe trade-off is crushing slowdown — MIR is interpreted, not JIT'd, and every access goes through check logic — and incomplete coverage (no formal specification of Rust semantics exists, so Miri uses an approximation, and programs calling opaque C code cannot be fully verified). But for the question it answers — *is there UB on this execution?* — it answers authoritatively and with an exact MIR-level diagnostic. The design lesson for a new language: if the IR is accessible and typed, an interpreter-based UB detector is cheap to add and catches bugs no DWARF-based debugger will.",
+      "sources": [
+        {
+          "url": "https://github.com/rust-lang/miri"
+        },
+        {
+          "url": "https://deepwiki.com/rust-lang/rust/6.2-miri:-mir-interpreter-and-ub-detector"
+        }
+      ]
+    },
+    {
+      "id": "whyline-interrogative",
+      "title": "Whyline — Interrogative Debugging",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Andrew Ko and Brad Myers (CHI 2004 for Alice, OOPSLA 2008 for Java) observed that when programmers debug, they don't step through code — they ask \"why did this happen?\" and \"why didn't that happen?\" Traditional debuggers force the programmer to translate those questions into breakpoint locations and watch expressions. The **Whyline** inverts the model: **the UI is a menu of why-did and why-didn't questions about program output, auto-generated from the program's source and execution.**\n\nSelecting a question (the Alice example: *\"Why didn't Pac resize 0.5?\"*) triggers a program analysis that answers it using **static + dynamic slicing, precise call graphs, and new algorithms for why-not-reached code**. The answer shows only the runtime events that caused or prevented the target outcome — the predicate that was false, the actions that defined its operands, the branches that skipped the relevant code — with colors and labels matching the source. Unrelated actions are excluded, reducing visual noise dramatically.\n\nEvaluation: comparing identical debugging scenarios, programmers using Whyline debugged 7.8× faster than without it; novices with Whyline outperformed experts without it; task-completion improved by 40%. The Java Whyline (2008) generalized the approach from Alice's tiny educational language to a mainstream ecosystem by recording execution traces with enough metadata to answer both kinds of questions retroactively on the trace.\n\nPhilosophically this sits alongside Pernosco (`data/record-and-replay#pernosco-omniscient`): both use a recorded execution as a queryable database, but Whyline's contribution is the *interrogative UI* — users don't compose queries, they pick from an auto-generated list derived from what's currently on the output. (See chapter intro on the §`data/automated-fault-isolation#whyline-interrogative`–8.11 provenance/intent lesson.)",
+      "sources": [
+        {
+          "url": "https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf"
+        },
+        {
+          "url": "https://faculty.washington.edu/ajko/papers/Ko2004Whyline.pdf"
+        }
+      ]
+    },
+    {
+      "id": "algorithmic-debugging-byrd-box",
+      "title": "Algorithmic Debugging and the Byrd Box 4-Port Model",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation",
+        "prolog"
+      ],
+      "content": "Two connected contributions from the logic-programming tradition, both worth importing into a modern language's debugger vocabulary.\n\n**The Byrd box model** (Lawrence Byrd, 1980) conceptualizes every Prolog predicate as a **state machine with four ports**: `call` (the predicate is invoked), `exit` (it succeeds), `redo` (the engine backtracks into it seeking another solution), `fail` (no more solutions). SWI-Prolog extends this with `unify` and `exception`. Boxes nest — calling a subgoal enters *its* box, and tracing walks a recursive tree of box activations, recording control flow through ports rather than through a linear call stack.\n\nThe original contribution is that **nondeterministic control flow needs a richer port model than call/return**. An imperative debugger's \"call\" and \"return\" cannot express backtracking or multiple-solution enumeration; the 4-port model can. For any language with coroutines, generators, search/backtracking, effect handlers, or dataflow reactivity, a Byrd-box-style tracer is more faithful than a plain call-stack tracer — each coroutine or handler has `call`, `suspend` (≈`exit`), `resume` (≈`redo`), and `fail` ports that map directly. Tracking execution through those ports exposes the control shape the programmer actually wrote.\n\n**Algorithmic debugging** (Ehud Shapiro, MIT PhD 1982, published as *Algorithmic Program Debugging*, MIT Press) is a different mechanism. Given a program that produced a **wrong answer**, Shapiro reifies the **computation tree** of that answer — each node is a subgoal call and its observed result — and **asks the user yes/no questions** about whether each subgoal's result is intended: *\"Did `factorial(5)` return 120? Correct? Y/N.\"* The debugger bisects the tree based on the user's answers, converging on the smallest subtree where the result is wrong but all its children were correct — **isolating the buggy clause mechanically, without the user inspecting code.**\n\nThis is **declarative debugging**: the user reasons about *intended semantics*, not operational behavior. The debugger infers the buggy code by triangulating between what the program did and what the user says should have happened. Extensions spread beyond Prolog: Naish's Mercury debugger, lazy functional-logic variants (Wadler-style), declarative diagnosers for constraint logic programming. The question the debugger asks the user is a design choice — \"Where should I step?\" (traditional), \"Why did X happen?\" (Whyline `data/automated-fault-isolation#whyline-interrogative`), \"Is this result correct?\" (Shapiro) — and the last is the cheapest for the user when the evaluator can reify its own computation tree.",
+      "sources": [
+        {
+          "url": "https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model"
+        },
+        {
+          "url": "http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html"
+        }
+      ]
+    },
+    {
+      "id": "daikon-dynamic-invariants",
+      "title": "Dynamic Invariant Detection — Daikon",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation"
+      ],
+      "content": "Dynamic invariant detectors observe executions and infer properties that appear to hold: `x <= y`, `len(buffer) == count`, `field != null`, \"this collection is sorted\", or \"this function returns a value larger than its argument.\" Daikon (Ernst et al.) is the canonical system: it instruments programs, records values at program points, and emits likely invariants that could be written as assertions, contracts, or documentation.\n\nThis is useful for fault isolation because inferred invariants summarize what the program usually believes about its own state. A failing run can be compared against mined invariants from passing runs; violated invariants become candidate explanations. False positives are expected — the technique depends on test quality — but even false invariants reveal missing tests or underspecified behavior. Daikon is the population-statistics sibling to CBI (`data/automated-fault-isolation#cooperative-bug-isolation`): both extract bug signal from many runs, with Daikon mining invariants and CBI mining failure-correlated predicates. (See chapter intro on observable-program-points design lesson.)",
+      "sources": [
+        {
+          "url": "https://plse.cs.washington.edu/daikon/"
+        },
+        {
+          "url": "https://plse.cs.washington.edu/daikon/pubs/"
+        }
+      ]
+    },
+    {
+      "id": "cbmc-bounded-model-checking",
+      "title": "CBMC — Bounded Model Checking for Production C/C++/Rust",
+      "tags": [
+        "domain:debugging",
+        "family:fault-isolation",
+        "verification"
+      ],
+      "content": "Edmund Clarke's **CBMC** (C Bounded Model Checker, 2000+; CMU originally, now University of Oxford and Diffblue) is one of the most-deployed production verifiers for C and C++. CBMC translates a C program plus a set of assertions into a SAT/SMT formula whose unsatisfiability is equivalent to the assertions holding for **all executions up to a bounded loop unroll depth**. The verifier is **bounded**: it cannot prove correctness for unbounded loops in general, but it can prove that no assertion violation, no memory-safety violation, and no integer-overflow occurs within the chosen bound.\n\nThe architectural distinction from KLEE (`data/automated-fault-isolation#klee-symbolic-execution`): KLEE *symbolically executes* a program, exploring path conditions and asking the solver whether each path is feasible; CBMC *encodes the entire program* (within bounds) as one large SMT formula and asks the solver whether any satisfying assignment violates an assertion. CBMC's encoding is more direct for verification (no path-explosion at the analysis level if the bound is reasonable); KLEE's exploration is better for test generation (each path produces a concrete reproducer). Both use SMT solvers underneath (Z3, MathSAT, CVC5, Bitwuzla), and the two are complementary tools rather than substitutes.\n\nDistinguishing features:\n\n- **Memory safety by default**: out-of-bounds, null-deref, double-free, use-after-free, integer overflow, and division-by-zero are checked automatically with `--memory-leak-check`, `--bounds-check`, `--pointer-check` flags.\n- **Concurrency support**: `--mm tso` and `--mm pso` model x86-TSO and PowerPC-style weak-memory orderings; thread interleavings are bounded by `--unwind` plus `--unwinding-assertions`. This is the most widely-used production verifier for concurrent C code's memory-model behaviour.\n- **Loop unwinding with proof obligations**: `--unwind 10 --unwinding-assertions` unrolls loops up to 10 iterations *and* generates an assertion that 10 iterations were sufficient (i.e., the loop terminates within 10 in all considered executions). If the unwinding-assertion fails, the bound was insufficient and the verification is incomplete; the user must increase the bound or prove the loop terminates by other means.\n- **C++ support via `goto-cc`**: Clarke, Kroening et al.'s `goto-cc` translates C/C++ source to GOTO programs (CBMC's IR), then CBMC analyses them.\n- **Counter-example traces**: when an assertion fails, CBMC emits a step-by-step trace including assignments, branch conditions, and function calls — directly debuggable, comparable to a normal debugger session.\n\nProduction deployment is the largest in this verifier family. **AWS** uses CBMC extensively for verifying memory safety of C code: the **AWS Encryption SDK**, **FreeRTOS** kernel verification, **Amazon S3** server code, parts of **Amazon Linux**, and the Rust-to-C interop layer for AWS Lambda. **Diffblue** uses CBMC for Java test generation. **FAA-certified avionics** software routinely uses CBMC for memory-safety properties under DO-178C certification. **Kani** (model-checking for Rust) uses CBMC as its SMT-encoding backend, making CBMC the substrate for AWS-scale Rust formal verification.\n\nDistinct from Miri (`data/automated-fault-isolation#miri-mir-interpreter`): Miri interprets one execution; CBMC verifies all bounded executions. Distinct from Verus (`data/verus`): Verus targets full functional correctness with linear-permission discipline; CBMC targets memory-safety + assertion-violation absence within loop bounds. Distinct from Kani: Kani is a Rust frontend over CBMC, so Kani inherits CBMC's bounded discipline.\n\nStatus (as of 2026-04): CBMC is open-source under BSD license, actively maintained by University of Oxford and the Diffblue team. CBMC ~6.0+ ships with substantial Rust support via Kani, making it the substrate for Rust formal verification at AWS scale. Edmund Clarke received the 2007 Turing Award for the development of model checking, and CBMC is the most-deployed production embodiment of that work.",
+      "sources": [
+        {
+          "url": "https://www.cprover.org/cbmc/"
+        },
+        {
+          "url": "https://github.com/diffblue/cbmc"
+        },
+        {
+          "url": "https://www.cprover.org/cprover-manual/cbmc/cbmc-tutorial/"
+        },
+        {
+          "url": "https://model-checking.github.io/kani/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.debuggingbook.org/html/DeltaDebugger.html"
+    },
+    {
+      "url": "https://www.cs.purdue.edu/homes/xyzhang/fall07/Papers/delta-debugging.pdf"
+    },
+    {
+      "url": "https://en.wikipedia.org/wiki/Program_slicing"
+    },
+    {
+      "url": "http://www0.cs.ucl.ac.uk/staff/mharman/sf.html"
+    },
+    {
+      "url": "https://dl.acm.org/doi/10.1145/1101908.1101949"
+    },
+    {
+      "url": "https://faculty.cc.gatech.edu/~harrold/6340/cs6340_fall2009/Slides/class20.pdf"
+    },
+    {
+      "url": "https://pages.cs.wisc.edu/~liblit/dissertation/"
+    },
+    {
+      "url": "https://pages.cs.wisc.edu/~liblit/pldi-2005/"
+    },
+    {
+      "url": "https://www.st.cs.uni-saarland.de/papers/fse2002/"
+    },
+    {
+      "url": "https://www.cs.umd.edu/~atif/zeller.pdf"
+    },
+    {
+      "url": "https://klee.github.io/docs/"
+    },
+    {
+      "url": "https://llvm.org/pubs/2008-12-OSDI-KLEE.pdf"
+    },
+    {
+      "url": "https://afl-1.readthedocs.io/en/latest/fuzzing.html"
+    },
+    {
+      "url": "https://chromium.googlesource.com/chromium/src/+/main/testing/libfuzzer/reproducing.md"
+    },
+    {
+      "url": "https://github.com/rust-lang/miri"
+    },
+    {
+      "url": "https://deepwiki.com/rust-lang/rust/6.2-miri:-mir-interpreter-and-ub-detector"
+    },
+    {
+      "url": "https://www.cs.cmu.edu/~NatProg/papers/Ko2008JavaWhyline.pdf"
+    },
+    {
+      "url": "https://faculty.washington.edu/ajko/papers/Ko2004Whyline.pdf"
+    },
+    {
+      "url": "https://swish.swi-prolog.org/pldoc/man?section=byrd-box-model"
+    },
+    {
+      "url": "http://www.cs.cmu.edu/Groups/AI/lang/prolog/code/debug/shapiro/0.html"
+    },
+    {
+      "url": "https://plse.cs.washington.edu/daikon/"
+    },
+    {
+      "url": "https://plse.cs.washington.edu/daikon/pubs/"
+    },
+    {
+      "url": "https://www.cprover.org/cbmc/"
+    },
+    {
+      "url": "https://github.com/diffblue/cbmc"
+    },
+    {
+      "url": "https://www.cprover.org/cprover-manual/cbmc/cbmc-tutorial/"
+    },
+    {
+      "url": "https://model-checking.github.io/kani/"
+    }
+  ]
+}

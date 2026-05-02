@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Union and Intersection Types",
+  "aliases": ["union-types", "intersection-types"],
+  "summary": "Union types model alternatives; intersection types model simultaneous capabilities. Pair naturally with control-flow narrowing, pattern matching, and dynamic-language migration. TypeScript narrowing follows JavaScript control flow and type guards; Typed Racket uses occurrence typing with propositions attached to predicates.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Union types model alternatives; intersection types model simultaneous capabilities. They pair naturally with control-flow narrowing, pattern matching, and dynamic-language migration.\n\nA union type `A | B` has values that are either `A` or `B`; an intersection type `A & B` has values that are *both* `A` and `B` simultaneously — useful for combining trait/interface obligations or for narrowing a value's static type after a runtime check.",
+      "refs": [
+        { "target": "occurrence-typing#overview", "type": "narrowed-by" },
+        { "target": "subtyping#overview", "type": "extends" },
+        { "target": "static-dynamic-gradual-typing#overview", "type": "supports" }
+      ]
+    },
+    {
+      "id": "production-narrowing",
+      "title": "Production narrowing — pointer to occurrence typing",
+      "tags": ["type-system", "narrowing"],
+      "content": "TypeScript flow analysis and Typed Racket's occurrence typing are the two production approaches to narrowing union types based on runtime predicates and control flow. Full treatment of the discipline — including TypeScript's `typeof`/type-guard rules and Typed Racket's proposition language — lives in `data/occurrence-typing`.",
+      "refs": [
+        { "target": "occurrence-typing#overview", "type": "see-also" }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design trade-offs",
+      "tags": ["type-system", "language-design"],
+      "content": "Union and intersection types blur the line between subtyping and type computation. Practical issues:\n\n- **distributivity**: should `A | (B & C)` equal `(A | B) & (A | C)`? Yes if the lattice is distributive (MLsub assumes this); not all languages commit either way.\n- **erased vs reified**: TypeScript erases unions at runtime, so a `string | number` value carries no tag — narrowing must be done by `typeof`. Languages with reified union tags (Scala 3 enums, Rust `enum`) get cheap pattern matching at the cost of explicit constructor calls.\n- **soundness with mutation**: a value of type `A & B` stored in a mutable cell typed as `A` can have its `B` half invalidated by a write — most languages refuse intersection-typed mutable storage or require unique borrowing.\n\nFor language designers, unions are a strong tool for migration from dynamic code; full intersection types are rare in production but appear in TypeScript, Scala 3, and Java 8+ via type intersection in generic bounds."
+    }
+  ],
+  "sources": [
+    { "label": "TypeScript Handbook — Narrowing", "url": "https://www.typescriptlang.org/docs/handbook/2/narrowing.html" }
+  ]
+}

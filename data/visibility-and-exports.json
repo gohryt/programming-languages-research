@@ -1,0 +1,55 @@
+{
+  "kind": "concept",
+  "name": "Visibility and Exports",
+  "aliases": [],
+  "summary": "Determines which declarations are public API surface vs internal implementation detail; production designs span Rust's rich `pub(crate)`/`pub(super)`/`pub(in path)` lattice, Go's capitalization convention, ML-style explicit signatures, and Common Lisp's `defpackage` symbol-namespace operations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Visibility and export rules define how a module exposes declarations to the rest of a program. They are crucial for encapsulation, refactoring safety, API design, and long-term architectural discipline.\n\nA language must decide what becomes visible outside a module. Three dominant approaches: **explicit export** (nothing leaves the module boundary unless marked: `pub`, `export`, `provide`, export lists — Rust, Zig, Racket), **public-by-default** (declarations are externally visible unless hidden — OCaml without `.mli` files, Python conventional openness), and **convention-based** (Go's capitalization rule).",
+      "refs": [
+        { "target": "module-systems#overview", "type": "related" },
+        { "target": "rust#tooling", "type": "related" }
+      ]
+    },
+    {
+      "id": "export-models",
+      "title": "Export models — Rust pub, Go capitalization, Common Lisp defpackage",
+      "tags": ["modules", "visibility", "api-design"],
+      "content": "Languages vary between explicit export systems, public-by-default models, and convention-based visibility. These choices affect how much effort is required to curate APIs and how easy it is to accidentally expose internal implementation details.\n\n**Rust** is unusually rich. In addition to private vs public, Rust offers `pub(crate)`, `pub(super)`, `pub(self)`, and `pub(in path)`. This is a real design advantage for large codebases: it lets a project express \"visible across this internal subsystem but not outside the crate\" without inventing artificial package boundaries. The privacy default is deliberately restrictive — items are private unless made visible.\n\n**Go** uses **capitalization-determines-export**: identifiers beginning with an uppercase letter are exported; lowercase identifiers are package-private. Extremely lightweight and avoids explicit `pub` markers, but depends on a naming convention rather than an explicit declaration.\n\n**Common Lisp's `defpackage`** is the richest export-list mechanism in the survey. Six distinct relationships exist: present-and-internal (interned in the package, not exported), present-and-external (interned and exported), inherited (visible via a `:use`d package), shadowed (a local symbol blocks an inherited one of the same name), shadowing-imported (an imported symbol blocks an inherited one), and uninterned (`#:foo` syntax). Qualified syntax `pkg::name` accesses internal symbols (double-colon, by convention discouraged in client code); `pkg:name` accesses exported symbols (single-colon, the public-API form). The lexical convention itself encodes the visibility distinction. The lesson: a sufficiently rich symbol-namespace operation set eliminates the need for separate \"import keyword variants\" — but at the cost of conceptual surface area.",
+      "refs": [
+        { "target": "rust#tooling", "type": "example" },
+        { "target": "go#packaging", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Rust visibility", "url": "https://doc.rust-lang.org/reference/visibility-and-privacy.html" },
+        { "label": "Common Lisp defpackage", "url": "https://www.lispworks.com/documentation/HyperSpec/Body/m_defpkg.htm" }
+      ]
+    },
+    {
+      "id": "visibility-granularity",
+      "title": "Visibility granularity",
+      "tags": ["visibility", "encapsulation", "design-guidance"],
+      "content": "Visibility systems range from simple public/private models to richer lattices such as package-local, crate-local, or ancestor-scoped access. Greater granularity can improve internal architecture but usually increases conceptual overhead.\n\nThe richer the visibility lattice, the more precisely large codebases can express intent. The simpler the lattice, the easier it is to teach and implement. The trade-off is real. Rust's `pub(in path)` lets a project share an internal item across one specific subsystem; Java's `protected`, package-private, public, private offers four levels; Go's two-level (package-private vs exported) is at the simple end.\n\nAt sufficient scale, **build-system visibility becomes the dominant abstraction**, not language-level visibility. Bazel's per-target `visibility = [...]` attribute restricts which other targets can depend on a target — enforced by the build graph at build time, not by the language. A class can be `public` (Java visibility) but only depended on by specific Bazel targets (Bazel visibility). The build graph enforces architectural boundaries that Java's package-level visibility cannot.",
+      "refs": [
+        { "target": "module-systems#core-design-axes", "type": "related" }
+      ]
+    },
+    {
+      "id": "re-exports-and-api-curation",
+      "title": "Re-exports and API curation",
+      "tags": ["visibility", "api-design", "modules"],
+      "content": "Re-exports let projects build stable public facades over changing internal layouts. They are useful for curated APIs, preludes, layered architecture, and documentation surfaces that should not mirror the raw source tree too closely.\n\nRust's `pub use` makes API curation a first-class module-system activity. A crate can hide an internal tree behind a flatter public facade, or expose a carefully chosen \"prelude\"-style surface while freely reorganizing internals underneath. This is one of the things that makes Rust crates feel polished: the published API is independent from the source tree shape.\n\nThe pattern generalizes to any language with declared exports — `re-export` ESM in JS, `provide` in Racket, `:export` in defpackage. The common architectural payoff: changing internal organization without breaking consumers becomes a refactoring win rather than a breaking change.",
+      "refs": [
+        { "target": "cargo#overview", "type": "relevant-to" },
+        {
+          "target": "module-identity#hierarchy-and-predictability",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

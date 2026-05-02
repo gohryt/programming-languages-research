@@ -1,0 +1,9 @@
+{
+  "id": "compiler",
+  "tag": "compiler",
+  "name": "Compiler",
+  "description": "The section discusses compilation — lowering, optimization, code generation, backends, JIT tiers, or compiler-emitted metadata. Used as a topic-level tag; finer-grained axes like family: or granularity: should be applied alongside it where relevant.",
+  "aliases": [
+    "compilers"
+  ]
+}

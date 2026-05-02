@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "MLsub — Algebraic Subtyping with Principal Type Inference",
+  "aliases": ["mlsub", "algebraic-subtyping", "biunification", "mlstruct", "mlscript"],
+  "summary": "Stephen Dolan's MLsub (Cambridge PhD, 2017): combines HM-style principal-type inference with proper subtyping by treating types as a distributive lattice with structural intersections and unions, and using biunification (every variable has both an upper and lower bound). Resolves the classical conflict between principal inference and subtyping. Production: MLstruct, MLscript; influence on Scala 3, Roc, Grain, Inko.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Stephen Dolan's MLsub (Cambridge PhD thesis, 2017) is the canonical research line combining **principal-type inference** (the property HM gives — every well-typed program has a most-general type that subsumes all valid types) with **proper subtyping** (the property OO type systems give — `Cat <: Animal` lets cats be used where animals are expected).\n\nThe classical problem: HM (`data/hindley-milner`) does not handle subtyping; F<: and OO-style subtype inference are exponential or undecidable in general; the two design points seemed irreconcilable. Dolan's **algebraic subtyping** resolves the conflict by treating the lattice of types as a *bicompletion of polar types* and showing that **biunification** yields principal types accounting for both upper and lower subtype bounds.",
+      "refs": [
+        { "target": "hindley-milner#overview", "type": "extends" },
+        { "target": "subtyping#overview", "type": "advanced-form-of" },
+        { "target": "row-polymorphism#overview", "type": "distinct-but-related" }
+      ],
+      "sources": [
+        { "label": "Stephen Dolan — Algebraic Subtyping (Cambridge PhD thesis, 2017)", "url": "https://www.cl.cam.ac.uk/~sd601/thesis.pdf" }
+      ]
+    },
+    {
+      "id": "technical-contributions",
+      "title": "Technical contributions — polarity, biunification, lattice restriction",
+      "tags": ["type-system", "subtyping", "inference"],
+      "content": "- **Polar types**: types appear with positive (output) or negative (input) polarity. A function type `A → B` is contravariant in `A` (negative position) and covariant in `B` (positive position). Polarity is what makes subtyping align with type-variable usage: a type variable in negative position has an *upper bound* (callers can pass any subtype), in positive position has a *lower bound* (callers can use any supertype).\n- **Biunification**: a unification variant where each type variable has both an *upper bound* (the largest type it can be) and a *lower bound* (the smallest type it must be). Substituting a variable replaces it everywhere with a type that satisfies both bounds. This is strictly more general than ordinary unification (which handles only equality) and gives a clean account of subtype constraints.\n- **Algebraic subtyping**: the type lattice is required to be a **distributive lattice** with structural intersection and union types. Types like `Int ∧ String` (intersection) and `Int ∨ String` (union) are first-class, and the subtyping relation is exactly the lattice ordering. This is the key restriction — restrictive enough to keep principal types, expressive enough for practical subtyping.\n- **Compact polar types**: the inferred types can be presented compactly without exposing the lattice machinery, so error messages and type signatures remain readable to ordinary programmers.\n\nThe result is **principal types in the presence of subtyping** with HM-style inference."
+    },
+    {
+      "id": "distinctions",
+      "title": "Distinctions from row polymorphism and F<:",
+      "tags": ["type-system", "subtyping"],
+      "content": "Distinct from row polymorphism: rows handle extensible records and variants but not full subtyping over arbitrary types. Distinct from F<: (Cardelli's bounded subtyping for OO): F<: handles general subtyping but loses HM-style principal inference. MLsub's contribution is the *middle ground* — restrictive enough on the type lattice to keep principal types, expressive enough for practical subtyping including over function types, records, and structural variants."
+    },
+    {
+      "id": "production-and-influence",
+      "title": "Production and research adoption",
+      "tags": ["type-system", "subtyping", "production"],
+      "content": "Production / research adoption:\n\n- **MLstruct** (Lionel Parreaux, EPFL, 2020+): the first practical implementation of MLsub-style algebraic subtyping in a language usable beyond research papers. Adds object-oriented features (records with width-and-depth subtyping) and is the substrate for further research into MLsub's interaction with OOP.\n- **MLscript** (Parreaux et al.): the followup language combining algebraic subtyping with class-based OOP, polymorphic methods, and modular abstraction.\n- **Influence on Scala 3 typing**: Dolan's polarity-and-biunification work fed into Scala 3's match-types and inference improvements, though Scala 3 does not implement full MLsub — Scala 3 retains ordinary unification with bounded type parameters rather than full biunification.\n- **Influence on Roc, Grain, Inko**: several modern functional language designs cite Dolan's thesis when explaining their inference choices.\n\nStatus (as of 2026-04): research-grade for full implementations; MLstruct/MLscript are the canonical reference. The lesson for language designers: **subtyping and HM-style principal inference are compatible** if the type lattice is restricted to a distributive lattice with structural intersections and unions. Languages that want both features can adopt MLsub's polarity-and-biunification approach; languages that want unrestricted subtyping (path-dependent types, F-bounded polymorphism) must accept the loss of principal inference.",
+      "sources": [
+        { "label": "MLstruct (Parreaux, EPFL)", "url": "https://infoscience.epfl.ch/record/278576" },
+        { "label": "MLscript repository", "url": "https://github.com/hkust-taco/mlscript" },
+        { "label": "Demystifying MLsub", "url": "https://lptk.github.io/programming/2020/03/26/demystifying-mlsub.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Stephen Dolan — Algebraic Subtyping (Cambridge PhD thesis, 2017)", "url": "https://www.cl.cam.ac.uk/~sd601/thesis.pdf" },
+    { "label": "MLstruct (Parreaux, EPFL)", "url": "https://infoscience.epfl.ch/record/278576" },
+    { "label": "MLscript repository", "url": "https://github.com/hkust-taco/mlscript" },
+    { "label": "Demystifying MLsub", "url": "https://lptk.github.io/programming/2020/03/26/demystifying-mlsub.html" }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Stamp-It",
+  "aliases": [],
+  "summary": "Pöter & Träff (PPoPP 2018) deliver a lock-free doubly linked stamp pool of thread reservations giving amortised O(1) reclamation overhead independent of thread count. Proof of correctness in the C++11/17 memory model with weakest-possible orderings. Earlier reclamation than EBR/HP in many workloads.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "safe-memory-reclamation",
+        "lock-free",
+        "bounded-memory",
+        "cpp"
+      ],
+      "content": "Pöter & Träff's **Stamp-It** (PPoPP 2018) delivers a lock-free doubly linked \"stamp pool\" of thread reservations giving **amortised O(1) reclamation overhead independent of thread count**. The key property is *thread-count-independent reclamation cost* — most prior schemes scale linearly with the number of threads (HP scans all hazard slots; EBR checks all thread epochs).\n\nThe paper provides a **proof of correctness in the C++11/17 memory model with weakest-possible orderings**, making Stamp-It one of the more rigorously verified SMR schemes. In many workloads it achieves earlier reclamation than EBR or HP because reservations are released as soon as the operation finishes rather than at the next epoch boundary.",
+      "refs": [
+        {
+          "target": "epoch-based-reclamation",
+          "type": "compared-with"
+        },
+        {
+          "target": "hazard-pointers",
+          "type": "compared-with"
+        },
+        {
+          "target": "hyaline-reclamation",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Stamp-It (arXiv)",
+          "url": "https://arxiv.org/abs/1805.08639"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Stamp-It paper",
+      "url": "https://arxiv.org/abs/1805.08639"
+    }
+  ]
+}

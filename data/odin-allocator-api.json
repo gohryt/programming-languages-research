@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Odin Allocator API",
+  "aliases": ["Odin context allocator", "context.allocator", "context.temp_allocator"],
+  "summary": "Odin's implicit `context` containing `context.allocator` and `context.temp_allocator`; built-ins (`make`, dynamic arrays, maps) and library routines use the context unless explicitly overridden, with arena-based temp allocation reset at frame or request boundaries.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "odin", "ergonomics"],
+      "content": "Odin uses an implicit `context` containing `context.allocator` and `context.temp_allocator`. Built-ins (`make`, dynamic arrays, maps) and library routines use that context unless overridden. The trade-off versus Zig's explicit allocator parameter is straightforward: ergonomics are higher (no allocator parameter percolation through call graphs) but lifetime discipline depends on convention (programmers must remember to reset the temp allocator at appropriate boundaries).\n\nThis is the canonical \"implicit context allocator\" model in the chapter 7.12 family.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "zig-allocator-api#overview", "type": "compared-with" },
+        { "target": "jai-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "context-and-temp",
+      "title": "Implicit context and temp-allocator discipline",
+      "tags": ["odin", "language-design"],
+      "content": "Every procedure receives the context implicitly; allocation built-ins consult `context.allocator` for permanent allocations and `context.temp_allocator` for scratch. The default temp allocator is arena-based, expected to be reset with `free_all(context.temp_allocator)` at a frame or request boundary. `TEMP_ALLOCATOR_GUARD` supports nested scoped temp lifetimes so a callee that itself wants temp scratch does not corrupt the caller's outstanding temp allocations.\n\nThe context can be overridden lexically with `context.allocator = my_allocator` or via `context = ...` blocks, which makes per-subtree allocator changes ergonomic without a separate parameter.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Odin overview", "url": "https://odin-lang.org/docs/overview/" },
+    { "label": "Odin runtime allocator API", "url": "https://pkg.odin-lang.org/base/runtime/" },
+    { "label": "Odin OS allocators source", "url": "https://github.com/odin-lang/Odin/blob/master/core/os/allocators.odin" }
+  ]
+}

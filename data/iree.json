@@ -1,0 +1,41 @@
+{
+  "kind": "framework",
+  "name": "IREE",
+  "aliases": ["iree-runtime", "intermediate-representation-execution-environment"],
+  "summary": "Google's IREE (2019+): MLIR-based ML compiler/runtime distinguished by holistic IR — a single representation containing both scheduling logic for parallel pipelined hardware and execution logic for hardware-specific dense computation. AOT host-side compilation; small embeddable runtime.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**IREE (Intermediate Representation Execution Environment)** (Google, 2019+; pronounced \"eerie\") is an end-to-end MLIR-based ML compiler/runtime, distinguished by **holistic IR**: a single representation containing *both* scheduling logic (data dependencies for parallel pipelined hardware) *and* execution logic (hardware-specific dense computation). Where TVM separates Relay (algorithm) from TIR (schedule) and lowers them as a two-step pipeline, IREE merges scheduling and execution in one IR and lets the same compiler driver target the full set of deployment platforms from one source.",
+      "refs": [
+        { "target": "mlir#overview", "type": "built-on" },
+        { "target": "tvm-relay-tir#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "IREE project page", "url": "https://iree.dev/" }
+      ]
+    },
+    {
+      "id": "vm-bytecode-dialect",
+      "title": "VM bytecode dialect",
+      "tags": ["compiler-ir", "bytecode", "ml"],
+      "content": "**VM bytecode dialect** (`vm`) — IREE programs ultimately compile to a small VM bytecode representing reference-counted resources, typed values, and control flow. This bytecode is **either interpreted at runtime** (the VMVX Vector VM Extensions backend uses it for portable CPU execution via a microkernel library) **or lowered further** to LLVM IR / C / SPIR-V kernels for native deployment. This dual interpret-or-lower posture is unusual: most ML compilers commit to one or the other.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "holistic-compilation",
+      "title": "Holistic compilation, embeddable runtime",
+      "tags": ["compiler-ir", "deployment", "ml"],
+      "content": "**Holistic compilation, embeddable runtime** — AOT compilation runs on the host machine targeting any combination of platforms; the runtime is small enough to embed in mobile / edge / browser deployments, or even bypass entirely for embedded systems calling out to custom accelerators. The contract is that the *same IR* produces the GPU kernels, the CPU code, and the scheduling logic, eliminating the impedance mismatch between separate compilation pipelines per target.\n\nImporters cover JAX, ONNX, PyTorch, TensorFlow, and TFLite; targets cover Vulkan, ROCm/HIP, CUDA, Metal (Apple), AMD AIE, and CPU (LLVM static or dynamic linkage).",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "IREE project page", "url": "https://iree.dev/" },
+    { "label": "IREE repository", "url": "https://github.com/iree-org/iree" }
+  ]
+}

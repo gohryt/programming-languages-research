@@ -1,0 +1,70 @@
+{
+  "kind": "concept",
+  "name": "QSBR — Quiescent-State-Based Reclamation",
+  "aliases": [
+    "quiescent-state-based reclamation"
+  ],
+  "summary": "Variant of EBR/RCU where threads explicitly announce quiescent points (no live references held) instead of bracketing critical sections. Among the lowest-overhead read-side schemes when the program already has natural quiescent points; ordinary reads need no per-access synchronisation. Production: liburcu-qsbr, DPDK rte_rcu_qsbr, Linux user-mode QSBR.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "safe-memory-reclamation",
+        "quiescent-state",
+        "read-copy-update",
+        "non-blocking"
+      ],
+      "content": "QSBR is a variant of EBR/RCU where threads explicitly announce *quiescent points* — moments at which they hold no live references to shared data — instead of bracketing each critical section. Among the lowest-overhead read-side schemes when the program already has natural quiescent points: ordinary reads need no per-access synchronisation, while one quiescent announcement per outer loop iteration amortises barrier cost across many reads.\n\nDPDK's per-data-structure quiescent-state variables let writers wait only on the readers actually relevant to a given structure, avoiding the global-grace-period pessimism of classical kernel RCU.",
+      "refs": [
+        {
+          "target": "rcu",
+          "type": "related"
+        },
+        {
+          "target": "epoch-based-reclamation",
+          "type": "related"
+        },
+        {
+          "target": "hazard-pointers",
+          "type": "contrasts-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "liburcu",
+          "url": "https://liburcu.org/"
+        },
+        {
+          "label": "DPDK RCU",
+          "url": "https://doc.dpdk.org/guides-20.11/prog_guide/rcu_lib.html"
+        }
+      ]
+    },
+    {
+      "id": "cost-model",
+      "title": "Cost model and trade-offs",
+      "tags": [
+        "reader-overhead",
+        "production"
+      ],
+      "content": "Cost: reader zero per access; one relaxed store per quiescent point. Trade-off: requires cooperative threads that periodically reach a \"no references held\" state — incompatible with arbitrary library code that may hold references across operation boundaries.\n\nThe canonical fit is packet-processing main loops (DPDK), kernel scheduler ticks (Linux), and request/response servers where each request boundary is a natural QS. The misfit is libraries that hand out references whose lifetime extends across QS announcements — those need HP/EBR-style per-access protection instead.\n\nProduction: **liburcu-qsbr**, **DPDK `rte_rcu_qsbr`** (packet-loop quiescence model), Linux user-mode QSBR.",
+      "refs": [
+        {
+          "target": "rcu#cost-model",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "liburcu",
+      "url": "https://liburcu.org/"
+    },
+    {
+      "label": "DPDK RCU library",
+      "url": "https://doc.dpdk.org/guides-20.11/prog_guide/rcu_lib.html"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "kind": "framework",
+  "name": "Iris — Higher-Order Concurrent Separation Logic",
+  "aliases": ["iris", "iris-coq", "iris-rocq", "iris-mosel"],
+  "summary": "Jung, Krebbers et al.'s Iris is a language-generic higher-order concurrent separation logic framework in Coq/Rocq, providing a single foundation for many program logics. Won the 2023 Alonzo Church Award. Higher-order ghost state with user-definable resource algebras unifies invariants, atomicity, and partial-commutative-monoid reasoning. Foundation for RustBelt, RefinedRust, RefinedC, and 50+ research projects.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["formal-verification", "program-logic", "separation-logic", "concurrent-separation-logic", "iris-logic", "step-indexed-logic", "coq", "mechanised-proof"],
+      "content": "Jung, Krebbers et al.'s **Iris** is a language-generic higher-order concurrent separation logic framework in Coq/Rocq, providing a single foundation for many program logics. Won the 2023 Alonzo Church Award. Higher-order ghost state with user-definable resource algebras unifies invariants, atomicity, and partial-commutative-monoid reasoning. **Iris Proof Mode (IPM/MoSeL)** Coq tactics make embedded separation-logic proofs as ergonomic as native Coq proofs. \"Iris-in-Iris\" self-hosting: Iris's own model is built within itself.\n\nFoundation for RustBelt, RefinedRust, RefinedC, many other verifications; used in 50+ research projects. The closest thing the field has to a universal substrate for separation-logic verification.",
+      "refs": [
+        { "target": "rustbelt-lambda-rust#overview", "type": "underlies" },
+        { "target": "compcert#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Iris project home", "url": "https://iris-project.org/" },
+        { "label": "Iris from the ground up (JFP)", "url": "https://www.cambridge.org/core/journals/journal-of-functional-programming/article/iris-from-the-ground-up-a-modular-foundation-for-higherorder-concurrent-separation-logic/26301B518CE2C52796BFA12B8BAB5B5F" }
+      ]
+    },
+    {
+      "id": "logic-design",
+      "title": "Higher-order ghost state and resource algebras",
+      "tags": ["program-logic", "separation-logic", "step-indexed-logic"],
+      "content": "Iris's central technical idea is **user-definable resource algebras**: a partial commutative monoid the verifier instantiates per-proof, used as the algebraic substrate for ghost state. Invariants, atomicity tokens, lock ownership, and lifetime tokens are all encoded as ghost-state constructions over chosen resource algebras rather than as logic primitives. A proof developer adds a new ghost-state mechanism by defining a resource algebra rather than extending the logic.\n\nThe logic is **step-indexed** — a stratification by approximation depth that lets propositions reason about higher-order state (functions stored in the heap, recursive predicates) without paradox. Combined with the higher-order assertion language, this admits assertions like \"every value satisfying predicate P implies the value behaves linearly\" — predicates over predicates that ordinary first-order separation logic cannot express.",
+      "refs": []
+    },
+    {
+      "id": "iris-proof-mode",
+      "title": "Iris Proof Mode and tooling",
+      "tags": ["proof-engineering", "coq", "coq-tactic"],
+      "content": "**Iris Proof Mode (IPM/MoSeL)** is a Coq tactic library that embeds separation-logic proof contexts inside Coq proof contexts. Spatial hypotheses (those consuming linear resources) are tracked separately from persistent ones; tactics like `iIntros`, `iApply`, `iSplit` mirror native Coq tactics but operate on the embedded logic. The result is that an Iris proof feels like a Coq proof — the same edit-rebuild loop, the same proof scripts, the same tooling — even though it discharges separation-logic obligations.\n\nMoSeL generalises IPM beyond Iris to other modal separation logics, so the same tactic infrastructure underlies a family of verification efforts.",
+      "refs": []
+    },
+    {
+      "id": "rustbelt-and-deployment",
+      "title": "RustBelt, RefinedRust, and the Iris ecosystem",
+      "tags": ["mechanised-proof", "research"],
+      "content": "Iris is the substrate of **RustBelt** (Jung et al., POPL 2018), which mechanises Rust's soundness; the **lifetime logic** that captures Rust's borrow checker is an Iris-derived logic with borrow propositions. **RefinedRust** (Gaeher et al., PLDI 2024) extends the same Iris model with refinement predicates and a more realistic operational semantics (Radium); **RefinedC** uses Iris for foundational verification of annotated C; **Tree Borrows** (Villani et al., PLDI 2025) formalises Rust's aliasing model on Iris substrate.\n\nStatus (as of 2026-04): Iris is the de facto foundation for new separation-logic research projects, with 50+ published verifications using its substrate. Its Coq mechanisation is large but stable enough that downstream projects share lemma libraries, tactic infrastructure, and proof patterns.",
+      "refs": [
+        { "target": "rustbelt-lambda-rust#overview", "type": "foundation-for" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Iris project home", "url": "https://iris-project.org/" },
+    { "label": "Iris from the ground up (JFP)", "url": "https://www.cambridge.org/core/journals/journal-of-functional-programming/article/iris-from-the-ground-up-a-modular-foundation-for-higherorder-concurrent-separation-logic/26301B518CE2C52796BFA12B8BAB5B5F" },
+    { "label": "Ralf Jung — PhD thesis", "url": "https://people.mpi-sws.org/~jung/thesis.html" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "on-cost-high",
+  "tag": "on-cost:high",
+  "name": "Cost when on: high",
+  "description": "Active overhead 2×–50×: traditional ptrace, full-DBI rewriting, ThreadSanitizer's race tracking, JIT-instrumented record/replay.",
+  "axis": "on-cost"
+}

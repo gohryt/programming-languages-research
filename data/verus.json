@@ -1,0 +1,35 @@
+{
+  "kind": "tool",
+  "name": "Verus — Spec/Proof/Exec IR",
+  "aliases": ["verus-rust"],
+  "summary": "Verus's IR has three modes: spec (uncomputable, unrestricted), proof (linear, ghost), and exec (compiled, runs at runtime). The three modes share the same surface syntax but are tracked separately in the IR — the compiler erases spec and proof code before runtime, leaving only exec.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Verus's IR has three modes: `spec` (uncomputable, unrestricted, used in specifications), `proof` (linear, ghost, used in proofs), and `exec` (compiled, runs at runtime). The three modes share the same surface syntax but are tracked separately in the IR — the compiler erases `spec` and `proof` code before runtime, leaving only `exec`.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "rust-hir-thir-mir#overview", "type": "extends" },
+        { "target": "refinement-types#overview", "type": "implements" },
+        { "target": "dependent-types#overview", "type": "uses-restricted-form" }
+      ],
+      "sources": [
+        { "label": "Verus repository", "url": "https://github.com/verus-lang/verus" }
+      ]
+    },
+    {
+      "id": "ir-design-contribution",
+      "title": "Verification artifacts at zero runtime cost",
+      "tags": ["verification", "compiler-ir", "rust"],
+      "content": "The contribution: a typed mode system that makes verification artifacts (proofs, specifications) coexist with compiled code in the same IR without affecting runtime cost. Linear ghost permissions in the `proof` mode let ghost code carry capability tokens (e.g., raw-pointer permissions) borrow-checked exactly like real Rust.\n\nThis is what makes Verus deployable on production Rust codebases: a `spec` block sits next to ordinary code and contributes nothing to the binary, while a `proof` block discharges obligations that would otherwise need an external verifier with its own copy of the source.",
+      "refs": [
+        { "target": "verification-intermediate-languages#overview", "type": "alternative-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Verus repository", "url": "https://github.com/verus-lang/verus" }
+  ]
+}

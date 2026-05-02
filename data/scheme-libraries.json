@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Scheme R6RS / R7RS Libraries",
+  "aliases": ["r6rs", "r7rs", "scheme-modules"],
+  "summary": "The Scheme standardization process produced two distinct module designs both deeply influential: R6RS libraries (2007) with library forms, export/import lists, and four canonical refinements (only/except/prefix/rename) plus phasing; R7RS libraries (2013) deliberately simplified by dropping versioning/phasing and adding cond-expand for portability.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The Scheme standardization process produced two distinct module designs, both deeply influential beyond Scheme itself.",
+      "refs": [
+        { "target": "module-calculi#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "r6rs-library-form",
+      "title": "R6RS library form",
+      "tags": ["r6rs", "scheme", "modules"],
+      "content": "**R6RS libraries** (2007) introduced the form:\n\n```scheme\n(library (stack)\n  (export make push! pop! empty!)\n  (import (rnrs))\n  (define (make) ...)\n  (define (push! s v) ...))\n```\n\nThe library name is a list of identifiers (`(net http client)`); export lists name bindings; import lists name libraries with optional refinements.\n\nThe four import refinements that became canonical across the broader Lisp/functional ecosystem:\n\n- `(only (lib) name1 name2 ...)` — import only the named bindings.\n- `(except (lib) name1 ...)` — import everything except the named bindings.\n- `(prefix (lib) my-)` — import all bindings with the given prefix added.\n- `(rename (lib) (old1 new1) (old2 new2) ...)` — import bindings under different local names.\n\nThese compose with import-list parentheses, so `(import (only (rename (foo) (bar baz)) baz))` imports `bar` from `(foo)` as `baz`. R6RS additionally supports versioning (`(my-lib (1 2))`) and **phasing** (`for` annotations indicating whether a library is needed at expand-time, run-time, or both — the same phase tower covered for Racket).",
+      "refs": [
+        { "target": "racket#phase-aware-imports", "type": "shares-phasing-with" }
+      ],
+      "sources": [
+        { "label": "R6RS — libraries", "url": "https://www.r6rs.org/final/html/r6rs/r6rs-Z-H-10.html" }
+      ]
+    },
+    {
+      "id": "r7rs-define-library",
+      "title": "R7RS define-library and cond-expand",
+      "tags": ["r7rs", "scheme", "portability"],
+      "content": "**R7RS libraries** (2013) deliberately simplified by dropping versioning and phasing, replacing `library` with `define-library`, and adding several declarations: `(include \"file.scm\")` for textually-included source, `(include-ci ...)` for case-insensitive include, `(include-library-declarations ...)` for shared library headers, and crucially `(cond-expand ...)` for portable feature-conditional compilation.\n\nThe R7RS form is more pragmatic; R6RS is more formally specified.",
+      "refs": [],
+      "sources": [
+        { "label": "R7RS report", "url": "https://small.r7rs.org/attachment/r7rs.pdf" }
+      ]
+    },
+    {
+      "id": "canonical-import-refinements",
+      "title": "Canonical import refinements as cross-language influence",
+      "tags": ["scheme", "imports", "design-guidance"],
+      "content": "The R6RS/R7RS import refinements are the canonical reference for declarative module composition. Their influence is visible throughout the survey: Haskell's `import qualified ... as` and `hiding`, Racket's `provide` / `require` forms, Rust's `use` with `as` renames, even Python's `from X import Y as Z`. R6RS made `only`/`except`/`prefix`/`rename` a complete vocabulary that subsequent designs picked from rather than reinventing.\n\nA subtle technical point worth recording: the import-list itself is a *form*, not just a list of names. The `(library X)` wrapper is required only when one of the names in `X` would otherwise be parsed as `for`/`only`/`except`/`prefix`/`rename` — a self-referential escape hatch that disambiguates the small set of import-keyword names from arbitrary library-name identifiers. Most production languages skip this nicety and reserve their import-keywords globally.\n\nThe lesson generalizes: **a small fixed set of import refinement operators (only/except/prefix/rename) covers virtually every selective-import pattern**, and the R6RS/R7RS vocabulary can be adopted without inventing a parallel set. The cost is minor — ~four import-form keywords to specify and document.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "R6RS libraries", "url": "https://www.r6rs.org/final/html/r6rs/r6rs-Z-H-10.html" },
+    { "label": "R7RS report", "url": "https://small.r7rs.org/attachment/r7rs.pdf" },
+    { "label": "Corrected R7RS — libraries", "url": "https://standards.scheme.org/corrected-r7rs/r7rs-Z-H-7.html" }
+  ]
+}

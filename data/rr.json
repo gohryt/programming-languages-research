@@ -1,0 +1,69 @@
+{
+  "kind": "tool",
+  "name": "rr",
+  "aliases": [],
+  "summary": "Mozilla's deterministic record-and-replay debugger for Linux user-space programs; ~20% recording overhead via single-threaded scheduling + hardware perf counters + nondeterminism logging; the substrate Pernosco builds on.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "rr is a record-and-replay debugger for Linux user-space programs. It is important because it makes deterministic replay and reverse execution practical for real systems without requiring a language-specific runtime or a full virtual machine environment.\n\nDeveloped by Robert O'Callahan and the Mozilla team, rr records the execution of a Linux process with ~20% overhead and lets a developer replay the recorded execution under GDB. Because replay is deterministic, GDB's reverse execution commands (reverse-continue, reverse-step, reverse-next) work — implemented by restoring the nearest checkpoint and replaying forward to the desired point.",
+      "refs": [
+        { "target": "record-and-replay#overview", "type": "example" },
+        { "target": "time-travel-debugging#overview", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "rr project", "url": "https://rr-project.org/" }
+      ]
+    },
+    {
+      "id": "deterministic-capture-model",
+      "title": "Deterministic capture model",
+      "tags": ["debugging", "determinism", "runtime"],
+      "content": "rr works by recording the nondeterministic parts of execution so the program can later be replayed under deterministic control. This makes it especially effective for race-adjacent, timing-sensitive, or rarely reproducible failures that are difficult to catch live.\n\nThe recording strategy:\n1. Execute only one thread at a time (eliminating data race nondeterminism by construction).\n2. Use CPU hardware performance counters (retired conditional branches) to measure application progress deterministically.\n3. Record only the sources of nondeterminism: system call results, signal delivery points, context switch points.\n\nReplay re-executes the program using the same counter values to deliver signals and switch contexts at exactly the right points. This gives bit-for-bit identical replay. The critical insight: you don't need to record every instruction — only the nondeterministic inputs. The CPU deterministically re-derives everything else during replay. This makes recording nearly free for CPU-bound code; the ~20% overhead comes primarily from the single-threaded scheduling constraint.",
+      "refs": [
+        {
+          "target": "record-and-replay#rr-deterministic-record-replay",
+          "type": "related"
+        },
+        {
+          "target": "concurrency-debugging#threadsanitizer-debugger-use",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "reverse-debugging-workflows",
+      "title": "Reverse debugging workflows",
+      "tags": ["debugging", "ux", "history"],
+      "content": "rr is a concrete demonstration of why reverse execution is so powerful in practice: once a failure has occurred, the user can navigate backward through execution rather than trying to guess the right breakpoint before reproducing the bug again.\n\nThe usual workflow: `rr record ./my_buggy_program` produces a recording in `~/.local/share/rr/`. `rr replay` opens GDB connected to the recording with full reverse-execution support. The developer sets breakpoints near the suspected bug area, runs forward to the symptom, then reverse-steps backward through history to find the cause — without re-running the program.\n\n**Pernosco** (Robert O'Callahan, rr's creator) extends rr by post-processing the trace into a searchable database of all program states at all points in time. Users get instant answers to questions like \"what is the value at this memory address at time T?\" or \"when was this value last modified?\" via reverse dataflow tracking. The trade-off is that Pernosco's analysis takes minutes to hours and writes tens of gigabytes — it is post-hoc rather than live.",
+      "refs": [
+        {
+          "target": "time-travel-debugging#bil-lewis-odb",
+          "type": "related"
+        },
+        { "target": "breakpoints#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "limits-and-deployment-boundaries",
+      "title": "Limits and deployment boundaries",
+      "tags": ["debugging", "tradeoffs", "systems"],
+      "content": "rr is highly effective within its intended environment, but its approach depends on specific platform and execution constraints. This makes it a strong case study in record-and-replay design without implying that the same engineering trade-offs generalize directly to every OS, runtime, or distributed system.\n\nThe hardware performance counter approach is brittle — it depends on CPU-specific counter behavior and has been broken by various CPU microcode updates and errata. The rr team maintains a list of known-good CPU models. An alternative project, **`rr.soft`**, replaces hardware counters with lightweight dynamic instrumentation for environments where counters are unavailable (VMs, cloud, Apple Silicon via emulation).\n\nrr's single-threaded scheduling means workloads with substantial true parallelism see worse than 20% overhead. Multi-threaded programs can be recorded but execute serially during recording. rr only records userspace, so kernel-level bugs need QEMU's full-system record/replay instead. Network nondeterminism (clock reads, gettimeofday) is captured. Distributed systems are out of scope — rr records one process tree.\n\n**UndoDB** offers a commercial alternative using JIT binary instrumentation instead of hardware counters, trading higher recording overhead (~2–4× vs. rr's 20%) for portability across CPUs and virtualized environments where rr cannot run.",
+      "refs": [
+        { "target": "post-mortem-debugging#overview", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "rr project",
+      "url": "https://rr-project.org/"
+    },
+    {
+      "label": "rr — engineering record and replay for deployability (CACM Queue)",
+      "url": "https://queue.acm.org/detail.cfm?id=3688088"
+    }
+  ]
+}

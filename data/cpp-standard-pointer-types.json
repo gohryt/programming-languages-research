@@ -1,0 +1,46 @@
+{
+  "kind": "concept",
+  "name": "Standard Smart Pointers, span, observer_ptr",
+  "aliases": ["unique_ptr", "shared_ptr", "weak_ptr", "std::span", "observer_ptr"],
+  "summary": "C++ vocabulary types encoding ownership and aliasing intent — the baseline that the Profiles approach to memory safety enforces against. `unique_ptr`/`shared_ptr`/`weak_ptr` are RAII heap ownership; `std::span` (C++20) is the canonical replacement for `T*, size_t` pairs; `observer_ptr<T>` (N4282) was never standardized.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cpp", "cpp-safety", "ownership", "smart-pointers", "gsl-pointer", "observer-pointer"],
+      "content": "C++'s ownership and aliasing story is expressed through library-level vocabulary types rather than language-level affinity. `unique_ptr` / `shared_ptr` / `weak_ptr` are RAII-based heap ownership; recognized by Clang's lifetime analysis as Owner/Pointer types and form the substrate that Profiles enforce against. `std::span` (C++20) is the canonical replacement for `T*, size_t` pairs; in hardened libc++ its iterators carry bounds. `observer_ptr<T>` (proposed N4282, \"world's dumbest smart pointer\" expressing non-owning intent) was never standardized; stuck in `std::experimental` after years; the Profiles era reduces motivation.\n\nThe lesson: C++'s ownership story is library-level vocabulary types, not language-level affinity — and the Profiles approach doubles down on that choice rather than introducing language-level move-only or borrow-checked references.",
+      "refs": [
+        { "target": "ownership#overview", "type": "related" },
+        { "target": "reference-counting#overview", "type": "related" },
+        { "target": "cpp-lifetime-profile", "type": "used-by" },
+        { "target": "cpp-hardened-stl", "type": "related" }
+      ]
+    },
+    {
+      "id": "owner-pointer-categories",
+      "title": "Owner / Pointer categories for Lifetime Profile",
+      "tags": ["cpp-safety", "lifetime-profile", "smart-pointers", "gsl-pointer"],
+      "content": "These vocabulary types matter beyond their RAII semantics because the Lifetime Profile (P1179) classifies them as Owner versus Pointer types. `unique_ptr` and `shared_ptr` are Owners; `weak_ptr` and `std::span` are Pointers. The classification is what allows local-only static analysis to detect dangling without whole-program annotation: an Owner's destruction invalidates any Pointer derived from it.\n\nThe `gsl::Owner` and `gsl::Pointer` attributes (and Clang's `lifetimebound`) refine the inference where the heuristic alone is insufficient. This is the substrate the Profiles approach is built on — language safety as a refinement of vocabulary-typed library code.",
+      "refs": [
+        { "target": "cpp-lifetime-profile", "type": "related" }
+      ]
+    },
+    {
+      "id": "observer-ptr-fate",
+      "title": "observer_ptr's fate",
+      "tags": ["observer-pointer", "cpp-safety", "wg21"],
+      "content": "`observer_ptr<T>` was proposed (N4282) as a non-owning pointer type whose role was to express \"this is a pointer that does *not* own its target\" in API signatures, where bare `T*` is ambiguous. It was never standardized; it has been parked in `std::experimental` for years. The Profiles era reduces its motivation further: if a Lifetime Profile already classifies bare pointers under Owner/Pointer categories from context, the explicit `observer_ptr` typename is redundant for the analysis. The result is that C++ never adopted a vocabulary type explicitly for non-owning intent — that role is absorbed by `T*` plus the Lifetime Profile classification.",
+      "refs": [
+        { "target": "cpp-lifetime-profile", "type": "related" }
+      ],
+      "sources": [
+        { "label": "N4282 observer_ptr proposal", "url": "https://open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4282.pdf" },
+        { "label": "cppreference — experimental observer_ptr", "url": "https://cppreference.com/w/cpp/experimental/observer_ptr.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "N4282 observer_ptr proposal", "url": "https://open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4282.pdf" },
+    { "label": "cppreference — experimental observer_ptr", "url": "https://cppreference.com/w/cpp/experimental/observer_ptr.html" }
+  ]
+}

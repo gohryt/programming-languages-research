@@ -1,0 +1,64 @@
+{
+  "kind": "concept",
+  "name": "Synchronization Primitives",
+  "aliases": ["locks-and-atomics", "synchronization"],
+  "summary": "The shared-memory coordination layer beneath higher-level concurrency abstractions: locks/mutexes, atomics with memory ordering, condition variables and parking, and lock-free / wait-free data structures used inside schedulers and concurrent containers.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Shared-memory coordination spans a spectrum from low-level locks and atomics to high-level transactional and lock-free abstractions. This record surveys the runtime mechanics — parking discipline, scheduler integration, atomics and memory ordering, and the lock-free queue requirements that schedulers and concurrent containers depend on. Memory-model formalisms belong in `data/ownership` and `data/garbage-collection`; type-level effect tracking lives in `data/type-and-effect-systems`. Software Transactional Memory is treated separately in `data/software-transactional-memory`.",
+      "refs": [
+        { "target": "ownership#tradeoffs", "type": "related" },
+        { "target": "software-transactional-memory#overview", "type": "alternative" }
+      ]
+    },
+    {
+      "id": "locks-and-mutexes",
+      "title": "Locks and mutexes",
+      "tags": ["concurrency", "locks", "synchronization"],
+      "content": "Locks are the baseline shared-memory coordination primitive. They are simple, efficient, and compatible with existing code, but are prone to deadlocks, priority inversion, lock convoying, and accidental blocking inside async runtimes.\n\nA language/runtime should decide whether locks block OS threads, park user tasks, integrate with cancellation, or participate in priority inheritance. Tokio's `Mutex` parks the awaiting task; Rust's `std::sync::Mutex` blocks the OS thread; Go's `sync.Mutex` parks the goroutine via `gopark`. Lock implementations also choose between adaptive spinning (CAS for short waits, then OS futex/wait), priority inheritance (Linux PI futexes, RTOS support), and reentrancy (Java's `synchronized` is reentrant; Rust's `Mutex` is not).",
+      "refs": [
+        { "target": "cancellation#cleanup-and-resource-release", "type": "related" }
+      ]
+    },
+    {
+      "id": "atomics-and-memory-ordering",
+      "title": "Atomics and memory ordering",
+      "tags": ["concurrency", "atomics", "memory-model"],
+      "content": "Atomics provide low-level synchronization through memory-ordering rules. They are necessary for runtimes, lock-free queues, reference counts, and high-performance coordination, but they are difficult for application programmers.\n\nC++11 / Rust / C# all expose `relaxed`, `acquire`, `release`, `acq_rel`, `seq_cst` ordering on atomic operations; Java exposes `volatile` plus the more granular `VarHandle` API since JDK 9. The choice of memory ordering is the difference between correct lock-free code and subtle hardware-dependent races. Full memory-model discussion belongs in `data/ownership` and `data/garbage-collection`; this record cares about atomics as scheduler and synchronization building blocks.",
+      "refs": []
+    },
+    {
+      "id": "condvars-semaphores-parking",
+      "title": "Condition variables, semaphores, and parking",
+      "tags": ["concurrency", "scheduling", "runtime"],
+      "content": "Condition variables and semaphores block until another thread signals. In user-mode runtimes, these primitives should usually park the logical task rather than the worker thread.\n\nGo's `gopark` and `goready` are runtime primitives for removing and re-adding goroutines to the scheduler run queue. Java virtual threads use a similar mount/unmount mechanism. Rust async typically composes parking from the executor's `Waker` API plus per-resource wait queues (Tokio's `Notify`, `Semaphore`, `RwLock`).",
+      "refs": [
+        { "target": "virtual-threads#mn-scheduling-model", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Go runtime HACKING", "url": "https://go.dev/src/runtime/HACKING.md" }
+      ]
+    },
+    {
+      "id": "lock-free-and-wait-free-structures",
+      "title": "Lock-free and wait-free structures",
+      "tags": ["concurrency", "lock-free", "data-structures"],
+      "content": "Lock-free queues, deques, and stacks are central to schedulers and executors. They reduce blocking but increase proof burden and expose memory-reclamation challenges. Work-stealing deques (`data/work-stealing#deque-based-scheduling`) are a representative case where owner operations should be cheap while steal operations can afford heavier synchronization.\n\nMemory-reclamation is the load-bearing subtlety: a lock-free reader cannot block a writer from freeing nodes, so the writer needs an external mechanism — hazard pointers, RCU, epoch-based reclamation, QSBR. Each is its own per-tech record (`data/hazard-pointers`, `data/rcu`, `data/epoch-based-reclamation`, `data/qsbr`).",
+      "refs": [
+        { "target": "work-stealing#deque-based-scheduling", "type": "uses" },
+        { "target": "hazard-pointers#overview", "type": "uses" },
+        { "target": "rcu#overview", "type": "uses" },
+        { "target": "epoch-based-reclamation#overview", "type": "uses" }
+      ]
+    },
+    {
+      "id": "design-guidance",
+      "title": "Design guidance",
+      "tags": ["concurrency", "design-guidance"],
+      "content": "A language/runtime designing its synchronization layer should answer:\n\n1. Do locks block the OS thread or park the logical task?\n2. Are atomics typed by ordering, and do users see those orderings?\n3. Does the runtime expose `park`/`unpark` as a public primitive, or hide it behind higher-level abstractions (channels, futures, mutexes)?\n4. Which lock-free structures are part of the standard library, and what reclamation discipline backs them?\n\nThe answers shape what library code can be written portably, how easy lock-free programming is for non-expert users, and how well the runtime composes with `cancellation` and `structured-concurrency`."
+    }
+  ]
+}

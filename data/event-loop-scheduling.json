@@ -1,0 +1,53 @@
+{
+  "kind": "concept",
+  "name": "Event-Loop Scheduling",
+  "aliases": ["event-loops", "reactor-pattern"],
+  "summary": "Scheduler family in which a single thread maintains a set of ready tasks plus a registration of I/O interests and dispatches them as the OS reports readiness/completion; powers JavaScript runtimes, libuv, Python asyncio, single-threaded Tokio, and the thread-per-core io_uring runtimes (Glommio, Monoio).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "An event-loop runtime maintains a set of ready tasks and I/O interests. When the OS reports readiness or completion, the runtime wakes the corresponding tasks. This model powers JavaScript runtimes (V8/libuv, JSC/Bun), libuv-based systems generally, Python `asyncio`, single-threaded Tokio runtimes, and many embedded async executors.\n\nEvent-loop schedulers are efficient for I/O-bound workloads but must prevent CPU-bound tasks from starving the loop. They need explicit blocking pools, cooperative yielding, or preemption support.",
+      "refs": [
+        { "target": "io-integration#readiness-and-completion-models", "type": "uses" },
+        { "target": "virtual-threads#mn-scheduling-model", "type": "contrasts-with" },
+        { "target": "work-stealing#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "thread-per-core-io-uring",
+      "title": "Thread-per-core io_uring runtimes",
+      "tags": ["concurrency", "io-uring", "scheduling"],
+      "content": "A distinctive Rust subfamily is the **thread-per-core io_uring runtimes** — **Glommio** (Datadog) and **Monoio** (Bytedance). Each worker thread runs its own independent single-threaded event loop bound to a specific CPU core via affinity, with its own `io_uring` instance for asynchronous I/O. Inter-core coordination is by explicit message passing through bounded channels rather than work-stealing across a shared scheduler.\n\nDistinct from Tokio's M:N work-stealing model where futures freely migrate between worker threads: Glommio/Monoio futures are pinned to one core for their lifetime, eliminating cross-core synchronisation on the hot path. The trade-off is sharp — perfect cache locality and zero shared-state contention, at the cost of needing to manually balance work across cores when the workload isn't naturally per-connection or per-shard.",
+      "refs": [
+        { "target": "glommio#overview", "type": "example" },
+        { "target": "monoio#overview", "type": "example" }
+      ]
+    },
+    {
+      "id": "primary-worker-topology",
+      "title": "Primary/worker reactor topology",
+      "tags": ["concurrency", "scheduling", "topology"],
+      "content": "A different topology layers on top of single-threaded eventloops: a **Primary Reactor** accepts connections on listen sockets and redistributes each accepted socket to one of N **Worker Reactors**, each of which runs its own independent eventloop in its own OS thread. ActiveJ Eventloop + Workers (`data/activej-eventloop`) is the JVM canonical example. Workers don't share mutable heap state; cross-worker communication is by explicit message-passing.\n\nDistinct from goroutine-shaped runtimes (shared heap, work-stealing) and from full actor systems (mailbox + supervision per actor): each worker is itself an arbitrary-code eventloop, but inter-worker isolation is structural.",
+      "refs": [
+        { "target": "activej-eventloop#overview", "type": "example" }
+      ]
+    },
+    {
+      "id": "all-in-one-runtimes",
+      "title": "All-in-one runtimes",
+      "tags": ["javascript", "runtime"],
+      "content": "**Bun** (`data/bun`) is a notable production data point: a Zig-implemented all-in-one runtime over JavaScriptCore with a custom Zig I/O loop, supporting `io_uring` on Linux and exposing Node-compatible APIs (`fs`, `http`, `child_process`, `cluster`) plus Web-standard APIs (`fetch`, `WebSocket`, `Response`) on the same eventloop.\n\nThe lesson generalises: **a single eventloop is the smallest practical concurrency runtime** and the easiest to make portable across OS interfaces — readiness (`epoll`, `kqueue`), completion (IOCP, `io_uring`), or hybrid models all fit the same surface.",
+      "refs": [
+        { "target": "bun#io-loop-and-zig-implementation", "type": "example" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Event loops minimise per-task overhead and expose a familiar single-threaded mental model, but they conflate scheduling with I/O dispatch and can be starved by CPU-bound work. The dominant escape hatches are:\n\n- explicit blocking pools (Node.js `Worker`, Tokio `spawn_blocking`);\n- cooperative yielding at well-defined safe points;\n- per-loop timer wheels and microtask queues to keep work from accumulating in any one tick.\n\nLanguages choosing an event-loop scheduler trade I/O efficiency and predictable single-threaded semantics for the burden of educating users about CPU-bound starvation and the boundary between sync and async work."
+    }
+  ]
+}

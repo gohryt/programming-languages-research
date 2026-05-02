@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-event",
+  "tag": "granularity:per-event",
+  "name": "Granularity: per event",
+  "description": "Mechanism fires once per semantic event the runtime defines: a GC pause, an actor message, a syscall, a database operation, a span boundary.",
+  "axis": "granularity"
+}

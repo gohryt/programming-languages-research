@@ -1,0 +1,7 @@
+{
+  "id": "family-parallel-hpc",
+  "tag": "family:parallel-hpc",
+  "name": "Family: parallel and HPC tracing",
+  "description": "Inter-rank causality and trillion-event tooling: Score-P, OTF2, Vampir, Scalasca, TAU.",
+  "axis": "family"
+}

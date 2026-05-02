@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "Futamura Projections",
+  "aliases": ["partial evaluation", "Futamura's three projections"],
+  "summary": "Yoshihiko Futamura 1971: if you have a partial evaluator, you can derive compilers mechanically. First projection: specialise an interpreter against a program → compiled program. Second: specialise the partial evaluator against the interpreter → a compiler. Third: specialise the partial evaluator against itself → a compiler generator. Truffle/Graal makes this practical.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Yoshihiko Futamura's 1971 insight: if you have a partial evaluator (a program that specialises a program given some of its inputs), you can derive compilers mechanically.\n\n- **First projection:** Partially evaluate an interpreter with respect to a specific source program. The result is a compiled version of that program — the interpreter's dispatch overhead has been baked away, leaving only the operations specific to the source program.\n- **Second projection:** Partially evaluate the partial evaluator with respect to the interpreter. The result is a compiler for that language — a program that transforms source programs into compiled programs.\n- **Third projection:** Partially evaluate the partial evaluator with respect to itself. The result is a compiler generator — a program that transforms interpreters into compilers.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "underlies" }
+      ]
+    },
+    {
+      "id": "truffle-graal-realisation",
+      "title": "Truffle / Graal — practical realisation",
+      "tags": ["jit", "partial-evaluation"],
+      "content": "The Truffle/Graal system (GraalVM) is the most successful practical application: Truffle interpreters written in Java are partially evaluated by Graal's JIT compiler, producing optimised native code. The programmer writes only the interpreter; the compiler is derived automatically.\n\nThe practical lesson: writing an interpreter is much easier than writing a compiler. If you have a sufficiently powerful partial evaluator or JIT, the interpreter *is* the compiler. This is why Truffle languages (Ruby, Python, JavaScript, R on GraalVM) can achieve near-native performance with relatively simple interpreter implementations.",
+      "refs": [
+        { "target": "deegen#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Futamura-style derivation of compilers (2024)", "url": "https://arxiv.org/pdf/2411.10559" }
+      ]
+    },
+    {
+      "id": "supercompilation",
+      "title": "Supercompilation — the generalisation",
+      "tags": ["partial-evaluation", "research"],
+      "content": "Supercompilation (Turchin, 1986) generalises partial evaluation by \"driving\" through all possible generalised execution histories of the original program, reducing redundancy of any kind — not just known inputs. In practice, supercompilers are harder to control than partial evaluators but can discover optimisations that partial evaluation misses.\n\nThe key intuition: partial evaluation specialises against known *inputs*; supercompilation specialises against known *behaviour*. The latter is more powerful but also more aggressive, and stopping conditions become harder to define. Most practical compiler-from-interpreter systems (Truffle, RPython meta-tracing) are partial evaluators with selective generalisation rather than full supercompilers.",
+      "refs": [],
+      "sources": [
+        { "label": "Supercompilation — Turchin", "url": "https://mazdaywik.github.io/direct-link/The%20Concept%20of%20a%20Supercompiler.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Futamura derivation 2024 survey", "url": "https://arxiv.org/pdf/2411.10559" },
+    { "label": "Turchin Supercompilation", "url": "https://mazdaywik.github.io/direct-link/The%20Concept%20of%20a%20Supercompiler.pdf" }
+  ]
+}

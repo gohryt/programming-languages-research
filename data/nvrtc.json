@@ -1,0 +1,41 @@
+{
+  "kind": "tool",
+  "name": "NVRTC — NVIDIA Runtime Compilation",
+  "aliases": [
+    "CUDA NVRTC",
+    "runtime PTX compiler"
+  ],
+  "summary": "NVIDIA's runtime CUDA compilation library: takes CUDA C++ source as input, emits PTX. Used by PyTorch, JAX, XLA, and other AI frameworks to specialise GPU kernels at runtime based on observed tensor shapes and types. Two-stage compilation (PTX → SASS happens later in the driver).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "NVRTC (NVIDIA Runtime Compilation) is NVIDIA's library for runtime CUDA compilation: takes CUDA C++ source as input at runtime, emits PTX (NVIDIA's GPU intermediate representation). The PTX is then compiled to SASS (the actual GPU instruction set) by the driver when the kernel is launched.\n\nThe two-stage compilation (CUDA C++ → PTX via NVRTC; PTX → SASS via driver) lets NVRTC cache PTX across runs and lets the driver pick the right SASS for the current GPU at launch time. This decoupling matters because PTX is forward-compatible across GPU generations while SASS is not.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "NVIDIA NVRTC",
+          "url": "https://docs.nvidia.com/cuda/nvrtc/"
+        }
+      ]
+    },
+    {
+      "id": "ai-framework-usage",
+      "title": "AI framework usage",
+      "tags": [
+        "cuda",
+        "ai",
+        "jit"
+      ],
+      "content": "PyTorch, JAX, XLA, and TensorFlow all use NVRTC to specialise GPU kernels at runtime. The pattern: observe the tensor shapes and dtypes for an operation, generate CUDA C++ source for a kernel specialised to those shapes, compile via NVRTC, cache the result keyed by `(operation, shapes, dtypes)`. Subsequent calls with the same shape signatures reuse the cached PTX.\n\nThe payoff is significant: a generic matrix multiplication kernel that handles arbitrary shapes is much slower than a kernel specialised for `(M=512, N=512, K=512, dtype=float16)`. Per-shape specialisation captures performance that would otherwise require either hand-written kernels per case or a heavier compilation framework like Triton.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "NVRTC docs",
+      "url": "https://docs.nvidia.com/cuda/nvrtc/"
+    }
+  ]
+}

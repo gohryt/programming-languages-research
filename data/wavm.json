@@ -1,0 +1,32 @@
+{
+  "kind": "runtime",
+  "name": "WAVM",
+  "aliases": ["WAVM Wasm runtime", "LLVM-only Wasm"],
+  "summary": "WebAssembly virtual machine that compiles every Wasm module via the full LLVM optimisation pipeline. Maximises peak performance for compute-heavy long-running workloads at the cost of multi-second per-module compile times. Useful when the Wasm module is a stable, long-lived computation kernel.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "WAVM is a WebAssembly runtime that takes the opposite trade-off from Wasmtime's Cranelift backend or Wasmer's multi-backend design: every Wasm module goes through the full LLVM optimisation pipeline. The result is peak code quality for any given Wasm input, at the cost of multi-second compilation per module.",
+      "refs": [
+        { "target": "llvm#overview", "type": "uses-as-backend" },
+        { "target": "wasmer#overview", "type": "compared-with" },
+        { "target": "wamr#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "WAVM", "url": "https://github.com/WAVM/WAVM" }
+      ]
+    },
+    {
+      "id": "use-cases",
+      "title": "Use cases",
+      "tags": ["wasm", "performance"],
+      "content": "WAVM is most useful when the Wasm module is a long-running computation kernel where peak throughput matters more than startup latency. Scientific computing, simulation engines, ML inference engines, and similar long-lived workloads benefit from spending compile time once at startup in exchange for steady-state performance close to native code.\n\nFor short-lived workloads (edge functions, plug-ins loaded on demand, sandboxed user scripts), WAVM's compile-time cost is unaffordable. Cranelift-based runtimes (Wasmtime, Wasmer with Cranelift) or even Wasmer's SinglePass are better fits there.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "WAVM", "url": "https://github.com/WAVM/WAVM" }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "kind": "tool",
+  "name": "SwiftForth",
+  "aliases": [
+    "FORTH Inc SwiftForth"
+  ],
+  "summary": "Subroutine-threaded Forth with direct code substitution and inline expansion for inlineable words. Strong reputation as a very fast desktop Forth without the full optimiser mystique of VFX. Commercially supported by FORTH Inc.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**SwiftForth** takes a more transparent path: it is a **subroutine-threaded** system that substitutes direct code where possible and supports inline expansion for words whose headers mark them as inlineable. This gives it a strong reputation as a very fast desktop Forth without requiring the full optimiser mystique of VFX.\n\nThe implementation angle is worth calling out because subroutine threading is often dismissed as \"just compile calls,\" but SwiftForth shows how much mileage you can get once you combine that with direct substitution and selective inlining.",
+      "refs": [
+        {
+          "target": "vfx-forth#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "SwiftForth",
+          "url": "https://www.forth.com/swiftforth/"
+        }
+      ]
+    },
+    {
+      "id": "position",
+      "title": "Position",
+      "tags": [
+        "forth"
+      ],
+      "content": "SwiftForth offers a clear execution model, fast in practice, commercially supported, and a good exemplar of subroutine-threaded design — with less published detail on deep optimiser internals than VFX or Gforth, and a commercial license.\n\nFor a Forth user wanting fast desktop performance with a clean execution model and commercial support, SwiftForth is the alternative to VFX. The choice between them is largely a matter of vendor preference and specific benchmark fit.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "SwiftForth",
+      "url": "https://www.forth.com/swiftforth/"
+    }
+  ]
+}

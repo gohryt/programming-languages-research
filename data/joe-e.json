@@ -1,0 +1,83 @@
+{
+  "kind": "tool",
+  "name": "Joe-E — Object-Capability Subset of Java",
+  "aliases": [
+    "joee"
+  ],
+  "summary": "Adrian Mettler, David Wagner, Tyler Close (UC Berkeley, NDSS 2010): a *taming subset* of Java that statically bans ambient-authority constructs (mutable statics, reflection, file APIs, etc.) so the remainder is provably ocap-safe. The 'maximal subset principle' — forbid only what breaks ocap reasoning, preserve existing tooling — generalises to other host languages. Archived; the technique survives in Caja and SES/Hardened JS.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "joe-e",
+        "ocap",
+        "language-capability",
+        "no-ambient-authority",
+        "java",
+        "verifier"
+      ],
+      "content": "**Joe-E** (Adrian Mettler, David Wagner, Tyler Close, UC Berkeley; NDSS 2010) is a *taming subset* of Java that statically bans ambient-authority constructs — mutable statics, reflection, `java.io.File`, `Class.forName`, native methods, finalizers — so the remainder is provably ocap-safe.\n\nThe defining contribution is the **maximal subset principle**: forbid only what breaks ocap reasoning; preserve existing tooling. A Joe-E program is also a valid Java program. It compiles with `javac`, runs on any JVM, can be debugged with standard tools, and can interoperate with general Java libraries through *taming files* that whitelist which methods are ocap-safe to call. This makes Joe-E the cleanest example of \"ocap by deletion from a host language,\" and the technique generalises directly to other ambient-authority languages.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "applies-same-technique-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Joe-E NDSS 2010",
+          "url": "https://people.eecs.berkeley.edu/~daw/papers/joe-e-ndss10.pdf"
+        }
+      ]
+    },
+    {
+      "id": "verifier-and-taming",
+      "title": "Verifier and taming files",
+      "tags": [
+        "joe-e",
+        "verifier",
+        "ocap"
+      ],
+      "content": "Implementation: a separate **Joe-E verifier** runs over Java source (or bytecode) and rejects any program that uses a banned construct. The verifier checks:\n\n- No mutable static fields (would be ambient global state).\n- No reflection that can bypass access modifiers.\n- No raw file I/O, network, or process APIs (these are authority-bearing and must be passed in as capability objects).\n- No native methods or finalizers (escape hatches for both above).\n\n**Taming files** describe how to expose general Java libraries safely: each method is annotated as honest (callable in Joe-E), unsafe (banned), or wrapped (callable via a Joe-E-defined capability shim). The Java standard library was tamed by hand for Joe-E; new libraries can be added incrementally.\n\n**Verifiable functional purity** falls out as a special case of capability emptiness: a Joe-E function that takes no capability parameters has no way to perform side effects, so it is provably pure (modulo non-termination), and the type system can mark it as such. The same trick generalises to *any* ocap discipline: \"no input capabilities\" implies \"no observable effects.\"",
+      "refs": [
+        {
+          "target": "ses-javascript",
+          "type": "shares-technique-with"
+        }
+      ]
+    },
+    {
+      "id": "lineage-and-status",
+      "title": "Lineage — Caja and SES",
+      "tags": [
+        "joe-e",
+        "historical",
+        "ses"
+      ],
+      "content": "Status (as of 2026-04): Joe-E itself is **archived/historical** — the Berkeley project ended around 2011, and Java itself has shifted enough since then (modules, records, sealed classes, security manager removal) that the verifier would need substantial rework.\n\nThe technique survives, however:\n\n- **Caja** (Google, 2007-2014) applied the same maximal-subset-by-deletion technique to JavaScript, defining a server-side rewriter that would inject capability discipline into untrusted third-party JS for safe embedding in trusted pages. Caja was archived when its primary use case (gadgets in iGoogle and similar) wound down.\n- **SES** (Secure ECMAScript) is the third-generation descendant — the same idea, now expressed natively as a TC39 proposal (`Compartment` + `lockdown()`) without needing a separate rewriter. SES is in production via Endo, Agoric, and MetaMask LavaMoat.\n\nThe reference value of Joe-E: it is the cleanest published demonstration that a host language can be retrofitted with ocap purely by removing constructs, and the maximal subset principle is now standard vocabulary in ocap design discussions.",
+      "refs": [
+        {
+          "target": "ses-javascript",
+          "type": "succeeded-by"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Joe-E NDSS 2010",
+          "url": "https://people.eecs.berkeley.edu/~daw/papers/joe-e-ndss10.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Joe-E NDSS 2010",
+      "url": "https://people.eecs.berkeley.edu/~daw/papers/joe-e-ndss10.pdf"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "kind": "language",
+  "name": "Frank — Bidirectional Effect Types Without Effect Variables",
+  "aliases": ["frank", "frank-lang", "do-be-do-be-do"],
+  "summary": "Lindley, McBride, Hillerström, Convent (POPL 2014/2017; JFP 2020): strict functional language whose effect system achieves effect polymorphism without effect variables in source code. Bidirectional propagation threads the ambient effect set through type checking; multi-handlers interpret commands from several effect sources at once. Substrate for Unison's abilities.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Lindley, McBride, Hillerström, Convent et al.'s **Frank** (initial paper \"Do Be Do Be Do\", POPL 2014/2017; expanded JFP article \"Doo Bee Doo Bee Doo\", 2020) is a strict functional language whose distinguishing contribution is **effect polymorphism without effect variables in source code**. Where Koka and Effekt require programmers to write effect rows like `<exn,async>` explicitly on function types, Frank achieves the same expressive power through a *bidirectional* effect-typing rule: the effect set a function may perform is propagated structurally through type checking, and the source language has no syntax for naming an effect variable.",
+      "refs": [
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "instance-of" },
+        { "target": "bidirectional-typing#overview", "type": "extends-to-effects" },
+        { "target": "unison#overview", "type": "substrate-for" }
+      ],
+      "sources": [
+        { "label": "Frank — Doo Bee Doo Bee Doo (JFP 2020)", "url": "https://homepages.inf.ed.ac.uk/slindley/papers/frankly-jfp.pdf" },
+        { "label": "Frank — Do Be Do Be Do (POPL 2017 arXiv)", "url": "https://arxiv.org/pdf/1611.09259" }
+      ]
+    },
+    {
+      "id": "adjustment-mechanic",
+      "title": "Adjustments and the bidirectional effect rule",
+      "tags": ["effect-system", "type-system"],
+      "content": "The mechanical core is the **adjustment**. A Frank arrow `[E1] A -> [E2] B` says \"in an ambient effect set adjusted by `E1` going in, returning a value of `B` adjusted by `E2`.\" Effect handlers (called *operators* in Frank) take continuation-style arguments and are pattern-matched against effect signatures; the typing rule for operator application threads the ambient effect set through the bidirectional check, and the language never needs an explicit `forall e. e in ...` quantifier the way ML-style row variables would.\n\nThis is the type-system reason Unison's *abilities* chose Frank as their basis: the bidirectional discipline scales better in practice than an explicit-row-variable ML extension would."
+    },
+    {
+      "id": "multi-handlers",
+      "title": "Multi-handlers",
+      "tags": ["effect-system", "handlers"],
+      "content": "**Multi-handlers** are Frank's other distinctive primitive: an operator can simultaneously interpret commands from *several* effect sources at once, without disturbing direct-style code. Where a Koka handler decides what to do with one effect at a time, a Frank multi-handler can specify the joint behaviour of (say) `state` and `nondet` together — useful for coordination patterns where the two effects must agree on action ordering.\n\nStatus (as of 2026-04): research-grade; Frank itself is a small implementation maintained by the authors at Edinburgh and Cambridge. The lesson generalises: **effect-row syntax in source code is not the only way to express effect polymorphism** — bidirectional propagation extended to effects is a viable alternative, and the same mechanism that lets a language elide many type annotations on values can elide them on effects. For language designers building from scratch, Frank is the existence proof that effect polymorphism does not require user-visible effect variables; the cost is that error messages must be carefully designed to expose the inferred effect set when bidirectional propagation fails.",
+      "sources": [
+        { "label": "Frank — Do Be Do Be Do draft (March 2014)", "url": "https://homepages.inf.ed.ac.uk/slindley/papers/frankly-draft-march2014.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Frank — Doo Bee Doo Bee Doo (JFP 2020)", "url": "https://homepages.inf.ed.ac.uk/slindley/papers/frankly-jfp.pdf" }
+  ]
+}

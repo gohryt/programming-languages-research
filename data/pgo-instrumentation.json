@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "Profile-Guided Optimisation (Instrumentation-Based)",
+  "aliases": ["PGO", "instrumentation PGO", "fprofile-generate"],
+  "summary": "Two-build PGO: instrument the program with branch and function counters, run on representative workloads to collect a profile, recompile with the profile guiding inlining/layout/branch prediction. 10–20% over -O3 typical for C/C++; build-pipeline complexity is the main adoption friction.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Classical **Profile-Guided Optimisation** instruments the program during an initial compilation — inserting counters on every branch and function entry — runs it on representative workloads to collect a profile, then recompiles with the profile as input. The optimiser uses the profile to guide inlining (prefer hot callees), layout (pack hot paths into instruction cache), and branch prediction (arrange `if` sides to minimise mispredictions).\n\nThe reported gains are substantial: 10–20% speedup over `-O3` is typical for C/C++ workloads, occasionally 30%+ for branchy code. GCC's `-fprofile-generate` / `-fprofile-use` and Clang's `-fprofile-instr-generate` / `-fprofile-instr-use` are the standard toolchains.",
+      "refs": [
+        { "target": "autofdo#overview", "type": "alternative-to" },
+        { "target": "bolt-binary-optimizer#overview", "type": "complementary-to" }
+      ],
+      "sources": [
+        { "label": "Clang PGO", "url": "https://clang.llvm.org/docs/UsersManual.html#profile-guided-optimization" }
+      ]
+    },
+    {
+      "id": "operational-friction",
+      "title": "Operational friction",
+      "tags": ["compiler", "deployment"],
+      "content": "The friction is operational: the workflow requires two builds, a profiling run, and correct handling of the profile file. Many projects skip PGO not because it doesn't work but because the build pipeline becomes more complex. Making PGO easy to run is a sometimes-overlooked design goal for a new language's toolchain.\n\nFor projects that have invested in PGO infrastructure, the gains compound: PGO + LTO routinely produces 20–30% speedups over plain -O3 builds, and the gains are often free of regressions. The two-build workflow is the cost; once paid, the wins are durable.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Clang PGO", "url": "https://clang.llvm.org/docs/UsersManual.html#profile-guided-optimization" }
+  ]
+}

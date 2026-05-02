@@ -1,0 +1,36 @@
+{
+  "kind": "tool",
+  "name": "rpmalloc",
+  "aliases": ["Rampant Pixels rpmalloc", "Mattias Jansson rpmalloc"],
+  "summary": "Mattias Jansson's lock-free per-thread allocator built on fixed 64 KiB span alignment so the free path can find the span header by masking low address bits, with no central table lookup.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "lock-free-allocator", "general-purpose-allocator"],
+      "content": "Mattias Jansson's rpmalloc is a lock-free per-thread allocator built on fixed 64 KiB span alignment. The clever trick: aligning every span on 64 KiB means the free path can find the span header by masking low address bits — there is no central table lookup, no `mmap`-based metadata structure. The design is small, public-domain (Unlicense), and ships with a pluggable memory mapper, making it popular in game engines and embedded contexts.\n\nIt sits in the same throughput-oriented family as mimalloc and snmalloc, with a different bias: rpmalloc's design priorities are minimal code, maximal portability, and zero allocation latency on the fast path even under pluggable backends.",
+      "refs": [
+        { "target": "allocators#throughput-allocators", "type": "part-of" },
+        { "target": "mimalloc#overview", "type": "compared-with" },
+        { "target": "snmalloc#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "span-aligned-cache",
+      "title": "Span-aligned lock-free cache",
+      "tags": ["lock-free", "thread-cache", "freelist"],
+      "content": "Each span is exclusively owned by its allocating thread; cross-thread frees go to a per-span deferred free list and are reclaimed when the owning thread next needs a span. A four-level cache hierarchy (active span, partial-free list, free-span list, global list) with adaptive sizing per size-class smooths the allocation rate without inflating the per-thread footprint.\n\nThe 64 KiB alignment is the architectural commitment: it bounds the address-space granularity but eliminates an entire class of metadata lookups on the hot path.",
+      "refs": []
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "userspace"],
+      "content": "Used in Unreal Engine variants, Haiku OS, and various Rust crates via `rpmalloc-rs`. The Unlicense plus pluggable mapper make it a natural fit for embedded and game-engine contexts where licensing and the ability to retarget the page allocator (to a custom HAL, for example) matter more than absolute peak throughput.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "rpmalloc GitHub", "url": "https://github.com/mjansson/rpmalloc" }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "kind": "language",
+  "name": "Dart",
+  "aliases": [],
+  "summary": "Google's UI-and-server language with library as the module unit (library directive plus part/part of for multi-file libraries), underscore-prefix privacy enforced at the language level, URI-shaped imports (dart:, package:, src/), and deferred as for lazy loading on web/AOT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Dart (Google, 2011+; Dart 3+ stable as of 2026) is the language behind Flutter and several Google internal systems. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "library-as-module-unit",
+      "title": "Library as the module unit",
+      "tags": ["dart", "libraries", "module-systems"],
+      "content": "Dart's module unit is the **library**, which can be a single file (the default) or a multi-file library coordinated by a `library` directive plus `part` and `part of` directives. A library is the privacy boundary: identifiers beginning with an underscore (`_foo`) are private to the library, not just to the file. This is structurally similar to Go's capitalization convention but inverted (underscore for private rather than capitalization for public).\n\nImports use URI specifiers: `import 'dart:io';` for SDK libraries, `import 'package:foo/foo.dart';` for pub packages, `import 'src/helpers.dart';` for relative paths. The `package:` scheme is resolved by the pub package manager via `pubspec.yaml` and a `.dart_tool/package_config.json` file generated at `pub get` time.",
+      "refs": [
+        { "target": "visibility-and-exports#visibility-granularity", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Dart libraries", "url": "https://dart.dev/language/libraries" }
+      ]
+    },
+    {
+      "id": "show-hide-deferred-and-export",
+      "title": "show/hide, deferred as, and export directive",
+      "tags": ["dart", "imports", "lazy-loading"],
+      "content": "Dart supports `show` and `hide` clauses on imports (`import 'foo.dart' show Bar, Baz;` or `import 'foo.dart' hide Internal;`), an `as` clause for prefixing (`import 'foo.dart' as f;`), and an `export` directive for republishing.\n\nThe **`deferred as`** form supports lazy loading on web and AOT-compiled mobile, so a library's code is only loaded when it is first referenced — relevant for code-splitting large applications. The deferred library is loaded by calling `loadLibrary()` on the prefix; until then, references to its types are unresolved and using them throws.",
+      "refs": [
+        { "target": "javascript#dynamic-import-and-federation", "type": "comparable-to" }
+      ]
+    },
+    {
+      "id": "part-and-part-of",
+      "title": "part / part of — single-library multi-file composition",
+      "tags": ["dart", "code-generation", "libraries"],
+      "content": "The `part`/`part of` system is unusual. A `part` file is *not* its own library; it is a syntactic continuation of the parent library, sharing the parent's privacy and import scope. This is similar to C++ separate compilation units that share a translation context, but expressed at the source level.\n\nThe part is mostly used for code generation: a `build_runner`-generated `*.g.dart` file is typically a `part of` the consuming library, letting it access private members for serialization, ORM, or freezing. This is the design choice that makes Dart's code-generation ecosystem (`json_serializable`, `freezed`, `mockito`) ergonomic — generated code can access library-private state without the library author exposing it via export.",
+      "refs": [],
+      "sources": [
+        { "label": "Dart part / part of", "url": "https://dart.dev/language/built-in-types#part-and-part-of" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Dart libraries", "url": "https://dart.dev/language/libraries" },
+    { "label": "Dart pub dependencies", "url": "https://dart.dev/tools/pub/dependencies" }
+  ]
+}

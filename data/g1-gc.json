@@ -1,0 +1,38 @@
+{
+  "kind": "runtime",
+  "name": "G1 — Predictive Pause-Time Regional Collection",
+  "aliases": ["G1", "G1 GC", "Garbage-First Collector"],
+  "summary": "Default JVM collector since JDK 9. Regional generational collector that divides the heap into ~2048 fixed-size regions and uses pause-time prediction to select a collection set of highest-yield regions, balancing throughput with a soft pause-time goal.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "regional-gc", "generational-gc", "concurrent-marking", "jvm", "openjdk", "default-collector"],
+      "content": "G1 (Garbage-First) is the **default JVM collector since JDK 9**: a regional generational collector that divides the heap into ~2048 fixed-size regions and uses pause-time prediction to select a \"collection set\" of highest-yield regions, balancing throughput with a soft pause-time goal.\n\nStatus (as of 2026-04): default JVM collector. Practical heap range up to ~32 GB.",
+      "refs": [
+        { "target": "garbage-collection#throughput-collectors", "type": "instance-of" },
+        { "target": "hotspot-cms", "type": "successor-of" },
+        { "target": "zgc", "type": "complements" },
+        { "target": "shenandoah-gc", "type": "complements" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Pause-time prediction and mixed collections",
+      "tags": ["regional-gc", "remembered-set", "card-table", "concurrent-marking"],
+      "content": "Tracks per-region live-data and copy cost to fit collections within `-XX:MaxGCPauseMillis`. **Concurrent SATB marking** identifies old regions; subsequent stop-the-world **mixed collections** evacuate young regions plus selected old regions chosen by the pause-time model.\n\nCard-table + remembered-set mechanics scale to heaps in the tens of GB (practical ~32 GB) without colored pointers or load barriers. The trade-off: G1's worst-case pause exceeds ZGC and Shenandoah by orders of magnitude on large heaps, because evacuation is STW even though marking is concurrent."
+    },
+    {
+      "id": "performance",
+      "title": "Performance profile",
+      "tags": ["throughput", "low-pause"],
+      "content": "Throughput-leaning workhorse; baseline pauses ~9–10 ms at idle, frequent multi-ms pauses under load. **Does not hit sub-ms in practice** — the latency story belongs to ZGC, Shenandoah, and C4.\n\nG1 occupies the throughput-vs-pause middle ground: better pauses than Parallel Scavenge, lower throughput overhead than ZGC/Shenandoah on most workloads. The pause-time goal (`-XX:MaxGCPauseMillis`) is *soft* — G1 tries to honour it via collection-set sizing, but cannot guarantee it under high allocation pressure.",
+      "refs": [
+        { "target": "azul-c4", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "G1 GC tuning guide (JDK 24)", "url": "https://docs.oracle.com/en/java/javase/24/gctuning/garbage-first-garbage-collector-tuning.html" }
+  ]
+}

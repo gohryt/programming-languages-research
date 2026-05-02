@@ -1,0 +1,7 @@
+{
+  "id": "family-continuous-fleet-scale",
+  "tag": "family:continuous-fleet-scale",
+  "name": "Family: continuous fleet-scale observation",
+  "description": "Always-on, statistically-sampled, fleet-wide profiling: Google-Wide Profiling, pprof, Parca, Pyroscope, managed continuous profilers.",
+  "axis": "family"
+}

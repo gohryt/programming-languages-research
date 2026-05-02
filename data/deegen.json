@@ -1,0 +1,61 @@
+{
+  "kind": "framework",
+  "name": "Deegen",
+  "aliases": [],
+  "summary": "Xu and Kjolstad (PLDI 2025): compiler generator for dynamic-language VMs. Bytecode semantics written once in C++ become a direct-threaded interpreter, a copy-and-patch baseline JIT, and the tier-up plumbing connecting them — all generated at build time. Closest to Futamura's second projection.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Deegen (Xu and Kjolstad, PLDI 2025) is a compiler generator for dynamic-language VMs: the language implementer writes bytecode semantics once in C++, and Deegen generates a two-tier execution engine consisting of a direct-threaded interpreter, a copy-and-patch baseline JIT, and the profiling and tier-switching logic that connects them.\n\nIn Futamura's taxonomy it is closest to a second projection: instead of partially evaluating an interpreter at runtime like Truffle, Deegen compiles the bytecode semantics to LLVM IR at build time, analyzes and transforms that IR, and emits the VM machinery ahead of time.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "generates" },
+        { "target": "copy-and-patch#stencil-based-code-generation", "type": "uses" }
+      ],
+      "sources": [
+        {
+          "label": "Deegen paper (arXiv 2411.11469)",
+          "url": "https://arxiv.org/html/2411.11469v1"
+        }
+      ]
+    },
+    {
+      "id": "single-source-bytecode-semantics",
+      "title": "Single-source bytecode semantics",
+      "tags": ["vm", "bytecode", "compiler-generator"],
+      "content": "The architectural distinction is that Deegen aims to make \"write the bytecode semantics\" the single source of truth for multiple VM tiers. The same semantics definition is specialized into:\n\n- interpreter handlers (direct-threaded dispatch)\n- JIT stencils (copy-and-patch baseline tier)\n- inline-cache logic\n- OSR-entry plumbing\n\nDynamic-language-specific optimizations — bytecode specialization, quickening, monomorphic and polymorphic inline caches, register pinning, tag-register optimization, hot/cold splitting — are either automatic or exposed through framework APIs.",
+      "refs": [
+        { "target": "copy-and-patch#stencil-based-code-generation", "type": "drives" },
+        { "target": "tiered-compilation#common-architecture-patterns", "type": "generates" }
+      ]
+    },
+    {
+      "id": "generated-execution-tiers",
+      "title": "Generated execution tiers",
+      "tags": ["jit", "runtime-design", "vm"],
+      "content": "The reported results: the Deegen-generated LuaJIT Remake interpreter is reported as faster than both PUC Lua's interpreter and LuaJIT's interpreter, while the generated baseline JIT achieves negligible startup delay and reaches a substantial fraction of LuaJIT's optimizing-JIT throughput.\n\nThe obvious caveats matter: the published evaluation omits garbage collection integration, targets x86-64 only, and does not yet include the future optimizing tier. The lesson is still strong: for dynamic languages, VM generation can move from parser-generator-style frontend automation toward execution-engine automation if the semantics are expressed in an analyzable form.",
+      "refs": [
+        { "target": "tiered-compilation#common-architecture-patterns", "type": "exemplifies" }
+      ]
+    },
+    {
+      "id": "comparison-points",
+      "title": "Comparison points",
+      "tags": ["jit", "tradeoffs", "language-implementation"],
+      "content": "Deegen suggests a middle path between \"hand-write everything in assembly/macros\" and \"reuse a host JIT like LLVM or Truffle at runtime\": do the hard compilation work at build time, ship a self-contained generated VM, and keep runtime compilation budgets tiny.\n\nUseful comparison points:\n- **LLVM as JIT backend**: heavyweight, multi-second compile per function. Deegen avoids this by doing all the LLVM-level work at the VM-implementer's build time.\n- **Cranelift as JIT backend**: lighter than LLVM but still a runtime cost. Deegen's baseline JIT has near-zero compile cost because stencils are pre-built.\n- **Sea-of-nodes JIT (TurboFan, C2)**: top-tier optimization but compile-time-expensive. Deegen targets the baseline-tier slot, where compile speed is the constraint.",
+      "refs": [
+        { "target": "llvm#role-in-jit-and-tiered-systems", "type": "alternative-to" },
+        { "target": "cranelift#fit-for-jit-and-tiered-compilation", "type": "alternative-to" },
+        { "target": "copy-and-patch#strengths", "type": "leverages" },
+        { "target": "sea-of-nodes#optimization-implications", "type": "alternative-to" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Deegen paper (arXiv 2411.11469)",
+      "url": "https://arxiv.org/html/2411.11469v1"
+    }
+  ]
+}

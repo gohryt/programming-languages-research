@@ -1,0 +1,65 @@
+{
+  "kind": "concept",
+  "name": "Structured Concurrency",
+  "aliases": [],
+  "summary": "A concurrency discipline that scopes child tasks to parent blocks so lifetime, failure, and cancellation follow the task tree; production examples include Trio nurseries, Swift task groups, Kotlin coroutine scopes, Java structured task scopes (JEP 428).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Structured concurrency makes task lifetime part of program structure by tying child tasks to the scope that created them. It is best understood as a lifecycle and coordination discipline rather than a single scheduler implementation.\n\nIt turns task lifetime into a syntactic property: children are scoped to a parent block, and cancellation/failure flow through the resulting tree. This reduces leaks, orphan work, and invisible background failures.",
+      "refs": [{ "target": "cancellation#overview", "type": "related" }]
+    },
+    {
+      "id": "task-lifetimes",
+      "title": "Task lifetimes",
+      "tags": ["concurrency", "task-lifetime", "runtime"],
+      "content": "In structured concurrency, child tasks cannot silently outlive the parent scope that spawned them. This improves visibility of work lifetime and gives concurrency a scope discipline similar to resource management models in other parts of language design.\n\nStructured concurrency organizes tasks into a tree. A parent scope starts children, waits for them, and owns their cancellation and failure propagation. Java's structured concurrency JEP describes subtasks as working on behalf of a task, with well-defined entry and exit points and lifetimes nested like syntactic blocks.",
+      "refs": [{ "target": "ownership#overview", "type": "related" }],
+      "sources": [
+        { "label": "JEP 428 — Structured Concurrency (preview)", "url": "https://openjdk.org/jeps/428" }
+      ]
+    },
+    {
+      "id": "nurseries-and-task-groups",
+      "title": "Nurseries and task groups",
+      "tags": ["concurrency", "coordination", "structured-concurrency"],
+      "content": "Common structured forms include nurseries, task groups, and scoped spawn blocks. The exact syntax varies, but the central invariant is that child work is accounted for and completed or cancelled before the enclosing scope exits.\n\nTrio nurseries (Python, Nathaniel J. Smith), Swift task groups, Kotlin coroutine scopes, and Java structured task scopes all enforce variants of the same rule: children do not outlive their scope. Swift task groups wait for all child tasks before the group is destroyed, and cancellation propagates through child tasks cooperatively.",
+      "refs": [{ "target": "async-await#execution-model", "type": "related" }],
+      "sources": [
+        { "label": "Swift TaskGroup", "url": "https://developer.apple.com/documentation/swift/taskgroup" }
+      ]
+    },
+    {
+      "id": "failure-and-cancellation-propagation",
+      "title": "Failure and cancellation propagation",
+      "tags": ["concurrency", "cancellation", "error-handling"],
+      "content": "Structured systems make cancellation and failure flow visible by tying them to the task tree. Parent failure often implies child cancellation, and child failure is less likely to disappear into detached background execution.\n\nCancellation may be: cooperative, observed at await/yield/checkpoint points; asynchronous, delivered by exception or signal; explicit through tokens; lexical through cancel scopes; implicit through parent failure; best-effort, advisory, or mandatory. Cooperative cancellation preserves cleanup and invariants but cannot stop CPU-bound or blocked code unless it checks cancellation. Asynchronous cancellation is more forceful but can violate invariants if it interrupts arbitrary code.",
+      "refs": [{ "target": "cancellation#semantics", "type": "uses" }]
+    },
+    {
+      "id": "async-cleanup-and-destructors",
+      "title": "Async cleanup and destructors",
+      "tags": ["concurrency", "cleanup", "tradeoffs"],
+      "content": "Concurrent systems need cleanup that can itself await: closing network connections, flushing buffers, joining tasks, or releasing distributed leases. Languages with synchronous destructors struggle here.\n\nThe Rust async book notes that dropping futures can cancel owned child futures, but spawned tasks require explicit handles/signals; Rust's lack of async destructors complicates asynchronous cleanup. A canonical example: `tokio::spawn`'d tasks are detached unless explicitly joined or aborted, breaking strict structured-concurrency expectations and creating an ongoing design tension between Rust's drop semantics and the structured-task ideal.",
+      "refs": [],
+      "sources": [
+        { "label": "Rust async book — structured", "url": "https://rust-lang.github.io/async-book/part-reference/structured.html" }
+      ]
+    },
+    {
+      "id": "escape-hatches-and-tradeoffs",
+      "title": "Escape hatches and trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Real systems still need detached daemons, service loops, and background workers, so structured concurrency usually includes explicit escape hatches. The core trade-off is between unrestricted spawning freedom and lifecycle safety that remains visible in the code structure.\n\nEvery practical system needs unstructured tasks for daemons, servers, top-level event loops, background indexing, and detached work. The key is to make unstructured concurrency explicit, observable, cancellable, and rare by default — opt-in `Task.detached(...)`-style spawn rather than ambient spawn.",
+      "refs": [
+        {
+          "target": "async-await#api-coloring-and-propagation",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

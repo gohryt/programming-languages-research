@@ -1,0 +1,73 @@
+{
+  "kind": "concept",
+  "name": "Generalized Algebraic Data Types",
+  "aliases": [
+    "generalized-algebraic-types",
+    "indexed-types"
+  ],
+  "summary": "Constructors return refined instantiations of a type constructor. Pattern matching on a GADT introduces local type equalities, which must be available while checking the branch. Powerful for typed embedded languages, length-indexed data, state machines, and proof-carrying APIs; complicates inference because pattern matching introduces local equality assumptions that don't leak outside the branch.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Generalized algebraic data types allow constructors to return refined instantiations of a type constructor. The classical example is a typed expression tree where `Lit Int : Expr Int`, `Add : Expr Int -> Expr Int -> Expr Int`, and `If : Expr Bool -> Expr a -> Expr a -> Expr a` — pattern matching on an `Expr Int` knows the result type is `Int`.\n\nPattern matching on a GADT introduces local type equalities, which must be available while checking the branch. GADTs are powerful for typed embedded languages, length-indexed data, state machines, and proof-carrying APIs, but they require careful inference design to avoid ambiguous or unsound conclusions.",
+      "refs": [
+        {
+          "target": "algebraic-data-types#overview",
+          "type": "extends"
+        },
+        {
+          "target": "constraint-based-typing#outsidein-x",
+          "type": "checked-via"
+        },
+        {
+          "target": "bidirectional-typing#design-applicability",
+          "type": "checked-via"
+        },
+        {
+          "target": "exhaustiveness-checking#overview",
+          "type": "complicates"
+        }
+      ]
+    },
+    {
+      "id": "inference-interaction",
+      "title": "Why GADTs complicate inference",
+      "tags": [
+        "type-system",
+        "inference"
+      ],
+      "content": "The fundamental issue: a GADT pattern match introduces a *local* type equality (e.g., \"in this branch, `a ~ Int`\"). If inference were allowed to use this equality to bind outer type variables, principality breaks: the same expression could have different inferred types depending on which branch the inferer happened to traverse first.\n\nOutsideIn(X) (`data/constraint-based-typing#outsidein-x`) is the canonical solution: the inference engine has an outer zone (no local equalities) and an inner zone (local GADT equalities active). Variables created in the outer zone are *rigid* in the inner zone — they cannot be bound by inner equalities; they only act as known-but-unrefined type witnesses.\n\nThe practical consequence is that GADT-using code must annotate more than ordinary ADT code: the function whose body matches on a GADT typically needs an explicit return type so the inference engine knows what the outer zone expects."
+    },
+    {
+      "id": "production-uses",
+      "title": "Production uses",
+      "tags": [
+        "type-system",
+        "haskell"
+      ],
+      "content": "Production GADT uses cluster around four families:\n\n- **typed embedded DSLs** — symbolic expression trees, query languages, regular expressions where the type encodes the result shape;\n- **length-indexed and shape-indexed data** — vectors carrying their length in the type, matrices carrying dimensions, parsers carrying the unconsumed-input type;\n- **state machines and protocols** — types encoding which state a computation is in, with transitions reflected in the type;\n- **proof-carrying APIs** — the type encodes a precondition the constructor witnessed, and pattern matching exposes the proof to the body.\n\nGHC is the reference implementation. OCaml supports GADTs since 4.00. Scala 3's match types are a related mechanism. Idris 2 and Lean express equivalent power through dependent indexing, where GADTs are a special case of dependent inductive types.\n\nThe pattern-matching side of GADTs has its own canonical paper — Simon Peyton Jones et al.'s \"GADTs Meet Their Match\" — covering the interaction between GADTs, exhaustiveness checking, guards, and laziness in a single semantic framework.",
+      "sources": [
+        {
+          "label": "GHC GADTs",
+          "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/gadt.html"
+        },
+        {
+          "label": "Peyton Jones et al. — GADTs Meet Their Match",
+          "url": "https://simon.peytonjones.org/assets/pdfs/gadtpm-acm.pdf"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "GHC GADTs",
+      "url": "https://haskell.org/ghc/docs/latest/html/users_guide/exts/gadt.html"
+    },
+    {
+      "label": "Peyton Jones et al. — GADTs Meet Their Match",
+      "url": "https://simon.peytonjones.org/assets/pdfs/gadtpm-acm.pdf"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Thread-Local Storage Models",
+  "aliases": ["TLS models", "local-exec", "initial-exec", "general-dynamic"],
+  "summary": "Four dominant models for thread-local variables: local-exec (offset known at link, fastest, executables only), initial-exec (resolved at program start, fast, libraries present at start), general-dynamic (per-access dynamic resolution, slowest, dlopen-friendly), local-dynamic (amortised general-dynamic). Compiler picks per access.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Thread-local variables require ABI support. The dominant models:\n\n- **Local-exec**: TLS variable offset known at link time relative to the thread's TLS block. Fastest access but requires linker cooperation; only works for executables, not shared libraries.\n- **Initial-exec**: offset resolved at program start via the dynamic linker. Fast access (one indirection) but only works if the library is present at program start.\n- **General-dynamic**: offset resolved on each access via `__tls_get_addr`. Slowest but most flexible; works for libraries loaded via `dlopen`.\n- **Local-dynamic**: like general-dynamic but amortises the lookup across multiple accesses in the same function.",
+      "refs": [
+        { "target": "object-file-formats#overview", "type": "supported-by" }
+      ],
+      "sources": [
+        { "label": "ELF TLS Models (Drepper)", "url": "https://www.akkadia.org/drepper/tls.pdf" }
+      ]
+    },
+    {
+      "id": "compiler-choice",
+      "title": "Compiler model selection",
+      "tags": ["compiler", "tls"],
+      "content": "The compiler must choose a model per TLS access based on visibility and module kind. Many languages just expose \"thread-local\" and let the backend pick; a few (C++ with `thread_local`, Rust with `#[thread_local]`) give users manual control.\n\nThe choice has real performance implications. Local-exec is essentially free (single instruction); general-dynamic costs a function call per access. For hot-path TLS (per-thread caches, scheduler state), choosing the right model can be the difference between trivial overhead and noticeable cost. Most compilers default conservatively to a model that works in any deployment; performance-critical code overrides explicitly.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Drepper TLS Models", "url": "https://www.akkadia.org/drepper/tls.pdf" }
+  ]
+}

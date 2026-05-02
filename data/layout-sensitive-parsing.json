@@ -1,0 +1,78 @@
+{
+  "kind": "concept",
+  "name": "Layout-Sensitive Parsing",
+  "aliases": [
+    "off-side-rule",
+    "indentation-sensitive-parsing"
+  ],
+  "summary": "Parsing techniques for languages where indentation or layout determines block structure (Haskell, Python, F#, Nim); production approach is a layout stage between lexer and parser that inserts virtual `{`, `;`, `}` tokens based on column positions.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Peter Landin's \"off-side rule\" (1966) is the foundational idea: nested blocks are delimited by indentation instead of brackets. The common production technique is a **layout stage** between lexer and parser that inserts virtual `{`, `;`, and `}` tokens based on column positions, so the downstream grammar can stay ordinary context-free.",
+      "refs": [
+        {
+          "target": "lexer-generators#contextual-lexing",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "haskell-layout-and-parse-error-rule",
+      "title": "Haskell layout and the parse-error rule",
+      "tags": [
+        "parser",
+        "layout",
+        "haskell"
+      ],
+      "content": "The **Haskell 2010 Report** gives the canonical specification. A layout-sensitive keyword (`let`, `where`, `do`, `of`) not followed by an explicit `{` inserts a virtual `{n}` token where *n* is the indentation of the next lexeme. The algorithm maintains a stack of layout contexts — each a column number or 0 for an explicit brace — and emits `;` when a new line matches the current indent, closes the context with `}` when it is less, and pushes a new context when greater.\n\nA distinctive feature is the **parse-error rule**: if the token stream otherwise fails to parse but would succeed with a virtual `}`, one is inserted. That rule entangles layout with the grammar in a way that is famously hard to implement cleanly outside a hand-written parser. Implementations either accept the entanglement or refuse to support the parse-error rule precisely.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Haskell 2010 Report — Layout",
+          "url": "https://www.haskell.org/onlinereport/haskell2010/haskellch10.html"
+        }
+      ]
+    },
+    {
+      "id": "python-and-other-approaches",
+      "title": "Python's INDENT/DEDENT and alternative formalisms",
+      "tags": [
+        "parser",
+        "layout",
+        "python"
+      ],
+      "content": "**Python** takes a simpler approach in its `tokenize` module: INDENT/DEDENT tokens emitted by the lexer on pure column comparisons, with no parse-error feedback. The lexer maintains a stack of indent levels; on a non-comment, non-empty line, if the current line's indent exceeds the top of the stack, it emits INDENT and pushes; if it's less, it pops and emits DEDENT for each level popped (with an error if the new indent doesn't match a stack level).\n\n**Data-dependent grammars** (Iguana) and **scannerless GLR** offer a more principled alternative: specify indentation as a parameterised constraint inside the grammar itself, which avoids the \"layout stage as a separate kludge\" problem. Adams (2013) developed a formal theory of indentation-sensitive parsing that composes with LR generators. In practice, most layout-sensitive languages (Haskell, Python, F#, Nim) still ship the simpler lexer-pass design because it gives hand-written parsers total control over the weird cases.",
+      "refs": [
+        {
+          "target": "scannerless-parsing#overview",
+          "type": "related"
+        },
+        {
+          "target": "generalized-cfg-parsing#overview",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Adams 2013 — Layout Parsing",
+          "url": "https://michaeldadams.org/papers/layout_parsing/LayoutParsing.pdf"
+        }
+      ]
+    },
+    {
+      "id": "design-implications",
+      "title": "Design implications",
+      "tags": [
+        "language-design",
+        "parser",
+        "layout"
+      ],
+      "content": "For a new language, layout sensitivity is a syntactic-vs-semantic trade-off. Brace-delimited blocks are the simpler choice — the grammar is purely CFG and the lexer doesn't need column tracking. Layout-sensitive blocks (Haskell, Python, F#) reduce visual noise but introduce the lexer-pass mechanism, complicate copy-pasting partial code (indentation must match), and create edge cases around mixed tabs/spaces and continuation lines.\n\nIf adopting layout sensitivity, the cleanest pattern is Python's: emit INDENT/DEDENT tokens at the lexer layer with pure column comparisons, no grammar-feedback like Haskell's parse-error rule. The grammar then stays context-free. The cost is that some idioms (multiline expressions, line continuation) need explicit syntax, but the parser stays simpler.",
+      "refs": []
+    }
+  ],
+  "sources": []
+}

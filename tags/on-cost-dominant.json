@@ -1,0 +1,7 @@
+{
+  "id": "on-cost-dominant",
+  "tag": "on-cost:dominant",
+  "name": "Cost when on: dominant",
+  "description": "Mechanism dominates execution time: Valgrind-style 10–50× shadow checks, full whole-system replay, offline omniscient databases, server-side trillion-event rendering.",
+  "axis": "on-cost"
+}

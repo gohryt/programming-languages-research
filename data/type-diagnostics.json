@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Type Diagnostics — Origin Tracking, Ambiguity, Rendering, Layered Explanations",
+  "aliases": ["type-error-messages", "diagnostic-rendering"],
+  "summary": "A type checker spends much of its observable lifetime explaining itself. Origin tracking through inference and constraint solving; ambiguity versus definite mismatch; rendering of internal types into human-readable form; concise messages for experienced users versus expanded explanations for learners.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A type checker spends much of its observable lifetime explaining itself. The distinguishing axis across diagnostic designs is *how much origin and explanation context flows alongside each generated constraint*: solver-shaped messages (the obligation that failed, with no source story) versus user-shaped messages (the source positions and language-level concepts the programmer typed).\n\nProduction checkers invest heavily in origin tracking, ambiguity classification, and human-readable rendering. The cost is solver-architecture overhead; the benefit is that error messages stop being a barrier to language adoption.",
+      "refs": [
+        { "target": "constraint-based-typing#overview", "type": "consumes" },
+        { "target": "bidirectional-typing#diagnostics-locality", "type": "supports" }
+      ]
+    },
+    {
+      "id": "origin-tracking",
+      "title": "Origin tracking",
+      "tags": ["diagnostics", "compiler-architecture"],
+      "content": "Every generated constraint should remember source origin, expected type, actual type, and explanation context. Without origin tracking, solvers produce technically correct but unusable diagnostics.\n\nUseful diagnostic metadata:\n\n- primary source span;\n- secondary spans;\n- expected and actual type renderings;\n- why the expected type was expected;\n- where an inferred type variable was introduced;\n- which obligation failed;\n- which candidates were considered;\n- ambiguity versus definite mismatch;\n- suggested annotation or import;\n- whether the message is suppressed because it depends on a previous error.\n\nThe practical engineering trade-off is solver-architecture cost: origin tracking inflates constraint records, but the diagnostics improvement is what keeps the language usable as the type system grows."
+    },
+    {
+      "id": "ambiguity-and-defaulting",
+      "title": "Ambiguity and defaulting",
+      "tags": ["diagnostics", "type-system"],
+      "content": "Ambiguity is not the same as type error. Numeric literals, overloaded functions, implicit instances, generic associated types, and effect variables may remain unsolved without additional context. A language needs a defaulting policy or a requirement for annotations.\n\nDefaulting is convenient for ergonomics but introduces non-locality — adding an unrelated declaration can change which default fires. The constraint-based architecture (`data/constraint-based-typing`) makes the choice *explicit* (\"this constraint defaulted to X because no other resolution was found\") rather than buried in the inference algorithm."
+    },
+    {
+      "id": "human-readable-rendering",
+      "title": "Human-readable type rendering",
+      "tags": ["diagnostics", "ui"],
+      "content": "Internal type representations are often unsuitable for users. The diagnostic renderer should simplify aliases, hide inference-variable internals, choose stable names, avoid exposing normalized projections unless necessary, and show enough structure to explain the problem.\n\nThe rendering algorithm matters. Naive rendering of a row-polymorphic effect type or a deeply-nested conditional type quickly becomes incomprehensible; production checkers (TypeScript, GHC, Scala, Rust) maintain dedicated rendering passes that prefer source-level vocabulary, hide internal flags, and progressively disclose detail as the user requests it (e.g., `--explain` flags or hover-on-type)."
+    },
+    {
+      "id": "teaching-vs-expert-mode",
+      "title": "Teaching mode and expert mode",
+      "tags": ["diagnostics", "language-design"],
+      "content": "A language can support layered diagnostics: concise messages by default, expanded explanations on request, and machine-readable JSON for tools. Type errors are often where users learn the language, so the checker should preserve a clear story about how the error follows from the rules.\n\nElm and Roc are notable for investing in beginner-friendly diagnostics; rustc's `--error-explain` system maps each error code to a long-form explanation; TypeScript's quick-fix UI is a primary diagnostics surface for many programmers. The lesson for language designers is that **diagnostics quality is part of the language design, not a tooling afterthought** — programmers experience the type system through error messages more than through specifications."
+    }
+  ]
+}

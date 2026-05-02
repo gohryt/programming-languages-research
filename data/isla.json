@@ -1,0 +1,30 @@
+{
+  "kind": "tool",
+  "name": "ISLA",
+  "aliases": ["isla-symbolic-execution", "cheri-sail-tool"],
+  "summary": "Tool for executing instructions specified in the Sail ISA description language symbolically, used heavily in CHERI verification. The IR here is the Sail specification of an ISA — a formal description of every instruction's semantics, expressed in Sail's typed functional language.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ISLA is a tool for executing instructions specified in the Sail ISA description language symbolically, used heavily in CHERI verification work. The IR here is the *Sail specification* of an ISA — a formal description of every instruction's semantics, expressed in Sail's typed functional language.",
+      "refs": [
+        { "target": "pydrofoil#overview", "type": "shares-substrate-with" }
+      ],
+      "sources": [
+        { "label": "ISLA / Sail (CHERI)", "url": "https://github.com/rems-project/isla" }
+      ]
+    },
+    {
+      "id": "isa-as-representation",
+      "title": "ISA spec as representation",
+      "tags": ["compiler-ir", "verification", "isa"],
+      "content": "Sail/ISLA's contribution to representations: an ISA can be a representation, queryable by symbolic-execution tools, formally verifiable, and the source of multiple downstream artifacts (emulators, decoders, formal models). ARM, RISC-V, MIPS, and CHERI all have Sail specifications; ISLA executes them for verification and bug-finding.\n\nMemory-safety hardware concerns and capability semantics live in `data/cheri` (CHERI canonical); this record covers the Sail-as-IR angle.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ISLA / Sail (CHERI)", "url": "https://github.com/rems-project/isla" }
+  ]
+}

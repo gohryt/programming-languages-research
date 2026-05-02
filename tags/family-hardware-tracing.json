@@ -1,0 +1,7 @@
+{
+  "id": "family-hardware-tracing",
+  "tag": "family:hardware-tracing",
+  "name": "Family: hardware tracing",
+  "description": "CPU/SoC facilities that capture execution data without software cooperation — Intel PT/LBR/PEBS, AMD IBS, ARM CoreSight/SPE/ITM, EM emanations.",
+  "axis": "family"
+}

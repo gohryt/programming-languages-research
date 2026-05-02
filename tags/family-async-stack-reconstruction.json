@@ -1,0 +1,7 @@
+{
+  "id": "family-async-stack-reconstruction",
+  "tag": "family:async-stack-reconstruction",
+  "name": "Family: async stack reconstruction",
+  "description": "Logical-call-chain reconstruction across suspension points: Go scheduler events, Kotlin coroutine metadata, V8 stitched stacks, tokio-console.",
+  "axis": "family"
+}

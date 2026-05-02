@@ -1,0 +1,7 @@
+{
+  "id": "family-retroactive-evaluation",
+  "tag": "family:retroactive-evaluation",
+  "name": "Family: retroactive evaluation",
+  "description": "Diagnostics introduced after-the-fact or during edit: Replay.io retroactive console.log, Hazel typed-hole live evaluation, Rust dbg!/Elixir dbg/2/icecream.",
+  "axis": "family"
+}

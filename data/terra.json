@@ -1,0 +1,42 @@
+{
+  "kind": "language",
+  "name": "Terra",
+  "aliases": ["Terra language"],
+  "summary": "DeVito et al. PLDI 2013: a low-level (C-like) language embedded in Lua as its meta-language. Lua runs at compile time; Terra is what Lua emits. Clean stage separation prevents accidental cross-stage code execution. Demonstrated by high-performance image-processing DSLs built from a few hundred lines of Lua driving Terra codegen.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Terra** (DeVito, Hegarty, Aiken, Hanrahan, Vitek, PLDI 2013) is a low-level (C-like) language embedded in Lua as its meta-language. Lua runs at compile time; Terra code is what Lua emits. Because Lua is a full dynamic language, the meta-programming surface is effectively unlimited — loops, conditionals, first-class functions, and libraries all operate on Terra AST fragments at compile time.",
+      "refs": [
+        { "target": "metaocaml#overview", "type": "compared-with" },
+        { "target": "compile-time-function-evaluation#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Terra project site", "url": "https://terralang.org/" }
+      ]
+    },
+    {
+      "id": "stage-separation",
+      "title": "Two-language stage separation",
+      "tags": ["staged-programming", "language-design"],
+      "content": "The novelty is separating the two languages cleanly: Lua never runs at Terra's runtime, Terra never runs at Lua's metatime. This avoids the usual staged-programming problem of accidentally running code at the wrong stage. The result is a systems language where generic code, domain-specific optimisations, and custom code generators can be built up in Lua and emitted as Terra functions.\n\nA Lua function that takes a Terra type and produces a Terra function is the standard pattern. Calling `compileMatMul(rows, cols)` from Lua emits a specialised Terra function for the given matrix dimensions, which then runs at native speed. Lua handles the generation logic (loop unrolling, blocking, vectorisation choices) without any of that logic existing at runtime.",
+      "refs": []
+    },
+    {
+      "id": "production-dsls",
+      "title": "Production-style domain DSLs",
+      "tags": ["dsl", "performance"],
+      "content": "Terra demonstrated particularly well on domain compilers. The original paper showed a high-performance DSL for image processing built from a few hundred lines of Lua driving Terra codegen, outperforming hand-written C. The pattern generalises: any domain whose programs share structural patterns (image kernels, linear algebra, parser combinators, graphics shaders) can have a Lua-side DSL that emits Terra-side native code.\n\nThe limitation is ecosystem: Terra never reached production adoption outside research projects, partly because the Lua/Terra split is unfamiliar and partly because LLVM's evolution and MLIR's emergence gave alternative routes to the same goal. As a research data point, Terra remains the cleanest example of the two-language staged-codegen pattern.",
+      "refs": [],
+      "sources": [
+        { "label": "Terra: A Multi-Stage Language for High-Performance Computing", "url": "https://cs.stanford.edu/~zdevito/pldi071-devito.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Terra project site", "url": "https://terralang.org/" },
+    { "label": "Terra paper (PLDI 2013)", "url": "https://cs.stanford.edu/~zdevito/pldi071-devito.pdf" }
+  ]
+}

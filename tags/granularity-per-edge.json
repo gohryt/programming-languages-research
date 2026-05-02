@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-edge",
+  "tag": "granularity:per-edge",
+  "name": "Granularity: per edge",
+  "description": "Mechanism observes control-flow edges/branches. Coverage-guided fuzzing's hash-of-(prev, curr) bitmap, edge profilers.",
+  "axis": "granularity"
+}

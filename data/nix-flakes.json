@@ -1,0 +1,46 @@
+{
+  "kind": "tool",
+  "name": "Nix Flakes",
+  "aliases": ["nix", "flakes", "nixos-flakes"],
+  "summary": "Functional package management where every package is a pure function from inputs to outputs and the build sandbox is hermetic by language-level construction; flakes (introduced 2021, opt-in stable since NixOS 22.05) are the modern Nix interface declaring inputs and outputs in flake.nix with content-addressed flake.lock pinning by narHash.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Nix flakes** (introduced 2021, opt-in stable since NixOS 22.05) are the modern Nix interface. A flake is a directory containing a `flake.nix` file at its root that declares **inputs** (other flakes) and **outputs** (packages, NixOS modules, dev shells, apps).\n\nThe core position Nix takes — shared with Guix (`data/guix`) — is that **every package is a pure function from inputs to outputs, and the build sandbox is hermetic by language-level construction**. The package manager is a programming environment for writing and composing those functions, not a tool for resolving artifact tarballs.",
+      "refs": [
+        { "target": "guix#overview", "type": "sibling" },
+        { "target": "reproducible-builds#overview", "type": "instance-of" },
+        { "target": "package-management#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "flake-structure",
+      "title": "Flake structure — inputs, outputs, and flake.lock",
+      "tags": ["nix", "flakes", "build-systems"],
+      "content": "```nix\n{\n  inputs = {\n    nixpkgs.url = \"github:NixOS/nixpkgs/nixos-23.11\";\n    flake-utils.url = \"github:numtide/flake-utils\";\n  };\n  outputs = { self, nixpkgs, flake-utils }:\n    flake-utils.lib.eachDefaultSystem (system:\n      let pkgs = nixpkgs.legacyPackages.${system}; in\n      {\n        packages.default = pkgs.callPackage ./default.nix {};\n        devShells.default = pkgs.mkShell { buildInputs = [ pkgs.cargo ]; };\n      });\n}\n```\n\nInputs are pinned in **`flake.lock`** by content hash (the *narHash* — a hash of the unpacked filesystem tree, not just the tarball). Because every input is content-addressed, two builds against the same `flake.lock` produce identical outputs *byte for byte*, regardless of when or where they run.",
+      "refs": [],
+      "sources": [
+        { "label": "NixOS Wiki — Flakes", "url": "https://nixos.wiki/wiki/Flakes" },
+        { "label": "nix.dev — flakes", "url": "https://nix.dev/concepts/flakes.html" }
+      ]
+    },
+    {
+      "id": "hermetic-build-sandbox",
+      "title": "Hermetic build sandbox and content-addressed store",
+      "tags": ["nix", "hermetic-build", "content-addressed"],
+      "content": "The build process is hermetic: each derivation runs in a sandbox with only its declared inputs visible, no network access, no `/usr`, no `$HOME`. Outputs are stored in `/nix/store/<hash>-<name>/` where `<hash>` is computed from all inputs. Two derivations with the same inputs produce the same output path; this is the basis for binary caching across machines.\n\nFor a package manager designer, the key Nix property is that reproducibility is **a property of the build, not a property of a lockfile**. Most modern systems (Cargo, Go, npm) treat reproducibility as something the lockfile pins; Nix makes it structurally guaranteed by the package-definition language disallowing non-pure operations."
+    },
+    {
+      "id": "design-points",
+      "title": "Design points worth carrying forward",
+      "tags": ["nix", "design-guidance"],
+      "content": "The design points worth carrying forward:\n\n- **Reproducibility by language-level construction**, not by retrofitted lockfile. The build is hermetic because the package definition language disallows non-pure operations, not because the package manager promises to.\n- **Content-addressed outputs** as the basis for sharing. Two machines computing the same derivation produce identical bytes; binary caches just serve those bytes by hash.\n- **Inputs are themselves packages** (or flakes). The dependency graph is fully declarative; there's no concept of \"system-installed\" vs \"managed\" — everything is a function input.\n- **The package manifest is a real programming language**. Nix expressions can be abstract, parameterized, and composed. The cost is a steep learning curve; the benefit is that complex package configurations (cross-compilation, multi-target builds, variant selection) are expressible as ordinary code.\n\nCompared with Cargo, npm, or PyPI — which are *artifact distribution* systems with reproducibility added on — Nix is a *build* system with distribution as a side effect. The trade-off is acquisition cost (significant Nix learning curve, a separate package ecosystem to inhabit) for hermetic reproducibility that no lockfile-based system can match."
+    }
+  ],
+  "sources": [
+    { "label": "NixOS Wiki — Flakes", "url": "https://nixos.wiki/wiki/Flakes" },
+    { "label": "nix.dev — flakes", "url": "https://nix.dev/concepts/flakes.html" }
+  ]
+}

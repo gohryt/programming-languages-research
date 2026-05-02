@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Row Polymorphism",
+  "aliases": ["row-types", "extensible-records", "polymorphic-variants"],
+  "summary": "Type-level abstraction over the rest of a record's fields or a variant's cases, expressed by a row variable standing for an unknown extension. Supports extensible records, polymorphic variants, effect rows, and sometimes capability sets. Row unification is more complex than ordinary type unification but gives flexible structural composition.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Row polymorphism — type-level abstraction over the *rest* of a record's fields or a variant's cases, expressed by a *row variable* standing for an unknown extension — addressed extensible records and variants without committing to nominal object hierarchies. It supports extensible records, polymorphic variants, effect rows, and sometimes capability sets.\n\nThe canonical signature: `{x: Int, ...r} -> Int` is a function that consumes any record with at least an `x: Int` field, returning an `Int`. The `...r` is a row variable; the function is polymorphic in the rest of the record's shape.",
+      "refs": [
+        { "target": "type-and-effect-systems#effect-rows", "type": "underlies" },
+        { "target": "unification-algorithms#row-and-projection-unification", "type": "depends-on" },
+        { "target": "nominal-structural-path-dependent#nominal-vs-structural-tradeoffs", "type": "specializes" }
+      ],
+      "sources": [
+        { "label": "Gaster and Jones — A Polymorphic Type System for Extensible Records and Variants", "url": "https://web.cecs.pdx.edu/~mpj/pubs/96-3.pdf" },
+        { "label": "Garrigue — Programming with Polymorphic Variants", "url": "https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf" }
+      ]
+    },
+    {
+      "id": "strengths-and-costs",
+      "title": "Strengths and costs",
+      "tags": ["type-system", "row-polymorphism"],
+      "content": "Strengths:\n\n- flexible structural composition;\n- precise record update and projection types;\n- extensible variants without central registration;\n- natural fit for effect rows (`data/type-and-effect-systems`).\n\nCosts:\n\n- row unification is more complex than ordinary type unification (`data/unification-algorithms#row-and-projection-unification`);\n- error messages can expose implementation details (rows render verbosely without dedicated rendering);\n- duplicate labels and scoped labels need policy;\n- separate compilation and ABI layout may need canonicalization (a row-polymorphic record cannot be flat-laid-out without specialization).\n\nGaster and Jones described a practical polymorphic type system for extensible records and variants with inference and a compilation strategy; OCaml's polymorphic variants show how structural variant polymorphism can be integrated into a production ML-family language."
+    },
+    {
+      "id": "extensible-variants",
+      "title": "Extensible variants and open errors",
+      "tags": ["type-system", "row-polymorphism"],
+      "content": "Extensible variants allow adding cases without modifying a central type definition. This is useful for plugin systems, typed errors, extensible interpreters, and modular effect encodings. The trade-off is that exhaustiveness becomes local unless the row is known to be closed.\n\nOCaml's polymorphic variants are the canonical production example: a value of type ``[> `Ok of int | `Error of string ]`` can be used in any context that expects at least those two cases plus more. Pattern matching on an open row type produces a warning if a default `_` case is missing — the compiler cannot guarantee exhaustiveness because new cases can appear anywhere.",
+      "refs": [
+        { "target": "algebraic-data-types#closed-vs-extensible", "type": "complementary-mechanism" }
+      ]
+    },
+    {
+      "id": "structural-vs-nominal-records",
+      "title": "Structural vs nominal records",
+      "tags": ["type-system", "records"],
+      "content": "Structural records make shape the interface. Nominal records make declaration identity the interface. Structural systems favor ad hoc composition and data interchange; nominal systems favor explicit API boundaries and evolution control.\n\nA language can mix both by using nominal declarations for public types and structural row types for local records, anonymous objects, effects, or pattern matching. OCaml is the canonical mixed example. Most ML-family languages have nominal sums (variant declarations) and structural products (records can be defined nominally or used structurally).",
+      "refs": [
+        { "target": "nominal-structural-path-dependent#nominal-vs-structural-tradeoffs", "type": "exemplifies" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Gaster and Jones — A Polymorphic Type System for Extensible Records and Variants", "url": "https://web.cecs.pdx.edu/~mpj/pubs/96-3.pdf" },
+    { "label": "Garrigue — Programming with Polymorphic Variants", "url": "https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf" }
+  ]
+}

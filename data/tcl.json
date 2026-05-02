@@ -1,0 +1,49 @@
+{
+  "kind": "language",
+  "name": "Tcl",
+  "aliases": ["tool-command-language"],
+  "summary": "Embeddable scripting language with two completely orthogonal modularity mechanisms: namespaces (pure naming, no distribution semantics) declared with `namespace eval ::foo` and packages (versioned distribution, no naming semantics) declared with `package provide`/consumed with `package require`; multiple versions of the same package can coexist registered.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Tcl (John Ousterhout, 1988+) is the cleanest example in the survey of **two completely orthogonal modularity mechanisms**: namespaces (pure naming, no distribution semantics) and packages (versioned distribution, no naming semantics). The two are independent and serve different purposes.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "Tcl namespace command", "url": "https://www.tcl-lang.org/man/tcl8.6/TclCmd/namespace.htm" },
+        { "label": "Tcl package command", "url": "https://www.tcl-lang.org/man/tcl8.6/TclCmd/package.htm" }
+      ]
+    },
+    {
+      "id": "namespaces-pure-naming",
+      "title": "Namespaces — pure naming",
+      "tags": ["tcl", "namespaces", "module-systems"],
+      "content": "A namespace is declared with `namespace eval ::foo { ... }`. Names inside use `::` as the path separator: `::foo::bar` references `bar` inside `foo` from the global namespace. Namespaces nest, support `namespace export` for visibility hints, and follow Tcl's lexical scoping rules. They have no distribution identity — a namespace exists in one Tcl interpreter for as long as it's defined, and is gone otherwise."
+    },
+    {
+      "id": "packages-versioned-distribution",
+      "title": "Packages — versioned distribution",
+      "tags": ["tcl", "packages", "package-resolution"],
+      "content": "A package is declared with `package provide MyPkg 1.3` (typically inside a Tcl source file) and consumed with `package require MyPkg 1.2-2.0` (asking for a version in a range). The discovery mechanism is `pkgIndex.tcl` files in directories on the Tcl auto-path: each file contains `package ifneeded MyPkg 1.3 [list source [file join $dir mypkg.tcl]]`, which registers a script-to-execute to load that specific version. The `pkg_mkIndex` helper auto-generates these. `package require` searches the registered index, picks the best matching version, and runs the registered script.\n\nThe crucial design point: **multiple versions of the same package can be registered simultaneously**. `pkgIndex.tcl` registrations are version-keyed; the resolver picks one when `package require X 1.2` is called. The application can hold one version while a sub-component requires another — though only one is *loaded* at a time per package name.",
+      "refs": [
+        { "target": "package-resolution#resolution-models", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Tcl wiki — package ifneeded", "url": "https://wiki.tcl-lang.org/page/package+ifneeded" }
+      ]
+    },
+    {
+      "id": "orthogonality-design-lesson",
+      "title": "Orthogonality as design lesson",
+      "tags": ["tcl", "design-guidance", "modularity"],
+      "content": "By convention, a package called `MyPkg` defines a namespace called `::MyPkg` and puts all its commands there. But this is convention, not a language requirement — `package provide` and `namespace eval` are independent constructs. A package could create no namespace; a namespace could exist without any package mechanism.\n\nThe lesson is that **modularity has two distinct concerns — naming and distribution — and they don't need to be coupled at the language level**. Most modern languages collapse them (Rust: package contains crates contains modules; Go: module contains packages). Tcl shows the alternative: keep them orthogonal, make the convention-of-correspondence explicit but not enforced. The cost is more concepts; the benefit is each mechanism stays simple and uncoupled."
+    }
+  ],
+  "sources": [
+    { "label": "Tcl namespace command", "url": "https://www.tcl-lang.org/man/tcl8.6/TclCmd/namespace.htm" },
+    { "label": "Tcl package command", "url": "https://www.tcl-lang.org/man/tcl8.6/TclCmd/package.htm" }
+  ]
+}

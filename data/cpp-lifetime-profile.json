@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "C++ Lifetime Profile (P1179)",
+  "aliases": ["P1179", "Lifetime Profile", "Wlifetime-safety"],
+  "summary": "Local-only static analysis (Herb Sutter, Neil MacIntosh) that classifies types into generalized Owner/Pointer categories and detects dangling/use-after-free at compile time without whole-program annotation. Partially shipped in MSVC since 2019 and upstreamed into Clang trunk as `-Wlifetime-safety` (Clang 23+).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cpp", "cpp-safety", "lifetime-profile", "memory-safety", "wg21"],
+      "content": "P1179 is a local-only static analysis that identifies generalized \"Owner\"/\"Pointer\" types via type categories to detect dangling/use-after-free at compile time without whole-program annotation. It uses acyclic CFG analysis with ~5% compile-time overhead; it identifies Owner (e.g. `unique_ptr`, `string`) versus Pointer (e.g. `string_view`, iterators) generically; and uses `gsl::Owner`, `gsl::Pointer`, and `clang::lifetimebound` attributes to refine the inference where the heuristic alone is insufficient.\n\nThe distinguishing design choice is that no whole-program or viral annotation is required: the analysis is intra-procedural, recognizes vocabulary types from the standard library by category, and emits warnings rather than rejecting programs. This is the closest existing C++ has to a lifetime-aware diagnostic without committing to a borrow-checker's expressivity or annotation discipline.",
+      "refs": [
+        { "target": "cpp-standard-pointer-types", "type": "uses" },
+        { "target": "cpp-stroustrup-profiles", "type": "related" },
+        { "target": "borrowing#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "implementations",
+      "title": "MSVC and Clang implementations",
+      "tags": ["msvc", "clang", "lifetime-profile", "cpp-safety", "static-analysis"],
+      "content": "Partially shipped in MSVC (warnings 26486–26489 in C++ Core Check) since 2019. Upstreamed to Clang trunk as `-Wlifetime-safety` (Clang 23+). The MSVC implementation is part of `/analyze` and integrates with the existing C++ Core Check warnings.\n\nStatus (as of 2026-04): lifetime/profile work is not normative C++26. The active path is a non-normative language-safety white paper plus compiler experiments and flags, with possible later standardization into a lifetime profile. The vendor implementations remain the practical access point — programmers turn the warnings on, fix or annotate the flagged code, and proceed without language-level changes.",
+      "refs": [
+        { "target": "cpp-safety-profiles-resolution", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Clang LifetimeSafety docs", "url": "http://clang.llvm.org/docs/LifetimeSafety.html" },
+        { "label": "Lifetime Profile update in Visual Studio 2019 (MSVC blog)", "url": "https://devblogs.microsoft.com/cppblog/lifetime-profile-update-in-visual-studio-2019-preview-2/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "P1179 Lifetime Profile", "url": "https://wg21.link/p1179" },
+    { "label": "Clang LifetimeSafety docs", "url": "http://clang.llvm.org/docs/LifetimeSafety.html" },
+    { "label": "Lifetime Profile update in Visual Studio 2019", "url": "https://devblogs.microsoft.com/cppblog/lifetime-profile-update-in-visual-studio-2019-preview-2/" }
+  ]
+}

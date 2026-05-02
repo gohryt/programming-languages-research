@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "LuaJIT IR",
+  "aliases": ["luajit-trace-ir"],
+  "summary": "Mike Pall's SSA IR for LuaJIT: trace-shaped — a linear sequence of operations recorded through one iteration of a hot loop, with guards on every speculation and side-exits to the interpreter. Demonstrates that SSA can be maximally compact when scoped to a single hot path.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "LuaJIT's IR (Mike Pall's design) is SSA-form but *trace-shaped*: a trace records the linear sequence of operations executed through one iteration of a hot loop, including inlined function calls. Guards check that every speculation (type, branch, allocation) holds; if a guard fails, execution falls back to the interpreter at a side exit, which may start recording a new trace.\n\nThe IR is dense, with carefully-tuned representation: each op is a fixed-size record, with operands as small indices into the trace buffer. Allocation sinking, store forwarding, and constant folding all operate on the trace as a linear sequence.",
+      "refs": [
+        { "target": "ssa#overview", "type": "instance-of" },
+        { "target": "trace-based-jit#overview", "type": "embedded-in" },
+        { "target": "luajit-bytecode#overview", "type": "lowers-from" }
+      ],
+      "sources": [
+        { "label": "LuaJIT compiler design specification", "url": "https://www.freelists.org/post/luajit/Compiler-Design-Specification" }
+      ]
+    },
+    {
+      "id": "trace-vs-method-jits",
+      "title": "Trace-form vs method-form SSA",
+      "tags": ["compiler-ir", "jit", "tradeoffs"],
+      "content": "Where method-JIT SSA IRs (LLVM, Cranelift, Turboshaft, sea-of-nodes) compile entire functions, trace IRs compile linearised hot paths. The benefit is that branch-heavy interpreter dispatch loops collapse into a straight-line trace through one observed control flow, ideal for languages with heavy dynamic dispatch and tagged-value boxing.\n\nThe cost is trace explosion: pathological branchy code can produce hundreds of side-exit-spawned traces, each with overlapping content. LuaJIT mitigates with side-trace abandonment heuristics and trace-recording quotas.",
+      "refs": [
+        { "target": "trace-based-jit#overview", "type": "exemplifies" },
+        { "target": "ssa#overview", "type": "alternative-shape-of" }
+      ]
+    },
+    {
+      "id": "production-cleanliness",
+      "title": "Production-quality compactness",
+      "tags": ["jit", "performance"],
+      "content": "LuaJIT's trace compiler is the cleanest production demonstration that an SSA IR can be maximally compact when scoped to a single hot path. Fixed-size op records, dense small-integer operand indices, and fused recording-plus-optimisation make the IR small enough to fit in cache while the trace is being constructed.\n\nThe design pattern transfers to any language whose dynamic-dispatch overhead outweighs typical static-language compile-time tradeoffs: trace IRs are an option whenever method-JITs cannot amortise their compile cost over short-lived hot loops.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "LuaJIT compiler design specification", "url": "https://www.freelists.org/post/luajit/Compiler-Design-Specification" }
+  ]
+}

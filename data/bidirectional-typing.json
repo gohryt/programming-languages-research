@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "Bidirectional Typing",
+  "aliases": ["check-and-synthesize", "bidi-typing"],
+  "summary": "Inference split into two modes: synthesis (infer a type from an expression) and checking (verify an expression against an expected type). Used when full inference is undecidable, expensive, or hostile to diagnostics; lets expected types flow into lambdas, patterns, literals, and holes while obvious expressions still synthesize.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Bidirectional typing splits typing into two modes:\n\n- **synthesis**: infer a type from an expression;\n- **checking**: verify an expression against an expected type.\n\nThis technique is especially useful when full inference is undecidable, too expensive, or hostile to diagnostics. It lets expected types flow into lambdas, patterns, literals, and holes, while still allowing obvious expressions to synthesize types.\n\nBidirectional typing has become the default practical pattern for expressive type systems precisely because it balances inference and annotation requirements: programmers annotate at boundaries (function signatures, top-level declarations) and the checker propagates expected types inward.",
+      "refs": [
+        { "target": "hindley-milner#costs-and-when-it-breaks", "type": "complement-when-richer" },
+        { "target": "higher-rank-polymorphism#overview", "type": "enables" },
+        { "target": "dependent-types#overview", "type": "scales-to" }
+      ],
+      "sources": [
+        { "label": "Dunfield and Krishnaswami — Bidirectional Typing (ACM 2021)", "url": "https://dl.acm.org/doi/fullHtml/10.1145/3450952" },
+        { "label": "Christiansen — Bidirectional Typing tutorial", "url": "https://davidchristiansen.dk/tutorials/bidirectional.pdf" }
+      ]
+    },
+    {
+      "id": "diagnostics-locality",
+      "title": "Why bidirectional typing improves diagnostics",
+      "tags": ["type-system", "diagnostics"],
+      "content": "Bidirectional typing improves error locality because the checker often knows what type was expected at the exact subexpression that fails. A unification-based HM solver may only discover an error long after the offending expression was traversed; a bidirectional checker fails the moment a subexpression cannot meet the expected shape, with the expected type already in hand to render in the diagnostic.\n\nThis is why most modern dependent and effect-typed languages adopt bidirectional discipline as the inference backbone: it keeps error messages local even when the type system is too rich for global inference."
+    },
+    {
+      "id": "design-applicability",
+      "title": "Where bidirectional typing scales well",
+      "tags": ["type-system", "language-design"],
+      "content": "Bidirectional typing scales well across:\n\n- **higher-rank polymorphism**: expected polymorphic types flow into lambdas;\n- **dependent types**: expected types fix the elaboration of implicit arguments;\n- **effect rows**: expected effect sets propagate into operation bodies (Frank does this without effect variables in source, `data/frank-language`);\n- **GADTs**: pattern-match arms know their expected result type;\n- **typed holes**: the hole displays the checking-mode expected type directly.\n\nThe practical cost is that programmers must annotate at function boundaries — the checker cannot infer a top-level signature in checking mode. Most languages accept this trade as worth it for the diagnostic and feature-interaction benefits.",
+      "refs": [
+        { "target": "frank-language#overview", "type": "applies-to-effects" },
+        { "target": "typed-holes#overview", "type": "supports" },
+        { "target": "gadts#overview", "type": "supports" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Dunfield and Krishnaswami — Bidirectional Typing", "url": "https://dl.acm.org/doi/fullHtml/10.1145/3450952" },
+    { "label": "Christiansen — Bidirectional Typing tutorial", "url": "https://davidchristiansen.dk/tutorials/bidirectional.pdf" }
+  ]
+}

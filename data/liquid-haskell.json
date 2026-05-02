@@ -1,0 +1,56 @@
+{
+  "kind": "tool",
+  "name": "LiquidHaskell",
+  "aliases": [
+    "liquid-types"
+  ],
+  "summary": "Refinement types layered on Haskell: predicates inferred via SMT-aided abstract interpretation (the *liquid* algorithm — predicate abstraction over a fixed set of qualifiers) with user-supplied annotations like {v:Int | v > 0}. Production users include Galois, Tweag, Awake Security; verifies sorted-list invariants, capacity bounds, total-pattern-match obligations, termination.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "LiquidHaskell (Vazou, Rondon, Jhala — POPL 2014; production usage since 2017) is the most-deployed refinement-type system. Predicates are inferred via SMT-aided abstract interpretation (the *liquid* algorithm: predicate abstraction over a fixed set of qualifiers), with user-supplied annotations like `{v:Int | v > 0}`.\n\nProduction users include Galois, Tweag, Awake Security; verified properties include sorted-list invariants, capacity bounds, total-pattern-match obligations, and termination. Distinct from GHC type classes: LiquidHaskell layers refinement on top of the existing Haskell type system rather than extending the core, so its trust boundary is the SMT solver plus the LH plugin rather than GHC itself.",
+      "refs": [
+        {
+          "target": "refinement-types#overview",
+          "type": "implements"
+        },
+        {
+          "target": "haskell#overview",
+          "type": "extends"
+        }
+      ],
+      "sources": [
+        {
+          "label": "LiquidHaskell project",
+          "url": "https://ucsd-progsys.github.io/liquidhaskell/"
+        }
+      ]
+    },
+    {
+      "id": "liquid-algorithm",
+      "title": "The liquid algorithm — predicate abstraction over qualifiers",
+      "tags": [
+        "refinement-types",
+        "smt"
+      ],
+      "content": "The liquid algorithm's central trick: instead of letting refinement predicates be arbitrary, fix a set of *qualifiers* (`v < 0`, `v >= 0`, `v < x`, `v == len(xs)`, ...) and infer the strongest conjunction of qualifiers that witnesses each refinement variable. This collapses the abstract-interpretation lattice to a finite domain — fast to converge and tractable for SMT discharge.\n\nProgrammers extend the qualifier set per-module when the default qualifiers are not strong enough. The cost is engineering: getting the qualifier set right for a non-trivial property may require tuning. The benefit is that *most* programs need very few user-written annotations because the inferred refinements track the relevant program facts automatically."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — refinement on top, not in core",
+      "tags": [
+        "type-system",
+        "language-design"
+      ],
+      "content": "LiquidHaskell's design choice is that the refinement layer sits on top of GHC, not inside it. Programs can ignore LiquidHaskell entirely and compile with GHC alone; LiquidHaskell only runs when invoked. The refinement annotations live in special comments (`{-@ ... @-}`), so the source is still ordinary Haskell.\n\nThis architecture is the cleanest example of optional verification: zero cost for code that does not use it, full power when needed. The trade-off is that LiquidHaskell's refinement information cannot inform GHC's own optimisations — the two passes do not share the refinement facts."
+    }
+  ],
+  "sources": [
+    {
+      "label": "LiquidHaskell project",
+      "url": "https://ucsd-progsys.github.io/liquidhaskell/"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "Spegion — Implicit and Non-Lexical Regions with Sized Allocations",
+  "aliases": ["spegion-calculus", "spegion-regions"],
+  "summary": "Hughes, Vollmer, and Batty's Spegion (ECOOP 2025) revisits region-based memory management with three modern constraints: region lifetimes should be implicit, non-lexical, and support sized allocations. Region lifetimes follow control-flow use rather than block nesting. Bridges classic Tofte-Talpin regions to Rust-style NLL while keeping the bulk-free benefits.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["region-based", "non-lexical-region", "research"],
+      "content": "Hughes, Vollmer, and Batty's **Spegion** (ECOOP 2025) revisits region-based memory management with three modern constraints: region lifetimes should be **implicit**, should be **non-lexical**, and should support **sized allocations** rather than assuming uniform heap cells.\n\nClassic Tofte-Talpin regions (`data/mlkit`) infer region structure but tie deallocation to lexical region scopes; this makes some natural allocation patterns impossible or forces data to remain live longer than necessary. Spegion loosens that shape by allowing region lifetimes to follow control-flow use rather than block nesting. Status (as of 2026-04): research-grade, but directly relevant to languages searching for a middle point between GC, ownership, and arena allocation.",
+      "refs": [
+        { "target": "region-based-memory#non-lexical-and-hybrid-region-models", "type": "instance-of" },
+        { "target": "mlkit#overview", "type": "successor-of" }
+      ],
+      "sources": [
+        { "label": "Spegion (arXiv)", "url": "https://arxiv.org/abs/2506.02182" }
+      ]
+    },
+    {
+      "id": "non-lexical-and-sized",
+      "title": "Non-lexical lifetimes and sized allocations",
+      "tags": ["non-lexical-region", "lifetime-region", "region-inference"],
+      "content": "The non-lexical aspect is the main bridge to Rust-style NLL: a region can become dead at the **last use** rather than at the end of the syntactic scope that introduced it. This brings region inference closer to modern borrow-check liveness analysis, where the relevant question is \"after which program point is this value never read again?\" rather than \"in which syntactic block was this value declared?\".\n\nThe sized-allocation aspect makes the calculus more **implementation-facing** than many classic region calculi, because real allocators care about object size classes, block reuse, and layout decisions. By including size as a first-class type-level concept, Spegion can reason about reuse opportunities that uniform-cell calculi cannot express.",
+      "refs": [
+        { "target": "borrowing#lifetimes-and-scope", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Spegion (Dagstuhl ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.15" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — regions are not limited to lexical lifetimes",
+      "tags": ["region-based", "non-lexical-region", "lifetime-region"],
+      "content": "The lesson is that **region systems are not limited to lexical stack-shaped lifetimes**. A language can keep the bulk-free and no-tracing benefits of regions while moving toward flow-sensitive lifetimes familiar from modern borrow checking.\n\nFor a language designer choosing between regions, ownership/borrowing, and tracing GC, Spegion shows that the historical \"regions = LIFO stack discipline\" framing is a contingent design choice, not a fundamental property of region-based memory management. A region calculus can be built on flow liveness, sized allocations, and implicit annotations — making it ergonomically closer to garbage collection while keeping the deterministic-deallocation cost model.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Spegion (arXiv)", "url": "https://arxiv.org/abs/2506.02182" },
+    { "label": "Spegion (Dagstuhl ECOOP 2025)", "url": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.15" }
+  ]
+}

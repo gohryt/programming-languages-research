@@ -1,0 +1,87 @@
+{
+  "kind": "tool",
+  "name": "Cranelift",
+  "aliases": [],
+  "summary": "Bytecode-Alliance compiler backend (originally Mozilla for Wasmtime) prioritizing compile speed over peak code quality. ISLE-driven instruction selection, regalloc2 SSA-aware allocator, e-graph mid-end. ~10× faster than LLVM at modestly lower code quality. Targets x86-64, aarch64, s390x, riscv64.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Cranelift is a compiler backend developed by the Bytecode Alliance (originally by Mozilla for Wasmtime). Unlike LLVM, Cranelift prioritizes compilation speed while maintaining reasonable code quality — making it ideal for JIT and baseline compilation tiers.\n\nProduction users: Wasmtime (WebAssembly), `rustc_codegen_cranelift` (alternative Rust backend for debug builds, 2–4× faster compile than LLVM), and several other projects. Targets x86-64, aarch64, s390x, and riscv64.",
+      "refs": [
+        { "target": "llvm#backend-role", "type": "alternative-to" },
+        { "target": "rust#overview", "type": "used-by" }
+      ],
+      "sources": [
+        { "label": "Cranelift", "url": "https://cranelift.dev/" }
+      ]
+    },
+    {
+      "id": "ir-design-and-ssa-form",
+      "title": "CLIF — Cranelift IR",
+      "tags": ["compiler-ir", "codegen", "ssa"],
+      "content": "Cranelift's IR (CLIF) is SSA-based but designed for compile speed rather than peak code quality. It uses dense integer indices instead of pointers (similar to V8 Turboshaft), keeps types minimal (`i8`/`i16`/`i32`/`i64`/`f32`/`f64`/vector + references), and is deliberately lower-level than LLVM IR — no target-independent bitcasts, fewer implicit conversions, fewer node kinds.\n\nCLIF uses block parameters rather than phi nodes for control-flow merges: each block declares parameters, and branch instructions pass arguments. This is cleaner for many transformations because branch instructions name their arguments at the call site rather than at the destination.",
+      "refs": [
+        { "target": "ssa#core-mechanics", "type": "uses-block-parameters" },
+        { "target": "llvm#ir", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "fit-for-jit-and-tiered-compilation",
+      "title": "Fit for JIT and tiered compilation",
+      "tags": ["jit", "performance", "backend"],
+      "content": "Cranelift compiles ~10× faster than LLVM at modestly lower code quality. This makes it attractive where code generation latency matters: JITs (Wasmtime is the canonical case), runtime specialization, debug-build compilation, and tooling scenarios that cannot afford heavyweight compilation on the critical path.\n\n`rustc_codegen_cranelift` is the production existence proof for the LLVM-as-AOT-backend / Cranelift-as-debug-backend split: Rust developers get faster `cargo build` cycles when iterating on debug builds, and the same Rust toolchain switches to LLVM for release builds where peak performance matters.",
+      "refs": [
+        { "target": "tiered-compilation#why-tiering-exists", "type": "powers" },
+        { "target": "copy-and-patch#stencil-based-code-generation", "type": "alternative-to" },
+        { "target": "deegen#overview", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "isle-and-regalloc2",
+      "title": "ISLE and regalloc2",
+      "tags": ["codegen", "instruction-selection", "register-allocation"],
+      "content": "Two key innovations distinguish Cranelift architecturally:\n\n**ISLE** (Instruction Selection Lowering Expressions) is a statically-typed term-rewriting DSL for instruction selection rules. Rules are written declaratively and compiled to Rust match trees; the ISLE compiler merges rules into a decision tree, sharing matching work where possible. This replaces hand-written C++ lowering code with rules that are easier to verify, fuzz, and maintain.\n\n**regalloc2** (Chris Fallin) is the register allocator: combines aspects of linear scan with SSA-aware splitting. Status (as of 2026-04): provides ~20% faster compilation than its predecessor while improving code quality 10–20% on register-pressure-heavy benchmarks. Operates on SSA form directly, splits live ranges at block boundaries, and uses parallel move resolution.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Cranelift regalloc2 design (Fallin)",
+          "url": "https://cfallin.org/blog/2022/06/09/cranelift-regalloc2/"
+        }
+      ]
+    },
+    {
+      "id": "optimization-scope-and-philosophy",
+      "title": "Optimization scope and philosophy",
+      "tags": ["optimization", "compiler-design"],
+      "content": "Cranelift prioritizes practical compile speed and adequate optimization over maximal sophistication. The mid-end uses an *aegraph* (acyclic e-graph): rewrite rules — strength reduction, algebraic identities, GVN — express as ISLE patterns matching against the aegraph. This gives some of the phase-ordering benefits of full equality saturation while keeping extraction tractable.\n\nThe philosophy: 50–70% of LLVM's peak performance for 10× faster compilation, with predictable behavior and a hackable codebase. This makes Cranelift a useful reference backend when predictability, implementation size, or runtime responsiveness matter more than the deepest optimization repertoire.",
+      "refs": [
+        { "target": "e-graphs#why-they-matter", "type": "uses" },
+        { "target": "llvm#strengths-and-tradeoffs", "type": "alternative-to" }
+      ]
+    },
+    {
+      "id": "research-comparison-points",
+      "title": "Research comparison points",
+      "tags": ["compiler-engineering", "tradeoffs"],
+      "content": "Cranelift offers a useful middle point in the lightweight-backend design space:\n\n- **More structured than copy-and-patch**: full SSA optimization, block-level GVN, peephole rewrites via ISLE.\n- **Lighter and faster than LLVM**: ~10× compile-speed advantage, hackable C-like codebase.\n- **More mature than QBE**: production at Wasmtime scale; multi-target codegen including AArch64, RISC-V, s390x.\n- **More principled than DynASM-style macroassemblers**: real SSA optimization rather than pushing register allocation onto the human.\n\nFor any new language picking a backend, the question is which point on this spectrum fits the workload — Cranelift is the modern default for compile-time-sensitive workloads where SSA-level optimization is wanted.",
+      "refs": [
+        { "target": "llvm#strengths-and-tradeoffs", "type": "contrasts-with" },
+        { "target": "copy-and-patch#strengths", "type": "contrasts-with" },
+        { "target": "sea-of-nodes#comparison-points", "type": "contrasts-with" },
+        { "target": "mlir#overview", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Cranelift docs",
+      "url": "https://cranelift.dev/"
+    },
+    {
+      "label": "Cranelift regalloc2 design (Fallin)",
+      "url": "https://cfallin.org/blog/2022/06/09/cranelift-regalloc2/"
+    }
+  ]
+}

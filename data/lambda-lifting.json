@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Lambda Lifting",
+  "aliases": ["function lifting", "lambda floating"],
+  "summary": "Johnsson 1985: rather than packaging free variables into an environment, add extra parameters to the function signature so nothing is free; lift the function to top level. Cheap when captures are few. GHC's full laziness, lambda floating, SpecConstr, and worker/wrapper are distinct but interacting transformations in the same family.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Lambda lifting** (Johnsson 1985) is the inverse of closure conversion in a sense: rather than packaging free variables into an environment, extra parameters are added to the function signature so that nothing is free. The function is then lifted to top level.\n\nExample: `let f x = y + x` inside a binding for `y` becomes `let f_lifted y x = y + x`, with all call sites rewritten to pass `y` explicitly. When the captured variables are few and cheap to pass, lambda lifting can be cheaper than closure conversion — no environment allocation at all.",
+      "refs": [
+        { "target": "closure-conversion#overview", "type": "alternative-to" },
+        { "target": "defunctionalization#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Lambda Lifting (Johnsson, 1985)", "url": "https://www.microsoft.com/en-us/research/publication/lambda-lifting-transforming-programs-to-recursive-equations/" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["compiler", "tradeoffs"],
+      "content": "Lambda lifting works well when captures are few and the function is called frequently. The arity increase is paid at every call site, but the closure allocation is avoided entirely. For escaping higher-order values (functions stored in data structures, returned from other functions), lambda lifting is impractical: every call site would need to know the captured arguments, which means the captures must travel with the function value somehow — at which point you're effectively back to closures.\n\nLambda lifting also interacts awkwardly with separate compilation: a lifted function with captures derived from another module's bindings would need cross-module specialisation, which compilers usually avoid. For library code that exports higher-order functions, full closure conversion is generally preferred.",
+      "refs": []
+    },
+    {
+      "id": "ghc-and-related-passes",
+      "title": "GHC and the lambda-lifting family",
+      "tags": ["ghc", "haskell", "compiler"],
+      "content": "Modern compilers mix closure conversion, lambda lifting/floating, and specialisation. Fully-applied functions with small capture sets may be lifted or specialised; higher-order functions that flow into data structures become proper closures.\n\nIn GHC, **full laziness**, **lambda lifting/floating**, **SpecConstr**, and **worker/wrapper** are distinct but interacting transformations. Full laziness floats let-bindings out of lambdas to share thunks across applications. Lambda lifting/floating moves let-bindings between scopes to expose more inlining or specialisation. SpecConstr specialises constructor-heavy call patterns at compile time. Worker/wrapper improves strictness, unboxing, and representation by splitting a function into a thin wrapper plus an inlined worker.\n\nThe family-of-passes view is clearer than \"lambda lifting\" alone — each transformation has its own trigger and trade-off, but they share the underlying idea of restructuring scope to enable downstream optimisations.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Johnsson — Lambda Lifting", "url": "https://www.microsoft.com/en-us/research/publication/lambda-lifting-transforming-programs-to-recursive-equations/" }
+  ]
+}

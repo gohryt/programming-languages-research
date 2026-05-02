@@ -1,0 +1,116 @@
+{
+  "kind": "concept",
+  "name": "CHERI / Morello / CheriBSD",
+  "aliases": [
+    "CHERI-128",
+    "Morello",
+    "CheriBSD",
+    "CheriABI"
+  ],
+  "summary": "Cambridge / SRI International's CHERI replaces 64-bit pointers with 128-bit unforgeable capabilities — address + bounds + permissions + 1-bit validity tag in tagged memory — enforced by the ISA. Hardware-enforced spatial safety and strong pointer provenance/integrity for C/C++. Morello is the ARM research prototype; CheriBSD is the reference OS.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "capability-hardware",
+        "bounds-check",
+        "memory-safety",
+        "exploit-mitigation",
+        "compartmentalisation"
+      ],
+      "content": "Cambridge / SRI International's **CHERI** replaces 64-bit pointers with 128-bit unforgeable capabilities — address + bounds + permissions + 1-bit validity tag in tagged memory — enforced by the ISA. It provides hardware-enforced spatial safety and strong pointer provenance/integrity for C/C++; temporal safety requires an accompanying revocation, quarantine, or allocation discipline.\n\nCHERI sits at the most ambitious end of the hardware-assisted memory-safety design spectrum: it changes the pointer representation itself rather than adding tags or signatures to existing pointers. The cost is doubled pointer size and ABI-level changes; the payoff is a fully bounded, provenance-tracked addressing model.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "related"
+        },
+        {
+          "target": "cheriot",
+          "type": "related"
+        },
+        {
+          "target": "cheri-lite",
+          "type": "related"
+        },
+        {
+          "target": "arm-mte",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "cheri-128",
+      "title": "CHERI-128 architecture",
+      "tags": [
+        "capability-hardware",
+        "bounds-check",
+        "aarch64",
+        "risc-v",
+        "research"
+      ],
+      "content": "Capabilities are 128-bit pointers carrying a base address, bounds, permissions (load/store/execute/seal/etc.), and a 1-bit validity tag held in tagged physical memory. The ISA forbids forging or out-of-bounds increment of capabilities; any violation traps. A pure-capability ABI (CheriABI) replaces all pointer-bearing register and memory operations with capability-bearing forms.\n\nOverhead ~2.2–3.2% geomean for SPECint 2006 in pure-cap mode on optimised microarchitectures. Doubled pointer size also imposes significant memory overhead.",
+      "refs": [
+        {
+          "target": "softbound-cets",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "morello",
+      "title": "Morello prototype",
+      "tags": [
+        "capability-hardware",
+        "aarch64",
+        "research"
+      ],
+      "content": "Morello is Arm's research prototype implementing CHERI on a Neoverse-class core. Its overhead is much higher than the architectural ideal because the store buffers were sized for 64-bit pointers — capability stores burn extra cycles. Morello demonstrated that pure-capability C/C++ stacks are buildable end-to-end but not that the cost can be made negligible without microarchitectural redesign.\n\nStatus (as of 2026-04): Morello is a research prototype, not commercial; production silicon for a Morello successor is still pending.",
+      "refs": []
+    },
+    {
+      "id": "cheribsd",
+      "title": "CheriBSD and compartmentalisation",
+      "tags": [
+        "capability-hardware",
+        "compartmentalisation",
+        "research"
+      ],
+      "content": "CheriBSD is the reference operating system for CHERI: a FreeBSD fork that runs entirely in pure-capability mode. Software compartmentalisation (sub-library `c18n` in CheriBSD 25.03 isolating malloc/syscall surface) and the pure-capability ABI (CheriABI) build on the ISA.\n\nWind River joined the CHERI Alliance in April 2026 (porting VxWorks/Helix to CHERI on RISC-V). Programming-model details, including compartments, are surveyed alongside other capability programming models.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "CHERI cap-contracts ICCD 2024",
+          "url": "https://www.cl.cam.ac.uk/research/security/ctsrd/pdfs/202411-iccd-cap-contracts.pdf"
+        },
+        {
+          "label": "CheriBSD 25.03 release",
+          "url": "https://www.cheribsd.org/release-notes/25.03/index.html"
+        },
+        {
+          "label": "Wind River joins the CHERI Alliance",
+          "url": "https://www.businesswire.com/news/home/20260421249526/en/Wind-River-Joins-the-CHERI-Alliance"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "CHERI cap-contracts ICCD 2024",
+      "url": "https://www.cl.cam.ac.uk/research/security/ctsrd/pdfs/202411-iccd-cap-contracts.pdf"
+    },
+    {
+      "label": "CheriBSD 25.03 release",
+      "url": "https://www.cheribsd.org/release-notes/25.03/index.html"
+    },
+    {
+      "label": "Wind River joins the CHERI Alliance",
+      "url": "https://www.businesswire.com/news/home/20260421249526/en/Wind-River-Joins-the-CHERI-Alliance"
+    }
+  ]
+}

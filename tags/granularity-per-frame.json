@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-frame",
+  "tag": "granularity:per-frame",
+  "name": "Granularity: per frame",
+  "description": "Mechanism operates at stack-frame granularity: unwinders, page-protection watchpoints, debugger frame-restart, GPU-frame capture.",
+  "axis": "granularity"
+}

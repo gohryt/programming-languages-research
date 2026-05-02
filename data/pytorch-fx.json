@@ -1,0 +1,33 @@
+{
+  "kind": "framework",
+  "name": "PyTorch FX",
+  "aliases": ["torch-fx", "pytorch-graph-ir"],
+  "summary": "Reed, James, Fei et al. (2021; PyTorch 1.8+): graph-based PyTorch IR for torch.compile. FX captures the forward computation as a torch.fx.GraphModule via dynamic-trace plus symbolic-shape inference. Trades expressivity for ease of adoption — traces user Python rather than requiring a constrained DSL.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**PyTorch FX** (Reed, James, Fei, et al., 2021; PyTorch 1.8+) is the graph-based PyTorch IR for `torch.compile`. FX captures the forward computation as a `torch.fx.GraphModule`, a Python-level symbolic trace of the model, with each tensor op as a node. The distinguishing property is that **FX traces user Python code** (via dynamic-trace plus symbolic-shape inference) rather than requiring users to write in a constrained DSL.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "PyTorch FX documentation", "url": "https://pytorch.org/docs/stable/fx.html" }
+      ]
+    },
+    {
+      "id": "trace-vs-structured",
+      "title": "Trace-based vs structured IR",
+      "tags": ["compiler-ir", "deep-learning"],
+      "content": "This is the same trade-off as JAX's `jit` (also trace-based) versus TVM/XLA's structured IR — FX prioritises ease of adoption over expressivity. FX is the substrate for **TorchInductor** (the `torch.compile` backend), for FX-based quantisation, partitioning, and pipeline-parallelism transformations, and for `torch.export` (the graph-export-to-stable-format path).\n\nThe limitation is that traced graphs are *specialised to the input shapes seen at trace time*; recompilation triggers when shapes change beyond marked dynamic dims.",
+      "refs": [
+        { "target": "tvm-relay-tir#overview", "type": "contrasts-with" },
+        { "target": "xla-stablehlo#overview", "type": "exports-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "PyTorch FX documentation", "url": "https://pytorch.org/docs/stable/fx.html" }
+  ]
+}

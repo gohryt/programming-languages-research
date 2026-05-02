@@ -1,0 +1,104 @@
+{
+  "kind": "language",
+  "name": "E — Object-Capability Language",
+  "aliases": [
+    "erights",
+    "e-rights"
+  ],
+  "summary": "Mark Miller's E (1997+) is the canonical object-capability language and the source of most modern ocap vocabulary: sealer/unsealer rights amplification, the Granovetter operator, eventual sends, vats, and CapTP. Historical/reference status; its ideas shipped to production via Cap'n Proto, Spritely Goblins, Agoric, SES/Hardened JS, and WASI components.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "e-language",
+        "ocap",
+        "object-capability",
+        "language-capability",
+        "granovetter-introduction"
+      ],
+      "content": "**E** (Mark S. Miller et al., 1997+) is the canonical object-capability programming language and the source from which most of the modern ocap vocabulary descends. E formalises the thesis that authority is conveyed **only by holding object references**: there is no global namespace, no `File.open`, no `process.getenv` — every effect requires receiving a reference from a creator.\n\nThe core security argument E established: holding an object reference *is* the permission to invoke methods on that object. Therefore the reference graph (which references which objects can name) statically bounds authority, and authority can only grow via the **Granovetter operator** — introduction through an existing reference. This is formalised as a lambda calculus security kernel and is the conceptual foundation cited by every later ocap design.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "foundational-for"
+        },
+        {
+          "target": "newspeak-language",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "E ocap ode",
+          "url": "https://erights.org/elib/capability/ode/ode-capabilities.html"
+        }
+      ]
+    },
+    {
+      "id": "primitives-sealers-and-eventual-send",
+      "title": "Primitives — sealer/unsealer pairs, eventual send, vats",
+      "tags": [
+        "sealed-capability",
+        "attenuated-capability",
+        "granovetter-introduction",
+        "capability"
+      ],
+      "content": "E introduced the language-level primitives that have become standard ocap vocabulary:\n\n- **Sealer/unsealer pairs** — a rights-amplification primitive that lets two parties hold capabilities whose joint use exceeds either alone. The sealer can put a value in a box; only the matching unsealer can open it. This is the basis for E's mint/purse currency pattern (the mint sealer can create money; the unsealer holds the deposit method) and for the broader pattern of \"capability brand-checking without losing unforgeability.\"\n- **Eventual send (`<-`)** — non-blocking message send returning a promise; the foundation of *promise pipelining*, which E pioneered and Cap'n Proto / CapTP standardised on the wire.\n- **Vats** — units of single-threaded sequential execution that own a set of objects; cross-vat references are remote and may only be invoked via eventual send. The vat is E's actor-equivalent and the addressing unit for distributed ocap.\n- **The Granovetter operator** — \"only `introduce(a, b)` via an existing reference can grow the reference graph.\" Formalised as a lambda calculus security kernel and used to prove confinement bounds.",
+      "refs": [
+        {
+          "target": "capn-proto",
+          "type": "wire-protocol-of"
+        },
+        {
+          "target": "actors",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "lineage-and-status",
+      "title": "Lineage and status",
+      "tags": [
+        "e-language",
+        "historical",
+        "ocap"
+      ],
+      "content": "Status (as of 2026-04): E itself is largely historical/reference — the canonical Java-implemented runtime is no longer actively developed. Its **influence is everywhere** in the modern ocap stack:\n\n- **Cap'n Proto / CapTP** is E's wire protocol generalised to a typed binary IDL.\n- **SES / Hardened JS** is the E discipline retrofitted as a JavaScript subset (`Compartment`, `lockdown()`).\n- **Spritely Goblins** is a direct port of E's vat/eventual-send/CapTP model to Racket and Guile Scheme.\n- **Monte** is a Python-syntax language with E semantics.\n- **Agoric** is a smart-contract platform built on hardened-JS with E's security model.\n- **WASI Component Model** independently rediscovers E's no-ambient-authority discipline at the binary level (resource handles play the role of object references).\n\nMark Miller's continued role at Agoric and on TC39 SES makes him the through-line: the same person who designed E in the 1990s now drives Hardened JS standardisation. The reference work for ocap design.",
+      "refs": [
+        {
+          "target": "capn-proto",
+          "type": "descended-into"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "descended-into"
+        },
+        {
+          "target": "spritely-goblins",
+          "type": "descended-into"
+        },
+        {
+          "target": "monte-language",
+          "type": "descended-into"
+        },
+        {
+          "target": "wasi-component-model",
+          "type": "rediscovered-by"
+        }
+      ],
+      "sources": [
+        {
+          "label": "E ocap ode",
+          "url": "https://erights.org/elib/capability/ode/ode-capabilities.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "E ocap ode",
+      "url": "https://erights.org/elib/capability/ode/ode-capabilities.html"
+    }
+  ]
+}

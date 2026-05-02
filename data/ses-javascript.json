@@ -1,0 +1,50 @@
+{
+  "kind": "framework",
+  "name": "SES — Secure ECMAScript / Hardened JS",
+  "aliases": ["ses", "secure-ecmascript", "hardened-js", "compartment", "lockdown", "caja"],
+  "summary": "Mark Miller, Agoric, MetaMask, et al.: a TC39 process proposal that hardens the JavaScript intrinsics (`lockdown()`) and provides isolated execution units (`Compartment`) so untrusted third-party JS can be evaluated under object-capability discipline. Production via Node.js (Endo), Agoric smart contracts, and MetaMask LavaMoat supply-chain hardening. Successor to Caja and the JavaScript application of the Joe-E technique.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["ses", "ocap", "language-capability", "no-ambient-authority", "js", "production"],
+      "content": "**SES** (Secure ECMAScript) — also called **Hardened JS** — is a TC39-process proposal that hardens the JavaScript intrinsics and provides isolated execution units so untrusted third-party JS can be evaluated under object-capability discipline. The two primitives are:\n\n- **`lockdown()`** — freezes the JavaScript intrinsics (`Object.prototype`, `Array.prototype`, `Function.prototype`, etc.) so prototype pollution and tampering with built-ins become impossible. Mutable shared state in the realm is eliminated.\n- **`Compartment`** — a fresh evaluation context with its own globals; code evaluated inside a Compartment receives only the capabilities its creator passed in. Authority is no longer ambient via `globalThis`.\n\nTogether these turn JavaScript into an ocap-disciplined host: a Compartment with a hardened intrinsic set has no way to perform I/O, no way to read clocks, no way to fetch URLs, unless explicitly granted those capabilities. The discipline is the same as Joe-E's for Java; SES is the modern, standards-track JavaScript application.",
+      "refs": [
+        { "target": "capability-based-memory", "type": "instance-of" },
+        { "target": "joe-e", "type": "applies-same-technique-as" },
+        { "target": "e-language", "type": "descended-from" }
+      ]
+    },
+    {
+      "id": "compartment-and-lockdown",
+      "title": "Compartment and lockdown — discipline mechanics",
+      "tags": ["ses", "compartment", "ocap", "no-ambient-authority"],
+      "content": "**`lockdown()`** runs at startup of the realm (Node process, browser frame, Worker) and applies to all subsequent code. It freezes built-in prototypes, removes ambient access to `eval` (or pins it), and removes other reflection / global-mutation surfaces. After `lockdown()`, no later code in the realm can monkey-patch `Array.prototype.push` to exfiltrate, intercept, or leak references — because the prototype is non-writable.\n\n**`Compartment`** creates a fresh evaluation context with a controlled global. The compartment's `globalThis` contains only what the creator put there; common patterns:\n\n- Pass in `harden(api)` for a capability surface — the compartment can call those methods but cannot reach beyond.\n- Pass in nothing — the compartment is a pure-computation sandbox, suitable for evaluating user-supplied formulas, smart-contract code, etc.\n- Layer compartments — a parent compartment can host child compartments, attenuating capabilities further.\n\n**Maximal subset principle** (inherited from Joe-E): only forbid what breaks ocap reasoning. Most of the JavaScript ecosystem — including npm packages, Promise machinery, async/await, generators, classes — works inside a compartment as long as the package itself does not depend on ambient authority. The hard part is taming third-party packages whose ambient-authority dependence is implicit (`require('fs')` at module scope).",
+      "refs": [
+        { "target": "joe-e", "type": "shares-discipline-with" }
+      ]
+    },
+    {
+      "id": "production-deployments",
+      "title": "Production deployments — Endo, Agoric, LavaMoat",
+      "tags": ["ses", "production", "supply-chain", "js"],
+      "content": "Status (as of 2026-04): SES ships in production in three notable settings.\n\n- **Endo** (Agoric, Node.js) — the SES-based runtime for hardening Node packages. `endo` provides a CLI for running Node programs under SES with a per-package compartment policy file, addressing the npm supply-chain attack class by static-rather-than-dynamic capability grants. A package's `package.json` policy declares which capabilities (network, file, env vars) it is allowed; `endo` enforces this at compartment construction.\n- **Agoric smart contracts** — the SES discipline is the substrate for Agoric's JavaScript-based smart-contract platform. Each contract runs in its own Compartment with hardened intrinsics; cross-contract calls go through capability references, exactly mirroring E's vat model. Hardened JS *is* the Agoric VM in this sense.\n- **MetaMask LavaMoat** — runs every npm dependency in its own SES compartment with explicit capability policy. This is the industrial supply-chain-hardening application of SES: the goal is not to run untrusted code per se, but to run *partially-trusted* code (your dependencies' dependencies) under an explicit capability budget so a malicious update to a deep transitive can't read your wallet's private keys.\n\n**TC39 standardisation**: SES is in active TC39 process (Stage 2 area; specific sub-proposals — `Compartment`, `lockdown`-equivalent intrinsic-freezing — are at varying stages). The implementation is `ses-shim` for current engines and a path to native engine support via the TC39 work.",
+      "refs": [
+        { "target": "capn-proto", "type": "complementary-with" }
+      ]
+    },
+    {
+      "id": "lessons-and-influence",
+      "title": "The 'language subset by deletion' technique generalises",
+      "tags": ["ses", "ocap", "design-guidance"],
+      "content": "The lesson SES makes clearest: **any memory-unsafe-by-default language can be retrofitted with ocap by removing ambient-authority constructs**, provided you can identify the surface area cleanly. JavaScript was the hardest case (very large surface, lots of legacy ambient authority, mutable everything), and SES still made it work. Easier hosts (Java via Joe-E, F# via project-specific dialects, Lua via sandboxed environments) follow the same recipe.\n\nThe relationship to `wasi-component-model`: WASI Components apply the same discipline at the binary level — a component's import surface *is* its capability budget — but enforced by the runtime rather than by source-language analysis. SES and WASI Components are complementary: WASI handles the binary-level capability boundary; SES handles the in-language capability boundary for JS code that runs inside a single component or runtime.",
+      "refs": [
+        { "target": "wasi-component-model", "type": "complementary-with" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Joe-E NDSS 2010", "url": "https://people.eecs.berkeley.edu/~daw/papers/joe-e-ndss10.pdf" },
+    { "label": "Cap'n Web (Cloudflare)", "url": "https://blog.cloudflare.com/capnweb-javascript-rpc-library/" }
+  ]
+}

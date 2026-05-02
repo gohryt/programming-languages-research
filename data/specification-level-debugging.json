@@ -1,0 +1,69 @@
+{
+  "kind": "concept",
+  "name": "Specification-level debugging",
+  "aliases": [
+    "model-checker counterexamples",
+    "TLA+ debugger",
+    "proof state viewer",
+    "Lean InfoView"
+  ],
+  "summary": "Debugging artifacts whose semantics are not 'run and observe' but 'verify and inspect' — model checkers (TLA+ TLC, Alloy, SPIN) producing counterexample traces, and interactive theorem provers (Lean, Coq, Agda) where the proof state itself is the debugger view.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Most of this document is about debugging executions of programs. This chapter is about debugging *specifications* — artifacts whose semantics are not \"run and observe\" but \"verify and inspect.\" Model checkers and interactive theorem provers share a debugger pattern: the proof or counterexample itself is the debugging surface, and the debugger's job is to make it navigable. The techniques are adjacent to omniscient debugging (`data/time-travel-debugging`) and typed-hole liveness (`data/retroactive-evaluation#hazel-typed-holes-live-eval`), but the execution model is fundamentally different — there is no live process, only a search over states or proof terms.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:specification-level`\n- **domain**: `domain:debugging`\n"
+    },
+    {
+      "id": "tla-plus-counterexample-debugger",
+      "title": "TLA+ — Counterexample Trace as Debugger Output",
+      "tags": [
+        "domain:debugging",
+        "family:specification-level",
+        "verification"
+      ],
+      "content": "When TLC (the TLA+ model checker) detects an invariant violation, it emits the **shortest state sequence** that leads to the violation — typically 3–15 states. The TLA+ Toolbox's Error Trace View renders the trace with per-step variable-change highlights (red for changed, expandable function values for nested updates, fold/hide unchanged variables), making it a navigable debugger trace rather than a wall of text.\n\nThe **Trace Explorer** is the original contribution: an expression box attached to the error trace where the user types arbitrary TLA+ expressions. Each expression is **evaluated at every state of the trace** and its values shown as a new column. Because TLA+ supports primed variables (`x'` = value of `x` in the next state), you can write action predicates (`prod' = x' * y'`) and see which action is firing, or derived quantities (`margin == max - sum`) to understand *why* an invariant holds right until it doesn't. This is a debugger's watch panel — except every watch is evaluated over the entire already-computed trace, retroactively.\n\nThe **TLA+ Debugger** (2024) extends this with **interactive state-space exploration**: breakpoints after `Init` or `Next`, **conditional breakpoints on `~ENABLED Next`** that catch deadlocks automatically, step-in using *minimal Hamming distance* between successor states to follow a \"close\" next state, step-over using *maximal Hamming distance* to jump to a \"far\" one. Trace export supports multiple formats: DOT/GraphViz for visualization, `_TLAPlusCounterExample` for replay as a TLA+ spec, `_TLCTESpec` for trace-expression specs that re-verify the trace as a valid behavior, `_TLCActionTrace` for minimization workflows.\n\nThis is a *debugger for specifications*. The \"program\" is a TLA+ spec, the \"bug\" is an invariant violation, the \"trace\" is the minimal path to the violation. No live process exists to step; the trace is a finite graph the debugger walks. The design lesson: **for any verification tool whose output is a counterexample, the debugger is a navigable view of that counterexample, not a separate artifact.** SPIN and Alloy deliver similar experiences for their respective formalisms.",
+      "sources": [
+        {
+          "url": "https://learntla.com/topics/toolbox.html"
+        },
+        {
+          "url": "https://discuss.tlapl.us/msg06620.html"
+        }
+      ]
+    },
+    {
+      "id": "lean-coq-agda-infoview",
+      "title": "Lean / Coq / Agda InfoView — Proof State as Debugger",
+      "tags": [
+        "domain:debugging",
+        "family:specification-level",
+        "verification"
+      ],
+      "content": "Interactive theorem provers (ITPs) are fundamentally dialogue-driven. Every user action — applying a tactic, filling a hole, elaborating a term — produces a new **proof state**: a list of open goals, each with a list of hypotheses (name + type) and a target type. The \"debugger\" is the view of this proof state, updated continuously as the user edits.\n\nLean 4's **InfoView** (described in Nawrocki et al., \"An Extensible User Interface for Lean 4\", ITP 2023) displays:\n- All open tactic goals at the cursor position, with hypothesis lists formatted with interactive type annotations.\n- **Diff highlighting**: subexpressions added or removed compared to the previous proof state are rendered green or red, so the *effect of a tactic* is visible without reading the tactic itself — a Myers-diff applied to proof state.\n- **Pin** locations: freeze a proof state view at a specific location so it remains visible when the cursor moves elsewhere, useful for comparing two branches of a proof or cross-referencing an earlier obligation.\n- **Bidirectional widgets**: UI components that can invoke Lean metaprograms and edit the proof script from inside the UI. The user can *make progress on the proof through the UI*, not just observe it.\n- **Metavariables** (`?m.392`, `?u.498`) and named goals (`case foo`), which are the proof-level analogue of typed holes (`data/retroactive-evaluation#hazel-typed-holes-live-eval`) — incomplete portions of the proof term that still typecheck and drive goal display.\n\nAgda's typed-hole UX and Coq's goal view are the same philosophy with syntactic variation — all three share the \"goals + hypotheses + target type\" trinity as the user's debugging surface.\n\nThe deeper claim: **in a language where the primary object is a proof (not a program), the debugger is a goal-state viewer**. Every tactic is simultaneously a construction step and a diagnostic — miss a hypothesis, the goal state shows what was missed; apply an over-eager rewrite, the diff highlights what got rearranged incorrectly.\n\nSee `data/retroactive-evaluation#hazel-typed-holes-live-eval` for Hazel's analogue in ordinary functional programming: incomplete expressions still typecheck and partially evaluate. InfoView is the proof-construction analogue; the underlying idea — **every editor state is meaningful; feedback is continuous** — is shared.",
+      "sources": [
+        {
+          "url": "https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf"
+        },
+        {
+          "url": "https://github.com/leanprover/vscode-lean4"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://learntla.com/topics/toolbox.html"
+    },
+    {
+      "url": "https://discuss.tlapl.us/msg06620.html"
+    },
+    {
+      "url": "https://drops.dagstuhl.de/opus/volltexte/2023/18399/pdf/LIPIcs-ITP-2023-24.pdf"
+    },
+    {
+      "url": "https://github.com/leanprover/vscode-lean4"
+    }
+  ]
+}

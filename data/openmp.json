@@ -1,0 +1,53 @@
+{
+  "kind": "framework",
+  "name": "OpenMP",
+  "aliases": ["open-mp"],
+  "summary": "Pragma-driven shared-memory parallel programming model for C, C++, and Fortran; compiler lowers #pragma omp directives to runtime calls into libgomp/libomp/iomp5 which manages a thread pool and dispatches work; the most-deployed parallel programming model in HPC.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "OpenMP (1997+; current OpenMP 5.2 from 2021, 6.0 in active development) is the de-facto standard for shared-memory parallel programming in C, C++, and Fortran. The interface is **directive-based**: `#pragma omp parallel for` on a loop, `#pragma omp parallel sections`, `#pragma omp task`, `#pragma omp critical`. The compiler (GCC, Clang, Intel, NVIDIA HPC SDK, IBM XL, AMD AOCC) lowers each directive to runtime calls into the OpenMP runtime library (`libgomp`, `libomp`, `iomp5`, etc.) which manages a thread pool and dispatches work.\n\nThe architectural distinction from explicit-task / actor / async runtimes is that **OpenMP is a pragma-driven structured-parallelism model** rather than a thread-or-task abstraction. Programmers don't write \"spawn a goroutine\" or \"create an actor\"; they write \"execute these iterations in parallel\" or \"this region runs concurrently across N threads.\" The mental model is the parallel loop nest (or task graph for OpenMP 4+ task model), not the concurrent process.",
+      "refs": [
+        { "target": "work-stealing#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "OpenMP specifications", "url": "https://www.openmp.org/specifications/" },
+        { "label": "GCC libgomp manual", "url": "https://gcc.gnu.org/onlinedocs/libgomp/" }
+      ]
+    },
+    {
+      "id": "distinguishing-features",
+      "title": "Distinguishing features",
+      "tags": ["parallelism", "directives", "scheduling"],
+      "content": "- **`parallel for` with scheduling clauses**: `static`, `dynamic`, `guided`, `auto`, `runtime`. Static partitioning works for regular loops; dynamic and guided use queue-based scheduling for irregular workloads. The runtime manages a thread pool sized by `OMP_NUM_THREADS`.\n- **`#pragma omp task`** (OpenMP 3.0+): explicit task-spawn for irregular parallelism. Tasks form a DAG; `taskwait` joins them. The OpenMP 4+ task model adds dependencies via `depend(in: x)` / `depend(out: y)` / `depend(inout: z)`, giving a deps-graph executor more powerful than parallel-for.\n- **`reduction` clause**: language-level support for parallel reductions over user-supplied or built-in operators (`+`, `*`, `min`, `max`, user-defined reduction operators since OpenMP 4.0).\n- **`target` directive (OpenMP 4+)**: offload to GPU or accelerator. The compiler generates kernels and the runtime manages data transfers, hiding most of the complexity that CUDA / SYCL programs handle explicitly. NVIDIA HPC SDK and AOMP are the canonical implementations.\n- **NUMA awareness**: thread-affinity policy via `OMP_PLACES` (e.g. `cores`, `sockets`, explicit core lists) and `OMP_PROC_BIND` (`spread`, `close`, `master`) lets the program co-locate threads with the memory they touch.",
+      "refs": []
+    },
+    {
+      "id": "vs-cilk-tbb-stdexec",
+      "title": "Contrast with Cilk, TBB, and std::execution",
+      "tags": ["parallelism", "comparison", "ecosystem"],
+      "content": "Distinct from Cilk (`data/work-stealing#overview`): Cilk-5 is a strict fork-join algebra with provable work-stealing bounds; OpenMP is pragma-based with multiple scheduling strategies and no global theoretical guarantee. Distinct from C++26 `std::execution` (`data/async-await#cpp-coroutines-and-senders`): OpenMP works on Fortran, C, and C++ uniformly with directive-level uniformity rather than language-level template machinery. Distinct from Reactive Streams (`data/channels#reactive-streams`): OpenMP is push-based with implicit barriers, not pull-based with explicit demand. Distinct from oneTBB (`data/onetbb`): OpenMP requires compiler support; TBB is a pure library.",
+      "refs": [
+        { "target": "onetbb#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "production-and-status",
+      "title": "Production and status",
+      "tags": ["production", "hpc"],
+      "content": "Production: virtually all HPC and scientific-computing workloads (LAMMPS, Quantum ESPRESSO, OpenFOAM, weather-forecasting codes like WRF and IFS, gene-sequencing pipelines such as BWA-MEM and STAR), much of NumPy/SciPy via OpenBLAS-OpenMP, large parts of the Linux kernel's per-thread-pool work, and increasingly CUDA-adjacent work via `target` offload. By any reasonable measure, OpenMP is the most-deployed parallel programming model in the world.\n\nStatus (as of 2026-04): OpenMP 5.2 (2021) is the current spec; OpenMP 6.0 in development.\n\nThe runtime-design lesson: a directive-driven parallelism model is a different design point from explicit threads, fibers, async tasks, or actors. It trades programmer control for ergonomic conciseness — `#pragma omp parallel for` adds three lines and gets correct parallelism for an embarrassingly-parallel loop. The cost is opacity (it's hard to reason about what the runtime is doing without instrumentation) and lock-in (porting an OpenMP codebase to a non-OpenMP runtime is hard because the parallelism is in pragmas, not in code structure).",
+      "refs": [],
+      "sources": [
+        { "label": "OpenMP API Specification 5.2 (PDF)", "url": "https://www.openmp.org/wp-content/uploads/OpenMP-API-Specification-5-2.pdf" },
+        { "label": "LLVM OpenMP runtime", "url": "https://openmp.llvm.org/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "OpenMP specifications", "url": "https://www.openmp.org/specifications/" },
+    { "label": "GCC libgomp manual", "url": "https://gcc.gnu.org/onlinedocs/libgomp/" },
+    { "label": "LLVM OpenMP runtime", "url": "https://openmp.llvm.org/" }
+  ]
+}

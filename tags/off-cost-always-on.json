@@ -1,0 +1,7 @@
+{
+  "id": "off-cost-always-on",
+  "tag": "off-cost:always-on",
+  "name": "Cost when off: always-on",
+  "description": "The mechanism cannot be turned off without rebuilding or detaching. DBI, sanitizers, post-execution recorders apply unconditionally.",
+  "axis": "off-cost"
+}

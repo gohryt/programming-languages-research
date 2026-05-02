@@ -1,0 +1,88 @@
+{
+  "kind": "concept",
+  "name": "Channels",
+  "aliases": [],
+  "summary": "Message-passing coordination mechanism in which send and receive operations synchronize producers and consumers; design space spans CSP-style channels (Go), low-latency ring buffers (LMAX Disruptor), and demand-driven backpressure protocols (Reactive Streams).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Channels are communication primitives that also act as synchronization points between producers and consumers. They are especially associated with CSP-style coordination and strongly shape how concurrency is structured in the languages that adopt them.\n\nChannels combine communication and synchronization. They may be unbuffered, bounded, or unbounded. Unbuffered channels force rendezvous; bounded channels provide backpressure; unbounded channels avoid sender blocking but can hide overload until memory grows. Go channels are often paired with goroutines to express CSP-like communication; the scheduler and netpoller make blocking channel and I/O operations suspend goroutines rather than OS threads in ordinary cases.",
+      "refs": [{ "target": "go#concurrency", "type": "example" }]
+    },
+    {
+      "id": "buffering-models",
+      "title": "Buffering models",
+      "tags": ["concurrency", "message-passing", "backpressure"],
+      "content": "Channels may be unbuffered, bounded, or unbounded, and this choice directly affects synchronization and overload behavior. Buffering policy is not just an implementation detail but one of the central semantic choices of a channel-based design.",
+      "refs": [
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "select-and-coordination-patterns",
+      "title": "Select and coordination patterns",
+      "tags": ["concurrency", "coordination", "scheduling"],
+      "content": "Channel systems are often judged by how well they support waiting on multiple communication possibilities at once. Fairness, cancellation safety, and compositional coordination operators matter as much as the channel primitive itself.\n\nA `select` or alternative construct waits on multiple communication operations. Implementation choices include randomization for fairness (Go's `select`), priority ordering, registration with wait queues, cancellation safety, and avoiding lost wakeups.",
+      "refs": [{ "target": "cancellation#semantics", "type": "related" }]
+    },
+    {
+      "id": "lmax-disruptor",
+      "title": "LMAX Disruptor — mechanical-sympathy ring buffer",
+      "tags": ["concurrency", "low-latency", "ring-buffer"],
+      "content": "Martin Thompson, Dave Farley, and the LMAX Exchange team developed the **Disruptor** (2010) for an order-matching platform that needed sub-millisecond latency and tens of millions of transactions per second. The mechanism is a single-producer-multi-consumer ring buffer with mechanical-sympathy-driven design:\n\n- **Cache-line padding around sequence counters** to avoid false sharing between the producer's claim cursor and consumer cursors.\n- **Lock-free progress via atomic sequence numbers**: producers claim a slot by incrementing a sequence; consumers wait for the producer's sequence to advance past their own; no locks, no channels, no `wait`/`notify`.\n- **Dependency graphs between consumers**: \"consumer C2 may only process slot N after consumer C1 has\". The graph is declared statically as a small DAG of consumer barriers.\n- **Pre-allocated event objects**: the ring slots are mutable event objects allocated once at startup. Producers write into them in place; consumers read from them in place. No per-event allocation, no GC pressure.\n\nLMAX reported six million transactions per second on a single matching-engine thread. Adopted in financial trading platforms, **log4j2's async appender**, **Apache Storm**, **Aeron messaging**, and **Disruptor.NET**. The architectural lesson is that a single ring buffer plus careful cache-line awareness can replace queues, lock-based handoff, and the GC pressure of allocating message objects when the producer/consumer arrangement is statically known. Distinct from CSP-style channels: the Disruptor doesn't decouple senders from receivers — it's a coordinated dataflow where consumers explicitly track each other's progress.\n\nStatus (as of 2026-04): production-stable since 2010, still actively used in low-latency financial systems, real-time telemetry, and high-throughput logging.",
+      "refs": [],
+      "sources": [
+        { "label": "LMAX Disruptor", "url": "https://lmax-exchange.github.io/disruptor/disruptor.html" },
+        { "label": "Martin Fowler on LMAX", "url": "https://martinfowler.com/articles/lmax.html" }
+      ]
+    },
+    {
+      "id": "reactive-streams",
+      "title": "Reactive Streams — demand-driven backpressure",
+      "tags": ["concurrency", "backpressure", "streams"],
+      "content": "The **Reactive Streams** specification (initiated by Lightbend, Pivotal, Netflix, Twitter et al., 2013–2015; absorbed into JDK 9 as `java.util.concurrent.Flow`) is a **demand-driven, backpressure-first** coordination paradigm distinct from CSP channels, actors, and senders/receivers. The defining mechanism is that subscribers explicitly **request** N elements from publishers; publishers must not produce more than the cumulative requested count. Backpressure is the default, not an opt-in.\n\nThe four-interface protocol: `Publisher<T>` (accepts a Subscriber via `subscribe(Subscriber<T>)`), `Subscriber<T>` (receives `onSubscribe(Subscription)`, then `onNext(T)` / `onError(Throwable)` / `onComplete()` events), `Subscription` (`request(long n)` and `cancel()`), `Processor<T,R>` (both Publisher and Subscriber, used for transformations).\n\nProduction implementations on the JVM:\n- **Project Reactor** (Pivotal/VMware) is the Spring WebFlux substrate. `Flux<T>` (0..N elements) and `Mono<T>` (0..1 element) are the core publisher types; ~250 operators compose pipelines.\n- **RxJava** (Netflix) was the original JVM reactive library; Rx 1.x predates Reactive Streams, Rx 2/3.x conform.\n- **Akka Streams** (Lightbend) layers reactive streams over the Akka actor system.\n- **Mutiny** (Quarkus) is Red Hat's alternative with a smaller operator surface.\n\nThe architectural lesson: demand-driven backpressure is a different coordination paradigm, not a feature you bolt onto channels or actors. CSP channels push the backpressure question onto the buffer-size choice; actors onto mailbox-overflow policy; reactive streams onto explicit per-subscription request semantics. Trade-off: reactive streams add operator-stack debugging cost and cancellation-correctness complexity. Status (as of 2026-04): production at huge scale across Spring (Reactor), Netflix services, Akka deployments. For a new language with channels, the design question is whether to standardise a backpressure protocol at the language level or leave it to library-level convention.",
+      "refs": [],
+      "sources": [
+        { "label": "Reactive Streams", "url": "https://www.reactive-streams.org/" },
+        { "label": "Project Reactor", "url": "https://projectreactor.io/" }
+      ]
+    },
+    {
+      "id": "distributed-message-passing",
+      "title": "Distributed message passing — Cap'n Web",
+      "tags": ["concurrency", "rpc", "distributed"],
+      "content": "Distributed actors and channels must confront serialization, versioning, network partitions, retries, ordering, identity, authentication, and rolling upgrades. The local concurrency abstraction rarely survives unchanged across the network boundary.\n\nCloudflare's **Cap'n Web** (Kenton Varda, September 2025; open-source under MIT) is a JavaScript-native RPC protocol that ports the Cap'n Proto / CapTP design to the browser-and-server JavaScript ecosystem. The implementation is under 10 kB gzipped, written in pure TypeScript with zero runtime dependencies; it runs in browsers, Cloudflare Workers, Node.js, Bun, Deno, using either WebSocket or HTTP-batch transport.\n\nDistinguishing properties versus REST or gRPC: **object capabilities** (the wire protocol carries first-class references to remote objects, not just method calls on flat services), **promise pipelining** (pre-send calls against the *result* of an in-flight call without waiting for the round-trip), **bidirectional RPC** (both ends can call each other's exported objects), and **sandboxing-friendly** call graphs (untrusted code that does not hold a capability cannot invoke methods on objects it cannot reach).\n\nThe lesson generalises: object-capability RPC is now economically deployable in browser-and-server JavaScript — historically the niche where REST and JSON dominated because capability protocols were too complex.",
+      "refs": [],
+      "sources": [
+        { "label": "Cap'n Web", "url": "https://blog.cloudflare.com/capnweb-javascript-rpc-library/" }
+      ]
+    },
+    {
+      "id": "backpressure-and-overload",
+      "title": "Backpressure and overload",
+      "tags": ["concurrency", "backpressure", "runtime"],
+      "content": "A good channel design makes overload visible instead of silently converting it into unbounded memory growth or scheduler collapse. This means channel semantics are deeply tied to buffering, cancellation, and queue behavior under stress.\n\nMechanisms include bounded queues, demand signals, credit-based protocols (Reactive Streams), async streams, supervision policies, and load shedding. Without them, fast producers can overwhelm slow consumers.",
+      "refs": [
+        {
+          "target": "structured-concurrency#failure-and-cancellation-propagation",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Channels are attractive because they make coordination explicit and can simplify pipeline-like architectures. Their trade-offs come from buffering policy, overload handling, coordination complexity, and the fact that communication primitives alone do not solve task lifecycle or scheduling design.\n\nThe **Forth family** offers an instructive minimalist counterpoint: traditional Forth systems have long supported multitasking through a small round-robin scheduler, an explicit `PAUSE` word, and mailbox or channel words for synchronization, with optional timesliced or interrupt-driven preemption layered on top. Concurrency can begin with a tiny cooperative runtime optimized for predictability, embedded deployment, and programmer-visible scheduling rather than transparent suspension.",
+      "refs": [
+        { "target": "actors#isolation-and-mailboxes", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": []
+}

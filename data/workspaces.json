@@ -1,0 +1,94 @@
+{
+  "kind": "concept",
+  "name": "Workspaces",
+  "aliases": [
+    "monorepo-workspaces"
+  ],
+  "summary": "Coordinates multiple related packages in one repository while sharing lockfile state, local dependency wiring, and tooling behavior; production examples include Cargo workspaces, Go workspaces (go.work, March 2022), pnpm/Yarn/npm workspaces, and Bazel monorepo modules.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Workspaces are the package-manager-level mechanism for coordinating multiple related packages together. They are important because they sit between single-package workflows and full-scale build systems, while often sharing resolution or tooling state.\n\nA workspace is a project structure where multiple related packages share a single source tree, build configuration, and (usually) lockfile. Workspaces are the package-manager-level answer to \"I have several libraries that evolve together.\"",
+      "refs": [
+        {
+          "target": "cargo#workspaces",
+          "type": "example"
+        }
+      ]
+    },
+    {
+      "id": "shared-state",
+      "title": "Shared state — Cargo, Go, pnpm",
+      "tags": [
+        "workspaces",
+        "monorepo",
+        "packaging"
+      ],
+      "content": "Workspaces commonly share lockfiles, output directories, dependency wiring, or local path relationships. Shared state improves consistency and coordination, but it can also reduce isolation between packages if the boundaries are not designed carefully.\n\n**Cargo workspaces** — declared by a top-level `Cargo.toml` with `[workspace]` and `members = [...]`. Member crates share a single `Cargo.lock`, can depend on each other by relative path, and `cargo build`/`cargo test` operate on the whole workspace.\n\n**Go workspaces** — `go.work` (introduced Go 1.18, March 2022) lets multiple modules be developed together, overriding `go.sum` resolution for the listed modules. Different from Cargo's model: each Go module retains its own `go.mod` and `go.sum`, the workspace just unifies their development.\n\n**Yarn workspaces** / **npm workspaces** / **pnpm workspaces** — declared via `workspaces` in the root `package.json`. Member packages are typically symlinked into the root `node_modules`, so cross-references resolve to the local source.\n\nThe package-manager design lesson is that **workspace support must be a first-class feature, not a hack on top of the single-package model**. Cargo and pnpm got this right relatively early; npm and Yarn took years to converge on consistent semantics.",
+      "refs": [
+        {
+          "target": "lockfiles#overview",
+          "type": "related"
+        },
+        {
+          "target": "cargo#workspaces",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Cargo workspaces",
+          "url": "https://doc.rust-lang.org/cargo/reference/workspaces.html"
+        },
+        {
+          "label": "Go workspaces",
+          "url": "https://go.dev/ref/mod#workspaces"
+        }
+      ]
+    },
+    {
+      "id": "benefits-and-tradeoffs",
+      "title": "Trade-offs",
+      "tags": [
+        "workspaces",
+        "monorepo",
+        "design-guidance"
+      ],
+      "content": "Workspaces make coordinated multi-package changes easier and can unify tooling for a repository. The trade-off is that they may blur package independence or make publishing and boundary reasoning less explicit if overused.\n\nThe general design tension is between **monorepo benefits** (atomic cross-package changes, shared tooling, single source of truth for versions) and **per-package independence** (separate version histories, separate publishing cadences, separate ownership). Workspace mechanisms try to give the first while preserving the second; the trade-offs vary by ecosystem.\n\nCross-member dependencies in a workspace can be path-based (resolved locally during development) without changing the published-package identity (resolved via registry when consumed externally) — Cargo's design here is particularly clean.",
+      "refs": [
+        {
+          "target": "go#packaging",
+          "type": "related"
+        },
+        {
+          "target": "package-management#build-orchestration",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "relationship-to-build-systems",
+      "title": "Relationship to build systems — Bazel, Buck",
+      "tags": [
+        "workspaces",
+        "build-systems",
+        "tooling"
+      ],
+      "content": "Workspaces solve coordination inside a package ecosystem, but they do not fully replace larger build systems with stronger graph control, visibility rules, or hermetic execution models. They are best understood as an ecosystem coordination layer rather than a universal build abstraction.\n\n**Bazel** has the most ambitious \"workspace\" concept: `WORKSPACE` (or `MODULE.bazel` in bzlmod) defines an entire build universe with arbitrary internal package boundaries, source dependencies, and remote build artifacts. Bazel and Buck (Meta's) implement per-target visibility declarations: a `BUILD` file lists targets and each target has a `visibility = [...]` attribute restricting which other targets can depend on it. This is enforced by the build graph at build time, not by the language.\n\nThe interaction with language-level modules is subtle. In a Bazel monorepo using Java, a class can be `public` (Java visibility) but only depended on by specific Bazel targets (Bazel visibility). The build graph enforces architectural boundaries that Java's package-level visibility cannot. **At sufficient scale, build-system visibility becomes the dominant abstraction**, not language-level visibility.",
+      "refs": [
+        {
+          "target": "package-management#build-orchestration",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Cargo book",
+      "url": "https://doc.rust-lang.org/cargo/"
+    }
+  ]
+}

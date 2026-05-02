@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-function",
+  "tag": "granularity:per-function",
+  "name": "Granularity: per function",
+  "description": "Observation/probe lives at function entry/exit boundaries. ftrace, BPF fentry/fexit, LLVM XRay sleds, APM advice templates.",
+  "axis": "granularity"
+}

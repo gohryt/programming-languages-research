@@ -1,0 +1,46 @@
+{
+  "kind": "language",
+  "name": "Nim",
+  "aliases": [],
+  "summary": "Statically-typed language with file-as-module convention and a uniquely terse export marker — a single asterisk after a declared identifier (proc foo*) marks it as exported; inherits Oberon's per-declaration export discipline; Nimble package manager with .nimble manifests.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Nim (Andreas Rumpf, 2008+) is a statically-typed multi-paradigm systems language with metaprogramming via macros and ARC/ORC reference counting. Memory aspects live in `data/nim-arc-orc`; macros in `data/nim-macros`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "file-as-module-with-asterisk-export",
+      "title": "File-as-module with * export marker",
+      "tags": ["nim", "modules", "exports"],
+      "content": "Nim's module surface is among the simplest in the survey. Every `.nim` file is automatically a module; there is no module declaration syntax. Imports use `import foo`, qualified imports use `from foo import bar`, and selective imports use `from foo import bar, baz`. The module is identified by its filename (without extension), and imports are resolved through the package path or relative paths.\n\nThe export mechanism is uniquely terse: a single asterisk (`*`) after a declared identifier marks it as exported. `proc foo*(x: int): int = ...` exports `foo`; `proc bar(x: int): int = ...` keeps `bar` private. This makes the export decision visible at the declaration site without a separate export list, and at the cost of one character of syntactic noise.\n\nNim also supports `include \"file.nim\"` for textual inclusion (sharing scope with the includer), `from foo import nil` to import a module without bringing names into scope, and `export foo` to re-export an imported module's public names.",
+      "refs": [
+        { "target": "wirth-modules#oberon-inline-export-markers", "type": "inherited-from" },
+        { "target": "visibility-and-exports#export-models", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Nim manual — modules", "url": "https://nim-lang.org/docs/manual.html#modules" },
+        { "label": "Nim manual — export marker", "url": "https://nim-lang.org/docs/manual.html#modules-export-marker" }
+      ]
+    },
+    {
+      "id": "nimble-package-manager",
+      "title": "Nimble package manager",
+      "tags": ["nim", "packaging"],
+      "content": "Nim's package manager is **Nimble**, which uses `.nimble` files for package metadata. Packages can declare dependencies on other Nimble packages and are resolved by Nimble's solver against the published index.\n\nThe design lesson is that **a tiny per-declaration export marker can replace export lists entirely** if the language is willing to make the marker mandatory at every public declaration. The trade-off is a small visual noise floor on every public symbol; the benefit is that the export decision is locally visible and reviewable.",
+      "refs": [],
+      "sources": [
+        { "label": "Nimble directory", "url": "https://nimble.directory/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Nim manual — modules", "url": "https://nim-lang.org/docs/manual.html#modules" },
+    { "label": "Nim manual — export marker", "url": "https://nim-lang.org/docs/manual.html#modules-export-marker" },
+    { "label": "Nimble", "url": "https://nimble.directory/" }
+  ]
+}

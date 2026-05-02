@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Mojo KGEN and POP Dialect",
+  "aliases": ["KGEN", "POP dialect", "Mojo parametric IR"],
+  "summary": "Mojo's MLIR-based parametric IR. KGEN (Kernel Generator) layer represents *parametric* code as first-class IR; POP dialect provides parametric types like `!pop.simd<size, dtype>` whose concrete semantics depend on parameter values. Pre-elaboration parametric IR is serialisable and instantiable later, even on a different target.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mojo's compiler is built on MLIR. The **KGEN** layer (Kernel Generator) represents *parametric* code as first-class IR — Mojo's generic functions, parameter-bound `@parameter` decisions, and `comptime` evaluation all live as parametric MLIR ops. The **POP dialect** (Parametric Operations) provides parametric types (`!pop.simd<size, dtype>`) and ops whose concrete semantics depend on parameter values.",
+      "refs": [
+        { "target": "mlir#overview", "type": "uses" },
+        { "target": "mojo-parameter#overview", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "Mojo POP Dialect Internal Docs", "url": "https://github.com/modular/modular/blob/main/mojo/stdlib/docs/internal/pop_dialect.md" }
+      ]
+    },
+    {
+      "id": "distinctive-properties",
+      "title": "Distinctive properties",
+      "tags": ["mlir", "parametric-ir"],
+      "content": "The distinctive properties: pre-elaboration parametric IR is *serialisable to disk* and instantiable later, even on a different target. A parametric Mojo function compiled today can be specialised at the user's machine for their CPU. This is unlike most generic systems (C++ templates, Rust monomorphization) which materialise concrete types at the original compile site.\n\nThe consequence is **target-specific specialisation across the module boundary**: a generic SIMD kernel in a Mojo library can be specialised for AVX-512 on one consumer and Apple AMX on another from the same source artifact. The library author does not have to ship multiple binaries; the elaborator picks the right specialisation when the consumer instantiates.",
+      "refs": []
+    },
+    {
+      "id": "design-implication",
+      "title": "Design implication — parametric IR shipped pre-instantiation",
+      "tags": ["compiler-architecture", "language-design"],
+      "content": "The design implication for module systems is significant: a parametric IR that ships pre-instantiation lets module systems carry generic code across distribution boundaries without committing to specialisations at the producer's site. This is a different model from Rust's monomorphisation (which produces concrete code at the library author's site for a fixed target tuple) and from Java's generic erasure (which erases parameters and recovers them at runtime via casts).\n\nFor language designers contemplating compile-time metaprogramming with cross-compilation flexibility, KGEN/POP is the cleanest production reference. The cost is a substantial MLIR investment; the benefit is generic code that travels with full parametric expressiveness across distribution and target boundaries.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Mojo POP dialect docs", "url": "https://github.com/modular/modular/blob/main/mojo/stdlib/docs/internal/pop_dialect.md" }
+  ]
+}

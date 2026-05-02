@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Hazard Pointers",
+  "aliases": ["HP", "Michael's hazard pointers", "std::hazard_pointer"],
+  "summary": "Maged Michael's wait-free read-protection scheme (2002/2004): each thread publishes single-writer/multi-reader pointers naming the objects it currently dereferences; retirers scan all hazard pointers before freeing. Bounded retired-list size O(N x H x R), integrated ABA fix without DCAS. Production form: Folly hazptr; standardised as C++26 std::hazard_pointer (P2530R3).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["safe-memory-reclamation", "hazard-pointer", "lock-free", "wait-free"],
+      "content": "Maged Michael's **hazard pointers** (2002 / 2004) provide safe memory reclamation for lock-free data structures by having each thread publish single-writer/multi-reader pointers naming the objects it is currently dereferencing. Retirers scan all hazard pointers before freeing — if any thread has a hazard pointer pointing at the candidate, reclamation is deferred until that pointer is cleared.\n\nProvides wait-free read protection using only single-word atomic stores plus a release/acquire fence (or seq_cst) per acquire. Bounded retired-list size O(N x H x R) (threads x HPs per thread x retire batch), giving worst-case bounded retention — the canonical strength of hazard pointers and the property that distinguishes them from epoch-based schemes. Integrated ABA fix without DCAS.",
+      "refs": [
+        { "target": "epoch-based-reclamation", "type": "contrasts-with" },
+        { "target": "rcu", "type": "contrasts-with" },
+        { "target": "hazard-eras", "type": "predecessor-of" },
+        { "target": "folly-hazptr", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Hazard Pointers (Michael, IEEE TPDS 2004)", "url": "https://www.cs.otago.ac.nz/cosc440/readings/hazard-pointers.pdf" }
+      ]
+    },
+    {
+      "id": "cost-model",
+      "title": "Cost model and trade-offs",
+      "tags": ["bounded-memory", "reader-overhead"],
+      "content": "Cost: ~1 store + 1 fence (often a full `mfence` on x86) per protected read; retire is amortised O(H x N) scan. The per-read fence is the main overhead — heavier than EBR's pin (relaxed/acquire) but with the compensating advantage that retention is bounded regardless of thread stalls.\n\nThe contrast with EBR is sharp: EBR has cheaper readers but unbounded retention if a thread is preempted while pinned; hazard pointers have heavier readers but rigorous worst-case bounds on retired-list growth. This trade-off animates the entire SMR design space — most later schemes (`data/hazard-eras`, `data/interval-based-reclamation`, `data/hyaline-reclamation`, `data/wait-free-eras`, `data/vbr-reclamation`, `data/nbr-reclamation`) are attempts to combine HP-style bounds with EBR-style throughput.",
+      "refs": [
+        { "target": "epoch-based-reclamation#cost-model", "type": "contrasts-with" },
+        { "target": "interval-based-reclamation", "type": "related" }
+      ]
+    },
+    {
+      "id": "production-and-standardisation",
+      "title": "Production and C++26 standardisation",
+      "tags": ["production", "cpp26", "library"],
+      "content": "Production implementations: Folly `hazptr` (Facebook, in production since 2017), OpenBSD/Concurrency Kit, McKenney's RCU \"hazard variant.\" The reference implementation behind C++26 standardisation is Folly's `hazptr`.\n\n**C++26 `std::hazard_pointer`** (P2530R3) lifts hazard pointers into the language standard alongside RCU, providing thread-cached `hazard_pointer` objects, `hazard_pointer_obj_base<T>::retire()`, and multi-domain support — essentially a portable subset of Folly's API.",
+      "refs": [
+        { "target": "folly-hazptr", "type": "related" },
+        { "target": "cpp26-hazptr-rcu", "type": "related" }
+      ],
+      "sources": [
+        { "label": "P2530R3 std::hazard_pointer", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf" },
+        { "label": "Folly hazptr", "url": "https://github.com/facebook/folly/blob/main/folly/synchronization/Hazptr.h" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Hazard Pointers paper", "url": "https://www.cs.otago.ac.nz/cosc440/readings/hazard-pointers.pdf" },
+    { "label": "P2530R3 std::hazard_pointer", "url": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2530r3.pdf" }
+  ]
+}

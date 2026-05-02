@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "Ballerina BIR",
+  "aliases": ["Ballerina IR", "BIR"],
+  "summary": "The single shared IR between Ballerina's two compilation pipelines (jBallerina → JVM bytecode, nBallerina → LLVM IR → native). Cached as a linking artifact in `.ballerina/` for incremental builds. Forces target-neutral semantics — neither JVM-isms nor LLVM-isms can leak into BIR.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ballerina IR (BIR) is the shared IR between Ballerina's two compilation pipelines: **jBallerina** (BIR → JVM bytecode) and **nBallerina** (BIR → LLVM IR → native binary). BIR is generated from the desugared AST after lowering high-level constructs. It is deliberately lower-level than the AST but higher-level than either target bytecode.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "Peering into the Ballerina Intermediate Representation", "url": "https://medium.com/ballerina-techblog/peering-into-the-ballerina-intermediate-representation-8e97361a070e" }
+      ]
+    },
+    {
+      "id": "architectural-details",
+      "title": "Architectural details",
+      "tags": ["ballerina", "compiler"],
+      "content": "Two architectural details stand out:\n\n1. **BIR is cached as a linking artifact.** Each package's BIR is serialised to binary and cached in `.ballerina/`, letting incremental builds resolve cross-module references without re-parsing source. Cross-module type checking and dependency resolution work against cached BIR, similar to how Rust caches `.rmeta` files.\n\n2. **The dual-target requirement forces cleanly target-neutral semantics.** BIR cannot bake in JVM-isms or LLVM-isms because both backends consume it. Memory models, calling conventions, exception handling, concurrency primitives — all must be expressible without reference to any specific runtime. The constraint is real engineering work but produces a cleaner IR than either target alone would.",
+      "refs": []
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — dual-target IR design",
+      "tags": ["compiler-architecture", "language-design"],
+      "content": "The compiler-side implication is that a shared mid-level artifact with per-target lowering is cleaner than duplicating the pipeline once a language needs multiple serious backends — but only if the IR avoids assumptions from any one backend.\n\nThe pattern generalises: a language wanting both managed-runtime (JVM, .NET) and native (LLVM, Cranelift) backends benefits from a single mid-level IR designed deliberately target-neutrally. Retrofitting target-neutrality after one backend has been built is much harder than designing it in.",
+      "refs": [],
+      "sources": [
+        { "label": "JVM Compiler Backend for Ballerina IR (dissertation)", "url": "http://dl.lib.uom.lk/handle/123/16182" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Ballerina BIR article", "url": "https://medium.com/ballerina-techblog/peering-into-the-ballerina-intermediate-representation-8e97361a070e" }
+  ]
+}

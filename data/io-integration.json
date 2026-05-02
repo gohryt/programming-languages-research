@@ -1,0 +1,94 @@
+{
+  "kind": "concept",
+  "name": "I/O Integration",
+  "aliases": [
+    "runtime-io"
+  ],
+  "summary": "How a concurrency runtime connects logical tasks to operating-system I/O: readiness vs completion-based interfaces, netpollers and async runtime drivers, timer wheels/heaps, and the FFI/blocking-pool boundary that determines whether an operation parks a task or blocks a worker.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A concurrency runtime is only as scalable as its I/O integration: the syscall boundary determines which operations park a logical task vs. block a worker, and timers feed the same scheduler decisions. This record covers readiness vs completion-based OS interfaces, runtime drivers and netpollers, timer wheel/heap trade-offs, and FFI-blocking handling.",
+      "refs": [
+        {
+          "target": "event-loop-scheduling#overview",
+          "type": "related"
+        },
+        {
+          "target": "virtual-threads#mn-scheduling-model",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "readiness-and-completion-models",
+      "title": "Readiness and completion models",
+      "tags": [
+        "io",
+        "operating-system",
+        "syscalls"
+      ],
+      "content": "I/O integration differs by OS:\n\n- **readiness**: `epoll` (Linux), `kqueue` (BSD/macOS), and most Unix event loops report when a file descriptor is *ready* for a non-blocking operation; the runtime then performs the operation itself.\n- **completion**: IOCP (Windows), `io_uring` completion queues (Linux 5.1+) report when an operation has *finished*; the runtime submits work and waits for completion events.\n- **blocking syscalls hidden behind runtime-managed threads**: Java virtual threads, Tokio `spawn_blocking`, Go's runtime treating syscall-blocked Ms specially.\n- **hybrid designs**: runtimes may combine readiness for some operations and completion for others (Tokio's optional `io_uring` driver, Rust's `mio`).\n\nA concurrency runtime should make the syscall boundary explicit: which calls park a task, which block a worker, and which require a blocking pool?",
+      "refs": []
+    },
+    {
+      "id": "netpollers-and-runtime-drivers",
+      "title": "Netpollers and async runtime drivers",
+      "tags": [
+        "io",
+        "runtime",
+        "scheduling"
+      ],
+      "content": "**Go's network poller** integrates non-blocking I/O with the goroutine scheduler: if an fd is not ready, the goroutine parks, the fd is registered with the poller, and a readiness event makes the goroutine runnable again. The poller is a per-runtime singleton sitting alongside the M:N scheduler.\n\n**Tokio** describes a runtime as providing an I/O driver, scheduler, and timer. The driver receives OS I/O events, wakes tasks, and lets the scheduler poll ready futures. Other Rust async runtimes (`async-std`, `smol`, `glommio`, `monoio`) make the same architectural split with different scheduler / driver / timer choices.\n\nStatus (as of 2026-04): the productionised choices for a new runtime designer are: epoll (Linux readiness, mature), io_uring (Linux completion, increasingly mature), kqueue (BSD/macOS readiness), IOCP (Windows completion). The runtime API surface shapes which of these can be supported portably without per-OS forks.",
+      "refs": [
+        {
+          "target": "go#concurrency",
+          "type": "example"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Go networking internals",
+          "url": "https://goperf.dev/02-networking/networking-internals/"
+        },
+        {
+          "label": "Tokio runtime documentation",
+          "url": "https://docs.rs/tokio/latest/tokio/runtime/"
+        }
+      ]
+    },
+    {
+      "id": "timers",
+      "title": "Timers",
+      "tags": [
+        "io",
+        "scheduling",
+        "timers"
+      ],
+      "content": "Timers are not just library utilities. They affect scheduler sleep decisions, wakeup precision, power usage, and fairness. Runtime timer wheels, heaps, per-worker timers, and OS timers all trade accuracy for overhead.\n\nGo's scheduler uses per-P timer heaps that it polls on each scheduler tick; the netpoll driver computes its sleep timeout from the nearest pending timer. Tokio uses a hierarchical timer wheel inside its driver. Java virtual threads use the standard scheduled executor with a heap. Linux kernel scheduling uses high-resolution timers (`hrtimer`) with nanosecond resolution.\n\nA design choice: do timers fire on the worker that scheduled them (locality) or on whichever worker is idle (load balance)? Per-worker timers are simpler; cross-worker firing requires synchronisation but balances load better.",
+      "refs": []
+    },
+    {
+      "id": "ffi-and-blocking-pools",
+      "title": "Foreign calls and blocking pools",
+      "tags": [
+        "io",
+        "ffi",
+        "concurrency"
+      ],
+      "content": "FFI and native calls may block in ways the runtime cannot observe. Options include:\n\n- require annotation for blocking calls (Java's `@Blocking`, Tokio's `spawn_blocking` convention);\n- run FFI calls on a dedicated blocking pool with elastic sizing;\n- detach the worker's scheduling token before entering the call (Go's M can become detached when blocked in a syscall);\n- pin virtual threads during native calls (Loom's pinning behaviour);\n- forbid certain calls in async contexts (most async runtimes warn or panic).\n\nThe choice between these is one of the most consequential parts of designing an async / virtual-thread runtime: getting it wrong leaks blocking into the scheduler and starves unrelated tasks.",
+      "refs": [
+        {
+          "target": "async-await#blocking-hazards",
+          "type": "related"
+        },
+        {
+          "target": "virtual-threads#pinning-and-blocking-hazards",
+          "type": "related"
+        }
+      ]
+    }
+  ]
+}

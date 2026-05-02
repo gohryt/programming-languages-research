@@ -1,0 +1,360 @@
+{
+  "kind": "concept",
+  "name": "Time-travel debugging",
+  "aliases": [
+    "reverse-debugging",
+    "omniscient-debugging",
+    "omniscient debugging",
+    "ODB",
+    "history-based debugging"
+  ],
+  "summary": "User-facing workflow of navigating and querying prior execution states instead of relying only on forward-running breakpoints; production examples include Bil Lewis's ODB, Chronon, IntelliTrace, RevDebug, Pharo's reflective debugger, Common Lisp condition/restart, and Replay.io.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Omniscient debugging records every interesting event and makes the execution history queryable after the fact — inverting the breakpoint model. Entries differ on **what the recorded unit is and who pays the cost**: variable assignments (ODB), structurally-shared states (Toby Ho), immutable model updates (Elm, Redux DevTools), bytecode-woven event streams at production scale (Chronon, TOD, IntelliTrace, RevDebug), decorator-level single-function traces (PySnooper, snoop, viztracer), reflective runtime frames (Pharo, Common Lisp, Racket), debugger-architecture outliers such as hypervisor-invisible hooks (HyperDbg), and managed-runtime hot-replacement (Edit-and-Continue, JVM HotSwap, Flutter hot reload) that folds compilation back into the paused-debug session. The common thread is Bil Lewis's original claim: **you don't need breakpoints if you record everything** — with HyperDbg included here as a time-travel-adjacent contrast rather than as a recording system.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:time-travel`\n- **domain**: `domain:debugging`\n- **on-cost**: `on-cost:dominant`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`\n"
+    },
+    {
+      "id": "bil-lewis-odb",
+      "title": "Bil Lewis — ODB (Omniscient Debugger for Java)",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "jvm",
+        "on-cost:dominant"
+      ],
+      "content": "Bil Lewis's ODB, the original omniscient debugger, records *every variable assignment* as a `(timestamp, variable, old_value, new_value)` tuple. After execution, a GUI allows the programmer to navigate backwards and forwards through the entire history.\n\nThe core idea: **you don't need breakpoints if you record everything.** The debugger becomes a database query tool — \"show me the last time variable X changed\" is a lookup, not a re-execution. \"Which threads ran when?\" is a fact, not a mystery.\n\nLewis reported that his programming style changed after using ODB exclusively: *\"I now write insanely fast, making numerous mistakes. This gives me something to search for with the ODB. It's fun.\"* This observation — that omniscient debugging changes not just how you debug but how you write code — is striking.\n\nThe recording overhead is real but bounded. Lewis reported being able to debug Ant, JUnit, and the debugger itself. The approach does not scale to long-running production workloads, but for development and testing it is viable.",
+      "sources": [
+        {
+          "url": "https://omniscientdebugger.github.io/"
+        }
+      ]
+    },
+    {
+      "id": "toby-ho-structural-sharing",
+      "title": "Toby Ho — Structural Sharing for Time-Travel State",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "on-cost:medium"
+      ],
+      "content": "Toby Ho built a time-traveling debugger for his \"Fun\" language that records a snapshot of the entire program state at every step. To keep the recording compact, he uses **structural sharing** — if a stack frame didn't change between two steps, only a reference to the previous frame is stored, not a copy.\n\nHe invented a \"JSON-R\" format (JSON with References) where objects can be assigned IDs (`+1 {...}`) and later referenced (`*1`), allowing the history file to share identical sub-trees across snapshots.\n\nThe insight: program state changes incrementally. Most of the state is identical between consecutive steps. Persistent/immutable data structures or copy-on-write can reduce the recording overhead from O(state_size × steps) to O(delta × steps). For programs where most variables don't change on most steps, this is a dramatic reduction.\n\nThe limitation: the history file is written to disk and the debugger reads it back after execution. This is not a live debugger — it is a post-mortem replay tool. But the offline model has advantages: the debugger never needs to re-execute the program, and the history file can be shared with colleagues.",
+      "sources": [
+        {
+          "url": "https://www.tobyho.com/video/Time-Traveling-Debugger-Part-1.html"
+        }
+      ]
+    },
+    {
+      "id": "elm-immutable-state-time-travel",
+      "title": "Elm — Immutable State Time Travel",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "on-cost:low"
+      ],
+      "content": "Elm's architecture (The Elm Architecture, TEA) naturally supports time-travel debugging because every state update produces a new immutable state value. The debugger simply holds onto each state over time and provides a slider to scrub through them.\n\nBecause Elm's model values are immutable, the debugger does not need to deep-copy mutable object graphs at each step. Consecutive states can share structure through persistent data structures, making time-travel cheap compared with snapshotting an equivalent mutable program.\n\nThis only works for languages designed around immutable values from the start. Retrofitting it onto mutable-state languages requires explicit snapshotting, which is expensive. Elm demonstrates that language-level design decisions can make powerful debugging features trivial to implement.",
+      "sources": [
+        {
+          "url": "https://elm-lang.org/news/time-travel-made-easy"
+        }
+      ]
+    },
+    {
+      "id": "pharo-smalltalk-reflective-debugger",
+      "title": "Pharo/Smalltalk — The Debugger as Development Tool",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-frame",
+        "smalltalk"
+      ],
+      "content": "Pharo's debugger is not a diagnostic tool bolted onto the side — it is a primary development tool. When an error occurs (including `doesNotUnderstand:`, the equivalent of \"method not found\"), the debugger opens with the full execution stack. The developer can then:\n\n- **Create the missing method on the fly** from inside the debugger, type the implementation, and **proceed** — execution resumes as if the method had always existed.\n- **Restart any frame** in the call stack, re-executing from that point with modified code or variables.\n- **Edit any method** in the stack and proceed with the new version.\n\nThis is possible because Smalltalk's runtime is fully reflective — `thisContext` is a first-class object representing the current stack frame, methods are objects that can be recompiled at any time, and the VM supports frame restart natively.\n\nThe philosophical point: the debugger is the IDE. Rather than a cycle of edit → compile → run → crash → read error → edit, the Smalltalk workflow is: run → crash → the debugger opens → write the code right there → proceed. The boundary between \"writing code\" and \"debugging code\" dissolves entirely.\n\nFew mainstream languages have reached this level of integration; Common Lisp's condition/restart system (`data/time-travel-debugging#common-lisp-condition-restart`) is the closest sibling.",
+      "sources": [
+        {
+          "url": "https://pharo.org/"
+        },
+        {
+          "url": "https://stackoverflow.com/questions/54496857/how-does-pharo-starts-debugger-when-message-is-not-understanded"
+        }
+      ]
+    },
+    {
+      "id": "common-lisp-condition-restart",
+      "title": "Common Lisp — Condition/Restart System",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "lisp",
+        "on-cost:low"
+      ],
+      "content": "Common Lisp's condition system separates three concerns that most languages conflate into \"exception handling\":\n\n1. **Signaling:** Code detects an error and signals a condition (like throwing an exception), but the stack is *not* unwound.\n2. **Handling:** A handler higher in the call stack decides what to do — but it runs *with the signaling frame still live*. It can inspect the full stack.\n3. **Restarting:** The handler invokes a *restart* — a recovery strategy established by code between the handler and the signaler. The restart runs in the signaler's frame, not the handler's frame.\n\nThe critical difference from exceptions: the stack is not unwound before the handler runs. The handler can see the full context of the error, choose a recovery strategy, and resume execution as if the error never happened.\n\nIn the interactive debugger, when an unhandled condition is signaled, the debugger presents the user with a list of available restarts. The user can choose \"use this value instead,\" \"retry the operation,\" \"skip this item,\" etc. — all without losing the execution context. This is the programmatic foundation for Pharo-style \"fix it in the debugger\" workflows, but expressed as a language-level mechanism rather than a VM feature.\n\nThe power is that libraries can establish restarts for anticipated failures without knowing how callers will handle them, and callers can handle them without knowing the library's internals. The debugger is just one possible handler.",
+      "sources": [
+        {
+          "url": "https://lisp-docs.github.io/docs/tutorial/conditions"
+        }
+      ]
+    },
+    {
+      "id": "racket-continuation-marks",
+      "title": "Racket — Continuation Marks",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-frame",
+        "on-cost:low",
+        "racket"
+      ],
+      "content": "Racket extends Scheme with \"continuation marks\" — key-value annotations that can be attached to any continuation frame (roughly, any stack frame). They are a language-level mechanism for stack inspection that doesn't require special VM privileges.\n\nAny code can attach a mark to the current frame with `with-continuation-mark`, and any code can read all marks on the current continuation with `current-continuation-marks`. Marks on tail-called frames replace the previous mark rather than accumulating, preserving tail-call space guarantees.\n\nDebuggers and profilers use continuation marks to implement stack inspection, step tracing, and source location tracking entirely within the language. The DrRacket IDE's debugger is implemented using continuation marks — it annotates source expressions with marks, then reads them to determine the current source location and available bindings.\n\nThe insight: if the language provides a first-class mechanism for annotating the stack, then debuggers don't need special VM hooks. They can be written as regular library code. Continuation marks also support other use cases: dynamic scoping, cost semantics tracking, and contract blame.\n\nThe overhead is one mark allocation per annotated frame. When no marks are read, the only cost is the allocation (which is amortized by the GC). When marks are read, it is a stack walk — but only the marks with the requested key are returned, not the entire stack.",
+      "sources": [
+        {
+          "url": "https://www2.ccs.neu.edu/racket/pubs/dissertation-clements.pdf"
+        },
+        {
+          "url": "https://srfi.schemers.org/srfi-157/srfi-157.html"
+        }
+      ]
+    },
+    {
+      "id": "hyperdbg-ept-hidden-hooks",
+      "title": "HyperDbg — Ring -1 Debugging with EPT Hidden Hooks",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "on-cost:medium",
+        "windows"
+      ],
+      "content": "HyperDbg takes a very different route from source-level debuggers and conventional kernel debuggers: it moves the debugger down to **ring -1**, building on Intel VT-x and EPT. The CCS 2022 paper describes HyperDbg as a hypervisor-based debugger that virtualizes an already running Windows system, aiming to be stealthy and as OS-independent as possible.\n\nThe most original mechanism is the **EPT hidden hook**. HyperDbg documents a mode that places a hidden `0xCC` breakpoint on a target function **without modifying the content of memory in the case of reading/writing**. In other words, code inspection from the guest can still see the original bytes even though execution traps on the hooked address. The docs also describe a faster `!epthook2` mode that avoids VM-exits, plus larger ambitions such as invisible read/write watchpoints, coverage measurement, and memory-move monitoring.\n\nThis is philosophically different from traditional debugger design. The debugger is not negotiating with the guest OS, nor patching visible code in the usual way. It is using the virtualization layer as the debugging primitive. That makes HyperDbg especially interesting for reverse engineering, anti-anti-debugging, and malware analysis, where being seen by the target is itself part of the problem.\n\nThe price is complexity and specificity. This is specialized machinery: Windows, VT-x, EPT, kernel-mode/hypervisor expertise, and significant engineering surface area. But it is genuinely original and belongs in the survey.",
+      "sources": [
+        {
+          "url": "https://misc0110.net/files/hyperdbg_ccs22.pdf"
+        },
+        {
+          "url": "https://docs.hyperdbg.org/commands/extension-commands/epthook"
+        },
+        {
+          "url": "https://github.com/HyperDbg/docs"
+        }
+      ]
+    },
+    {
+      "id": "repl-integrated-debuggers",
+      "title": "REPL-Integrated Debuggers — pdb, PuDB, GHCi `:history`",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "haskell",
+        "python"
+      ],
+      "content": "Dynamic-language REPLs embed the debugger as first-class commands rather than a bolt-on tool. Python's `pdb.set_trace()` (and its 3.7+ `breakpoint()` builtin) hard-codes a break in source; PuDB wraps pdb in a full-screen TUI; GHCi integrates `:break`, `:trace`, `:history`, `:back`, and `:forward` directly into Haskell's interactive environment.\n\nThe most original of these is **GHCi's `:history` / `:back`**. Because Haskell is lazy-evaluated, there is no meaningful *lexical* call stack at an arbitrary point — evaluation order does not follow source order, so \"what called this function\" is often unanswerable. GHCi works around this by maintaining a **ring buffer of the last N breakpoint locations passed through during evaluation**. When an exception fires, `:history` prints the sequence, `:back` steps backwards through it, and the user can inspect bindings at each historical location. This is a bounded time-travel mechanism built inside a lazy language, solving a problem eager languages do not have.\n\nPython's `pdb` contribution is idiomatic ubiquity: `pdb.set_trace()` can be dropped anywhere, and in 3.14 the function gained a `backend` parameter to swap between `sys.settrace` (legacy) and PEP 669 `sys.monitoring` (shipped in 3.12) — the latter gives near-zero overhead when no tool is attached. PEP 768's Safe External Debugger Interface (accepted 2025) is the sibling mechanism on the attach side, covered in `data/cooperative-safepoints#cpython-pep-768`. PuDB's angle is the TUI: a single-terminal split view with source, stack, breakpoints, and variables, plus post-mortem-on-crash and remote-over-socket modes, entirely keyboard-driven.",
+      "sources": [
+        {
+          "url": "https://docs.python.org/3/library/pdb.html"
+        },
+        {
+          "url": "https://documen.tician.de/pudb/index.html"
+        },
+        {
+          "url": "https://simonmar.github.io/bib/papers/ghci-debug.pdf"
+        }
+      ]
+    },
+    {
+      "id": "managed-runtime-omniscient-debuggers",
+      "title": "Managed-Runtime Omniscient Debuggers — Chronon, TOD, IntelliTrace, RevDebug",
+      "tags": [
+        "domain:debugging",
+        "dotnet",
+        "family:time-travel",
+        "granularity:per-event",
+        "jvm",
+        "on-cost:medium"
+      ],
+      "content": "Bil Lewis's ODB (`data/time-travel-debugging#bil-lewis-odb`) defined the shape of omniscient debugging for Java but did not solve scale. Four production-grade successors share its architecture — **bytecode weaver + event stream + replay UI + queryable history** — and each makes a different engineering bet on where the overhead lands: Chronon on the target JVM (commercial Eclipse/IntelliJ DVR; click any line of output to jump to its generating moment), TOD on a distributed event database (academic; 55k events/s single machine, 470k events/s on ten), IntelliTrace on snapshot size (Visual Studio Enterprise; `.iTrace` files captured by a stand-alone collector on production machines and opened later), and RevDebug on commercial scoping heuristics across .NET/Java/Python/JavaScript (observability platform with a time-travel front-end).\n\n| Product | Runtime | Where overhead lands | Distinct UX |\n|---|---|---|---|\n| Chronon | JVM | Target JVM (in-process weaver) | Click program output → jump to generating moment |\n| TOD | JVM | Distributed event database cluster | Linear scaling across machines; scoped trace capture |\n| IntelliTrace | CLR / .NET | Snapshot size in `.iTrace` files | Stand-alone production collector; \"Activate Historical Debugging\" |\n| RevDebug | .NET / Java / Python / JS | Commercial scoping heuristics | Inline value prompts; global search across entire recording |\n\nThe pattern is mature enough that choosing among them is an engineering trade-off, not a research question.\n\nStatus (as of 2026-04): Chronon, IntelliTrace, and RevDebug are commercial products; TOD is an academic system.",
+      "sources": [
+        {
+          "url": "https://wiki.jvmlangsummit.com/Chronon_-_Time_Travelling_Debugger"
+        },
+        {
+          "url": "https://pleiad.cl/tod/"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/visualstudio/debugger/intellitrace"
+        },
+        {
+          "url": "https://revdebug.com/"
+        }
+      ]
+    },
+    {
+      "id": "decorator-omniscient-tracing",
+      "title": "Decorator-Based Omniscient Tracing — PySnooper, snoop, viztracer",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "on-cost:dominant",
+        "python"
+      ],
+      "content": "For languages with runtime tracing hooks (`sys.settrace` in Python, `TracePoint` in Ruby), omniscient-style debugging is achievable with a **single decorator and no infrastructure**: apply the decorator to a function, run, inspect the play-by-play log of every line executed and every variable assignment. No setup, no breakpoints, no database. The Python ecosystem ships three tools in this category, each adding something to the base shape:\n\n- **PySnooper** (Ram Rachum, 2019): the base — `@pysnooper.snoop()` writes line-and-assignment logs to stderr or a file; `watch=` lifts arbitrary expressions; `depth=N` traces nested calls.\n- **snoop** (Alex Hall): adds `pp(expr)` icecream-like structured print (`data/retroactive-evaluation#structured-print-debugging`) and `pp.deep(lambda: expr)` which logs every intermediate subexpression in evaluation order — a lightweight version of Pernosco's reverse dataflow (`data/record-and-replay#pernosco-omniscient`) via AST rewriting.\n- **viztracer**: captures function entry/exit events via `sys.setprofile` plus a C extension, writes Perfetto-format JSON, opens in a Perfetto UI tab; handles threading, multiprocessing, asyncio, subprocess, and PyTorch natively, with `min_duration` and `log_sparse` filters for long runs.\n\nThe design lesson: **if the language runtime exposes per-line or per-function callback hooks, decorator-based omniscient tracing is a ~100-line library**. The cost is 10–100× runtime overhead depending on configuration, but the workflow is \"add a decorator, run once, inspect output\" — the cheapest omniscient pattern available in any mainstream language for exploratory debugging of a specific function.",
+      "sources": [
+        {
+          "url": "https://github.com/alexmojaki/snoop"
+        },
+        {
+          "url": "https://pypi.org/project/PySnooper/"
+        },
+        {
+          "url": "https://viztracer.readthedocs.io/en/latest/viztracer.html"
+        }
+      ]
+    },
+    {
+      "id": "redux-devtools",
+      "title": "Redux DevTools — Omniscient Over Application State",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event",
+        "javascript",
+        "on-cost:low"
+      ],
+      "content": "Redux DevTools applies Elm's time-travel pattern (`data/time-travel-debugging#elm-immutable-state-time-travel`) to the JavaScript ecosystem: record every action dispatched to the store, replay actions from initial state to reach any historical point, skip/reorder/import/export sessions. Because reducers are pure functions on immutable actions, no process snapshot is needed.\n\nThe distinct contribution beyond `data/time-travel-debugging#elm-immutable-state-time-travel` is the **Replay.io integration**: because Replay records the *browser process*, not just the store, it can inspect non-serializable objects in any reducer after replaying to that dispatch. Pure Redux DevTools is limited to JSON-serializable state; Replay + Redux DevTools closes that gap by layering the omniscient execution recording (`data/retroactive-evaluation#replay-io-retroactive-console-log`) underneath the action-replay view.",
+      "sources": [
+        {
+          "url": "https://github.com/reduxjs/redux-devtools"
+        }
+      ]
+    },
+    {
+      "id": "codetracer",
+      "title": "CodeTracer — A New User-Friendly Time-Travel Debugger",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-event"
+      ],
+      "content": "**CodeTracer** is a newer open-source time-travel debugging effort that is interesting less for a novel tracing substrate than for its attempt to make time-travel debugging feel like an ordinary developer workflow rather than a specialist or enterprise-only tool. Public material describes it as a GUI-first debugger intended to support multiple languages, initially around Ruby with broader language ambitions.\n\nThe architectural interest is its product direction: reduce the intimidation factor of reverse debugging by presenting recording, replay, and navigation in a more everyday developer experience. That is a different emphasis from rr (`data/record-and-replay#rr-deterministic-record-replay`), Pernosco (`data/record-and-replay#pernosco-omniscient`), WinDbg TTD (`data/record-and-replay#windbg-time-travel-debugging`), or UndoDB (`data/record-and-replay#undodb-liverecorder`), which are either lower-level, strongly platform-specific, or aimed at expert workflows.\n\nStatus (as of 2026-04): early-stage and less established than the major time-travel systems above. It is worth recording as evidence of a continuing trend toward **developer-friendly time-travel debugging** as a mainstream aspiration rather than a niche research capability.",
+      "sources": [
+        {
+          "url": "https://github.com/metacraft-labs/codetracer"
+        },
+        {
+          "url": "https://www.rubyevents.org/talks/codetracer-a-new-way-to-debug"
+        }
+      ]
+    },
+    {
+      "id": "edit-and-continue-hot-replacement",
+      "title": "Edit-and-Continue / Hot Code Replacement",
+      "tags": [
+        "domain:debugging",
+        "family:time-travel",
+        "granularity:per-frame"
+      ],
+      "content": "Live code replacement sits between debugging and compilation. The user edits code while the program is paused or running; the runtime installs the new version; existing frames either continue on old code, deoptimize into an interpreter, restart, or map to the new version. The *module-system* preconditions that make this possible — flat-or-stable module identity, individually loadable artifacts, language-level cooperation primitives like `import.meta.hot.accept` — are covered in `data/dlopen-live-reload`, `data/erlang-hot-reload`, `data/julia-revise`, `data/lisp-incremental-redefinition`, `data/dotnet-edit-and-continue`, and `data/hot-module-replacement`.\n\nVisual Studio Edit and Continue, JVM HotSwap, Erlang hot code loading, Smalltalk images, Flutter hot reload, Clojure REPL-driven development, and browser hot-module replacement all pick different points in the design space. The core problems are stable function identity, active-frame migration, closure layout changes, object shape changes, inlined-frame deoptimization, and coexistence of old and new code.\n\nThis is the modern industry continuation of the Pharo (`data/time-travel-debugging#pharo-smalltalk-reflective-debugger`) and Common Lisp (`data/time-travel-debugging#common-lisp-condition-restart`) live-edit lineage: the difference is that managed runtimes (CLR, JVM, Dart VM) supply the deoptimization machinery the original reflective systems built into the language. The language-design lesson: **hot replacement needs versioned code and explicit frame semantics**. Decide whether active frames keep running old code, restart in new code, or can be migrated. Deoptimizing optimized frames back to an inspectable representation before applying a patch is what makes hot replacement debuggable; the OSR / deopt machinery itself is owned by `data/osr-deoptimization`.",
+      "sources": [
+        {
+          "url": "https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue"
+        },
+        {
+          "url": "https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html"
+        },
+        {
+          "url": "https://docs.flutter.dev/tools/hot-reload"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://omniscientdebugger.github.io/"
+    },
+    {
+      "url": "https://www.tobyho.com/video/Time-Traveling-Debugger-Part-1.html"
+    },
+    {
+      "url": "https://elm-lang.org/news/time-travel-made-easy"
+    },
+    {
+      "url": "https://pharo.org/"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/54496857/how-does-pharo-starts-debugger-when-message-is-not-understanded"
+    },
+    {
+      "url": "https://lisp-docs.github.io/docs/tutorial/conditions"
+    },
+    {
+      "url": "https://www2.ccs.neu.edu/racket/pubs/dissertation-clements.pdf"
+    },
+    {
+      "url": "https://srfi.schemers.org/srfi-157/srfi-157.html"
+    },
+    {
+      "url": "https://misc0110.net/files/hyperdbg_ccs22.pdf"
+    },
+    {
+      "url": "https://docs.hyperdbg.org/commands/extension-commands/epthook"
+    },
+    {
+      "url": "https://github.com/HyperDbg/docs"
+    },
+    {
+      "url": "https://docs.python.org/3/library/pdb.html"
+    },
+    {
+      "url": "https://documen.tician.de/pudb/index.html"
+    },
+    {
+      "url": "https://simonmar.github.io/bib/papers/ghci-debug.pdf"
+    },
+    {
+      "url": "https://wiki.jvmlangsummit.com/Chronon_-_Time_Travelling_Debugger"
+    },
+    {
+      "url": "https://pleiad.cl/tod/"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/visualstudio/debugger/intellitrace"
+    },
+    {
+      "url": "https://revdebug.com/"
+    },
+    {
+      "url": "https://github.com/alexmojaki/snoop"
+    },
+    {
+      "url": "https://pypi.org/project/PySnooper/"
+    },
+    {
+      "url": "https://viztracer.readthedocs.io/en/latest/viztracer.html"
+    },
+    {
+      "url": "https://github.com/reduxjs/redux-devtools"
+    },
+    {
+      "url": "https://github.com/metacraft-labs/codetracer"
+    },
+    {
+      "url": "https://www.rubyevents.org/talks/codetracer-a-new-way-to-debug"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/visualstudio/debugger/edit-and-continue"
+    },
+    {
+      "url": "https://docs.oracle.com/javase/8/docs/technotes/guides/jpda/enhancements1.4.html"
+    },
+    {
+      "url": "https://docs.flutter.dev/tools/hot-reload"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "kind": "concept",
+  "name": "Parallel Codegen Units",
+  "aliases": ["CGUs", "parallel codegen", "rustc CGU split"],
+  "summary": "Split the program into many independent codegen units; compile each in parallel. rustc and LLVM both use this approach. Trade-off: more parallelism vs lost cross-unit inlining. ThinLTO recovers most of the cross-unit optimisation while keeping the parallelism.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Modern compilers split the program into many independent **codegen units** (CGUs) and compile each in parallel. rustc partitions a crate into 16 CGUs by default (release builds); LLVM's parallel codegen splits modules similarly.\n\nThe approach is straightforward: for each function, decide which CGU it belongs to (usually based on a hash of the function name plus some load-balancing); within each CGU, run the optimiser and codegen normally; link the CGUs at the end. The wall-clock time scales near-linearly with cores up to the CGU count.",
+      "refs": [
+        { "target": "lto-thinlto#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "rustc Codegen Backend Guide", "url": "https://rustc-dev-guide.rust-lang.org/backend/codegen.html" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["compiler", "parallelism"],
+      "content": "The trade-off is **lost cross-unit inlining**. Functions that would have been inlined across CGU boundaries by a single-CGU compile aren't inlined when split across CGUs. The performance impact is workload-dependent: ~5–15% on Rust release builds typically.\n\nThinLTO is the modern answer to recover most of the cross-unit optimisation while keeping the parallelism. By exporting per-CGU summaries and making globally-aware inlining decisions in the linker, ThinLTO captures most of Full LTO's wins at near-CGU-parallel build speed.\n\nFor a new language, the question is at what CGU granularity to default. Too few CGUs: parallelism is wasted. Too many CGUs: cross-unit inlining loss dominates. rustc's default of 16 is a reasonable starting point but workload-dependent.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "rustc Codegen", "url": "https://rustc-dev-guide.rust-lang.org/backend/codegen.html" }
+  ]
+}

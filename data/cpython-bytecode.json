@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "CPython Bytecode",
+  "aliases": ["python-bytecode"],
+  "summary": "Stack-based bytecode for CPython, with each opcode encoded as 1 byte (opcode) + 1 byte (oparg or extension). Modern CPython (3.11+) uses an adaptive interpreter: hot opcodes are rewritten in place to type-specialised variants based on runtime feedback (PEP 659).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "CPython's bytecode is stack-based, with each opcode encoded as 1 byte (opcode) + 1 byte (oparg or extension). Modern CPython (3.11+) uses an *adaptive* interpreter: hot opcodes are rewritten in place to type-specialised variants (`LOAD_ATTR_INSTANCE_VALUE` instead of generic `LOAD_ATTR`) based on runtime feedback. PEP 659 specifies this.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "bytecode-quickening#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "PEP 659: Specializing Adaptive Interpreter", "url": "https://peps.python.org/pep-0659/" }
+      ]
+    },
+    {
+      "id": "specialization-substrate",
+      "title": "Specialisation as bytecode substrate",
+      "tags": ["bytecode", "interpreter", "performance"],
+      "content": "The specialising adaptive interpreter is the most consequential CPython performance change in years: 10–60% runtime improvement without a JIT, by exploiting monomorphic call-site type stability inside the interpreter dispatch loop.\n\nThe bytecode design enables this: the in-place opcode rewriting works because CPython's bytecode is a contiguous byte array with stable instruction widths, and the runtime can swap one opcode for a specialised variant of the same width without disturbing surrounding code. This makes the bytecode itself the speculation substrate, with adaptive feedback recorded as instruction-level rewrites.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "PEP 659: Specializing Adaptive Interpreter", "url": "https://peps.python.org/pep-0659/" }
+  ]
+}

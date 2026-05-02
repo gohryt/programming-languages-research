@@ -1,0 +1,80 @@
+{
+  "kind": "concept",
+  "name": "CHERIoT — Microcontroller CHERI",
+  "aliases": [
+    "CHERIoT-RTOS",
+    "cheriot-ibex"
+  ],
+  "summary": "32-bit RISC-V CHERI variant designed from scratch for MCU-class deeply embedded systems; combines hardware memory safety with rich compartmentalisation. CHERIoT 1.0 ISA released November 2025; SCI Semiconductors ICENI chip is the first commercial CHERI silicon, scaling production in 2026.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "capability-hardware",
+        "risc-v",
+        "embedded",
+        "microcontroller",
+        "compartmentalisation",
+        "memory-safety"
+      ],
+      "content": "**CHERIoT** is a 32-bit RISC-V CHERI variant designed from scratch for MCU-class deeply embedded systems; combines hardware memory safety with rich compartmentalisation. Object-granularity heap safety in hardware (incl. assembly); revocation-based use-after-free; lightweight cross-compartment calls; 64-bit capability over 32-bit address (4 bytes metadata + 4 bytes addr).\n\nCHERIoT is the most plausible near-term CHERI deployment: it avoids the Morello-class store-buffer cost by targeting MCUs where pointer-size growth is acceptable and compartmentalisation is the killer feature.",
+      "refs": [
+        {
+          "target": "cheri",
+          "type": "derived-from"
+        },
+        {
+          "target": "capability-based-memory",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status and ICENI silicon",
+      "tags": [
+        "embedded",
+        "microcontroller",
+        "production",
+        "risc-v",
+        "use-after-free"
+      ],
+      "content": "Status (as of 2026-04): CHERIoT 1.0 ISA released November 2025; SCI Semiconductors **ICENI** chip (cheriot-ibex core) returning from fab and scaling mass production in 2026 — *first commercial CHERI silicon*. Microsoft's CHERIoT-RTOS is open-source; CHERIoT-Rust port active.\n\nThe object-granularity revocation mechanism gives CHERIoT temporal safety in addition to the spatial safety inherited from CHERI's capabilities — addressing the use-after-free class that pure CHERI capabilities alone do not.",
+      "refs": [
+        {
+          "target": "cheri",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "CHERIoT 1.0 ISA",
+          "url": "https://cheriot.org/sail/specification/release/2025/11/03/cheriot-1.0.html"
+        },
+        {
+          "label": "cheriot-ibex",
+          "url": "https://github.com/Microsoft/cheriot-ibex"
+        },
+        {
+          "label": "CHERIoT-RTOS publication",
+          "url": "https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "CHERIoT 1.0 ISA",
+      "url": "https://cheriot.org/sail/specification/release/2025/11/03/cheriot-1.0.html"
+    },
+    {
+      "label": "cheriot-ibex",
+      "url": "https://github.com/Microsoft/cheriot-ibex"
+    },
+    {
+      "label": "CHERIoT-RTOS publication",
+      "url": "https://www.microsoft.com/en-us/research/publication/cheriot-rtos-an-os-for-fine-grained-memory-safe-compartments-on-low-cost-embedded-devices/"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "kind": "library",
+  "name": "SwiftSyntax",
+  "aliases": ["swift-syntax"],
+  "summary": "Apple's official syntax library for Swift, modelled on Roslyn red-green but with explicit byte-exact round-trip as a first-party API guarantee. The boundary for Swift macros (SE-0382, SE-0389, Swift 5.9+).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Apple's SwiftSyntax is the official syntax library for Swift, modelled on Roslyn red-green but with explicit *byte-exact round-trip* as a first-party API guarantee. Every comment, every space, every token is preserved through the tree and re-serializable to the exact original bytes. This is stronger than rowan's default — rowan preserves trivia but byte-exactness depends on the printer.",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "instance-of" },
+        { "target": "roslyn-red-green#overview", "type": "modeled-on" }
+      ],
+      "sources": [
+        { "label": "swift-syntax", "url": "https://github.com/swiftlang/swift-syntax" }
+      ]
+    },
+    {
+      "id": "macro-substrate",
+      "title": "Macro substrate",
+      "tags": ["macros", "metaprogramming", "cst"],
+      "content": "The reason for the stronger guarantee: SwiftSyntax is the boundary for Swift macros (SE-0382, SE-0389, Swift 5.9+). A user-written macro receives a SwiftSyntax tree and returns one; compile then continues with the rewritten tree. If round-trip were lossy, every macro expansion would silently mangle source. The cost is that every macro plugin compiles a non-trivial SwiftSyntax dependency into its binary, which inflates per-plugin build cost.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "swift-syntax", "url": "https://github.com/swiftlang/swift-syntax" },
+    { "label": "SE-0389 Attached Macros", "url": "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0389-attached-macros.md" }
+  ]
+}

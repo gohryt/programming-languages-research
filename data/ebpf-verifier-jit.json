@@ -1,0 +1,35 @@
+{
+  "kind": "runtime",
+  "name": "Linux BPF Verifier and In-Kernel JIT",
+  "aliases": ["eBPF", "BPF", "BPF verifier"],
+  "summary": "Linux's verifier-first restricted bytecode + per-architecture in-kernel JIT. Verifier proves bounded execution, memory safety, no information leaks; only verified programs reach the JIT, which compiles to native instructions on x86-64, ARM64, RISC-V, etc. The blueprint for safe untrusted code in a kernel.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "An eBPF program is submitted as bytecode from userspace via a `bpf()` syscall. Before execution, the kernel runs a **verifier** that performs extensive static analysis: bounded execution (no unbounded loops), memory safety (all loads/stores must be provably in-bounds), no pointer leaks to userspace, no accessing uninitialized memory. Programs that fail verification are rejected.\n\nOnly verified programs reach the **JIT**, which compiles BPF bytecode to native instructions on every major architecture (x86-64, ARM64, RISC-V, PPC, s390). The JIT is per-architecture hand-written, living in the kernel tree under `arch/*/net/bpf_jit*.c`. Compilation is single-pass and fast — tens of microseconds for typical programs.",
+      "refs": [
+        { "target": "move-bytecode-verifier#overview", "type": "shares-design-with" },
+        { "target": "bytecode#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "Linux BPF Documentation", "url": "https://docs.kernel.org/bpf/" }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Verifier-first design",
+      "tags": ["bpf", "kernel", "safety"],
+      "content": "The design is a specific answer to a hard problem: how do you let untrusted users load code into the kernel safely? The answer is *restrict the language severely* (no function pointers, no recursion, bounded stack, typed pointers) so that a lightweight verifier can prove safety, then JIT to native without further checks. The verifier does the hard work; the JIT is straightforward.\n\nBPF's reach is extraordinary. Every packet filter (tcpdump, Cilium, Cloudflare), every kernel tracing tool (bcc, bpftrace), and every XDP-based high-performance networking path goes through this pipeline. The combination of verified restricted bytecode + per-architecture JIT is the blueprint for safe in-kernel code execution beyond kernels.",
+      "refs": [],
+      "sources": [
+        { "label": "BPF Verifier", "url": "https://www.kernel.org/doc/html/latest/bpf/verifier.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Linux BPF docs", "url": "https://docs.kernel.org/bpf/" },
+    { "label": "BPF Verifier", "url": "https://www.kernel.org/doc/html/latest/bpf/verifier.html" }
+  ]
+}

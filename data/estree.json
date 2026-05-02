@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "ESTree",
+  "aliases": ["estree-spec", "javascript-ast-spec"],
+  "summary": "The de-facto AST schema for JavaScript tooling. Originally from Mozilla's SpiderMonkey JS reflection API, now maintained as a standalone spec used by ESLint, Prettier, Babel, Acorn, and most JS tools. Each node is a plain JavaScript object with a type property; no class hierarchy, no tagged enum.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ESTree is the de-facto AST schema for JavaScript tooling. Originally from Mozilla's SpiderMonkey JS reflection API, now maintained as a standalone spec used by ESLint, Prettier, Babel, Acorn, and most JS tools. Each node is a plain JavaScript object with a `type` property and category-specific fields; no class hierarchy, no tagged enum — just JSON-shaped data.",
+      "refs": [
+        { "target": "abstract-syntax-trees#overview", "type": "instance-of" },
+        { "target": "babel-pipeline#overview", "type": "consumed-by" }
+      ],
+      "sources": [
+        { "label": "ESTree spec", "url": "https://github.com/estree/estree" }
+      ]
+    },
+    {
+      "id": "untyped-json-shape",
+      "title": "Untyped JSON shape",
+      "tags": ["ast", "javascript", "tooling"],
+      "content": "The trade-off is that nothing enforces schema conformance — every consumer trusts that `node.type === \"BinaryExpression\"` implies the expected shape. Babel's plugin system layers a dynamic type-check on top, but the underlying ESTree spec is untyped JSON.\n\nThe pragmatic upside is portability: ESTree trees serialize trivially to JSON, are easy to diff, and any JSON-aware tool can manipulate them. This is what made ESTree the dominant interchange format for JS tooling — the specification is small enough that any new tool can implement it without committing to one parser implementation.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ESTree spec", "url": "https://github.com/estree/estree" }
+  ]
+}

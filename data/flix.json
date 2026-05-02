@@ -1,0 +1,30 @@
+{
+  "kind": "language",
+  "name": "Flix",
+  "aliases": ["flix-lang"],
+  "summary": "Functional, logic, and imperative language with a type and effect system featuring primitive effects, algebraic effects, heap effects, effect polymorphism, sub-effecting, effect exclusion, purity reflection, and associated effects. Combines effect rows with explicit subtyping over effect sets.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Flix describes a type and effect system with primitive effects, algebraic effects, heap effects, effect polymorphism, sub-effecting, effect exclusion, purity reflection, and associated effects.\n\nThe distinguishing feature versus Koka is **explicit sub-effecting**: a function performing only `<exn>` can be passed where a `<exn,async>` function is expected, and the type system makes the subtype lattice over effect sets a first-class concept rather than relying on row unification alone.",
+      "refs": [
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "instance-of" },
+        { "target": "subtyping#overview", "type": "applies-to-effects" }
+      ],
+      "sources": [
+        { "label": "Flix effect system", "url": "https://doc.flix.dev/effect-system.html" }
+      ]
+    },
+    {
+      "id": "effect-features",
+      "title": "Effect features in production",
+      "tags": ["effect-system", "type-system"],
+      "content": "Flix offers a wide vocabulary inside one effect system:\n\n- **primitive effects** (I/O, allocation, exception);\n- **algebraic effects** declared by the programmer;\n- **heap effects** that constrain what regions a function may touch;\n- **effect polymorphism** so combinators abstract over the effect of their argument;\n- **sub-effecting** so a smaller effect can flow into a larger expected effect;\n- **effect exclusion** so a function can declare it does *not* perform a specified effect;\n- **purity reflection** so a higher-order function can ask whether its argument is pure;\n- **associated effects** so a trait-like declaration can carry effect obligations.\n\nFor language designers, Flix is the broadest exemplar of \"effects as a first-class lattice with rich operations\"; the cost is that the effect-system error messages need careful rendering to stay readable as the lattice grows."
+    }
+  ],
+  "sources": [
+    { "label": "Flix effect system", "url": "https://doc.flix.dev/effect-system.html" }
+  ]
+}

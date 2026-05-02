@@ -1,0 +1,92 @@
+{
+  "kind": "concept",
+  "name": "Session Types — Typed Communication Protocols",
+  "aliases": [
+    "binary-session-types",
+    "multiparty-session-types",
+    "mpst",
+    "scribble"
+  ],
+  "summary": "Honda 1993; multiparty extension Honda-Yoshida-Carbone POPL 2008. The canonical typing discipline for communication protocols. A session type is an inhabited type for one side of a channel; the protocol is the dual pair. The type system rejects sending wrong-type messages, receiving in send states, or closing channels mid-protocol. Multiparty extends to global protocols with per-role projections.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Session types (Honda 1993; Honda, Vasconcelos, Kubo — ESOP 1998; multiparty extension Honda, Yoshida, Carbone — POPL 2008) are the canonical typing discipline for **communication protocols**. A session type is an inhabited type for one *side* of a channel; the protocol is the dual pair: `!T.S` (\"send `T`, then continue with session `S`\") on one endpoint requires `?T.S'` (\"receive `T`, then continue with session `S'`\") on the other, with `S` and `S'` themselves dual.\n\nThe type system rejects programs that try to send a message of the wrong type, receive in a state where the protocol expects a send, or close a channel before the protocol completes.",
+      "refs": [
+        {
+          "target": "channels#overview",
+          "type": "type-discipline-for"
+        },
+        {
+          "target": "linear-affine-types#overview",
+          "type": "depends-on-linearity"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Yoshida — Multiparty Session Types tutorial",
+          "url": "https://www.doc.ic.ac.uk/~yoshida/papers/multiparty-tutorial.pdf"
+        },
+        {
+          "label": "Honda, Vasconcelos, Kubo — Language Primitives and Type Discipline for Structured Communication-Based Programming (ESOP 1998)",
+          "url": "https://groups.inf.ed.ac.uk/abcd/papers/ESOP98.pdf"
+        }
+      ]
+    },
+    {
+      "id": "binary-vs-multiparty",
+      "title": "Binary versus multiparty session types",
+      "tags": [
+        "session-types",
+        "type-system"
+      ],
+      "content": "The two-party (binary) form generalises to **multiparty session types (MPST)**: a global type describes the protocol from the system view, and per-role *projections* give each participant its local session type. The Imperial College / OOI **Scribble** specification language is the production-grade MPST tool: participants generate session-typed APIs from a single global protocol description, and the projection algorithm guarantees that local conformance implies global protocol fidelity.",
+      "sources": [
+        {
+          "label": "Scribble multiparty protocol description language",
+          "url": "https://www.scribble.org/"
+        }
+      ]
+    },
+    {
+      "id": "distinct-from-typestate-and-effects",
+      "title": "Distinct from typestate, algebraic effects, and CSP channels",
+      "tags": [
+        "session-types",
+        "type-system"
+      ],
+      "content": "Distinct from typestate (`data/typestate`): typestate tracks *one object's* state machine; session types track *the protocol of communication between multiple parties*. Distinct from algebraic effects (`data/type-and-effect-systems`): effects describe what a function may do; session types describe the contract between communicating processes. They commonly compose — Effekt and Singularity OS's Sing# integrate session types with effect handlers / channel contracts, respectively. Distinct from CSP-style channels: CSP gives runtime communication, session types give *static* communication-protocol typing — the same protocol can be a runtime behaviour or a compile-time guarantee."
+    },
+    {
+      "id": "production-deployments",
+      "title": "Production and research deployments",
+      "tags": [
+        "session-types",
+        "production"
+      ],
+      "content": "Production and research deployments:\n\n- **Singularity OS Sing#** — Microsoft Research's microkernel (2005–2010) used session-typed channel contracts to verify zero-data-race kernel-level message passing.\n- **Rust crates** — `mpstthree` (multiparty), `rumpsteak` (binary), `session-types-ng`. Use Rust's affinity discipline to enforce session linearity natively.\n- **F\\* session types** (Project Everest) for low-level network protocol verification.\n- **Java Sessions / Mungo / StMungo** — JVM session-types frameworks with Scribble integration.\n- **OCaml session-ocaml** — ML-family experiment.\n- **Effekt session types** — extends Effekt's second-class capabilities with session-typed channels.\n\nStatus (as of 2026-04): full multiparty session types remain research-grade in production languages; binary session types are simpler to integrate but limited to two-party protocols. The architectural lesson is that **session types are the type-level dual of CSP and the actor model**: for a language with channels, session types are the strongest static guarantee available; for a language with actors, MPST adapts naturally as a global-protocol description that projects to per-actor local types. Languages designing channels or actors from scratch should decide early whether session-type integration is in scope, since retrofitting linear-session discipline onto an existing channel API is hard.",
+      "sources": [
+        {
+          "label": "Session types in Rust (sessionrs)",
+          "url": "https://github.com/sessionrs/sessionrs"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Yoshida — Multiparty Session Types tutorial",
+      "url": "https://www.doc.ic.ac.uk/~yoshida/papers/multiparty-tutorial.pdf"
+    },
+    {
+      "label": "Scribble multiparty protocol description language",
+      "url": "https://www.scribble.org/"
+    },
+    {
+      "label": "Honda, Vasconcelos, Kubo — Structured Communication-Based Programming",
+      "url": "https://groups.inf.ed.ac.uk/abcd/papers/ESOP98.pdf"
+    }
+  ]
+}

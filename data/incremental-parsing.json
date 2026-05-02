@@ -1,0 +1,68 @@
+{
+  "kind": "concept",
+  "name": "Incremental Parsing",
+  "aliases": ["incremental-reparse"],
+  "summary": "Reuse previous parse structure across edits so that a small change does not force a full reparse. The load-bearing technique for editors, language servers, and any environment where parsing happens on every keystroke.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Incremental parsing reuses previous parse structure so that edits do not require reparsing an entire file from scratch. It is essential for editors, language servers, and any environment where parsing happens continuously rather than once.\n\nThe canonical production examples are tree-sitter, Lezer, and rust-analyzer's resilient LL parser. Each takes a different point in the design space — generated GLR (tree-sitter), generated LR (Lezer), hand-written resilient recursive descent (rust-analyzer) — but they share the property that an edit that touches one function reuses the parse tree of every other function unchanged.",
+      "refs": [
+        { "target": "tree-sitter#incrementality", "type": "exemplified-by" },
+        { "target": "lezer#tree-shape", "type": "exemplified-by" },
+        { "target": "language-server#overview", "type": "essential-for" }
+      ]
+    },
+    {
+      "id": "editor-driven-constraints",
+      "title": "Editor-driven constraints",
+      "tags": ["parser", "incrementality", "editors"],
+      "content": "Incremental parsing is driven by editor constraints: low latency on every keystroke, tolerance for syntactically broken intermediate states, stable structure under edits (so cursor and selection survive), and compatibility with repeated semantic analysis. It is more than an optimization on top of batch parsing — these constraints reshape the parser's data model and error-handling strategy.\n\nA batch parser can stop on the first error and demand a clean re-run. An editor's parser cannot: the file is broken almost all the time, and the editor has to render highlighting, brackets, and outlines for whatever exists.",
+      "refs": [
+        { "target": "language-server#design-constraints", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "tree-reuse-and-partial-updates",
+      "title": "Tree reuse and partial updates",
+      "tags": ["parser", "incrementality", "tooling"],
+      "content": "The main technical idea is to preserve unchanged structure and only re-parse the regions affected by an edit. Concretely: nodes carry byte ranges, the parser identifies which ranges intersect the edit, and subtrees outside the affected range are reused unchanged.\n\nThis often shapes parse-tree representation: nodes keep relative offsets so the tree can be traversed without rebuilding absolute positions, and the tree may use red/green or persistent layouts so old versions remain valid for in-flight clients.",
+      "refs": [
+        { "target": "tree-sitter#incrementality", "type": "implementation" },
+        { "target": "concrete-syntax-trees#overview", "type": "shapes" }
+      ]
+    },
+    {
+      "id": "structured-and-projectional-editing",
+      "title": "Relationship to structured editing",
+      "tags": ["parser", "incrementality", "editor-integration"],
+      "content": "Laurence Tratt's framing is useful: incremental parsing is the practical bridge between free-form text editing and structure-aware tooling. The editor lets users type ordinary text while a continuously updated parse tree (including partially broken trees) lives in the background.\n\nThis recovers many benefits of structured / projectional editing — AST-level refactoring, syntax-aware completion, structural diffs — without forbidding transient syntax errors. JetBrains MPS represents the alternative: pure projectional editing, no parsing, but block-edits and partial rewrites become awkward.",
+      "refs": [
+        { "target": "language-server#editor-features", "type": "enables" },
+        { "target": "parser-combinators#tradeoffs", "type": "contrasts-with" }
+      ],
+      "sources": [
+        {
+          "label": "Tratt — Structured Editing and Incremental Parsing (2024)",
+          "url": "https://tratt.net/laurie/blog/2024/structured_editing_and_incremental_parsing.html"
+        },
+        {
+          "label": "Beckmann et al. — Partial Parsing for Structured Editors",
+          "url": "https://dl.acm.org/doi/10.1145/3567512.3567522"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Tree-sitter documentation",
+      "url": "https://tree-sitter.github.io/tree-sitter"
+    },
+    {
+      "label": "Tratt — Structured Editing and Incremental Parsing (2024)",
+      "url": "https://tratt.net/laurie/blog/2024/structured_editing_and_incremental_parsing.html"
+    }
+  ]
+}

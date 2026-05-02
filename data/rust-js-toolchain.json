@@ -1,0 +1,53 @@
+{
+  "kind": "concept",
+  "name": "Rust-Based Modern JS Toolchain",
+  "aliases": ["rust-js-tools", "swc", "oxc", "biome", "rolldown", "rspack", "turbopack", "lightningcss", "esbuild"],
+  "summary": "Family of JavaScript build tools migrated wholesale to Rust between 2022 and 2026 — swc, oxc, biome, Rolldown, rspack, Turbopack, lightningcss — each re-implementing a JS-ecosystem standard (Webpack, Rollup, ESLint, Babel, Prettier, PostCSS) with API compatibility so user code does not need to migrate; esbuild (Go) predates the Rust wave but established the compiled-bundler template.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The JavaScript build-tool ecosystem migrated wholesale to Rust between 2022 and 2026. This is a single ecosystem-wide phenomenon worth recording because the migration pattern recurs in other ecosystems (Python's `uv`/`ruff`, Ruby's `prism`) and offers concrete data on rewriting a mature toolchain in a systems language without breaking ecosystem compatibility.",
+      "refs": [
+        { "target": "javascript#overview", "type": "tooling-for" },
+        { "target": "package-management#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "tools-and-roles",
+      "title": "Tools and their roles",
+      "tags": ["javascript", "rust", "tooling"],
+      "content": "Key tools and their roles:\n\n- **swc** (Donny Kim, 2017+) — Rust TypeScript/JavaScript compiler used by Next.js, Vercel, Deno's `deno bundle` (legacy), and Parcel. Drop-in faster replacement for Babel.\n- **esbuild** (Evan Wallace, 2020+) — Go-based bundler/minifier; predates the Rust wave but established the \"compiled bundler\" template that the Rust tools followed.\n- **oxc** (The Oxc Project, 2023+) — Rust JavaScript/TypeScript toolchain: parser, linter, type-checker, formatter, all in one Rust workspace. Goal is \"one Rust crate replaces the Babel + ESLint + Prettier + tsc stack.\"\n- **biome** (BiomeJS, 2023+; descendant of Rome Tools) — Rust formatter + linter; faster than Prettier + ESLint with less configuration friction.\n- **Rolldown** (Rolldown team, VoidZero, 2024+) — Rust-based bundler designed as a drop-in replacement for both Rollup (production) and esbuild (dev). Vite 6 (2025) ships Rolldown as its production bundler, replacing the two-bundler split (esbuild for dev, Rollup for production) that defined Vite 1–5.\n- **rspack** (ByteDance, 2023+) — Rust bundler with Webpack API compatibility. Status (as of 2026-04): Rspack 2.0 (April 2026) is production-default for several large ByteDance and Alibaba codebases. Drop-in faster Webpack.\n- **Turbopack** (Vercel, 2022+) — Rust bundler tightly integrated with Next.js. Distinct from Rspack (general Webpack-compatible) by being Next.js-specific in scope.\n- **lightningcss** (Devon Govett, 2022+) — Rust CSS parser/transformer/minifier; faster than PostCSS for the common case.",
+      "refs": [],
+      "sources": [
+        { "label": "swc", "url": "https://swc.rs/" },
+        { "label": "oxc", "url": "https://oxc.rs/" },
+        { "label": "biome", "url": "https://biomejs.dev/" },
+        { "label": "Rolldown", "url": "https://rolldown.rs/" },
+        { "label": "rspack", "url": "https://rspack.rs/" },
+        { "label": "lightningcss", "url": "https://lightningcss.dev/" }
+      ]
+    },
+    {
+      "id": "architectural-commonality",
+      "title": "Architectural commonality and trade-offs",
+      "tags": ["rust", "javascript", "performance"],
+      "content": "The architectural commonality: each tool re-implements a JavaScript-ecosystem standard (Webpack, Rollup, ESLint, Babel, Prettier, PostCSS) in Rust, exposing the existing JS-API surface so user code does not need to migrate. The Rust performance margin is substantial — typically 5–20× faster on cold builds, with proportionally smaller margin on warm builds.\n\nThe cost is incremental ecosystem fragmentation: Rust-based plugins and JS-based plugins are largely incompatible, so each Rust tool re-implements ecosystem plugins it inherits in JavaScript. A user upgrading from Babel to swc loses Babel-plugin compatibility unless the plugin has been ported; the same applies to ESLint→Biome, Prettier→Biome, Webpack→rspack/Turbopack, Rollup→Rolldown, PostCSS→lightningcss."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — ship in a systems language from day 1",
+      "tags": ["design-guidance", "tooling"],
+      "content": "The lesson generalises: **a mature ecosystem can be re-implemented in a faster systems language one tool at a time, with API compatibility as the governing constraint**.\n\nFor language designers shipping a new ecosystem, the choice between \"fast tools from day one in a systems language\" (Rust, Zig, Go) and \"tools written in the language itself\" (Python's pip, Ruby's bundler, npm in Node) has a clear answer in 2026: faster tools win developer mindshare quickly enough that the rewrite is forced eventually. Ship in a systems language from day 1.\n\nThe pattern repeats across ecosystems: Astral's `uv` (Rust pip replacement) and `ruff` (Rust linter) for Python; the Prism parser (C) for Ruby; the wave of Rust-based tools for JS. The performance margin and the API-compat constraint make these rewrites economically obvious once the systems-language tooling exists."
+    }
+  ],
+  "sources": [
+    { "label": "swc", "url": "https://swc.rs/" },
+    { "label": "oxc", "url": "https://oxc.rs/" },
+    { "label": "biome", "url": "https://biomejs.dev/" },
+    { "label": "Rolldown", "url": "https://rolldown.rs/" },
+    { "label": "rspack", "url": "https://rspack.rs/" },
+    { "label": "lightningcss", "url": "https://lightningcss.dev/" }
+  ]
+}

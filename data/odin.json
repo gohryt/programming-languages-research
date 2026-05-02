@@ -1,0 +1,40 @@
+{
+  "kind": "language",
+  "name": "Odin",
+  "aliases": ["odin-lang"],
+  "summary": "Systems language by Ginger Bill emphasising directness, low ceremony, and package-per-directory simplicity; uses collections (base, core, vendor) to group package roots; less rigidly DAG-enforcing than Go, less expressive than Rust's visibility lattice.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Odin (Ginger Bill, 2016+) is a systems programming language with a smaller and less formally layered module model than Rust's or Go's, but that simplicity is exactly why it is valuable as a reference point. Memory-allocator concerns live in `data/odin-allocator-api`. This record covers the module-system surface.",
+      "refs": [
+        { "target": "module-systems#core-design-axes", "type": "example" }
+      ]
+    },
+    {
+      "id": "package-per-directory",
+      "title": "Package-per-directory model",
+      "tags": ["odin", "module-systems", "packages"],
+      "content": "Odin organizes code around **packages**, with directory structure playing a large role in package identity and import organization. The official ecosystem is further described in terms of **collections** such as `base`, `core`, and `vendor`, which act as grouped roots of packages rather than as semantic language features in the ML sense.\n\nThe language aims for low ceremony. There is less emphasis on explicit module declarations as separate syntactic objects and more emphasis on \"code in this package directory belongs together.\" This makes the module/import system easy to explain and easy to operate in smaller codebases. It also fits Odin's broader philosophy of directness and low abstraction overhead.",
+      "refs": [
+        { "target": "go#packaging", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "Odin packages", "url": "https://odin-lang.org/docs/overview/#packages" }
+      ]
+    },
+    {
+      "id": "vs-rust-and-go",
+      "title": "Contrast with Rust and Go",
+      "tags": ["odin", "comparison", "design-space"],
+      "content": "Compared with Go, Odin appears less rigidly optimized around a package-DAG-as-compilation-machine story, at least in its public presentation. Compared with Rust, it offers less expressivity in visibility structure and fewer distinct layers between package, compilation unit, and published artifact. But the benefit is ergonomic clarity: code organization is visible from the filesystem and import paths without much extra language machinery.\n\nOdin is useful in two ways. First, it is a reminder that a systems language does not need Rust's level of module-system richness to be usable. A package-per-directory model with predictable import rules may be sufficient if the language's goals emphasize readability, straightforward tooling, and a relatively opinionated project layout. Second, Odin is a good counterweight to Go. Both lean on directory/package organization, but Go turns that into a hard architecture rule with cycle prohibition and capitalization-driven exports. Odin's ecosystem suggests a softer, more convention-shaped style — useful for calibrating how strict the rules should be.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Odin packages", "url": "https://odin-lang.org/docs/overview/#packages" },
+    { "label": "Odin import statements", "url": "https://odin-lang.org/docs/overview/#import-statements" }
+  ]
+}

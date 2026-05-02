@@ -1,0 +1,41 @@
+{
+  "kind": "tool",
+  "name": "PartitionAlloc",
+  "aliases": ["PartitionAlloc-Everywhere", "MiraclePtr", "BackupRefPtr"],
+  "summary": "Chrome's type/size-aware partitioned allocator with BackupRefPtr (MiraclePtr) refcount-based dangling-pointer protection — the most consequential exploit-mitigation deployed at scale on a memory-unsafe codebase.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "hardened-allocator", "production", "chromium"],
+      "content": "Chrome's PartitionAlloc uses type/size-aware partitioning: different \"partitions\" exist in disjoint address-space regions, and a freed slot can only be reused by an allocation of the same bucket *and* same partition, neutering most type-confusion exploits. PartitionAlloc-Everywhere routes all of Chrome's `malloc` to PA, so the protection covers the whole browser, not just designated security-critical code.\n\nPaired with BackupRefPtr (also called MiraclePtr), PartitionAlloc is the most consequential exploit-mitigation deployed at scale on a memory-unsafe codebase.",
+      "refs": [
+        { "target": "allocators#hardened-allocators", "type": "part-of" },
+        { "target": "scudo#overview", "type": "compared-with" },
+        { "target": "hardened-malloc#overview", "type": "compared-with" },
+        { "target": "cpp-standard-pointer-types#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "partitioning-and-miracleptr",
+      "title": "Partitioning and BackupRefPtr/MiraclePtr",
+      "tags": ["bin-segregated", "guard-page", "delayed-free", "out-of-line-metadata", "mte-integrated"],
+      "content": "2 MiB super-pages with permanently-inaccessible first/last partition pages act as guard pages; metadata sits in a dedicated, non-adjacent OOB region so a buffer overflow into adjacent allocations cannot rewrite allocator bookkeeping.\n\nBackupRefPtr / MiraclePtr stores a refcount per allocation. The Chromium smart-pointer type `raw_ptr<T>` increments that refcount on construction, so a freed slot is not really released until all dangling pointers drop. The effect: a use-after-free on a `raw_ptr<T>` becomes a memory leak or a non-security crash rather than an exploitable type-confusion. Integrates with ARM MTE on Android Pixel for additional hardware-tag enforcement.",
+      "refs": [
+        { "target": "arm-mte#overview", "type": "uses" },
+        { "target": "cpp-standard-pointer-types#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "chromium"],
+      "content": "Status (as of 2026-04): deployed across all Chromium-derived browsers (Chrome, Edge, Brave, Opera) reaching billions of users per public Chromium documentation; exact per-platform default scope is release-specific. MiraclePtr is the most consequential exploit-mitigation deployed at scale on a memory-unsafe codebase — it converts a category of bugs that would have been remote-code-execution into denial-of-service.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "PartitionAlloc design", "url": "https://chromium.googlesource.com/chromium/src/+/HEAD/base/allocator/partition_allocator/PartitionAlloc.md" },
+    { "label": "MiraclePtr blog (Google Security)", "url": "https://security.googleblog.com/2022/09/use-after-freedom-miracleptr.html" }
+  ]
+}

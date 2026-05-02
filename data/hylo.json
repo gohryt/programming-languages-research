@@ -1,0 +1,50 @@
+{
+  "kind": "language",
+  "name": "Hylo",
+  "aliases": ["Val", "hylo-lang"],
+  "summary": "Dimi Racordon and Dave Abrahams's Hylo (formerly Val) achieves memory safety without first-class references. Every binding is an independent value; the language exposes shared/mutable access only through compile-time projections with strictly bounded lifetimes. Four parameter conventions (let, inout, sink, set) replace references; subscripts that yield rather than return are the distinctive primitive. The Swiftlet calculus (JOT 2022) is the formal grounding.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["hylo", "value-semantics", "mvs", "ownership", "memory-safety", "compile-time-safety"],
+      "content": "Dimi Racordon and Dave Abrahams's **Hylo** (formerly Val) achieves memory safety *without first-class references*. Every binding is an independent value; the language exposes shared/mutable access only through compile-time *projections* with strictly bounded lifetimes.\n\nThe four parameter conventions — `let`, `inout`, `sink`, `set` — replace references; `inout` is \"copy-in / copy-out\" semantically but compiles to in-place mutation under the law of exclusivity.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Hylo language", "url": "https://www.hylo-lang.org/" },
+        { "label": "Mutable value semantics (JOT 2022)", "url": "https://www.jot.fm/issues/issue_2022_02/article2.pdf" }
+      ]
+    },
+    {
+      "id": "subscripts",
+      "title": "Subscripts that yield",
+      "tags": ["hylo", "subscript", "value-semantics", "lifetime"],
+      "content": "The distinctive primitive is **subscripts** that `yield` rather than `return`:\n\n```\nsubscript min(x: yielded T, y: yielded T): T { if cond { &x } else { &y } }\n```\n\nThe caller gets temporary access to a part of an existing value, with the variant (`let`/`inout`/`sink`) chosen at the call site. No lifetime annotations exist in surface syntax: aliasing constraints are inferred from projection nesting because a projection's lifetime is always \"until the call returns.\"",
+      "refs": [],
+      "sources": [
+        { "label": "Hylo subscripts language tour", "url": "https://docs.hylo-lang.org/language-tour/subscripts" }
+      ]
+    },
+    {
+      "id": "formal-grounding",
+      "title": "Swiftlet calculus and formal grounding",
+      "tags": ["hylo", "value-semantics", "static-analysis"],
+      "content": "The Swiftlet calculus (Racordon-Abrahams, JOT 2022) is the formal grounding for Hylo's mutable value semantics. The design contribution is showing that ambient mutable aliasing can be replaced entirely with compile-time projections — the language never offers first-class references, only call-bounded projections — yielding memory safety without a borrow checker, and without lifetime annotations in surface syntax.",
+      "refs": [
+        { "target": "ownership", "type": "contrasts-with" },
+        { "target": "borrowing", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Mutable value semantics (JOT 2022)", "url": "https://www.jot.fm/issues/issue_2022_02/article2.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Hylo language", "url": "https://www.hylo-lang.org/" },
+    { "label": "Mutable value semantics (JOT 2022)", "url": "https://www.jot.fm/issues/issue_2022_02/article2.pdf" },
+    { "label": "Hylo subscripts language tour", "url": "https://docs.hylo-lang.org/language-tour/subscripts" }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "kind": "language",
+  "name": "Carbon",
+  "aliases": ["carbon-lang"],
+  "summary": "Google's experimental C++ successor (announced CppNow 2022, lead by Chandler Carruth) with modules designed against the lessons of the C++20 modules and JPMS retrofits: explicit package/library declarations, API/impl file split, per-API-element export markers, strict acyclic imports, build-system-managed module identity — modules from day 1 with no migration debt.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Google's **Carbon** (announced CppNow 2022, lead by Chandler Carruth) is an experimental C++ successor language with a module system designed against the lessons of the C++20 modules retrofit (`data/cpp20-modules`) and the JPMS retrofit (`data/java#jpms-module-info`).\n\nUnlike C++20, Carbon makes modules the primary unit from version 1; unlike JPMS, modules are language-level rather than artifact-level; unlike Rust, the module-and-package layering is co-designed with the build system from the start.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "cpp20-modules#header-units-and-migration", "type": "learns-from" },
+        { "target": "java#jpms-adoption-and-cost", "type": "learns-from" }
+      ]
+    },
+    {
+      "id": "module-design-points",
+      "title": "Carbon module design points",
+      "tags": ["carbon", "modules", "design"],
+      "content": "Carbon's module design (still evolving; Carbon is pre-1.0, status as of 2026-04):\n\n- **Explicit `package` and `library` declarations**: every Carbon source file declares its package and library at the top via `package Foo library \"Bar\" api;` (or `impl` for implementation files). Imports are `import Foo library \"Bar\";` — the package name resolves through a dependency manifest, the library name resolves within the package.\n- **API/impl file split**: Carbon distinguishes API files (the public-interface files, similar to Ada's specification or OCaml's `.mli`) from impl files (the implementation bodies). API files are the only thing visible to importers; impl files supply the bodies.\n- **Per-API-element export markers**: API files use the `api` modifier on declarations (similar to Nim's `*` marker but as an explicit keyword). The visibility decision is locally visible at every declaration.\n- **Strict acyclic imports**: cycles are forbidden between libraries within a package and between packages. The language statically rejects cyclic dependency graphs, following Go rather than Python.\n- **Toolchain-managed module identity**: a `BUILD` file (similar to Bazel's) names libraries and their dependencies, mapping language-level imports to artifact-level builds. Carbon explicitly accepts that build-tool and language are co-designed.",
+      "refs": [
+        { "target": "ada#package-specification-body-split", "type": "inspired-by" },
+        { "target": "go#package-dag-and-cycles", "type": "inspired-by" }
+      ],
+      "sources": [
+        { "label": "Carbon — modules design", "url": "https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/modules.md" }
+      ]
+    },
+    {
+      "id": "modules-from-day-1-claim",
+      "title": "Modules from day 1 — no migration debt",
+      "tags": ["carbon", "design-guidance", "ecosystem"],
+      "content": "The distinguishing claim is that **Carbon learns from the C++20 retrofit**: by making modules the *only* unit from day 1, Carbon avoids the migration overhead that left half of C++'s ecosystem still on `#include` in 2026.\n\nThe cost is that Carbon has no existing ecosystem to consume — every dependency must be Carbon-native, with C++ interop via a dedicated FFI layer rather than `import` of C++ headers. The interop story is structurally distinct: Carbon defines a controlled interop surface for calling into and out of C++ libraries, but Carbon imports do not see C++ headers as modules."
+    },
+    {
+      "id": "status-and-takeaway",
+      "title": "Status and design takeaway",
+      "tags": ["carbon", "production"],
+      "content": "Status (as of 2026-04): Carbon is pre-1.0, not production-ready. The published 2025 roadmap targeted two areas of focus: a \"major chunk of C++ interop working\" demo and the design of memory safety; both are still in progress as of early 2026. The language is being developed in the open at `github.com/carbon-language/carbon-lang`; the explicit non-goal is \"stable enough for production today.\"\n\nFor module-system designers, Carbon is the cleanest current example of \"modules from day 1, no migration debt\" in a C-family successor language — even if Carbon itself never reaches production, its module-system design choices are an instructive data point on what can be done when the migration constraint is removed.",
+      "refs": [],
+      "sources": [
+        { "label": "Carbon repository", "url": "https://github.com/carbon-language/carbon-lang" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Carbon — modules design", "url": "https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/modules.md" },
+    { "label": "Carbon repository", "url": "https://github.com/carbon-language/carbon-lang" },
+    { "label": "Carbon — code organization", "url": "https://github.com/carbon-language/carbon-lang/blob/trunk/docs/design/code_and_name_organization/README.md" }
+  ]
+}

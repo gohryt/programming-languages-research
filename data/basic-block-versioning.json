@@ -1,0 +1,70 @@
+{
+  "kind": "concept",
+  "name": "Basic Block Versioning",
+  "aliases": [
+    "BBV",
+    "lazy basic block versioning"
+  ],
+  "summary": "Maxime Chevalier-Boisvert's BBV: lazily generate per-block specialised variants based on observed types, without tracing or method-level versioning. Each basic block can have multiple type-specialised versions; selection happens per-edge based on the predecessor's specialisation. Powers Ruby's YJIT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Basic Block Versioning** (Maxime Chevalier-Boisvert) lazily generates per-block specialised variants based on observed types — without tracing or method-level versioning. Each basic block can have multiple type-specialised versions; selection happens per-edge based on the predecessor block's specialisation context.\n\nBBV's appeal: it captures most of tracing's path-specialised performance with simpler implementation. Where tracing JITs record long sequences of inlined operations and pay trace-explosion costs, BBV specialises one block at a time and compiles only the type combinations that actually occur at each edge.",
+      "refs": [
+        {
+          "target": "trace-based-jit#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "osr-deoptimization#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Basic Block Versioning (Chevalier-Boisvert)",
+          "url": "https://chrisseaton.com/truffleruby/basic-block-versioning/"
+        }
+      ]
+    },
+    {
+      "id": "lazy-bbv",
+      "title": "Lazy BBV",
+      "tags": [
+        "jit",
+        "optimization"
+      ],
+      "content": "The original 2015 OOPSLA paper (\"Simple and Effective Type Check Removal Through Lazy Basic Block Versioning\") introduced the lazy variant: don't pre-compute all type combinations; specialise blocks on demand as new type contexts arrive.\n\nThe runtime starts with one unspecialised version of each basic block. When a block is reached with type context X, generate version-X if it doesn't exist, and link the predecessor's exit to the new version. As the program runs, the set of versions grows to cover the actually-occurring type combinations. Versions that prove rarely used can be discarded; commonly used ones become the steady-state JIT output.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Lazy BBV (OOPSLA 2015)",
+          "url": "https://dl.acm.org/doi/10.1145/2816707.2816714"
+        }
+      ]
+    },
+    {
+      "id": "yjit",
+      "title": "Ruby YJIT — production BBV",
+      "tags": [
+        "ruby",
+        "jit",
+        "production"
+      ],
+      "content": "Ruby's YJIT (Chevalier-Boisvert et al., shipping in Ruby 3.1+) is the most prominent production deployment of BBV. The implementation is in Rust (since Ruby 3.2); typical workloads see 30–50% speedup over the standard interpreter, with predictable warm-up behaviour and low memory overhead compared to a method-level optimising JIT.\n\nThe lesson generalises: BBV is the right design point for languages where method-level specialisation is too coarse but full tracing is too elaborate. It hits a sweet spot of implementation simplicity, fast warm-up, and adequate steady-state performance for many dynamic-language workloads.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "BBV (Seaton TruffleRuby blog)",
+      "url": "https://chrisseaton.com/truffleruby/basic-block-versioning/"
+    },
+    {
+      "label": "Lazy BBV OOPSLA 2015",
+      "url": "https://dl.acm.org/doi/10.1145/2816707.2816714"
+    }
+  ]
+}

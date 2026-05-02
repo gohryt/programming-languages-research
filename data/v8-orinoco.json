@@ -1,0 +1,33 @@
+{
+  "kind": "runtime",
+  "name": "V8 Orinoco — Hybrid Generational Concurrent",
+  "aliases": ["Orinoco", "V8 GC", "V8 Orinoco GC"],
+  "summary": "V8's Orinoco combines parallel, concurrent, and incremental techniques across a generational heap (Scavenger young-gen + Mark-Compact major) to push GC work off the main JS thread.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "generational-gc", "parallel-gc", "concurrent-gc", "incremental-gc", "compacting-gc", "v8", "chromium", "production", "default-collector"],
+      "content": "V8's **Orinoco** combines parallel, concurrent, and incremental techniques across a generational heap (Scavenger young-gen + Mark-Compact major) to push GC work off the main JS thread. Default in Chrome / Node.js; stable production since ~2017.",
+      "refs": [
+        { "target": "garbage-collection#v8-and-lua-collectors", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "concurrent-marking",
+      "title": "Concurrent marking and parallel scavenging",
+      "tags": ["concurrent-marking", "parallel-gc", "write-barrier"],
+      "content": "**Concurrent marking** with helper threads + write-barrier-tracked refs; main thread does only a brief marking-finalization pause. **Parallel Scavenger** and **parallel compaction** reduced compaction time from ~7 ms to under 2 ms; concurrent sweeping runs alongside JS execution.\n\nBlack allocation, parallel remembered-set processing, and **Oilpan integration** for Blink/C++ tracing across the JS heap boundary. Oilpan is what makes V8's GC reach into Chrome's DOM/C++ world without a separate collector for each side."
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment and significance",
+      "tags": ["v8", "chromium", "production", "default-collector"],
+      "content": "Default in Chrome / Node.js; stable production since ~2017.\n\nOrinoco is the largest-deployment example of \"hybrid\" GC design: rather than picking parallel vs. concurrent vs. incremental, V8 uses each technique where it pays off best — Scavenger is parallel STW (young heap, short pauses), major marking is concurrent (background threads), compaction is parallel STW (with concurrent sweeping). The combination keeps the JS main thread responsive even under heavy allocation."
+    }
+  ],
+  "sources": [
+    { "label": "V8 Orinoco", "url": "https://v8.dev/blog/orinoco" },
+    { "label": "V8 — \"Trash talk\" Orinoco intro", "url": "https://v8.dev/blog/trash-talk" }
+  ]
+}

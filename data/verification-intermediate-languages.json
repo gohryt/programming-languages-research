@@ -1,0 +1,70 @@
+{
+  "kind": "concept",
+  "name": "Verification Intermediate Languages",
+  "aliases": ["vil-family", "boogie-viper-whyml-fstar-lowstar"],
+  "summary": "ILs designed not to be compiled but to be discharged by a theorem prover. Boogie (imperative + axioms; backbone of Spec#, VCC, Dafny, Move Prover), Viper/Silver (separation logic; backbone of Prusti, Nagini, VerCors, Gobra), WhyML (functional + multi-prover dispatch; backbone of Frama-C, SPARK, Creusot), F\\* Low\\* / KaRaMeL (verified C-extractable subset; backbone of Project Everest).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The complementary representation family to verification-typed IRs (Verus, RustBelt) is the **verification intermediate language** (VIL): an IR designed not to be compiled but to be discharged by a theorem prover. The same architectural principle as MLIR — multiple frontend languages share one mid-level substrate — but applied to verification rather than codegen. Each entry below is the lingua franca of an entire verifier ecosystem.",
+      "refs": [
+        { "target": "mlir#overview", "type": "shares-pattern-with" },
+        { "target": "dafny#overview", "type": "consumed-by" },
+        { "target": "fstar#overview", "type": "consumed-by" },
+        { "target": "move-language#bytecode-verifier", "type": "consumed-by" }
+      ],
+      "sources": [
+        { "label": "Boogie verifier project", "url": "https://github.com/boogie-org/boogie" },
+        { "label": "Viper / Silver project (ETH Zurich)", "url": "https://www.pm.inf.ethz.ch/research/viper.html" },
+        { "label": "Why3 home", "url": "https://why3.lri.fr/" },
+        { "label": "KaRaMeL (F\\* extraction to C)", "url": "https://github.com/FStarLang/karamel" }
+      ]
+    },
+    {
+      "id": "boogie",
+      "title": "Boogie — imperative VIL with axioms",
+      "tags": ["verification", "vil", "imperative"],
+      "content": "**Boogie** (Microsoft Research, K. Rustan M. Leino, 2007+) is the workhorse VIL: an imperative language with first-class procedures, modifies clauses, pre/post-conditions, axioms, and assertions, designed to be the target of higher-level verifiers. **Spec#** compiles to Boogie; **VCC** (verifying C compiler) compiles to Boogie; **Dafny** compiles to Boogie; **Chalice** compiles to Boogie; **Move Prover** (Diem/Aptos blockchain verification) compiles to Boogie. Each frontend translates its surface language into Boogie's imperative-with-assertions IR and lets Boogie's verification condition generator + Z3 (or other SMT solvers) discharge the proof obligations. The IR-design lesson: a small imperative VIL with built-in modifies clauses scales to verifying tens of thousands of lines of source code per frontend.",
+      "refs": []
+    },
+    {
+      "id": "viper",
+      "title": "Viper / Silver — separation-logic VIL",
+      "tags": ["verification", "vil", "separation-logic"],
+      "content": "**Viper / Silver** (ETH Zurich, Schwerhoff, Müller et al., 2015+) is the **separation-logic equivalent**: an imperative VIL where assertions are separation-logic predicates with explicit ownership transfer (`acc(x.f, write)` is \"the program holds write-permission to field f of x\"). **Prusti** compiles Rust to Viper; **Nagini** compiles annotated Python to Viper; **VerCors** compiles Java/PVL to Viper; **Gobra** compiles Go to Viper. The frontends share Viper's permission-based reasoning rather than reinventing it per language. Distinct from Boogie: Viper has separation logic primitives in the core language, where Boogie axiomatises them via per-frontend encodings.",
+      "refs": []
+    },
+    {
+      "id": "whyml",
+      "title": "WhyML — functional VIL with multi-prover dispatch",
+      "tags": ["verification", "vil", "functional"],
+      "content": "**WhyML** (Why3, INRIA — Filliâtre, Marché, Paskevich, 2010+) is the **functional VIL**: a purely-functional ML-like language with refinement types and ghost code, used by **Frama-C** (C verification via the C-to-WhyML compiler), **SPARK** (Ada verification), and **Creusot** (Rust verification via prophetic borrows). WhyML's distinctive choice is **multi-prover backend dispatch**: a single Why3 verification condition is offered to Z3, CVC4/CVC5, Alt-Ergo, Vampire, and Coq simultaneously, with the user choosing which prover to pursue per goal. This makes Why3 robust to per-prover regressions and lets users combine SMT speed with interactive-prover precision on hard goals.",
+      "refs": []
+    },
+    {
+      "id": "fstar-lowstar",
+      "title": "F\\* Low\\* / KaRaMeL — systems-verification VIL family",
+      "tags": ["verification", "vil", "systems"],
+      "content": "**F\\* Low\\* / KaRaMeL pipeline** (Project Everest) is the systems-verification VIL family. F\\* is the surface language with effects and refinement; **Low\\*** (ICFP 2017) is the C-extractable subset with a stack/heap memory model; **KaRaMeL** (formerly KreMLin) extracts Low\\* programs to readable C. The IR-design lesson is that **a verification-focused IL paired with a code-extractable subset gives both proof and production binary from one source** — HACL\\*, EverCrypt, EverParse, and the Linux kernel WireGuard implementation all ship via this pipeline.",
+      "refs": []
+    },
+    {
+      "id": "design-lesson",
+      "title": "Architectural lesson",
+      "tags": ["verification", "compiler-design"],
+      "content": "The architectural lesson generalising these four: **separating the verification IL from the surface language is the right scaling move**. Each surface language compiles to one of these VILs, the VILs themselves are stable enough to maintain over decades, and prover advancements (Z3, CVC5) propagate to all frontends simultaneously. Compare MLIR's dialect framework: the shape is the same — one framework hosting multiple frontend translations into a small set of mid-level substrates — applied to verification rather than compilation.",
+      "refs": [
+        { "target": "mlir-verification-dialects#overview", "type": "compares-to" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Boogie verifier project", "url": "https://github.com/boogie-org/boogie" },
+    { "label": "Viper / Silver project (ETH Zurich)", "url": "https://www.pm.inf.ethz.ch/research/viper.html" },
+    { "label": "Why3 home", "url": "https://why3.lri.fr/" },
+    { "label": "KaRaMeL (F\\* extraction to C)", "url": "https://github.com/FStarLang/karamel" },
+    { "label": "Aldrich — Lecture notes on Boogie (CMU 17-355)", "url": "https://www.cs.cmu.edu/~aldrich/courses/17-355-19sp/notes/notes-Boogie.pdf" }
+  ]
+}

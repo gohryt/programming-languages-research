@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "Name Resolution and Symbol Binding",
+  "aliases": ["resolver", "symbol-binding"],
+  "summary": "The compiler phase or service that maps identifiers to declarations and scopes before type checking can run. Covers pre-typing vs interleaved resolution, stable symbol identities for incremental compilation and cross-references, and the surface a language server consumes.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Before a type checker can reason about a program, identifiers must be bound to declarations and scopes must be modelled. The resolver maps identifiers to declarations, handles lexical scopes, imports, module aliases, prelude visibility, shadowing, and sometimes overload sets.\n\nThe distinguishing axis across resolvers is whether name resolution runs *before* type checking, *during* type checking, or through a query system that interleaves the two. Pre-typing resolution is simpler and gives clear duplicate-name and unknown-name diagnostics. Interleaved resolution is needed when overloads, type-directed lookup, extension methods, implicits, macros, or dependent module paths affect what a name denotes.",
+      "refs": [
+        { "target": "scope-graphs#overview", "type": "alternative-architecture" },
+        { "target": "language-server#frontend-architecture-requirements", "type": "consumed-by" }
+      ]
+    },
+    {
+      "id": "pre-typing-vs-interleaved",
+      "title": "Pre-typing vs interleaved resolution",
+      "tags": ["compiler-architecture", "name-resolution"],
+      "content": "A pre-typing resolver runs as its own phase: AST in, name-resolved AST out, with every identifier bound to a definition site or flagged as unknown. This is the architecture in Rust (early-pass `Resolver`), Go (package-level resolution before typing), and most ML descendants.\n\nAn interleaved resolver runs name resolution and type checking together. This is required when:\n\n- overload sets depend on the expected type (Java method overloading, C++ ADL, Swift overload resolution);\n- extension methods or implicits add to the visible name set after types are known;\n- dependent module paths (Scala `p.T`, OCaml `M.t`) make the meaning of a name depend on a value-level path;\n- macro expansion changes the scope at the point of use, requiring scopes to be re-built incrementally.\n\nThe trade-off is diagnostic clarity versus expressive power: pre-typing resolution gives clean \"unknown name\" errors, while interleaved resolution can express overload-driven and type-directed lookup at the cost of more entangled error messages."
+    },
+    {
+      "id": "symbols-and-stable-identity",
+      "title": "Symbols, definitions, and stable identity",
+      "tags": ["compiler-architecture", "incrementality"],
+      "content": "A compiler usually needs stable symbol identities distinct from source spelling. A symbol may represent a local variable, type parameter, module, type constructor, trait, method, associated type, field, label, effect, capability, or generated compiler artifact.\n\nStable identities help incremental compilation, caching, cross-reference indexes, language-server rename, and serialized metadata. If symbol identity is path-based, package-based, or declaration-based, the module system must make that policy explicit — package identity itself is owned by `data/module-identity` and `data/package-management`.\n\nThe rust-analyzer and gopls language servers both invest heavily in symbol identities that survive edits: a rename on line 5 should not invalidate the symbol identity of an unrelated declaration on line 500.",
+      "refs": [
+        { "target": "module-identity#overview", "type": "depends-on" },
+        { "target": "salsa-incremental#overview", "type": "consumed-by" }
+      ]
+    }
+  ]
+}

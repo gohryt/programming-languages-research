@@ -1,0 +1,9 @@
+{
+  "id": "scheduler",
+  "tag": "scheduler",
+  "name": "Scheduler",
+  "description": "Sections tagged with the Scheduler concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "schedulers"
+  ]
+}

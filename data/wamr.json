@@ -1,0 +1,59 @@
+{
+  "kind": "runtime",
+  "name": "WebAssembly Micro Runtime (WAMR)",
+  "aliases": [
+    "wasm-micro-runtime"
+  ],
+  "summary": "Bytecode Alliance embedded-targeted Wasm runtime: C, kilobyte-budget, multi-mode execution (interpreter / fast interpreter / AOT / JIT). Supports Wasmtime-class semantics on MCU-class hardware. Multi-mode design lets the same module run differently across deployment contexts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "WebAssembly Micro Runtime (WAMR), maintained by the Bytecode Alliance, is the embedded-targeted Wasm runtime. Written in C with a kilobyte-budget footprint, it targets MCU-class and small-Linux deployments where the multi-megabyte runtimes (Wasmtime, Wasmer, WAVM) are too heavy.",
+      "refs": [
+        {
+          "target": "wasmer#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "wavm#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "WebAssembly Micro Runtime",
+          "url": "https://github.com/bytecodealliance/wasm-micro-runtime"
+        }
+      ]
+    },
+    {
+      "id": "multi-mode-execution",
+      "title": "Multi-mode execution",
+      "tags": [
+        "wasm",
+        "embedded"
+      ],
+      "content": "WAMR supports multiple execution modes that can be selected per deployment:\n\n- **Classic interpreter** — smallest footprint, lowest performance.\n- **Fast interpreter** — somewhat faster via decoded bytecode pre-processing, slightly larger footprint.\n- **AOT (ahead-of-time)** — compile to native at build time, ship the native code; near-native performance, no runtime compilation.\n- **JIT** — runtime LLVM compilation when available; useful for dynamic deployment.\n\nThe multi-mode design lets the same Wasm module run on a Cortex-M MCU (interpreter mode, kilobytes of RAM) and on a Linux server (AOT or JIT mode, native performance) with no source change.",
+      "refs": []
+    },
+    {
+      "id": "design-implication",
+      "title": "Design implication",
+      "tags": [
+        "wasm",
+        "embedded",
+        "deployment"
+      ],
+      "content": "The Wasm runtime spectrum spans from QuickJS-class interpreter-only embedded engines (kilobyte footprint, slow) through WAMR (kilobyte to megabyte footprint, choose-your-mode) up to LLVM-only WAVM (megabyte footprint, peak performance). For language designers compiling to Wasm, WAMR provides the broadest deployment surface — the same artifact runs across the spectrum without recompilation.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "WAMR repository",
+      "url": "https://github.com/bytecodealliance/wasm-micro-runtime"
+    }
+  ]
+}

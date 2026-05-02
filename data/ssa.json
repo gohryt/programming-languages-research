@@ -1,0 +1,81 @@
+{
+  "kind": "concept",
+  "name": "SSA",
+  "aliases": ["static-single-assignment"],
+  "summary": "Every value assigned exactly once, with φ-functions or block parameters at control-flow joins. The dominant IR shape for modern imperative compilers; varies by surrounding graph structure (linear blocks, sea-of-nodes, linear-with-side-tables, trace-form).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "SSA — every variable assigned exactly once, with φ-functions at join points — is the dominant IR shape for modern imperative compilers.\n\nThe distinguishing axis across implementations is what graph structure SSA sits inside: linear basic blocks (LLVM IR, Cranelift CLIF, Bril), sea-of-nodes (HotSpot C2, V8 TurboFan), linear-with-side-tables (V8 Turboshaft), or trace-form (LuaJIT). The trade-off is global-scheduling freedom (sea-of-nodes maximum, linear blocks minimum) vs cache locality and compile-time predictability (linear blocks better than graphs).",
+      "refs": [
+        { "target": "llvm#ir", "type": "exemplified-by" },
+        { "target": "cranelift#overview", "type": "exemplified-by" },
+        { "target": "sea-of-nodes#overview", "type": "alternative-graph-shape" },
+        { "target": "v8-turbofan#overview", "type": "exemplified-by" },
+        { "target": "v8-turboshaft#overview", "type": "exemplified-by" },
+        { "target": "luajit-ir#overview", "type": "trace-form" },
+        { "target": "ghc-cmm#overview", "type": "exemplified-by" },
+        { "target": "bril#overview", "type": "minimal-form" },
+        { "target": "rvsdg#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        {
+          "label": "SSA form (Wikipedia)",
+          "url": "https://en.wikipedia.org/wiki/Static_single-assignment_form"
+        }
+      ]
+    },
+    {
+      "id": "why-compilers-use-ssa",
+      "title": "Why compilers use SSA",
+      "tags": ["compiler-ir", "optimization"],
+      "content": "SSA simplifies use-def chains: every value has exactly one definition, so reaching-definitions analysis is implicit in the IR rather than a separate dataflow pass. This makes many classic analyses and optimizations more direct: constant propagation, dead code elimination, sparse conditional constant propagation, global value numbering, and several register-allocation strategies all benefit from explicit value-flow structure.\n\nKelsey (1995) showed a formal correspondence: CPS and SSA are essentially the same — SSA's φ-functions correspond to CPS's continuation parameters, and SSA's basic blocks correspond to CPS's continuation lambdas.",
+      "refs": [
+        { "target": "llvm#optimization", "type": "powers" },
+        { "target": "cranelift#overview", "type": "powers" }
+      ]
+    },
+    {
+      "id": "core-mechanics",
+      "title": "Core mechanics: φ vs block parameters",
+      "tags": ["compiler-ir", "control-flow", "dataflow"],
+      "content": "SSA is built around basic blocks, value definitions, and merge points at control-flow joins. Different SSA families represent merges differently:\n\n- **Explicit phi nodes** (LLVM IR): a φ instruction at the start of a block lists `(value, predecessor block)` pairs. The instruction has no run-time semantics; it is a definitional placeholder.\n- **Block parameters** (Cranelift CLIF, MLIR, Swift SIL): each block declares parameters, and branch instructions pass arguments. φ-functions are eliminated in favour of explicit dataflow at the branch.\n\nBlock parameters are widely considered cleaner — branch instructions name their arguments — but require giving up some optimization passes that exploit phi-instruction structure directly.",
+      "refs": [
+        { "target": "mlir#overview", "type": "uses-block-parameters" },
+        { "target": "sea-of-nodes#structure-and-semantics", "type": "alternative-form" }
+      ]
+    },
+    {
+      "id": "limits-of-ssa",
+      "title": "Limits of SSA",
+      "tags": ["compiler-ir", "tradeoffs", "analysis"],
+      "content": "SSA makes scalar value flow explicit, but it does not by itself solve memory effects, aliasing, heap state, or every control-flow subtlety. Real compilers still need:\n\n- **Memory SSA** or alias analysis to reason about loads/stores.\n- **Effect modeling** (LLVM `nounwind`, `nosync`, `nofree` attributes; Swift SIL effects) for reordering across calls.\n- **Region-based or capability-based reasoning** for ownership and lifetime analyses (Rust MIR adds borrows on top of SSA).\n\nThis is why production compilers layer SSA inside a richer mid-level IR rather than treating SSA as the final analysis form.",
+      "refs": [
+        { "target": "mid-level-ir#why-this-layer-exists", "type": "extends" },
+        { "target": "garbage-collection#overview", "type": "interacts-with" }
+      ]
+    },
+    {
+      "id": "jit-and-runtime-relevance",
+      "title": "JIT and runtime relevance",
+      "tags": ["jit", "runtime-design", "compiler-ir"],
+      "content": "SSA is used in both AOT compilers and JIT compilers because it gives optimization tiers a precise way to reason about value flow.\n\nIn JITs, SSA shape interacts with deoptimization metadata: each speculative operation must know how to bail to a lower tier with reconstructed program state. Sea-of-nodes JITs (HotSpot C2, V8 TurboFan, Graal) attach deopt info at every speculative node; linear-SSA JITs (Cranelift, V8 Turboshaft, V8 Maglev) attach inline deopt records to instructions. The choice of SSA graph structure shapes how that metadata is threaded.",
+      "refs": [
+        { "target": "tiered-compilation#common-architecture-patterns", "type": "powers" },
+        { "target": "copy-and-patch#overview", "type": "alternative-to" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "SSA form (Wikipedia)",
+      "url": "https://en.wikipedia.org/wiki/Static_single-assignment_form"
+    },
+    {
+      "label": "LLVM Language Reference",
+      "url": "https://llvm.org/docs/LangRef.html"
+    }
+  ]
+}

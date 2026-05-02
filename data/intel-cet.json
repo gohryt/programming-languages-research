@@ -1,0 +1,32 @@
+{
+  "kind": "concept",
+  "name": "Intel CET — Control-flow Enforcement Technology",
+  "aliases": ["CET", "Intel CET", "Control-flow Enforcement Technology", "CET-IBT", "Hardware-enforced Stack Protection"],
+  "summary": "Intel's hardware control-flow integrity: a hardware shadow stack (CALL pushes return addr; RET checks mismatch) plus Indirect Branch Tracking (indirect CALL/JMP must land on ENDBR opcode). Ships on Tiger Lake (11th gen, 2020) and later, AMD Zen 3+. Linux 6.4 (2023) added userspace shadow stack. Mainstream now.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["shadow-stack", "cfi", "indirect-branch-tracking", "x86", "production", "rop-mitigation", "exploit-mitigation", "memory-safety"],
+      "content": "Intel's **Control-flow Enforcement Technology** combines a hardware shadow stack (CALL pushes return addr; RET checks mismatch → #CP fault) and Indirect Branch Tracking (indirect CALL/JMP must land on `ENDBR` opcode). Shadow stack lives in special read-only-to-userspace pages; speculation also limited to ~2 instructions past non-ENDBR targets (Alder Lake+).\n\nCET attacks the same exploit class as ARM PAC — backward- and forward-edge control-flow integrity — but uses a hardware-managed shadow stack rather than cryptographic pointer signing.",
+      "refs": [
+        { "target": "arm-pac", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "x86", "shadow-stack", "indirect-branch-tracking"],
+      "content": "Ships on Tiger Lake (11th gen, 2020) and later, AMD Zen 3+. Linux: CET-IBT in 5.18, **userspace shadow stack in 6.4 (2023)**. Windows 11 enables Hardware-enforced Stack Protection. Mainstream now.",
+      "refs": [],
+      "sources": [
+        { "label": "Linux shadow stack docs", "url": "https://docs.kernel.org/next/x86/shstk.html" },
+        { "label": "Phoronix — Intel CET-IBT for Linux 5.18", "url": "https://www.phoronix.com/news/Intel-CET-IBT-For-Linux-5.18" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Linux shadow stack docs", "url": "https://docs.kernel.org/next/x86/shstk.html" },
+    { "label": "Phoronix — Intel CET-IBT for Linux 5.18", "url": "https://www.phoronix.com/news/Intel-CET-IBT-For-Linux-5.18" }
+  ]
+}

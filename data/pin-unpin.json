@@ -1,0 +1,48 @@
+{
+  "kind": "concept",
+  "name": "Pin / Unpin and Async Lifetimes",
+  "aliases": ["Pin", "Unpin", "rust-pin", "pin-projection"],
+  "summary": "Library-level rather than language-level mechanism for address stability, needed because async desugars to self-referential state machines that cannot tolerate moves. Pin<P> is a wrapper proving the pointee won't move until dropped; Unpin is an opt-out auto-trait. Future::poll(self: Pin<&mut Self>, ...) threads the pin through every poll. The drop guarantee — once pinned, drop runs before the memory is reused — is what intrusive data structures actually rely on. Pin stabilized Rust 1.33 (February 2019); async/await 1.39 (November 2019).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["pin-projection", "rust", "lifetime", "async-await", "memory-safety"],
+      "content": "**Pin/Unpin** is a library-level rather than language-level mechanism for *address stability*, needed because async desugars to self-referential state machines that cannot tolerate moves.\n\n`Pin<P>` is a wrapper proving the pointee won't move until dropped; `Unpin` is an opt-out auto-trait declaring \"I don't care about address stability.\" `Future::poll(self: Pin<&mut Self>, ...)` threads the pin through every poll, making self-referential `async fn` state machines sound without compiler support.",
+      "refs": [
+        { "target": "borrowing", "type": "related" },
+        { "target": "ownership", "type": "related" },
+        { "target": "rust", "type": "exemplified-by" },
+        { "target": "async-await", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Pin documentation", "url": "https://doc.rust-lang.org/std/pin/" },
+        { "label": "without.boats on pin", "url": "https://without.boats/blog/pin/" }
+      ]
+    },
+    {
+      "id": "drop-guarantee-and-intrusive-structures",
+      "title": "Drop guarantee and intrusive data structures",
+      "tags": ["pin-projection", "memory-safety", "async-await"],
+      "content": "The **drop guarantee** — once pinned, `drop` runs before the memory is reused — is what intrusive data structures (e.g. tokio's linked lists) actually rely on. Pin's safety contract is therefore not only about address stability during normal execution but also about destruction ordering.",
+      "refs": []
+    },
+    {
+      "id": "library-only-character",
+      "title": "Why Pin is library-only",
+      "tags": ["pin-projection", "rust", "language-design"],
+      "content": "Pin stabilized in Rust 1.33 (February 2019); async/await in 1.39 (November 2019). The library-only character is unusual: Rust's ownership machinery is rich enough to express \"addresses are stable until destruction\" without a new language feature.\n\nC++20 coroutines face the same self-reference problem and resolve it differently: coroutine frames are heap-allocated by default and accessed indirectly through `coroutine_handle`, sidestepping the address-stability question by making the frame's address fixed by allocation rather than by type discipline.",
+      "refs": [
+        { "target": "async-await", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Async book pinning chapter", "url": "https://rust-lang.github.io/async-book/part-reference/pinning.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Pin documentation", "url": "https://doc.rust-lang.org/std/pin/" },
+    { "label": "without.boats on pin", "url": "https://without.boats/blog/pin/" },
+    { "label": "Async book pinning chapter", "url": "https://rust-lang.github.io/async-book/part-reference/pinning.html" }
+  ]
+}

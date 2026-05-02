@@ -1,0 +1,31 @@
+{
+  "kind": "tool",
+  "name": "Flux — Refinement Types for Rust on MIR",
+  "aliases": ["flux", "flux-refinement"],
+  "summary": "Lehmann, Geller, Vazou, Jhala, Lerner (PLDI 2023): brings LiquidHaskell-style refinement to Rust on top of MIR. Leverages Rust's ownership for soundness rather than fighting it — Rust's affinity discipline makes the implicit-pointer-aliasing problem (the worst case for refinement-type SMT encodings) tractable.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Flux (Lehmann, Geller, Vazou, Jhala, Lerner — PLDI 2023) brings LiquidHaskell-style refinement to **Rust on top of MIR**, leveraging Rust's ownership for soundness rather than fighting it.\n\nThis combination is novel because **Rust's affinity discipline makes the implicit-pointer-aliasing problem (the worst case for refinement-type SMT encodings) tractable**. Refinement types over imperative languages typically struggle with mutation and aliasing — when two pointers may alias, every write through one invalidates refinement facts about the other, leading to either soundness leaks or excessive proof obligations. Rust's borrow checker eliminates the ambiguity at the language level, so the refinement checker can use a clean separation-logic-flavoured discipline without an aliasing analysis of its own.",
+      "refs": [
+        { "target": "refinement-types#overview", "type": "implements" },
+        { "target": "liquid-haskell#liquid-algorithm", "type": "ports" },
+        { "target": "rust-hir-thir-mir#overview", "type": "operates-on" }
+      ],
+      "sources": [
+        { "label": "Flux refinement types for Rust", "url": "https://flux-rs.github.io/flux/" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — affinity makes refinement easier",
+      "tags": ["refinement-types", "rust", "ownership"],
+      "content": "Flux exemplifies a broader pattern: **language features that statically rule out aliasing are dual-use** — they are useful for memory safety, useful for concurrency, and useful for refinement-type encodings. A language designer adding affinity, ownership, or linear types can expect refinement-type tooling to be substantially easier to build on top.\n\nThe converse is also informative: refinement-type tools for languages without affinity (LiquidHaskell on Haskell, Dafny's general framing) handle aliasing through immutability or whole-program ownership analysis. Those approaches work, but Flux shows the architectural simplification when affinity is already present in the host language."
+    }
+  ],
+  "sources": [
+    { "label": "Flux refinement types for Rust", "url": "https://flux-rs.github.io/flux/" }
+  ]
+}

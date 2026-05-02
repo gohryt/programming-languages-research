@@ -1,0 +1,42 @@
+{
+  "kind": "framework",
+  "name": "MPS — Memory Pool System as Pluggable GC Framework",
+  "aliases": ["MPS", "Memory Pool System", "Ravenbrook MPS"],
+  "summary": "Ravenbrook's Memory Pool System (MPS, 1994+) is a flexible GC framework distinct from BDW's single-collector model: MPS supports both precise and conservative scanning and is structured around pool classes that the application chooses per allocation domain.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "pluggable-gc", "framework", "production"],
+      "content": "Ravenbrook's **Memory Pool System** (MPS, 1994+) is a flexible GC framework distinct from BDW's single-collector model: MPS supports **both precise and conservative scanning** and is structured around **pool classes** that the application chooses per allocation domain.\n\nA program can mix mark-sweep (`AMC`), copying (`AMS`), automatic mark-compact, and reference-counted pools in one heap, with MPS providing the underlying root scanning, write barriers, and GC scheduling.",
+      "refs": [
+        { "target": "garbage-collection#conservative-and-frameworks", "type": "instance-of" },
+        { "target": "boehm-bdwgc", "type": "contrasts-with" },
+        { "target": "mmtk", "type": "related" }
+      ]
+    },
+    {
+      "id": "per-pool-policy",
+      "title": "Per-pool memory-management policy",
+      "tags": ["pluggable-gc", "framework"],
+      "content": "The architectural lesson is **per-pool memory-management policy in one runtime**. The same program can allocate Java-style objects into a generational copying pool, COBOL-style flat records into a manually-managed pool, and DSL-specific types into a custom pool, all sharing one root set and one collector cycle.\n\nThis is similar in spirit to Verona's per-region pluggable strategies (region-typed languages enforce the choice in the type system) but MPS provides the same flexibility as a library for languages that do not have language-level region typing."
+    },
+    {
+      "id": "verification",
+      "title": "Verification heritage",
+      "tags": ["verification", "framework", "production"],
+      "content": "The implementation has unusually rich verification heritage: MPS's hot-path code is **specified in a formal modelling language** (the \"MPS protocol\") and large parts of the codebase have been reviewed for memory-management invariants by professional verifiers. **Twenty-plus years of continuous maintenance with no major reported memory-safety bug** is an unusual record for a 60 KLOC C codebase performing concurrent root scanning."
+    },
+    {
+      "id": "deployment",
+      "title": "Production deployments",
+      "tags": ["framework", "production"],
+      "content": "Production: Open Dylan's runtime is MPS-based; **Configura's CET designer** (a CAD tool) has shipped on MPS since the 1990s; the collector also underpins several proprietary financial-systems runtimes.\n\nStatus (as of 2026-04): commercial support and licensing via Ravenbrook; MPS itself is BSD-licensed."
+    }
+  ],
+  "sources": [
+    { "label": "Ravenbrook Memory Pool System", "url": "https://www.ravenbrook.com/project/mps/" },
+    { "label": "MPS documentation (readthedocs mirror)", "url": "https://memory-pool-system.readthedocs.io/" },
+    { "label": "MPS official manual (Ravenbrook)", "url": "https://www.ravenbrook.com/project/mps/master/manual/html/" }
+  ]
+}

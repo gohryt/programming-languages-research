@@ -1,0 +1,37 @@
+{
+  "kind": "concept",
+  "name": "Modulo Scheduling",
+  "aliases": ["software pipelining", "Rau modulo scheduling"],
+  "summary": "Rau (HP Labs 1994): transform an inner loop so that iterations overlap — iteration i+1 starts while iteration i is still finishing — exposing more ILP across iteration boundaries. Find the minimum initiation interval (II) and generate prologue/kernel/epilogue. Pays off on wide-issue architectures with high register count.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Software pipelining transforms an inner loop so that iterations overlap — iteration *i+1* starts executing while iteration *i* is still finishing — exposing more ILP across iteration boundaries. **Modulo scheduling** (Rau, HP Labs 1994) is the classical algorithm: find the minimum initiation interval (II) such that the loop body can be scheduled periodically with period II, then generate prologue/kernel/epilogue.",
+      "refs": [
+        { "target": "list-scheduling#overview", "type": "specialised-form-of" }
+      ],
+      "sources": [
+        { "label": "Modulo Scheduling (Rau, HP Labs 1994)", "url": "https://www.hpl.hp.com/techreports/94/HPL-94-115.pdf" }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "title": "Algorithm",
+      "tags": ["compiler", "scheduling", "loops"],
+      "content": "Compute the minimum **initiation interval** (II) — the smallest cycle count between iteration starts that respects both data dependences and resource constraints. Data dependences in a loop carry from one iteration to the next via loop-carried values; resource constraints come from finite hardware (functional units, registers).\n\nGiven II, schedule one iteration of the loop body modulo II. The schedule is a function from each instruction to (cycle, resource), with the constraint that two instructions that conflict in their resource use cannot be at the same `cycle mod II`.\n\nGenerate three regions: a **prologue** that fills the pipeline by starting II-many iterations before the steady state, a **kernel** that is the modulo-scheduled body running periodically, and an **epilogue** that drains the pipeline after the last iteration starts. The transformation overlaps independent iterations, exploiting parallelism that single-iteration scheduling cannot.",
+      "refs": []
+    },
+    {
+      "id": "production-relevance",
+      "title": "Production relevance",
+      "tags": ["compiler", "production"],
+      "content": "Modulo scheduling pays off most on architectures with high register count and wide issue (IA-64, modern GPUs, some DSPs). LLVM's `MachinePipeliner` implements it for targets that opt in.\n\nOn general-purpose CPUs with out-of-order execution, much of the benefit is captured by the hardware scheduler, so explicit software pipelining is often redundant — which is why it is an optional, target-specific pass rather than a universal one. On in-order or VLIW targets without aggressive hardware reordering, modulo scheduling remains essential and produces dramatic speedups on the inner loops it can handle.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Rau — Modulo Scheduling", "url": "https://www.hpl.hp.com/techreports/94/HPL-94-115.pdf" }
+  ]
+}

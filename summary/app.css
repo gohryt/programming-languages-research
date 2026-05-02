@@ -1,0 +1,197 @@
+:root {
+    color-scheme: light dark;
+    font-family: Inter, system-ui, sans-serif;
+    line-height: 1.55;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+#app {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 1rem 1.25rem 2rem;
+}
+
+.page-header {
+    margin-bottom: 1rem;
+}
+
+.subtitle {
+    color: #666;
+}
+
+.controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.compact-controls {
+    align-items: flex-start;
+}
+
+.panel {
+    border: 1px solid #8884;
+    border-radius: 6px;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.75rem;
+    background: color-mix(in oklab, Canvas 96%, transparent);
+}
+
+.compact-panel {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+}
+
+.page-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(8px);
+}
+
+.browse-tags-panel details {
+    margin: 0;
+}
+
+.browse-tags-panel summary {
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.browse-tags-body {
+    margin-top: 0.5rem;
+}
+
+.record-header {
+    margin-bottom: 0.75rem;
+}
+
+.record-list,
+.section-list,
+.link-list,
+.tag-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.record-list li,
+.section-list li {
+    margin-bottom: 0.55rem;
+}
+
+.link-list li {
+    margin-bottom: 0.2rem;
+}
+
+.tag-pill {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid #8885;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.document-panel {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+.section {
+    margin: 0;
+}
+
+.section-selected {
+    border-left: 3px solid #4c8bf5;
+    padding-left: 0.6rem;
+}
+
+.section-divider {
+    border: 0;
+    border-top: 1px solid #8883;
+    margin: 0.9rem 0;
+}
+
+.section h3 {
+    margin: 0 0 0.35rem;
+}
+
+.section-content p,
+.section-content ul {
+    margin-top: 0.45rem;
+    margin-bottom: 0.45rem;
+}
+
+.section-content code {
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    background: #8882;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.meta-block {
+    margin-top: 0.4rem;
+    font-size: 0.92rem;
+}
+
+.meta-block summary {
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.link-group {
+    margin-top: 0.35rem;
+}
+
+.inline-toc {
+    margin-top: 0.75rem;
+}
+
+.inline-toc h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+}
+
+.search-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.search-form input {
+    flex: 1;
+    min-width: 260px;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #8885;
+}
+
+.search-form button {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #8885;
+    cursor: pointer;
+}
+
+.muted {
+    color: #666;
+}
+
+a {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+pre {
+    white-space: pre-wrap;
+}

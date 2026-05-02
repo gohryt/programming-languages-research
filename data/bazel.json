@@ -1,0 +1,50 @@
+{
+  "kind": "tool",
+  "name": "Bazel",
+  "aliases": ["bazel-build"],
+  "summary": "Google's open-sourced build system for large monorepos: BUILD files declare per-target visibility (visibility = [...]), enforced by the build graph at build time rather than by the language; WORKSPACE / MODULE.bazel defines the build universe; bzlmod (since 2023) is the modern dependency-management interface.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Bazel** (Google's open-sourced build system) implements per-target visibility declarations: a `BUILD` file lists targets (libraries, binaries, tests) and each target has a `visibility = [...]` attribute restricting which other targets can depend on it. This is enforced by the build graph at build time, not by the language.\n\nBazel is structurally similar to Buck (`data/buck`) — both descend from Google's internal build system Blaze and Meta's internal version — but they have evolved separately under different organisations. This record covers Bazel; Buck is treated separately.",
+      "refs": [
+        { "target": "buck#overview", "type": "sibling" },
+        { "target": "package-management#overview", "type": "complements" },
+        { "target": "module-systems#overview", "type": "complements" }
+      ],
+      "sources": [
+        { "label": "Bazel — visibility", "url": "https://bazel.build/concepts/visibility" }
+      ]
+    },
+    {
+      "id": "per-target-visibility",
+      "title": "Per-target visibility — build-graph enforcement",
+      "tags": ["bazel", "visibility", "build-systems"],
+      "content": "This is structurally similar to JPMS's `exports ... to` qualified exports but at the build-graph level rather than the language level. The consequence is that **a single source file can have one set of language-level visibility and a different set of build-system-level visibility**, with the latter being the operative constraint in monorepo deployments.\n\nThe interaction with language-level modules is subtle. In a Bazel monorepo using Java, a class can be `public` (Java visibility) but only depended on by specific Bazel targets (Bazel visibility). The build graph enforces architectural boundaries that Java's package-level visibility cannot. Google internally relies on this heavily.",
+      "refs": [
+        { "target": "java#jpms-module-info", "type": "comparable-to" },
+        { "target": "visibility-and-exports#overview", "type": "complements" }
+      ]
+    },
+    {
+      "id": "workspace-module-bazel-bzlmod",
+      "title": "WORKSPACE, MODULE.bazel, and bzlmod",
+      "tags": ["bazel", "workspaces", "dependencies"],
+      "content": "Bazel has the most ambitious \"workspace\" concept among the systems surveyed: `WORKSPACE` (or `MODULE.bazel` in bzlmod) defines an entire build universe with arbitrary internal package boundaries, source dependencies, and remote build artifacts.\n\n**bzlmod** (since 2023) is the modern dependency-management interface, replacing the older `WORKSPACE`-only model. A `MODULE.bazel` file declares dependencies on other Bazel modules in the **Bazel Central Registry** (BCR) plus source-level overrides. The transition has been gradual; large existing Bazel codebases continue to use WORKSPACE for years before migrating.",
+      "refs": [
+        { "target": "workspaces#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — build-system visibility at scale",
+      "tags": ["bazel", "design-guidance", "monorepo"],
+      "content": "The lesson is that **at sufficient scale, build-system visibility becomes the dominant abstraction**, not language-level visibility. Languages designed for monorepo use should consider whether their module-system primitives compose cleanly with build-system visibility, or whether the two will fight. Most languages punt on this; Bazel's reach is substantial enough that punting is increasingly costly.\n\nProduction: Google internally (the original use case), Twitter/X, Stripe, Pinterest, Uber, and many other large monorepo organisations. The cost is a steep learning curve and significant configuration surface; the benefit is that architectural boundaries become enforceable at the build layer regardless of language."
+    }
+  ],
+  "sources": [
+    { "label": "Bazel — visibility", "url": "https://bazel.build/concepts/visibility" }
+  ]
+}

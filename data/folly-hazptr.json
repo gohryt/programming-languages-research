@@ -1,0 +1,66 @@
+{
+  "kind": "library",
+  "name": "Folly hazptr",
+  "aliases": [
+    "folly::hazptr"
+  ],
+  "summary": "Facebook's production C++ hazard pointers — thread-cached hazptr_recs, RAII hazptr_holder, hazptr_obj_base<T>::retire(), multi-domain support. Thread-local hprec cache with dynamic sizing & decay. Link-counting API for graph reclamation with no reader overhead. Cohorts and synchronous reclamation extensions queued for C++29 (P3135R0). In production at Meta since 2017; reference implementation behind C++26 std::hazard_pointer.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "library",
+        "hazard-pointer",
+        "cpp",
+        "production",
+        "folly"
+      ],
+      "content": "Facebook's **Folly `hazptr`** is the production C++ implementation of hazard pointers and the reference implementation behind C++26 `std::hazard_pointer`. The API surface:\n\n- Thread-cached `hazptr_rec`s (per-thread cache of hazard records to avoid global pool contention)\n- RAII `hazptr_holder` for scoped acquisition\n- `hazptr_obj_base<T>::retire()` for retirement (CRTP base class so the retired-list link lives in the user object)\n- Multi-domain support so independent subsystems can have independent reclamation domains\n\nThe thread-local `hprec` cache uses **dynamic sizing & decay** (recent commits) — caches grow under load and shed unused records over time, balancing per-thread footprint against allocation churn.",
+      "refs": [
+        {
+          "target": "hazard-pointers",
+          "type": "implementation-of"
+        },
+        {
+          "target": "cpp26-hazptr-rcu",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Folly Hazptr.h",
+          "url": "https://github.com/facebook/folly/blob/main/folly/synchronization/Hazptr.h"
+        }
+      ]
+    },
+    {
+      "id": "advanced-features",
+      "title": "Link-counting, cohorts, C++29 extensions",
+      "tags": [
+        "cpp",
+        "lock-free-data-structures",
+        "experimental"
+      ],
+      "content": "Beyond the standard HP API, Folly hazptr ships several advanced features:\n\n- **Link-counting API** for graph reclamation with no reader overhead — useful for object graphs where reachability cannot be tracked by a single hazard pointer per access\n- **Cohorts** — batched retirement groups with bulk reclamation, cutting per-retire scan amortised cost\n- **Synchronous reclamation** for shutdown / drain scenarios\n\nThe cohort and synchronous-reclamation extensions are queued for **C++29 standardisation in P3135R0**, building on the C++26 baseline.\n\nIn production at Meta since 2017 across many internal services. The implementation has been the reference behind C++26 `std::hazard_pointer` (P2530R3), so the standardised API is essentially a portable subset of Folly's mature design.",
+      "refs": [
+        {
+          "target": "hazard-pointers#production-and-standardisation",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Folly Hazptr source",
+          "url": "https://github.com/facebook/folly/blob/main/folly/synchronization/Hazptr.h"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Folly Hazptr.h",
+      "url": "https://github.com/facebook/folly/blob/main/folly/synchronization/Hazptr.h"
+    }
+  ]
+}

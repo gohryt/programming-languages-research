@@ -1,0 +1,7 @@
+{
+  "id": "family-cooperative-safepoints",
+  "tag": "family:cooperative-safepoints",
+  "name": "Family: cooperative safepoints",
+  "description": "The runtime arranges for threads to notice an observation request at points already safe for the implementation, rather than trapping at arbitrary instructions.",
+  "axis": "family"
+}

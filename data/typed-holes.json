@@ -1,0 +1,25 @@
+{
+  "kind": "concept",
+  "name": "Typed Holes",
+  "aliases": ["holes", "typed-incomplete-programs", "expected-type-queries"],
+  "summary": "First-class diagnostic objects representing missing subexpressions. Typed holes let programmers ask the checker what type is expected and what variables are in scope. Support editor workflows, partial programs, and proof development. Should be first-class with expected type, local context, constraints, and candidate completions — not treated as parse errors.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Typed holes let programmers ask the checker what type is expected and what variables are in scope. They also support editor workflows, partial programs, and proof development.\n\nHoles should be first-class diagnostic objects with expected type, local context, constraints, and candidate completions. They should not be treated merely as parse errors. The distinction matters: a parser that recovers from a missing expression typically produces a synthetic error placeholder; a *typed* hole is a deliberate query the programmer wrote to ask the checker for help.",
+      "refs": [
+        { "target": "dependent-types#overview", "type": "natural-fit" },
+        { "target": "bidirectional-typing#overview", "type": "leverages" },
+        { "target": "elaborator-reflection#overview", "type": "exposes" }
+      ]
+    },
+    {
+      "id": "ide-and-proof-workflow",
+      "title": "IDE and proof workflows",
+      "tags": ["tooling", "type-system"],
+      "content": "Typed holes are most powerful when they are integrated with editor tooling:\n\n- **expected type display**: hover over a hole shows what type the surrounding context expects.\n- **local context display**: hover shows what variables are in scope and their types.\n- **candidate completion**: the editor proposes terms in scope that match the expected type.\n- **partial programs**: a function with a hole still type-checks (the hole has the expected type by construction); other parts of the program can be analysed without waiting for the hole to be filled.\n- **proof development**: in dependently-typed languages, holes act as proof goals; tactics manipulate them until all are discharged.\n\nFor language designers, the practical guidance is that **holes pay off across the language-design space**, not just in proof assistants. Even a non-dependently-typed language benefits from \"show me the expected type here\" as an editor primitive."
+    }
+  ]
+}

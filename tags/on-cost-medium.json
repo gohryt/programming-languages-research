@@ -1,0 +1,7 @@
+{
+  "id": "on-cost-medium",
+  "tag": "on-cost:medium",
+  "name": "Cost when on: medium",
+  "description": "Active overhead in single-digit to low-tens of percent: per-event aggregation, per-sample stack walk, ~2× compiler-inserted check, lightweight buffered emission.",
+  "axis": "on-cost"
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "Dependent Types",
+  "aliases": ["pi-types", "dependent-product-types", "type-as-program"],
+  "summary": "Types that mention terms. Express precise invariants such as vector length, protocol state, parser grammar properties, or proof obligations. Full dependent typing changes the type checker into an elaborator plus kernel architecture: rich surface elaborates to small core, kernel re-checks core terms, tactics provide proof automation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Dependent types allow types to mention terms. They can express precise invariants such as vector length, protocol state, parser grammar properties, or proof obligations. Full dependent typing changes the type checker into an elaborator plus kernel architecture in many systems.\n\nThe distinguishing axis across dependent-type designs is *how much surface power is delegated to elaboration heuristics versus encoded in the trusted core*. Lean elaborates aggressively (overloads, coercions, type classes, tactics, all in elaboration); Coq-flavoured systems keep more of the core decidable. Idris 2 sits in between, with QTT in the core (`data/idris2-qtt-ir`) and elaboration tactics on top.",
+      "refs": [
+        { "target": "typed-elaboration#overview", "type": "uses" },
+        { "target": "elaborator-reflection#overview", "type": "extended-by" },
+        { "target": "typed-holes#overview", "type": "supports" },
+        { "target": "cubical-agda-hott#overview", "type": "advanced-form" }
+      ]
+    },
+    {
+      "id": "common-architecture",
+      "title": "Common elaborator-plus-kernel architecture",
+      "tags": ["dependent-types", "compiler-architecture"],
+      "content": "A common architecture is:\n\n1. parse rich surface syntax;\n2. resolve names and implicit arguments;\n3. create metavariables for holes;\n4. elaborate to a small core language;\n5. solve unification and typeclass obligations;\n6. check the core term in a trusted kernel;\n7. expose tactics or metaprogramming for proof automation.\n\nLean's elaborator is a major reference for combining implicit arguments, overloading, coercions, type class inference, tactics, and reduction. The kernel is small enough to audit; the elaborator is large, heuristic, and user-extensible. This split is valuable even outside proof assistants: a language can elaborate a rich surface into a simpler typed core and check that core with a smaller algorithm.",
+      "sources": [
+        { "label": "Lean elaboration algorithm", "url": "https://leodemoura.github.io/files/elaboration.pdf" }
+      ]
+    },
+    {
+      "id": "kernel-vs-elaborator-split",
+      "title": "Kernel versus elaborator — the trust boundary",
+      "tags": ["dependent-types", "verification"],
+      "content": "A small kernel gives a compact trusted base, while the elaborator can be large, heuristic, and user-extensible. Anything an elaborator produces can be re-checked by the kernel, so bugs in elaboration heuristics cannot produce ill-typed core terms. This is what makes proof assistants like Coq, Lean, and Agda trustworthy despite having complex frontends — the kernel is the only thing that needs to be right.\n\nFor language designers, the lesson is that **the elaborator/kernel split is reusable beyond proof assistants**. A language can elaborate a rich surface into a simpler typed core (rust HIR/THIR/MIR is a related architecture, `data/rust-hir-thir-mir`) and check the core with a smaller, more auditable algorithm."
+    }
+  ],
+  "sources": [
+    { "label": "Lean elaboration algorithm", "url": "https://leodemoura.github.io/files/elaboration.pdf" }
+  ]
+}

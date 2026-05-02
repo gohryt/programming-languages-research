@@ -1,0 +1,42 @@
+{
+  "kind": "tool",
+  "name": "mimalloc",
+  "aliases": ["Microsoft mimalloc"],
+  "summary": "Daan Leijen's general-purpose allocator from Microsoft Research using page-local sharded free lists with three lists per page (`free`, `local_free`, `thread_free`) that enforce a temporal cadence between fast-path allocation and batched maintenance.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "general-purpose-allocator", "production"],
+      "content": "Daan Leijen's mimalloc (Microsoft Research) was originally designed as the runtime allocator for Lean and Koka — languages whose Perceus reference counting hammers the allocator with short-lived objects. The headline idea is page-local sharded free lists: every page carries three lists (`free`, `local_free`, `thread_free`) that enforce a *temporal cadence* between fast-path allocation and batched maintenance, so the alloc/free fast path stays branchless while deferred-free and remote-free are merged in lock-free.\n\nThe library is small, portable C, and ships as a drop-in `LD_PRELOAD`-style replacement for the system `malloc`. It is the canonical \"throughput-oriented modern allocator\" alongside snmalloc and rpmalloc.",
+      "refs": [
+        { "target": "allocators#throughput-allocators", "type": "part-of" },
+        { "target": "snmalloc#overview", "type": "compared-with" },
+        { "target": "rpmalloc#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "three-list-sharding",
+      "title": "Three-list sharding and secure mode",
+      "tags": ["thread-cache", "freelist", "lock-free", "secure-allocator"],
+      "content": "Each page owns three free lists: `free` (consumed by the fast path on the owning thread), `local_free` (where the owning thread parks frees during a quantum), and `thread_free` (a lock-free MPSC list where remote threads push frees). Periodically the owner swaps `free <- local_free` and merges `thread_free` in. This gives a branchless allocation fast path while still amortising the cost of cross-thread free.\n\nFree-list pointers are encoded with per-page random keys: a corruption flips the encoding and detection happens on next pop. Secure mode adds guard pages around metadata, randomized initialization, and double-free detection at roughly 10% overhead. A separate \"guarded mode\" places sampled OS guard pages (e.g. one in 4000 allocations) so production builds catch UBSan-style overflow without paying for guard pages on every allocation.",
+      "refs": [
+        { "target": "allocators#throughput-allocators", "type": "context" }
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "tags": ["production", "userspace"],
+      "content": "Production users include the Lean and Koka runtimes (its design driver), Redis, .NET runtime experiments, and the Swift/Python reference-counting backends — all workloads where reference counting or short-lived object churn dominates. The Perceus algorithm in Koka was tuned alongside mimalloc; together they hit numbers competitive with tracing GCs on benchmarks where allocators are the bottleneck.\n\nStatus (as of 2026-04): widely deployed; a stable v2 series with an in-progress v3 generation maintained by Microsoft Research.",
+      "refs": [
+        { "target": "reference-counting#overview", "type": "context" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "mimalloc tech report", "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2019/06/mimalloc-tr-v1.pdf" },
+    { "label": "mimalloc modes documentation", "url": "https://microsoft.github.io/mimalloc/modes.html" },
+    { "label": "mimalloc GitHub", "url": "https://github.com/microsoft/mimalloc" }
+  ]
+}

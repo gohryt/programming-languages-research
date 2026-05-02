@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "GHC Core",
+  "aliases": ["haskell-core"],
+  "summary": "GHC's Core is a small typed lambda calculus with let-bindings, case analysis, and explicit type abstraction/application. ANF-like (every let binds an intermediate), strongly typed (System F + extensions), and the substrate for all major GHC optimizations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "GHC's Core is a small typed lambda calculus with let-bindings, case analysis, and explicit type abstraction/application. Core is ANF-like (every let binds an intermediate), strongly typed (System F + extensions), and the substrate for all major GHC optimizations (inlining, specialization, fusion, strictness analysis, demand analysis).",
+      "refs": [
+        { "target": "cps-anf#overview", "type": "instance-of" },
+        { "target": "ghc-cmm#overview", "type": "lowers-to" },
+        { "target": "haskell#overview", "type": "ir-of" }
+      ],
+      "sources": [
+        { "label": "GHC Core source", "url": "https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Core.hs" }
+      ]
+    },
+    {
+      "id": "small-spec",
+      "title": "Small enough to formalize",
+      "tags": ["compiler-ir", "haskell", "typed"],
+      "content": "Core's distinctive property: it's *small enough to fit in a memorable specification*, which makes it tractable for formal reasoning. The GHC team treats Core as a stable interface — passes operate on Core, not on the much more complex Haskell source — so the compiler's invariants live at the Core level.\n\nThis is the level at which Haskell's \"Beautiful Concurrency\" (parallel evaluation, STM) is implemented. Linear Haskell layers multiplicities on top of Core arrows; type families and GADTs ride on Core's existing type machinery.",
+      "refs": [
+        { "target": "linear-haskell-ir#overview", "type": "extended-by" }
+      ]
+    },
+    {
+      "id": "ghc-pipeline",
+      "title": "GHC pipeline: Core → STG → Cmm",
+      "tags": ["compiler-pipeline", "haskell"],
+      "content": "GHC's pipeline: Core (typed lambda calculus) → STG (Spineless Tagless G-machine, operational semantics for laziness) → Cmm (portable assembly) → native or LLVM. Each level has a specific role: Core for high-level optimizations, STG for laziness-related transformations (closure analysis, eager-evaluation analysis), Cmm for codegen-level concerns (register allocation, calling conventions).\n\nSTG is the level that distinguishes GHC's pipeline from strict-language compilers: it makes the implementation of laziness explicit (closures, indirections, blackholing) so optimizations can reason about evaluation order.",
+      "refs": [
+        { "target": "ghc-cmm#overview", "type": "downstream" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "GHC Core source", "url": "https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Core.hs" }
+  ]
+}

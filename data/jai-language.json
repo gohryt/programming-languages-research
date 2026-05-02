@@ -1,0 +1,39 @@
+{
+  "kind": "language",
+  "name": "Jai",
+  "aliases": ["Jai language"],
+  "summary": "Jonathan Blow's Jai (closed beta since 2014): the compiler is a library that the programmer drives, not a black box. `#run` any function at compile time, `#insert` for AST manipulation, compiler message loop for plug-in metaprogramming, dual backends (custom x64 + LLVM) for fast dev and optimised release builds.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Jonathan Blow's **Jai** has been in closed beta since 2014, targeting release alongside *Order of the Sinking Star*. The guiding design is that the compiler is a library that the programmer drives, not a black box that consumes source files.\n\nJai's design philosophy is unusually metaprogramming-forward: rather than a separate macro system, the language exposes the compiler itself to user code. Build configuration, code generation, AST manipulation, and even data-layout transformations are written as ordinary Jai code that runs during compilation.",
+      "refs": [
+        { "target": "zig-comptime#overview", "type": "compared-with" },
+        { "target": "mojo-parameter#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Jai Metaprogramming (BSVino's JaiPrimer)", "url": "https://github.com/BSVino/JaiPrimer/wiki/Metaprogramming" }
+      ]
+    },
+    {
+      "id": "core-features",
+      "title": "Core metaprogramming features",
+      "tags": ["jai", "metaprogramming"],
+      "content": "- **`#run` any function at compile time.** Result is either baked into the binary as a constant or used to drive compilation. Canonical demos: generating an sRGB lookup table at compile time; running an entire Space Invaders game at compile time and embedding the final state. The compile-time runtime is a bytecode interpreter built into the compiler.\n- **`#insert` for generalised AST insertion.** Produces structured code from a compile-time computation and splices it into surrounding context — enables data-layout transformations (e.g., struct-of-arrays from a struct-of-scalars schema) as library code.\n- **Compiler message loop.** A proc marked `#compiler` receives messages from the compiler during compilation (\"type-checking started,\" \"declaration parsed,\" \"bytecode generated\"); the meta-program can inspect, modify, or reject them. This makes the compiler a plugin host accessible as ordinary Jai. The build system itself is a Jai meta-program (`build.jai`) — no separate configuration language.\n- **Dual backends.** Custom x64 backend for fast-path dev builds (no optimization, near-instant compile); LLVM for release. The custom backend exists specifically because even LLVM -O0 adds noticeable compile latency on large codebases. Compile-speed target: 1M LOC/second; public demos show 80k LOC compiling in under a second.",
+      "refs": []
+    },
+    {
+      "id": "design-tradeoff",
+      "title": "Design trade-off",
+      "tags": ["language-design"],
+      "content": "The design trade-off is principled: if compile-time code is ordinary language code that can mutate the AST and control the compiler, there's no \"metaprogramming language\" to learn. The cost is a compiler that must be designed as a library from day one — hard to retrofit.\n\nFor language designers, Jai is the existence proof of \"compiler-as-library\" as a coherent design choice. The trade-off versus more conventional macro systems: more powerful (the metaprogram can do anything) at the cost of less constrained (the metaprogram can do anything). The scope of what compile-time code can affect is, by design, larger than in Rust, Scala, or even Zig.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Jai metaprogramming primer", "url": "https://github.com/BSVino/JaiPrimer/wiki/Metaprogramming" },
+    { "label": "Jai (Wikipedia)", "url": "https://en.wikipedia.org/wiki/JAI_(programming_language)" }
+  ]
+}

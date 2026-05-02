@@ -1,0 +1,32 @@
+{
+  "kind": "language",
+  "name": "Halide",
+  "aliases": ["halide-lang"],
+  "summary": "Halide's representation explicitly separates the algorithm (what to compute) from the schedule (how to compute it: tile size, vectorization, parallelism, storage layout). The same algorithm can be re-scheduled without touching the algorithm code, exploring an enormous optimization search space.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Halide's representation explicitly separates the *algorithm* (what to compute) from the *schedule* (how to compute it: tile size, vectorization, parallelism, storage layout). The same algorithm can be re-scheduled without touching the algorithm code, exploring an enormous optimization search space.",
+      "refs": [
+        { "target": "polyhedral-optimization#overview", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Halide", "url": "https://halide-lang.org/" }
+      ]
+    },
+    {
+      "id": "algorithm-schedule-split",
+      "title": "Algorithm/schedule split as IR design",
+      "tags": ["compiler-ir", "auto-tuning", "image-processing"],
+      "content": "This algorithm/schedule split is a distinctive IR design: most compilers embed scheduling decisions within the IR (loop nests, pragmas, layout choices), and changing them requires rewriting the program. Halide's separation lets auto-tuners (Halide's autoscheduler, Adams et al.) explore schedules automatically while the algorithm remains stable.\n\nThe pattern transfers to TVM TIR, IREE, and other tensor-graph compilers — the algorithm/schedule separation is the fundamental design idea that lets autotuners search over hardware-specific implementations of the same logical computation.",
+      "refs": [
+        { "target": "tvm-relay-tir#overview", "type": "inspires" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Halide", "url": "https://halide-lang.org/" }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "kind": "tool",
+  "name": "Binaryen",
+  "aliases": [],
+  "summary": "WebAssembly-oriented compiler toolkit and optimizer with its own structured IR designed around Wasm's validation and structured-control-flow constraints. Used by Emscripten, AssemblyScript, and as a post-processing optimizer for many wasm-emitting toolchains.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Binaryen is a compiler toolkit centered on WebAssembly, with its own IR and optimization pipeline for wasm generation, transformation, and simplification. It is a useful concrete example of a backend and IR ecosystem tuned to a specific portable target.\n\nProduction adopters: Emscripten uses Binaryen for post-LLVM wasm optimization; AssemblyScript uses it directly as the compiler backend; wasm-bindgen's `wasm-opt` is Binaryen with a different CLI; many wasm-emitting toolchains run Binaryen as a final optimization pass on emitted wasm.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "specializes-for" },
+        { "target": "llvm#backend-role", "type": "alternative-to" }
+      ],
+      "sources": [
+        {
+          "label": "Binaryen repository",
+          "url": "https://github.com/WebAssembly/binaryen"
+        }
+      ]
+    },
+    {
+      "id": "structured-wasm-ir",
+      "title": "Structured wasm IR",
+      "tags": ["representation", "compiler", "wasm"],
+      "content": "Binaryen's IR is shaped by WebAssembly's structured control-flow model rather than treating wasm as another machine backend. Wasm has `block`/`loop`/`if`/`else` rather than arbitrary jumps, so Binaryen's IR is also structured — a tree of blocks rather than a CFG of basic blocks. This is the dual of LLVM/Cranelift, where SSA over basic blocks is the canonical form.\n\nThe choice trades some optimization-algorithm familiarity (most SSA optimization literature assumes a CFG) for natural fit with the validation and codegen target.",
+      "refs": [
+        { "target": "mid-level-ir#boundary-with-backend-forms", "type": "specializes" },
+        { "target": "llvm#ir", "type": "alternative-shape" }
+      ]
+    },
+    {
+      "id": "optimization-shape",
+      "title": "Optimization shape",
+      "tags": ["optimization", "wasm", "backend"],
+      "content": "Binaryen optimizations are shaped by wasm's structured, validated execution model and by the practical needs of compilers that emit portable sandboxed code: code-size minimization (download size matters for browser delivery), control-flow simplification (collapsing redundant blocks), inlining bounded by code-size budgets, and wasm-specific constructs like dropping side-effect-free `local.tee` results.\n\nThis is why Binaryen runs as a *post-pass* on wasm produced by other toolchains: LLVM produces correct wasm, but Binaryen knows wasm-specific rewrites that LLVM does not — primarily because LLVM's optimizer assumes a CFG-of-basic-blocks model that wasm cannot directly express.",
+      "refs": [
+        { "target": "llvm#strengths-and-tradeoffs", "type": "complements" }
+      ]
+    },
+    {
+      "id": "where-binaryen-fits",
+      "title": "Where Binaryen fits",
+      "tags": ["backend", "tooling", "wasm"],
+      "content": "Binaryen is best understood as a specialized backend and transformation toolkit for WebAssembly-oriented workflows. It is most valuable where wasm is not just an output format but a real architectural target with its own representation and optimization logic.\n\nFor a language designer targeting wasm: emit through LLVM if rich C-family optimization is wanted at the cost of some wasm-specific rewrites; emit through Binaryen directly (AssemblyScript path) if wasm-shape control matters more than reusing LLVM's optimizer; or emit through LLVM and post-process with Binaryen to get both.",
+      "refs": [
+        { "target": "llvm#backend-role", "type": "complements" },
+        { "target": "bytecode#why-systems-use-bytecode", "type": "exemplifies" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Binaryen repository",
+      "url": "https://github.com/WebAssembly/binaryen"
+    }
+  ]
+}

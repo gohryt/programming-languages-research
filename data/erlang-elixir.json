@@ -1,0 +1,69 @@
+{
+  "kind": "language",
+  "name": "Erlang and Elixir (BEAM)",
+  "aliases": ["erlang", "elixir", "beam-languages"],
+  "summary": "Erlang's flat module-per-.erl-file system with -export([func/1]) and per-application OTP supervision unit, plus Elixir's hierarchical-naming-convention (`MyApp.Accounts.User` compiles to BEAM module `Elixir.MyApp.Accounts.User`) and Mix/Hex packaging; Gleam adds Hindley-Milner typing on the same flat-named runtime substrate.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Erlang (Joe Armstrong et al., 1986+) and Elixir (José Valim, 2011+) share the BEAM virtual machine and OTP runtime framework. Concurrency aspects (BEAM scheduler, processes) live in `data/actors#isolation-and-mailboxes`, `data/beam-bytecode`, `data/beam-gc`; runtime hot-reload lives in `data/erlang-hot-reload`. This record covers the language-level module-system surface.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "actors#overview", "type": "concurrency-of" },
+        { "target": "erlang-hot-reload#overview", "type": "runtime-aspect" }
+      ]
+    },
+    {
+      "id": "erlang-flat-modules-and-applications",
+      "title": "Erlang — flat modules and OTP applications",
+      "tags": ["erlang", "modules", "otp"],
+      "content": "Erlang has the simplest possible module surface — `-module(foo).` declares a module, `-export([func/1, other/2]).` declares its public functions, and `foo:func(arg)` calls a function in another module. Module names are flat (no hierarchy), and a module corresponds to a single `.erl` source file producing a single `.beam` BEAM file. The flatness reflects Erlang's age (1986) and is the canonical example of a flat-namespace ecosystem that scales reasonably through naming conventions (`my_lib_socket`, `cowboy_http`) rather than through hierarchical paths.\n\nAbove modules, Erlang/OTP layers **applications**, which are not modules in the namespace sense but are the unit of *runtime configuration and supervision*. An OTP application is described by a `.app` file listing its modules, registered names, started supervisor, environment configuration, and dependencies on other applications. The runtime treats applications as the lifecycle unit: start, stop, take down with their supervisors.\n\nThis gives Erlang two distinct levels — the module (compilation and namespace unit) and the application (deployment and runtime unit) — without trying to fuse them.",
+      "refs": [],
+      "sources": [
+        { "label": "Erlang code loading", "url": "https://www.erlang.org/doc/system/code_loading.html" },
+        { "label": "OTP applications", "url": "https://www.erlang.org/doc/design_principles/applications.html" }
+      ]
+    },
+    {
+      "id": "hot-module-reload-from-module-system-angle",
+      "title": "Hot module reload from the module-system angle",
+      "tags": ["erlang", "hot-reload", "module-systems"],
+      "content": "Erlang supports **hot module reload**, where a running system can load a new version of a module while existing processes continue executing the old version. The VM keeps two versions of each module active simultaneously; existing local calls (`func()` within the module) continue on the old version, while fully-qualified calls (`my_module:func()`) always dispatch to the current version.\n\nThe module system enables this directly: because modules are flat, named, individually loadable artifacts with explicit export lists, the runtime can swap their implementations without invalidating the global namespace. Full runtime treatment lives in `data/erlang-hot-reload`.",
+      "refs": [
+        { "target": "erlang-hot-reload#overview", "type": "complements" }
+      ]
+    },
+    {
+      "id": "elixir-hierarchical-naming-and-mix",
+      "title": "Elixir — hierarchical naming convention and Mix/Hex",
+      "tags": ["elixir", "modules", "mix"],
+      "content": "**Elixir** sits on top of the Erlang VM and reuses the same module mechanics with a more hierarchical naming convention (`MyApp.Accounts.User`) and the `defmodule ... do ... end` syntax. The dot-separated module name is a **convention layered on top of the flat BEAM module namespace** — `MyApp.Accounts.User` compiles to a BEAM module named `Elixir.MyApp.Accounts.User`.\n\nElixir's `import`, `alias`, `require`, and `use` keywords cover different access patterns: `alias` for shorter names, `import` for unqualified function access, `require` for compile-time macro availability, `use` for invoking a module's `__using__/1` macro at compile time.\n\n**Mix** is Elixir's build tool, which adds package and dependency management (with **Hex** as the registry) above the application layer.",
+      "refs": [],
+      "sources": [
+        { "label": "Elixir defmodule", "url": "https://hexdocs.pm/elixir/Kernel.html#defmodule/2" },
+        { "label": "Mix", "url": "https://hexdocs.pm/mix/Mix.html" }
+      ]
+    },
+    {
+      "id": "gleam-typed-beam",
+      "title": "Gleam — Hindley-Milner typed BEAM language",
+      "tags": ["gleam", "typed", "beam"],
+      "content": "**Gleam** (Louis Pilfold, 2016+; v1.0 March 2024) is the third major BEAM language and the first with **Hindley-Milner type inference** as the primary discipline. Modules use the same `.gleam` file = one module convention with hierarchical names mirroring directory paths (`gleam/io.gleam` → `gleam/io`); imports are declarative `import gleam/list` with optional `as` renames and selective `.{map, filter}` unqualified-import; privacy is per-declaration (`pub fn` exports, no marker = module-local).\n\nThe compiler targets *both* Erlang BEAM and JavaScript, sharing the same module declaration syntax across both backends — distinct from Elixir, which is BEAM-only. The package manager (`gleam` CLI plus Hex registry) integrates with the Mix/Hex ecosystem so Gleam modules can be published alongside Erlang/Elixir packages and consumed from any BEAM language.\n\nThe lesson: **a typed, ML-flavoured layer on a flat-named-runtime substrate (BEAM) is feasible without redesigning the runtime**; the module system is unchanged from Erlang's, but the type system makes the ML-style `import .{..}` discipline feel natural rather than retrofitted.",
+      "refs": [
+        { "target": "hindley-milner#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "Gleam language", "url": "https://gleam.run/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Erlang code loading", "url": "https://www.erlang.org/doc/system/code_loading.html" },
+    { "label": "OTP applications", "url": "https://www.erlang.org/doc/design_principles/applications.html" },
+    { "label": "Elixir defmodule", "url": "https://hexdocs.pm/elixir/Kernel.html#defmodule/2" },
+    { "label": "Mix", "url": "https://hexdocs.pm/mix/Mix.html" },
+    { "label": "Gleam", "url": "https://gleam.run/" }
+  ]
+}

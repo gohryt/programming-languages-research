@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "Typed Elaboration as Compiler Boundary",
+  "aliases": ["surface-to-typed-core", "elaboration", "constraint outputs feed lowering"],
+  "summary": "The compiler boundary between surface syntax and a typed core IR. Lean elaboration, Rust's HIR/THIR, Swift's SIL all sit at this boundary. Type-system outputs (resolved overloads, inferred types, instance dictionaries, effect rows) become IR inputs the backend can specialise on without re-running inference.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Typed elaboration** is the compiler phase that turns surface syntax (where types may be implicit, overloads unresolved, traits unselected) into a typed core IR (where every value has a known type, every overload has been resolved, every trait obligation has been discharged).\n\nThe outputs of elaboration become the inputs the backend specialises on. Resolved overloads get inlined directly. Inferred types drive monomorphisation. Instance dictionaries become evidence values threaded through generic code. Effect rows determine which optimisations are safe.",
+      "refs": [
+        { "target": "rust-hir-thir-mir#overview", "type": "instance-of" },
+        { "target": "evidence-passing#overview", "type": "produces" },
+        { "target": "dependent-types#overview", "type": "extreme-form-in" },
+        { "target": "elaborator-reflection#overview", "type": "extended-by" }
+      ]
+    },
+    {
+      "id": "kernel-vs-elaborator-split",
+      "title": "Kernel versus elaborator split",
+      "tags": ["compiler-architecture", "type-system"],
+      "content": "A small kernel gives a compact trusted base, while the elaborator can be large, heuristic, and user-extensible. This split is valuable even outside proof assistants: a language can elaborate a rich surface into a simpler typed core and check that core with a smaller algorithm.\n\nThe canonical reference is Lean: the kernel is small enough to audit; the elaborator is large, programmable through tactic monads, and supports user extensions. rustc's HIR/THIR/MIR cascade (`data/rust-hir-thir-mir`) applies the same idea outside a proof assistant: each stage discards information the next does not need, and each stage's checker is targeted at exactly its work — type checking on HIR, exhaustiveness on THIR, borrow checking on MIR.\n\nFor language designers building rich surface languages with verifiable cores, the split is structurally cleaner than merging surface and core into one type-checking pass."
+    },
+    {
+      "id": "design-implication",
+      "title": "Design implication — durable type-system outputs",
+      "tags": ["compiler-architecture", "type-system"],
+      "content": "For a language designer, the design implication is that **the type checker's outputs need to survive past type-checking**. If inference results live only in transient analysis state, the backend has to re-derive them for every optimisation that needs them, which is both wasteful and incorrect-prone.\n\nProduction examples: Lean's elaborator produces fully-elaborated kernel terms; rustc's HIR carries name resolution, THIR carries type information, MIR carries borrow lifetimes; Swift's SIL preserves protocol-witness selection through optimisation; GHC's Core preserves type-class dictionary applications. Each design captures the type system's facts in a form the backend can consume directly.",
+      "refs": []
+    }
+  ]
+}

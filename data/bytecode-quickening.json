@@ -1,0 +1,72 @@
+{
+  "kind": "concept",
+  "name": "Bytecode Quickening and Specialising Interpreters",
+  "aliases": [
+    "specializing adaptive interpreter",
+    "PEP 659",
+    "quickening",
+    "Brunthaler quickening"
+  ],
+  "summary": "Brunthaler ECOOP 2010: replace generic bytecodes with type-specialised variants at runtime. CPython 3.11 PEP 659 brought this to mainline Python — `LOAD_ATTR` rewrites in place to `LOAD_ATTR_INSTANCE_VALUE` based on observed object shapes. 10–60% runtime improvement without a JIT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Stefan Brunthaler's **bytecode quickening** technique (ECOOP 2010) replaces generic bytecodes with type-specialised variants at runtime. The first execution of `BINARY_ADD` observes its operand types; subsequent executions are rewritten in place to a specialised opcode like `BINARY_ADD_INT` that skips the type-dispatch prologue. This amounts to inline caching but inside the interpreter dispatch loop instead of JIT-compiled code.",
+      "refs": [
+        {
+          "target": "bytecode#overview",
+          "type": "extends"
+        },
+        {
+          "target": "tiered-compilation#overview",
+          "type": "alternative-to-low-tier"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Brunthaler ECOOP 2010",
+          "url": "https://publications.cispa.saarland/1069/1/ecoop10.pdf"
+        }
+      ]
+    },
+    {
+      "id": "cpython-pep-659",
+      "title": "CPython PEP 659",
+      "tags": [
+        "python",
+        "interpreter",
+        "optimization"
+      ],
+      "content": "**CPython 3.11's specialising adaptive interpreter** (PEP 659, Mark Shannon 2021) brought this technique to mainline Python. The interpreter observes call sites and rewrites `LOAD_ATTR` into forms like `LOAD_ATTR_INSTANCE_VALUE` (fast path for common layouts) or `LOAD_ATTR_SLOT` based on observed object shapes. A counter decays on miss, and families de-optimise back to the generic form if specialisation fails.\n\nPython 3.11 gained 10–60% runtime improvement primarily from this mechanism — without a JIT. The improvement is per-opcode, multiplied across the millions of hot opcodes a typical Python program executes, so the cumulative speedup compounds.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "PEP 659 — Specializing Adaptive Interpreter",
+          "url": "https://peps.python.org/pep-0659/"
+        }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": [
+        "language-design",
+        "tradeoffs"
+      ],
+      "content": "The insight: you don't need to generate machine code to get inline-caching benefits. Interpreter-level specialisation captures the same monomorphic-fast-path wins with a fraction of the engineering complexity. The trade-off is favourable on both axes — large baseline speedup, low architectural cost — which makes it a strong candidate to evaluate before committing to a JIT.\n\nFor a new language designer, the lesson is that bytecode quickening is one of the highest-leverage interpreter optimisations available, and substantially cheaper to implement than a baseline JIT. CPython proved it works on a real-world dynamic-language workload at production scale.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Brunthaler ECOOP 2010",
+      "url": "https://publications.cispa.saarland/1069/1/ecoop10.pdf"
+    },
+    {
+      "label": "PEP 659",
+      "url": "https://peps.python.org/pep-0659/"
+    }
+  ]
+}

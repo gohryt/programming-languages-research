@@ -1,0 +1,63 @@
+{
+  "kind": "language",
+  "name": "F* — Refinement and Effectful Verification",
+  "aliases": [
+    "f-star"
+  ],
+  "summary": "Refinement types combined with effect-typed computation, so refinements can constrain not only return values but also which effects an expression performs. Used in Project Everest / HACL* / EverCrypt — the largest production refinement-types result outside Dafny IAM. Compiles to OCaml, F#, JavaScript, or low-level C with verified boundary contracts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "F\\* combines refinement types with *effect-typed computation*, so refinements can constrain not only return values but also which effects an expression performs. The refinement-from-the-verification-result side is covered in `data/karamel-low-star` (Project Everest, HACL\\*, EverCrypt).\n\nThe **Everest deployment** is the largest production refinement-types result outside Dafny IAM. F\\* is also distinctive in combining refinement with effect-typed computation, so refinements can constrain not only return values but also which effects an expression performs.",
+      "refs": [
+        {
+          "target": "refinement-types#overview",
+          "type": "first-class-implementation"
+        },
+        {
+          "target": "type-and-effect-systems#overview",
+          "type": "integrates"
+        }
+      ],
+      "sources": [
+        {
+          "label": "F* language",
+          "url": "https://www.fstar-lang.org/"
+        }
+      ]
+    },
+    {
+      "id": "effect-and-refinement-integration",
+      "title": "Refinement plus effect typing",
+      "tags": [
+        "refinement-types",
+        "effect-system"
+      ],
+      "content": "F\\*'s contribution beyond Dafny is treating effects as part of the type. A function type carries:\n\n- the value type of the result;\n- a refinement constraining the result;\n- the effect the function may perform (`Pure`, `Total`, `Stateful`, `Exception`-throwing, etc.);\n- pre- and post-conditions tied to the effect (e.g., `STATEFUL` post-conditions reason about heap state before and after).\n\nThis integration is what enables verifying low-level cryptographic primitives end-to-end: the implementation must produce the right value *and* perform only the allowed memory operations *and* preserve the heap invariants the cryptographic algorithm requires. Project Everest's HACL\\* library uses this discipline to ship verified cryptographic primitives that compile to low-level C with refinement-checked memory safety.",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#overview",
+          "type": "complementary"
+        }
+      ]
+    },
+    {
+      "id": "everest-deployment",
+      "title": "Project Everest — production cryptography",
+      "tags": [
+        "verification",
+        "production",
+        "cryptography"
+      ],
+      "content": "Project Everest (Microsoft Research, INRIA, CMU, MIT) verifies the cryptographic stack from primitives up to TLS:\n\n- **HACL\\*** — verified primitives (Curve25519, Poly1305, ChaCha20, etc.), shipped in Mozilla NSS, Linux kernel via Wireguard, and others;\n- **EverCrypt** — verified cryptographic provider with provider-agnostic API;\n- **EverParse** — verified parser combinators for binary protocols;\n- **miTLS** — verified TLS implementation.\n\nThe shipping evidence: HACL\\* primitives are in production at Mozilla (Firefox NSS), in the Linux kernel's Wireguard implementation, and in Microsoft Azure cryptographic stacks. The lesson for refinement-type tooling: **narrow-domain verification (cryptography, parsers, kernel-level access control) is production-shipping technology**; broad-domain verification remains research-grade."
+    }
+  ],
+  "sources": [
+    {
+      "label": "F* language",
+      "url": "https://www.fstar-lang.org/"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "kind": "tool",
+  "name": "Mesh",
+  "aliases": ["Mesh allocator", "Bobby Powers Mesh"],
+  "summary": "Bobby Powers et al.'s allocator that implements compaction without relocation — finds pairs of sparsely-occupied pages with disjoint live-object bitmaps and merges them at the *physical* page level via `mremap`, leaving virtual addresses unchanged.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["allocator", "compacting-allocator", "research"],
+      "content": "Bobby Powers et al.'s Mesh (PLDI 2019) implements \"compaction without relocation\" — the unique idea that a non-moving allocator can still defragment by merging the *physical* pages backing two virtual pages whose live-object bitmaps happen to be disjoint. Pointer values do not change; the kernel just maps two virtual pages to the same physical page after the merge.\n\nMesh uses only standard virtual-memory operations (no kernel changes) so it works as a drop-in `LD_PRELOAD` library. It is the existence proof that virtual memory can substitute for a moving collector in C/C++ programs that cannot tolerate pointer changes.",
+      "refs": [
+        { "target": "allocators#specialised-allocators", "type": "part-of" }
+      ]
+    },
+    {
+      "id": "mremap-merging",
+      "title": "Bitmap-disjoint page merging via mremap",
+      "tags": ["mremap-compact", "bitmap", "research"],
+      "content": "Mesh tracks per-page allocation bitmaps. Periodically it searches for pairs of sparsely-occupied pages whose live-object bitmaps are disjoint and merges them: `mremap` collapses the two virtual pages onto a single physical page, the unused physical page is returned to the OS, and live objects in both pages remain at their original virtual addresses. Randomized allocation plus a randomized pair-search algorithm provably breaks the Robson worst-case fragmentation bound with high probability.\n\nThe implementation is built on top of Heap Layers. Reported numbers: Firefox memory reduced by 16%, Redis by 39%, with comparable runtime to state-of-the-art allocators.",
+      "refs": [
+        { "target": "linux-folio-mthp#overview", "type": "context" }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["research", "experimental"],
+      "content": "Status (as of 2026-04): research-grade implementation available on GitHub; not in widespread production deployment, but the technique itself is the headline contribution. The \"compact without moving\" idea is unique in the allocator literature — virtual memory is what makes it possible, and the algorithmic proof connecting random search to fragmentation bounds is a standalone result.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Mesh PLDI 2019", "url": "https://people.cs.umass.edu/~mcgregor/papers/19-pldi.pdf" },
+    { "label": "Mesh repository", "url": "https://github.com/plasma-umass/Mesh" }
+  ]
+}

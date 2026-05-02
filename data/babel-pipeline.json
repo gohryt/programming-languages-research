@@ -1,0 +1,33 @@
+{
+  "kind": "tool",
+  "name": "Babel AST + Plugin Pipeline",
+  "aliases": ["babel"],
+  "summary": "Babel transforms JavaScript via plugins, each operating on the ESTree-shaped AST. The IR is the AST itself, mutated in place by visitor functions; plugins register interest in specific node types and rewrite them. Optimised for transformation throughput, not optimisation depth.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Babel transforms JavaScript via plugins, each operating on the ESTree-shaped AST. The \"IR\" in Babel is the AST itself, mutated in place by visitor functions; plugins register interest in specific node types and rewrite them. The transformation pipeline composes plugins in order, but each plugin sees the AST as-is — there is no separate intermediate form.",
+      "refs": [
+        { "target": "abstract-syntax-trees#overview", "type": "instance-of" },
+        { "target": "estree#overview", "type": "consumes" }
+      ],
+      "sources": [
+        { "label": "@babel/parser", "url": "https://babeljs.io/docs/babel-parser" },
+        { "label": "@babel/parser source", "url": "https://github.com/babel/babel/tree/master/packages/babel-parser" }
+      ]
+    },
+    {
+      "id": "transformation-throughput",
+      "title": "Transformation-throughput focus",
+      "tags": ["compiler-ir", "tooling", "javascript"],
+      "content": "The pragmatic consequence: Babel's representation is the same shape across all phases, which makes plugin authoring trivial and plugin composition near-free. The cost is that some optimizations want a different shape (SSA, sea-of-nodes, etc.) and Babel cannot offer those without breaking its plugin contract.\n\nBabel optimizes for *transformation* throughput, not *optimization* depth — which fits its actual use case (transpiling, bundling, minifying) better than a heavyweight optimizer would. The Rust-based modern alternatives (swc, oxc, Rolldown) preserve this AST-centric model while implementing the visitor pipeline in a faster systems language.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "@babel/parser", "url": "https://babeljs.io/docs/babel-parser" },
+    { "label": "@babel/parser source", "url": "https://github.com/babel/babel/tree/master/packages/babel-parser" }
+  ]
+}

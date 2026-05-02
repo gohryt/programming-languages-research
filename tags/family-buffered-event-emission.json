@@ -1,0 +1,7 @@
+{
+  "id": "family-buffered-event-emission",
+  "tag": "family:buffered-event-emission",
+  "name": "Family: buffered event emission",
+  "description": "Lock-free or per-CPU buffered structured-event pipelines: JFR, ETW, EventPipe, runtime/trace, LTTng/CTF, distributed-tracing spans.",
+  "axis": "family"
+}

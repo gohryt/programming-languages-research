@@ -1,0 +1,43 @@
+{
+  "kind": "tool",
+  "name": "GraalVM Native Image",
+  "aliases": ["Native Image", "GraalVM AOT", "closed-world AOT"],
+  "summary": "Closed-world analysis at build time, whole-program AOT compilation, native executable with fast startup and low memory. No JIT fallback for arbitrary methods at runtime. Reflection, dynamic class loading, proxies must be declared or discovered during image building. The radical-trade end of the AOT/JIT spectrum.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "GraalVM Native Image takes the more radical trade: closed-world analysis at build time, whole-program AOT compilation, and a native executable with fast startup and low memory footprint. Unlike ReadyToRun, there is no ordinary JIT fallback for arbitrary methods at runtime. Reflection, dynamic class loading, proxies, serialisation, and resource access must be declared or discovered during image building.",
+      "refs": [
+        { "target": "dotnet-r2r#overview", "type": "compared-with" },
+        { "target": "project-leyden#overview", "type": "compared-with" },
+        { "target": "project-crac#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["jvm", "aot"],
+      "content": "The benefit is excellent startup latency and deployment simplicity for CLIs, serverless functions, and microservices. The cost is reduced dynamism, longer builds, larger build-time memory use, and the need to model runtime reflection ahead of time.\n\nNative Image is the reminder that AOT is not just a backend decision: it shapes the semantics of reflection, loading, initialisation, and dynamic code generation. The design pattern — ship AOT code with IL fallback for re-optimisation, or choose closed-world AOT and remove the fallback entirely — is a useful spectrum whenever startup matters.\n\nThe trade-offs between R2R, Leyden, CRaC, and GraalVM Native Image are the active frontier of managed-runtime compilation. Each picks a different point on the dynamism-vs-startup-vs-deployment-simplicity triangle.",
+      "refs": []
+    },
+    {
+      "id": "polyglot-targets",
+      "title": "Polyglot targets — GraalPy and TruffleRuby",
+      "tags": ["jvm", "polyglot"],
+      "content": "GraalVM's polyglot story extends Native Image beyond Java: **GraalPy** (Python on GraalVM) and **TruffleRuby** (Ruby on GraalVM) compile via the Truffle framework's partial-evaluation pipeline (`data/truffle-graal-ast-ir`) into native images that share the AOT discipline with Java workloads. Both are interesting data points for the closed-world model: dynamic-language semantics that traditionally rely on runtime metaprogramming compile to a closed-world-friendly form when the Truffle frontend can constrain what runtime features the program may use.",
+      "refs": [
+        { "target": "truffle-graal-ast-ir#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "GraalPy (Python on GraalVM)", "url": "https://www.graalvm.org/python/" },
+        { "label": "TruffleRuby (Ruby on GraalVM)", "url": "https://www.graalvm.org/ruby/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "GraalPy (Python on GraalVM)", "url": "https://www.graalvm.org/python/" },
+    { "label": "TruffleRuby (Ruby on GraalVM)", "url": "https://www.graalvm.org/ruby/" }
+  ]
+}

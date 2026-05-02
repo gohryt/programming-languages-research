@@ -1,0 +1,100 @@
+{
+  "kind": "concept",
+  "name": "Compiler-Inserted Tracing",
+  "aliases": [
+    "patchable-tracing",
+    "trace-sleds"
+  ],
+  "summary": "Makes traceability an explicit compiler/runtime contract by reserving or injecting instrumentation points during code generation; production examples include Luau LOP_BREAK, Erlang BeamAsm jump-target patching, Linux ftrace/eBPF NOP-to-CALL, LLVM XRay sleds, and DTrace USDT.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Compiler-inserted tracing emits or reserves trace points during compilation so that a runtime or tool can activate them later with minimal ambiguity. It is a useful middle point between manual instrumentation in source code and post-hoc binary rewriting.\n\nMechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site. The common axis is the cost when a probe is *not* installed: a reserved NOP, a predicted short jump, a single-byte flag read, or literally nothing. The disabled-overhead model: patch only the requested sites, keep the normal bytecode stream identical when no probe is active, and pay dispatch cost only at enabled probes.",
+      "refs": [
+        {
+          "target": "instrumentation#overview",
+          "type": "related"
+        },
+        {
+          "target": "dynamic-binary-instrumentation",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "patchable-sites-and-side-tables",
+      "title": "Patchable sites and side tables",
+      "tags": [
+        "compiler",
+        "tracing",
+        "runtime"
+      ],
+      "content": "Compiler-inserted tracing often relies on patchable NOP sites, reserved sleds, function-entry hooks, or side metadata tables that describe where and how instrumentation can later be activated. This keeps disabled overhead low while preserving strong control over trace points.\n\n**Luau** (Roblox's Lua fork) rejects `debug.sethook()` because a hook check on every instruction creates a global tax. Instead it treats observation as bytecode patching: the target opcode is replaced with `LOP_BREAK`, while a parallel `debuginsn[]` array stores the original instruction for restoration.\n\n**Erlang BeamAsm** emits a tiny function prologue with a predicted jump over a shared instrumentation fragment. Normal execution pays one predictable branch; enabling observation changes a jump offset so control falls through to the fragment.\n\n**Linux ftrace** is built around compiler-emitted patch points. Modern kernels use `__fentry__`, dynamic ftrace, and related patchable-entry schemes. When tracing is disabled, a call site is patched to a NOP; when enabled, it is patched to call a trampoline. `text_poke()` and architecture-specific machinery handle instruction-cache coherency. eBPF's `fentry`/`fexit` attaches near function entry/exit through BPF trampolines and is much cheaper than kprobes.\n\n**Wasmtime** Winch baseline compiler reserves patch space by inserting a `nop` between native-code fragments corresponding to WebAssembly instructions. A tool can replace that reserved byte with a trap instruction.\n\n**DTrace USDT (User Statically Defined Tracing)** allows application developers to place trace points in their code with very low disabled overhead. **`is-enabled` probes** let user code cheaply ask whether a probe is active before constructing expensive arguments. The key design pattern: separate the \"is anyone listening?\" check from the \"prepare and emit probe data\" work.\n\n**LLVM XRay** is the compiler-toolchain version of the same \"zero when off, patch when on\" design. When a program is compiled with `-fxray-instrument`, LLVM inserts patchable sleds into selected functions and emits an `xray_instr_map` section that describes where those sleds live. The runtime library can patch individual sleds into calls to XRay trampolines or unpatch them back to no-ops without rebuilding the binary. XRay supports function entry, function exit, tail-call handling, and user-defined `custom`/`typed` event points.",
+      "refs": [
+        {
+          "target": "breakpoints#gdb-int3-displaced-stepping",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "LLVM XRay",
+          "url": "https://llvm.org/docs/XRay.html"
+        },
+        {
+          "label": "Luau performance",
+          "url": "https://luau.org/performance/"
+        }
+      ]
+    },
+    {
+      "id": "semantic-versus-mechanical-instrumentation",
+      "title": "Semantic versus mechanical instrumentation",
+      "tags": [
+        "compiler",
+        "language-design",
+        "tooling"
+      ],
+      "content": "When the compiler participates directly, trace points can follow language-level structure rather than only machine-level function or instruction boundaries. This makes compiler-inserted tracing especially valuable when the goal is meaningful observability rather than only generic execution monitoring.\n\nThe Linux tracing stack illustrates the spectrum. **`TRACE_EVENT` static tracepoints** are deliberate semantic events placed by kernel developers — `sched_switch`, block I/O events, syscall events — with stable names and structured fields. They are the production-friendly surface: a tool can depend on the event contract rather than reverse-engineering implementation details. **`kprobes` and `kretprobes`** are dynamic probes attached to arbitrary kernel instruction addresses or function returns. Excellent for one-off investigation because they require no source change, but their contract is unstable. **BPF `fentry`/`fexit`** is the modern low-overhead middle ground. A runtime should distinguish stable semantic tracepoints from unstable implementation probes.\n\n**eBPF CO-RE (Compile Once — Run Everywhere)**, driven by Andrii Nakryiko's libbpf work in 2019–2020, replaced BCC's runtime-compilation model with load-time relocation against **BTF (BPF Type Format)**. BTF is a deduplicated type-info section describing every struct layout of the running kernel. A BPF object file carries its own BTF plus a CO-RE relocation table. At `BPF_PROG_LOAD` time, libbpf walks the relocation table, matches each local type descriptor against the running kernel's BTF, computes the actual field offset, and **patches the `ldx`/`stx` instructions in place** before handing the program to the verifier.",
+      "refs": [
+        {
+          "target": "dwarf-debug-info#overview",
+          "type": "related"
+        },
+        {
+          "target": "fault-isolation#design-implications",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "eBPF CO-RE",
+          "url": "https://nakryiko.com/posts/bpf-core-reference-guide/"
+        }
+      ]
+    },
+    {
+      "id": "interaction-with-optimization-and-runtime-tooling",
+      "title": "Interaction with optimization and runtime tooling",
+      "tags": [
+        "compiler",
+        "optimization",
+        "profiling"
+      ],
+      "content": "Compiler-inserted tracing must coexist with inlining, code motion, tiered compilation, and runtime metadata generation. The main challenge is preserving useful trace semantics even when the compiler heavily transforms the original structure.\n\nThe disabled cost is best described as near-zero dispatch overhead, not literally zero: NOP sites still consume code bytes and can affect layout, I-cache pressure, and decode bandwidth. Even so, patchable instrumentation is the gold standard for \"almost free when off, cheap when on\" tracing and has been battle-tested across billions of machines.\n\n**Trapless Kernel Probes** (USENIX ATC 2024, IBM Research) further refine this: standard Kprobes rely heavily on double traps; the new mechanism applies strategically placed NOPs, slightly modifying the code layout to bypass the typical restrictions of probe optimization. This yields a 10x improvement over standard Kprobes while preserving performance across 96% of the kernel code.\n\nFor a new language: reserve patchable trace sleds in generated code and emit a side table that lets the runtime patch them selectively. This gives the language an always-available production tracing surface without forcing every function call through a hook check.",
+      "refs": [
+        {
+          "target": "tiered-compilation#common-architecture-patterns",
+          "type": "related"
+        },
+        {
+          "target": "sampling-profiling#frame-pointers",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

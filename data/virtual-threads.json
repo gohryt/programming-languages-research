@@ -1,0 +1,76 @@
+{
+  "kind": "concept",
+  "name": "Virtual Threads",
+  "aliases": ["fibers", "lightweight-threads", "green-threads"],
+  "summary": "Runtime-scheduled thread abstraction that preserves blocking-style code while multiplexing many logical threads onto fewer kernel threads via M:N scheduling; production examples include Java virtual threads (JEP 444), Go goroutines, OCaml 5 fibers, and GHC lightweight threads.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Virtual threads are cheap logical threads managed by the runtime rather than mapped one-to-one to kernel threads. They are appealing because they preserve the familiar thread model while changing the runtime cost profile dramatically.\n\nA fiber has its own stack or stack segment and can suspend with an ordinary call stack intact. This makes synchronous-looking code natural and helps retrofit existing APIs. Costs include stack allocation, stack growth, stack scanning for GC, and foreign-call pinning. Status (JDK 21+, final): Java virtual threads became a final feature, giving the JDK an M:N virtual-thread scheduler over carrier platform threads.",
+      "refs": [
+        {
+          "target": "async-await#api-coloring-and-propagation",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "mn-scheduling-model",
+      "title": "M:N scheduling model",
+      "tags": ["concurrency", "runtime", "scheduling"],
+      "content": "Virtual threads usually rely on an M:N scheduling model where many logical threads are multiplexed onto a smaller number of kernel threads. This shifts scalability responsibility into the runtime rather than leaving it entirely to the operating system.\n\nGo's G/M/P model is the canonical production example: goroutines are Gs, OS threads are Ms, and Ps represent the resources and right to execute Go code. There are exactly `GOMAXPROCS` Ps, while Ms can grow when threads block in system calls. Java virtual threads also use M:N scheduling on a JDK-managed carrier pool: a virtual thread *mounts* on a carrier platform thread while running and *unmounts* when yielding or blocking in supported operations; they do not preserve affinity to a particular carrier thread.\n\nGHC's runtime is a similar production example built around **lightweight threads** plus a separate parallel-evaluation mechanism (sparks). The runtime exposes **capabilities** as virtual processors; each capability can run one Haskell thread at a time, while the runtime manages one or more OS threads behind the scenes. This design lets ordinary Haskell threads remain extremely cheap while still allowing multicore execution and blocking foreign calls.",
+      "refs": [{ "target": "go#concurrency", "type": "related" }],
+      "sources": [
+        { "label": "Go runtime HACKING", "url": "https://go.dev/src/runtime/HACKING.md" }
+      ]
+    },
+    {
+      "id": "blocking-style-programming",
+      "title": "Blocking-style programming",
+      "tags": ["concurrency", "ergonomics", "runtime"],
+      "content": "A major appeal of virtual threads is that they preserve blocking-style programming without forcing async signatures through the entire API graph. This makes them an important contrast to async/await designs where suspension is explicit in the type or function boundary.\n\nVirtual-thread and fiber systems choose the opposite trade-off from stackless async: blocking-looking APIs can suspend the logical task without requiring the caller to become async. The runtime and standard library must then ensure that blocking operations unmount or park only the logical task, not the carrier thread. Continuation-based languages such as Raku take a similar uncoloured-await stance.",
+      "refs": [
+        {
+          "target": "async-await#api-coloring-and-propagation",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "ocaml-effect-handlers",
+      "title": "OCaml 5 effect handlers as concurrency substrate",
+      "tags": ["concurrency", "ocaml", "effect-handlers"],
+      "content": "OCaml 5 separates **parallelism** from **concurrency substrate**. Domains are the unit of parallel execution, while effect handlers and heap-allocated fibers support user-level concurrency abstractions such as lightweight threads, generators, and asynchronous I/O. This is a different decomposition from both GHC and Loom.\n\nEffect handlers are runtime-backed but **not statically effect-safe** in the stock language — that is, the type system does not track which functions may perform or handle which effects, so unhandled effects manifest at runtime rather than as type errors. The concurrency substrate is therefore powerful and composable, but the burden of disciplined use falls more on library design and runtime semantics than on the type checker.\n\nA portable analogue at the binary-format layer is being developed for WebAssembly: typed continuations / stack-switching primitives that can compile fibers, lightweight threads, coroutines, generators, async/await, and effect handlers uniformly. Full treatment lives in `data/wasmfx`; the WebAssembly 3.0 milestone (September 2025) shipped GC and exception handling but not stack switching, which continues toward a subsequent milestone.",
+      "refs": [
+        { "target": "wasmfx#overview", "type": "comparable-to" }
+      ],
+      "sources": [
+        { "label": "OCaml effect handlers", "url": "https://ocaml.org/manual/effects.html" },
+        { "label": "Retrofitting concurrency for OCaml (PLDI 2021)", "url": "https://kcsrk.info/papers/retro-concurrency_pldi_21.pdf" }
+      ]
+    },
+    {
+      "id": "pinning-and-blocking-hazards",
+      "title": "Pinning and blocking hazards",
+      "tags": ["concurrency", "runtime", "ffi"],
+      "content": "Virtual threads rely on the runtime being able to suspend work cheaply, but pinning, native calls, or unsupported blocking regions can defeat that model. This makes the boundary between logical suspension and physical blocking a crucial design and documentation issue.\n\nVirtual-thread and fiber systems must handle operations that cannot safely unmount: native calls, monitor regions, critical sections, or runtime-internal pinned states. If a virtual thread is pinned while blocking, its carrier may be blocked too, reducing scalability. OpenJDK Loom implementation discussions and code expose concepts such as continuations, carrier threads, and pinned reasons.",
+      "refs": [
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "related"
+        },
+        { "target": "async-await#blocking-hazards", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Virtual threads improve direct-style ergonomics and can reduce async coloring, but they require deep runtime integration, stack management, and carefully documented blocking boundaries. They are best understood as a runtime-heavy answer to concurrency ergonomics rather than a free abstraction.",
+      "refs": [{ "target": "async-await#blocking-hazards", "type": "related" }]
+    }
+  ],
+  "sources": []
+}

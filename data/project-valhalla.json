@@ -1,0 +1,50 @@
+{
+  "kind": "runtime",
+  "name": "Project Valhalla — JVM Value Types and Heap Layout",
+  "aliases": ["Valhalla", "Project Valhalla", "JVM value classes", "Q-types", "primitive specialisation"],
+  "summary": "Project Valhalla redefines JVM heap layout by introducing value classes (formerly 'inline classes') and primitive types in generics. Value classes are stack-allocated or inlined into containing structures by default; primitive-backed generics avoid boxing entirely.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "value-class", "flat-array", "jvm", "openjdk", "experimental"],
+      "content": "**Project Valhalla** (Brian Goetz, John Rose, Dan Heidinga et al., OpenJDK, 2014+) redefines JVM heap layout by introducing **value classes** (formerly \"inline classes\") and **primitive types in generics**.\n\nThe change is fundamental to JVM memory: today every non-primitive value is a heap-allocated object with an 8/16-byte header, and `List<Integer>` boxes every `int` into a heap object. Valhalla's value classes are stack-allocated or inlined into containing structures by default; primitive-backed generics avoid the boxing entirely. This belongs in the GC chapter rather than allocators because the change is fundamentally about *which objects exist on the GC heap at all*, not about the allocator's internal policy.",
+      "refs": [
+        { "target": "garbage-collection#language-design-implications", "type": "instance-of" },
+        { "target": "project-lilliput", "type": "complements" },
+        { "target": "zgc", "type": "complements" },
+        { "target": "g1-gc", "type": "complements" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Value classes, null-restricted types, primitive specialisation",
+      "tags": ["value-class", "flat-array", "jvm"],
+      "content": "The mechanism, in stages:\n\n- **Value classes (`value class Point`)**: declared via the `value` modifier; instances have **no identity** (`==` compares fields; `hashCode` is field-based), are **immutable**, and the JIT may **flatten them inline** wherever the container's layout permits. A `Point[]` becomes a flat array of two-coordinate records, not an array of pointers to heap-allocated Points. The flattening is opportunistic: the JIT decides per-call-site whether the value-class is small enough and the container layout regular enough to flatten.\n- **Null-restricted types (`Point!`)**: a value type that cannot be null. Null-restricted types are eligible for full flattening; nullable references must still carry a presence indicator (because flattened layout has no natural representation for \"absent\"). The `!` modifier is the first time JVM types acquire null-restriction at the language level.\n- **Primitive types as value classes**: in JDK 25+ preview, `int`, `long`, `double` etc. are unified with value classes, making `int` a value class with static methods and field-like access in the same syntactic position as user-defined value types. The unification eliminates the historical Java distinction between \"primitives\" and \"objects\" — everything is an object, but value-class objects flatten.\n- **Primitive specialisation in generics** (project-internal \"Q-types\"): `List<int>` is a real instantiation, not a `List<Integer>` with autoboxing. The JVM specialises the bytecode at first instantiation, so collection types that historically paid 4–8x memory overhead for primitive elements (autoboxed `Integer`s in an `ArrayList<Integer>`) become flat primitive arrays."
+    },
+    {
+      "id": "impact",
+      "title": "Memory and GC impact",
+      "tags": ["garbage-collection", "low-latency-gc", "jvm"],
+      "content": "The expected memory-pressure impact is large. JEP-Valhalla benchmarks report **2–5x memory reduction and 1.5–3x throughput improvement** on workloads that allocate large numbers of small immutable structures (geometry, financial records, collections of pairs, `Optional<T>`, `Map.Entry`).\n\nThe GC pressure benefit compounds: fewer live heap objects means shorter GC pauses, more efficient generational promotion, and better cache locality. ZGC and Shenandoah both gain proportionally because their barrier costs scale with the number of object headers traversed."
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs — identity, synchronisation, library migration",
+      "tags": ["jvm", "value-class"],
+      "content": "Trade-offs: value classes lose object identity, which breaks code that relies on identity-based hashing (`IdentityHashMap`) or `==` reference equality (`object1 == object2` becomes a field-by-field comparison). **Synchronisation primitives** (`synchronized`, `wait`/`notify`) cannot be applied to value classes — they have no monitor header. Library migration is non-trivial: `Optional<T>`, `Map.Entry`, `LocalDate`, and many JDK types are candidates for value-class migration, but each migration is an ABI change requiring careful staging."
+    },
+    {
+      "id": "status",
+      "title": "Status — JDK 25 LTS preview",
+      "tags": ["experimental", "jvm", "openjdk"],
+      "content": "Status (as of 2026-04): Valhalla is in **preview** in JDK 25+ (LW5 prototype), with full delivery expected across JDK 26–28. The first user-facing migration (Java records becoming value classes by default) is the planned smooth-migration path; existing record-based code becomes flattenable without source change.\n\nThe architectural lesson is that **a managed runtime that started with universal heap allocation can retrofit value semantics**, but the cost is a decade-plus design effort spanning JEPs, ABI changes, and standard-library migrations. For new languages, value classes (or noncopyable structs, or Hylo's MVS) should be designed in from day 1 — retrofitting them onto an established type system is what made Valhalla a 12+ year effort."
+    }
+  ],
+  "sources": [
+    { "label": "Project Valhalla", "url": "https://openjdk.org/projects/valhalla/" },
+    { "label": "JEP 401: Value Classes and Objects (Preview)", "url": "https://openjdk.org/jeps/401" },
+    { "label": "Goetz — State of Valhalla, Part 1 (Background)", "url": "https://cr.openjdk.org/~briangoetz/valhalla/sov/01-background.html" },
+    { "label": "State of Valhalla — Goetz talk (YouTube)", "url": "https://www.youtube.com/watch?v=XBu54ZIXIgM" }
+  ]
+}

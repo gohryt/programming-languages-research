@@ -1,0 +1,42 @@
+{
+  "kind": "runtime",
+  "name": "Glommio",
+  "aliases": ["glommio-runtime"],
+  "summary": "Rust thread-per-core async runtime by Datadog where each worker thread runs an independent single-threaded event loop bound to a CPU core via affinity, with its own io_uring instance; rejects work-stealing in exchange for perfect cache locality and zero cross-core contention.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Glommio** (Datadog, originally for ScyllaDB-adjacent workloads) is the canonical Rust thread-per-core io_uring runtime. Each worker thread runs its own independent single-threaded event loop bound to a specific CPU core via affinity, with its own `io_uring` instance for asynchronous I/O. Inter-core coordination is by explicit message passing through bounded channels rather than work-stealing across a shared scheduler.\n\nFutures are pinned to one core for their lifetime, eliminating cross-core synchronisation on the hot path. The trade-off is sharp: perfect cache locality and zero shared-state contention, at the cost of needing to manually balance work across cores when the workload isn't naturally per-connection or per-shard.",
+      "refs": [
+        { "target": "event-loop-scheduling#overview", "type": "example" },
+        { "target": "io-integration#readiness-and-completion-models", "type": "uses" },
+        { "target": "work-stealing#fork-join-fit", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Glommio repository", "url": "https://github.com/DataDog/glommio" }
+      ]
+    },
+    {
+      "id": "vs-tokio-shared-scheduler",
+      "title": "Contrast with Tokio's shared-scheduler model",
+      "tags": ["concurrency", "scheduling", "tradeoffs"],
+      "content": "Distinct from Tokio's M:N work-stealing model where futures freely migrate between worker threads: Glommio futures are pinned to one core for their lifetime. Cross-core synchronisation cost is zero on the data path, paid only on explicit channel sends.\n\nDistinct from ActiveJ Eventloop + Workers (`data/activej-eventloop`): ActiveJ's primary/worker topology balances *connections* across worker eventloops at accept time and lets each worker run arbitrary code; Glommio expects the application to organise itself around per-core ownership of long-lived state.",
+      "refs": [
+        { "target": "monoio#overview", "type": "sibling" },
+        { "target": "activej-eventloop#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "production-use",
+      "title": "Production use",
+      "tags": ["runtime", "production"],
+      "content": "Production use: ScyllaDB-class databases where every connection is a long-lived shard owner, Cloudflare's pingora proxy variants, Datadog internal services. The pattern fits workloads where every connection or shard is a long-lived independent unit of work — the per-core ownership model maps cleanly to per-connection state.\n\nStatus (as of 2026-04): stable, MIT-licensed, maintained by Datadog. Less mainstream than Tokio but the canonical reference for thread-per-core Rust async.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Glommio repository", "url": "https://github.com/DataDog/glommio" }
+  ]
+}

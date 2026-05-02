@@ -1,0 +1,34 @@
+{
+  "kind": "framework",
+  "name": "ASTro AST-Based Reusable Optimisation Framework",
+  "aliases": ["ASTro", "AST optimisation framework"],
+  "summary": "VMIL 2025: an AST-based reusable optimisation framework using AST semantics plus a partial-evaluator framework. Avoids semantic duplication between an interpreter and a compiler — the same AST representation drives both. Related to Truffle/Graal's partial-evaluation approach but reframed for reusability across languages.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ASTro (VMIL 2025) is a research framework for reusable AST-based optimisation. The premise: the same AST representation that drives an interpreter can also drive a partial-evaluator-based compiler, eliminating the semantic duplication that arises when interpreter and compiler are written separately and must be kept in sync.\n\nThe framework provides AST semantics specifications plus a partial-evaluator infrastructure. A language implementer writes the AST and its semantics once; ASTro derives the JIT-compilable form via partial evaluation against the semantics specification.",
+      "refs": [
+        { "target": "futamura-projections#truffle-graal-realisation", "type": "related-to" }
+      ],
+      "sources": [
+        { "label": "ASTro paper (VMIL 2025)", "url": "https://www.atdot.net/~ko1/activities/2025_astro_VMIL2025.pdf" }
+      ]
+    },
+    {
+      "id": "design-position",
+      "title": "Design position",
+      "tags": ["compiler", "research", "framework"],
+      "content": "ASTro sits in the same design space as Truffle/Graal but with different emphasis. Truffle is tightly coupled to GraalVM's partial evaluator and to Java as the host language; ASTro frames the abstraction more reusably across languages and is positioned as a research framework rather than a production runtime.\n\nThe distinguishing claim is that the AST itself can be a reusable optimisation substrate — that the optimisation infrastructure can be written once and instantiated against multiple language ASTs without per-language compiler engineering. Whether this scales to production-grade performance is an open research question; the VMIL 2025 paper presents the framework as a starting point.",
+      "refs": [],
+      "sources": [
+        { "label": "ASTro DL link", "url": "https://dl.acm.org/doi/10.1145/3759548.3763371" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "ASTro VMIL 2025 paper", "url": "https://www.atdot.net/~ko1/activities/2025_astro_VMIL2025.pdf" },
+    { "label": "ASTro DL", "url": "https://dl.acm.org/doi/10.1145/3759548.3763371" }
+  ]
+}

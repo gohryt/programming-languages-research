@@ -1,0 +1,57 @@
+{
+  "kind": "concept",
+  "name": "Sendability",
+  "aliases": [],
+  "summary": "Safe-sharing classification that determines which values may cross threads, tasks, or actor boundaries without violating concurrency invariants; production examples are Rust's Send/Sync, Swift's Sendable, Pony's reference capabilities.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Sendability is the classification of values that may cross concurrency boundaries safely. It becomes important wherever work is spawned, transferred, or communicated across threads, tasks, or isolation domains.",
+      "refs": [
+        { "target": "ownership#overview", "type": "related" },
+        { "target": "type-and-effect-systems#overview", "type": "type-rule-related" },
+        { "target": "ownership-as-type-constraint#overview", "type": "type-rule-related" }
+      ]
+    },
+    {
+      "id": "concurrency-boundary-checks",
+      "title": "Concurrency boundary checks",
+      "tags": ["concurrency", "type-system", "safe-sharing"],
+      "content": "The central sendability question is what kinds of data may cross a boundary without introducing races or hidden sharing hazards. Some systems enforce this statically, while others rely on copying, convention, or dynamic discipline.\n\nSendability markers (Rust's `Send`/`Sync`, Swift's `Sendable`) classify types by whether values or shared references may cross concurrency domains. From a runtime perspective the relevant point is that the check happens when a value is handed to another task, actor message, or thread spawn. Rust's `Send` says \"a value of this type can be transferred across threads\"; `Sync` says \"a shared reference `&T` is safe to send to another thread.\" `Send`/`Sync` are auto-derived for types whose constituents are `Send`/`Sync`; types containing raw pointers, `Cell`, `RefCell`, or `Rc<T>` are not. Swift `Sendable` is similar but with checked-by-default behavior in Swift 6's strict concurrency mode.",
+      "refs": [{ "target": "go#concurrency", "type": "contrasts-with" }],
+      "sources": [
+        { "label": "Rust Send/Sync", "url": "https://doc.rust-lang.org/book/ch16-04-extensible-concurrency-sync-and-send.html" },
+        { "label": "Swift Sendable", "url": "https://developer.apple.com/documentation/swift/sendable" }
+      ]
+    },
+    {
+      "id": "relation-to-actor-and-task-isolation",
+      "title": "Relation to actor and task isolation",
+      "tags": ["concurrency", "actors", "isolation"],
+      "content": "Actor and task systems often need an explicit notion of which values can be transferred or shared across isolation domains. Sendability is therefore one of the cleanest abstractions for connecting type rules to practical concurrency boundaries.\n\nActor isolation prevents direct unsynchronized access to actor-local mutable state at runtime: only an actor-mounted continuation may touch its instance state, and message payloads must satisfy the language's sendability rules. The runtime-relevant subtlety is reentrancy across `await` — Swift actor-isolated functions are reentrant, so other work may run on the actor while a function is suspended, breaking single-threaded-execution invariants if not coded carefully.",
+      "refs": [
+        { "target": "actors#isolation-and-mailboxes", "type": "used-by" }
+      ]
+    },
+    {
+      "id": "relation-to-ownership-and-capabilities",
+      "title": "Relation to ownership and capabilities",
+      "tags": ["ownership", "capabilities", "type-system"],
+      "content": "Ownership, immutability, and capability systems can all justify sendability. In many designs, the type system proves that crossing a concurrency boundary either transfers unique ownership or preserves safe shared access.\n\nReference capabilities classify aliases by what they can read, write, or send, and **Pony** is the canonical example combining capabilities with actors to obtain static data-race freedom while still allowing zero-copy message passing. Capability kinds: `iso` (unique, sendable), `val` (deeply immutable, freely shareable), `ref` (actor-local, not sendable), `tag` (opaque identity, send-only), and `trn`/`box` (transition forms) determine which message payloads the compiler permits across the actor boundary, and the runtime relies on those guarantees to avoid runtime synchronization on transferred objects.\n\nStatic race freedom is strong but restrictive. Dynamic race detectors, happens-before tracing, lockset analysis, and scheduler fuzzing are useful complements. ThreadSanitizer, Go's race detector, and Java's `java.util.concurrent` `ReentrantLock` instrumentation each cover a different runtime layer.",
+      "refs": [
+        { "target": "ownership#language-examples", "type": "related" },
+        { "target": "capability-based-memory#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Strong sendability rules improve race-freedom and local reasoning, but they can also make APIs more constrained and generic async code harder to express. This concept should stay focused on boundary crossing rather than absorbing all of ownership or capability theory.\n\nThe coloring problem applies: once a closure must be `Send`, every value it captures must be `Send`, propagating the constraint up the call graph. Async fn in traits has the same issue: a trait with `async fn handle()` cannot directly express \"the returned future is `Send` if `Self: Sync`\" — Rust's RTN (Return Type Notation) addresses this with `T: Service<handle(): Send>`. Swift's strict concurrency mode (Swift 6) makes Sendable checks default-on, surfacing the same constraint propagation but with better diagnostics.",
+      "refs": [{ "target": "ownership#tradeoffs", "type": "related" }]
+    }
+  ],
+  "sources": []
+}

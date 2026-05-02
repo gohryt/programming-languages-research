@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Hardened libc++ / MSVC STL / libstdc++",
+  "aliases": ["libc++ hardening", "MSVC STL hardening", "STL hardening", "_LIBCPP_HARDENING_MODE"],
+  "summary": "The clearest normative C++26 standard-library hardening: bounds and precondition checks in standard containers and iterators with controlled performance overhead. libc++ shipped 2024; MSVC STL ships an opt-in mode (VS 2022 17.14, May 2025); libstdc++ is actively implementing.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["cpp", "cpp26", "cpp-safety", "library-hardening", "hardening-mode", "runtime-bounds-check", "precondition-check"],
+      "content": "Hardened libc++ / MSVC STL / libstdc++ is the clearest normative C++26 standard-library hardening / bounds-checking memory-safety addition: bounds/precondition checks in standard containers and iterators with controlled performance overhead. libc++ uses `_LIBCPP_HARDENING_MODE` ∈ {`none`, `fast`, `extensive`, `debug`}; `_LIBCPP_ABI_BOUNDED_ITERATORS` makes iterator types carry bounds for `span`/`string_view`. Shipped 2024.\n\nMSVC STL ships `_MSVC_STL_HARDENING=1` opt-in (VS 2022 17.14, May 2025); uses `__fastfail`/`__builtin_verbose_trap` for ~29-byte trap codegen; default in a future release. libstdc++ is actively implementing.",
+      "refs": [
+        { "target": "cpp-standard-pointer-types", "type": "related" },
+        { "target": "cpp-stroustrup-profiles", "type": "related" }
+      ]
+    },
+    {
+      "id": "rollout-and-significance",
+      "title": "Rollout and significance",
+      "tags": ["cpp-safety", "library-hardening", "cpp26"],
+      "content": "Google reports significant CVE-class elimination from rolling out `fast` mode in production. Standardized in C++26; vendor-shipping but mostly opt-in. The pragmatic C++ safety story is: Profiles for the language layer is unfinished; library hardening is what's actually shipping.\n\nThe hardening modes ladder from `none` (no checks) through `fast` (production-grade preconditions on container access, predictable cost) to `extensive` and `debug` (more checks, higher cost). The trap codegen in MSVC's implementation is deliberately compact (~29 bytes) so that hardened code remains close in size to unchecked code.",
+      "refs": [
+        { "target": "cpp-safety-profiles-resolution", "type": "related" }
+      ],
+      "sources": [
+        { "label": "MSVC STL Hardening", "url": "https://github.com/microsoft/STL/wiki/STL-Hardening" },
+        { "label": "MSVC C++ conformance improvements", "url": "https://learn.microsoft.com/en-us/cpp/overview/cpp-conformance-improvements" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "MSVC STL Hardening", "url": "https://github.com/microsoft/STL/wiki/STL-Hardening" },
+    { "label": "MSVC C++ conformance improvements", "url": "https://learn.microsoft.com/en-us/cpp/overview/cpp-conformance-improvements" }
+  ]
+}

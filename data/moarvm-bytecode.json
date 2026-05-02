@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "MoarVM MAST and Bytecode",
+  "aliases": ["moarvm-mast", "mbc"],
+  "summary": "Raku's MoarVM has two bytecode levels — MAST (the high-level abstract bytecode that NQP and Raku compile to) and MoarVM bytecode (MBC, the lower-level executable form, register-based, with operations modeling Raku's rich semantics).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "MoarVM (Raku's VM) has two bytecode levels. **MAST** (MoarVM Abstract Syntax Tree, despite the name a bytecode-shaped IR) is the high-level abstract bytecode that NQP and Raku compile to. **MoarVM bytecode** (often called MBC) is the lower-level executable form — register-based, with operations modeling Raku's rich semantics (multi-dispatch, multiple integer kinds, parameter handling, container types).\n\nThe two-level design lets MAST be the stable compile target while MBC evolves.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "rakuast#overview", "type": "lowered-from" },
+        { "target": "moarvm-spesh#overview", "type": "specialised-by" }
+      ],
+      "sources": [
+        { "label": "MoarVM bytecode documentation", "url": "https://github.com/MoarVM/MoarVM/blob/master/docs/bytecode.markdown" }
+      ]
+    },
+    {
+      "id": "raku-pipeline-role",
+      "title": "Role in the Raku compile chain",
+      "tags": ["bytecode", "raku", "pipeline"],
+      "content": "The Raku source pipeline is RakuAST → QAST → MAST → MBC. Each step lowers to a more execution-shaped form. The architectural value of separating MAST from MBC is that MAST acts as a stable contract between the high-level Rakudo frontend and the lower-level VM-evolution surface — bytecode-format changes can happen at the MBC layer without forcing every consumer of MAST to update.\n\nspesh and new-disp specialisation operate at the MBC level after first execution, producing tier-up to optimised form. See `data/moarvm-spesh` and `data/moarvm-new-disp` for the optimisation-pipeline angles.",
+      "refs": [
+        { "target": "moarvm-new-disp#overview", "type": "specialises" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "MoarVM bytecode documentation", "url": "https://github.com/MoarVM/MoarVM/blob/master/docs/bytecode.markdown" }
+  ]
+}

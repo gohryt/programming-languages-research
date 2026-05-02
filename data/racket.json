@@ -1,0 +1,51 @@
+{
+  "kind": "language",
+  "name": "Racket",
+  "aliases": ["plt-scheme"],
+  "summary": "Scheme-descended Lisp where modules are phase-aware language-extension boundaries; for-syntax and module phases tie imports to the macro-expansion model; the #lang mechanism lets a source file declare which language it is written in, making modules into language-construction substrate.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Racket (PLT, 1995+; the language formerly known as PLT Scheme) is the most important example in the typed-and-phase-aware family for a different reason from OCaml or SML: it treats modules as **phase-aware language-extension boundaries**. A Racket module is not only a namespace and compilation unit; it is also part of the language's macro-expansion model.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" }
+      ],
+      "sources": [
+        { "label": "Racket reference — modules", "url": "https://docs.racket-lang.org/reference/Modules.html" }
+      ]
+    },
+    {
+      "id": "phase-aware-imports",
+      "title": "Phase-aware imports — for-syntax and module visiting",
+      "tags": ["racket", "phases", "macros"],
+      "content": "Imports can be shifted across phases with forms like `for-syntax`, and modules can be instantiated or visited at different phase levels depending on whether they are needed for runtime evaluation or compile-time expansion.\n\nThis is a qualitatively different design point from both the static graph systems and the ML-style typed module systems. In Racket, modules participate directly in the language's metaprogramming semantics. The distinction between compile-time and runtime is not an implementation detail hidden behind proc-macro crates or compiler internals; it is part of the programmer-visible module language.\n\nThe complexity has multiple dimensions: multiple phase levels, module instantiation vs visiting, different import modes for compile-time and runtime, and a tighter coupling between the expander and the module system than most languages ever attempt.",
+      "refs": [],
+      "sources": [
+        { "label": "Racket guide — phases", "url": "https://docs.racket-lang.org/guide/phases.html" }
+      ]
+    },
+    {
+      "id": "hash-lang-as-language-substrate",
+      "title": "#lang — modules as language-construction substrate",
+      "tags": ["racket", "languages", "metaprogramming"],
+      "content": "The `#lang` mechanism pushes module-as-extension-boundary even further. A source file can declare not only \"which module am I in?\" but effectively \"which language is this file written in?\" That makes modules into language-construction boundaries. Racket's module system is therefore one of the strongest examples anywhere of **modules as extension substrate**, not just code organization.\n\nProduction `#lang` ecosystems include Typed Racket (typed dialect), Scribble (documentation), Pollen (publishing DSL), and dozens of pedagogical and research dialects. Each is implemented as a module that exports a reader and a set of bindings that the host file uses as its language.",
+      "refs": [],
+      "sources": [
+        { "label": "Racket guide — #lang reader", "url": "https://docs.racket-lang.org/guide/hash-lang_reader.html" }
+      ]
+    },
+    {
+      "id": "design-warning-and-inspiration",
+      "title": "Design warning and inspiration",
+      "tags": ["racket", "design-guidance"],
+      "content": "Racket is not primarily a candidate for direct imitation. It is a warning and an inspiration. If a language ever wants macros, DSLs, or language-as-library features at this level, then **module phases must be designed deliberately**. If that power is not wanted now, then Racket is evidence that it is often better deferred than approximated halfway.\n\nFor a language designer, the takeaway is: don't bolt phase-aware imports onto an existing module system later. The phase tower interacts with module elaboration, name resolution, hygiene, and incremental compilation in ways that are very hard to retrofit."
+    }
+  ],
+  "sources": [
+    { "label": "Racket reference — modules", "url": "https://docs.racket-lang.org/reference/Modules.html" },
+    { "label": "Racket guide — module paths", "url": "https://docs.racket-lang.org/guide/module-paths.html" },
+    { "label": "Racket guide — phases", "url": "https://docs.racket-lang.org/guide/phases.html" }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "kind": "tool",
+  "name": "cppfront / Cpp2",
+  "aliases": [
+    "Cpp2",
+    "Sutter Cpp2"
+  ],
+  "summary": "Herb Sutter's alternative-syntax frontend that transpiles to today's C++; safety becomes the default with explicit `unchecked_*` opt-outs, while remaining 100% interop with existing C++. Personal experiment, not on the standardization track, but used as empirical evidence for the Profiles-style \"safe defaults\" claim.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "cpp",
+        "cppfront-cpp2",
+        "transpile",
+        "cpp-safety",
+        "syntax-reform"
+      ],
+      "content": "Herb Sutter's cppfront is an alternative-syntax frontend that transpiles to today's C++; safety becomes the default with explicit `unchecked_*` opt-outs, while remaining 100% interop with existing C++. Bounds-checked subscripts, null-checked dereferences, mixed-sign comparison rejection, and div-by-zero checks are on by default; `-no-subscript-checks` etc. switch them off per file. Unified `operator=` covers construction/assignment/destruction; `that` parameter for safer copy/move; type-unsafe casts not expressible in Cpp2 syntax.",
+      "refs": [
+        {
+          "target": "cpp-safety-profiles-resolution",
+          "type": "related"
+        },
+        {
+          "target": "cpp-stroustrup-profiles",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "implementation",
+      "title": "Implementation",
+      "tags": [
+        "transpile",
+        "cppfront-cpp2",
+        "cpp"
+      ],
+      "content": "Compiles to standard C++20 — drop-in into existing build systems with all existing tooling. The transpilation target choice is deliberate: any existing toolchain that accepts C++20 (debugger, sanitizer, IDE, build system) works unchanged on the generated output, so the safety guarantees are layered without disrupting the existing build/debug pipeline.\n\nPersonal experiment (Sutter); not on the standardization track. Cpp2's role in the WG21 safety debate is mostly as evidence: it demonstrates that \"safe defaults with opt-out\" is workable on a non-trivial codebase without giving up C++ interop, supporting the Profiles position that recompilation-plus-restrictions is a viable safety model.",
+      "refs": [
+        {
+          "target": "cpp-stroustrup-profiles",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "cppfront project",
+      "url": "https://hsutter.github.io/cppfront/"
+    },
+    {
+      "label": "cppfront / Cpp2 safety",
+      "url": "https://hsutter.github.io/cppfront/cpp2/safety/"
+    },
+    {
+      "label": "Herb Sutter — March 2025 blog",
+      "url": "https://herbsutter.com/2025/03/"
+    }
+  ]
+}

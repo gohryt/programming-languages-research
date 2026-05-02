@@ -1,0 +1,66 @@
+{
+  "kind": "runtime",
+  "name": "Deno",
+  "aliases": ["deno-runtime"],
+  "summary": "Ryan Dahl's JavaScript/TypeScript runtime where module identity is an HTTPS URL with no central registry; modules are content-addressed via SHA-256 in deno.lock with subresource integrity by default; per-program capability sandbox via --allow-net/--allow-read/--allow-write/--allow-env explicit grants.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Ryan Dahl's **Deno** (2018+) takes a position no other entry takes: **module identity is an HTTPS URL, and there is no central registry**. An import statement is `import { serve } from \"https://deno.land/std@0.220.0/http/server.ts\";` — the URL is the canonical name, the version is in the path, and there is no equivalent of crates.io, npm, PyPI, or Maven Central as a governance bottleneck.\n\nModules are content-addressed via SHA-256 in a `deno.lock` file, downloaded on first use, and cached in a per-user directory under `$DENO_DIR`. This is a TypeScript-first runtime built on V8 plus a Rust core (`deno_core`); compare `data/bun` (Zig + JavaScriptCore, all-in-one toolchain) for the closest peer.",
+      "refs": [
+        { "target": "module-identity#identity-models", "type": "url-shaped-example" },
+        { "target": "javascript#esm", "type": "uses" },
+        { "target": "bun#tradeoffs-vs-node-and-deno", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Deno modules", "url": "https://docs.deno.com/runtime/fundamentals/modules/" }
+      ]
+    },
+    {
+      "id": "url-shaped-identity",
+      "title": "URL-shaped identity and content-addressed lockfile",
+      "tags": ["deno", "module-identity", "lockfiles"],
+      "content": "The design choices that follow from URL-shaped identity:\n\n- **No `node_modules` or virtual environment per project**: dependencies are content-addressed in a global cache, shared across projects. Builds are reproducible because the lock file pins the URL plus the content hash.\n- **Subresource integrity by default**: an import that resolves to bytes whose hash does not match the lock file is rejected at load. This defends against registry compromise and man-in-the-middle attacks without requiring users to opt in.\n- **Bring-your-own-CDN identity**: deno.land/std is one CDN; jsr.io is another; private registries can be self-hosted by serving HTTPS responses with the right content negotiation. There is no governance bottleneck because identity is URL-shaped.\n- **Top-level `await` and ESM by default**: Deno follows ECMAScript module semantics directly, with no CommonJS distinction.",
+      "refs": [
+        { "target": "lockfiles#overview", "type": "uses" }
+      ]
+    },
+    {
+      "id": "capability-sandbox",
+      "title": "Per-program capability sandbox",
+      "tags": ["deno", "capabilities", "security"],
+      "content": "**Per-program capability sandbox**: a Deno program runs with no ambient authority by default — `--allow-net`, `--allow-read`, `--allow-write`, `--allow-env` are explicit grants. Combined with URL-shaped imports, this makes it possible to audit \"what code runs, where it came from, and what authority it has\" at deployment time.\n\nThe capability angle complements the broader object-capability discipline (`data/capability-based-memory`) at the runtime boundary. Code from an untrusted URL cannot read the filesystem unless `--allow-read=path/to/dir` was passed; cannot reach the network unless `--allow-net=domain.com` was passed. The flags compose: a CI deployment can lock down exactly the capabilities a workload needs and reject anything that tries to exceed them.",
+      "refs": [
+        { "target": "capability-based-memory#overview", "type": "complements" }
+      ],
+      "sources": [
+        { "label": "Deno security and permissions", "url": "https://docs.deno.com/runtime/fundamentals/security/" }
+      ]
+    },
+    {
+      "id": "jsr-and-npm-interop",
+      "title": "JSR and npm interop (Deno 2.0+)",
+      "tags": ["deno", "registries", "ecosystem"],
+      "content": "Status (as of 2026-04): Deno 2.0+ added **jsr.io** (a curated registry serving canonical URLs while still URL-shaped) and improved npm-package interoperability via `npm:`-prefixed specifiers, partially closing the ecosystem gap with Node.\n\nProduction users include Deno Deploy, Netlify Edge Functions, and several Node-replacement deployments. The two main current criticisms are the loss of central discovery (no equivalent of npm search) and ecosystem fragmentation between `deno.land/x`, `jsr.io`, and `npm:` resolution paths.",
+      "refs": [],
+      "sources": [
+        { "label": "Deno blog — JSR Q4", "url": "https://deno.com/blog/jsr_q4" },
+        { "label": "JSR docs", "url": "https://jsr.io/docs" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — content-addressed URLs as module identity",
+      "tags": ["deno", "design-guidance"],
+      "content": "The design lesson generalises: **content-addressed URLs as module identity** eliminate the registry-name-squatting and registry-availability problems that plague Node and crates.io / PyPI, at the cost of giving up centralised discovery affordances and ecosystem-curation. Go's import-paths-as-URLs takes a similar position with a less radical lockfile model. A new language designer can adopt URL-shaped imports without committing to the full Deno model.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Deno modules", "url": "https://docs.deno.com/runtime/fundamentals/modules/" },
+    { "label": "Deno security", "url": "https://docs.deno.com/runtime/fundamentals/security/" },
+    { "label": "JSR docs", "url": "https://jsr.io/docs" }
+  ]
+}

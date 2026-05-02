@@ -1,0 +1,38 @@
+{
+  "kind": "concept",
+  "name": "1ML",
+  "aliases": ["1ml-language"],
+  "summary": "Andreas Rossberg's research language (ICFP 2015) that unifies the ML module language and core language: modules are first-class values, signatures are first-class types, functors are ordinary functions; demonstrates that the conventional core/module dichotomy can be eliminated in a sufficiently expressive single language.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Andreas Rossberg's **1ML** (ICFP 2015, with subsequent refinements) is the most ambitious modern attempt to *unify* the ML module language and the ML core language. In ordinary ML, the module language and the core (term/type) language are distinct: types are in the core, signatures are in the module language; values are in the core, structures are in the module language. They use different syntax, different binding mechanisms, and different scoping rules. 1ML demonstrates that this dichotomy can be eliminated: in 1ML, **modules are first-class values, signatures are first-class types, functors are ordinary functions**, and the core/module distinction collapses into one language.",
+      "refs": [
+        { "target": "module-calculi#first-class-modules", "type": "extends" },
+        { "target": "standard-ml#overview", "type": "unifies" }
+      ],
+      "sources": [
+        { "label": "1ML — Core and Modules United", "url": "https://people.mpi-sws.org/~rossberg/1ml/1ml.pdf" }
+      ]
+    },
+    {
+      "id": "technical-mechanism",
+      "title": "Technical mechanism — signatures as large types",
+      "tags": ["1ml", "type-system", "module-calculus"],
+      "content": "The technical move that makes 1ML work is treating signatures as a particular form of (large) type and modules as values of those types. Type abstraction is recovered through existential quantification, and applicative-vs-generative functor distinctions are recovered through choice of polymorphism mode (predicative vs impredicative).\n\nThe result is a language whose module system is as expressive as full SML modules but expressed with no separate module syntax. Where SML and OCaml separate `signature SIG = sig ... end` from `type t = ...` and `structure S = struct ... end` from `let x = ...`, 1ML uses one syntax for all four cases."
+    },
+    {
+      "id": "significance-as-existence-proof",
+      "title": "Significance as an existence proof",
+      "tags": ["1ml", "design-guidance"],
+      "content": "1ML is not a production language. Its significance is conceptual: it shows that the apparent need for \"two languages\" (core + module) is not fundamental, and that a sufficiently expressive single language can absorb the module system.\n\nMost production languages will not benefit from this — the two-language style is what makes ML modules approachable — but the existence proof matters because it bounds what is necessary. Future ML descendants can choose between the conventional two-language ML style (more accessible) and 1ML's unified style (more expressive but conceptually heavier).",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "1ML — Core and Modules United", "url": "https://people.mpi-sws.org/~rossberg/1ml/1ml.pdf" },
+    { "label": "Andreas Rossberg's homepage", "url": "https://people.mpi-sws.org/~rossberg/" }
+  ]
+}

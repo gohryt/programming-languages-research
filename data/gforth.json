@@ -1,0 +1,44 @@
+{
+  "kind": "runtime",
+  "name": "Gforth",
+  "aliases": [
+    "Gforth-fast"
+  ],
+  "summary": "The strongest documented open Forth implementation with a fast threaded-code engine. Direct/indirect threading hybrids, dynamic superinstructions, stack caching. The cleanest long-running laboratory for VM implementation techniques.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "If the question is \"what is the strongest open, portable, well-documented Forth implementation with a fast traditional engine?\", **Gforth** is the obvious answer. The Gforth manual states that on RISC machines its engine is \"very close to optimal\" for threaded-code execution, and the system layers in **dynamic superinstructions** and later **stack caching** as the major performance levers.\n\nGforth matters beyond Forth because it is one of the cleanest long-running laboratories for VM implementation techniques: direct/indirect threading hybrids, superinstruction formation, stack caching, and careful benchmarking.",
+      "refs": [
+        {
+          "target": "dynamic-superinstructions#overview",
+          "type": "implements"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Gforth performance",
+          "url": "https://gforth.org/manual/Performance.html"
+        }
+      ]
+    },
+    {
+      "id": "position",
+      "title": "Position in the Forth landscape",
+      "tags": [
+        "forth",
+        "interpreter"
+      ],
+      "content": "Gforth is the strongest documented open threaded engine — open source, ANS-oriented, and extremely instructive — but outrun by good commercial native-code Forths (VFX, SwiftForth) when absolute peak performance is the priority.\n\nFor education, research, and any project that values reading the source, Gforth is the natural choice. For peak desktop performance with commercial tooling acceptable, VFX or SwiftForth occupy the top of the spectrum.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Gforth performance",
+      "url": "https://gforth.org/manual/Performance.html"
+    }
+  ]
+}

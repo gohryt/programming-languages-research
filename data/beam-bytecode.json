@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "BEAM Bytecode",
+  "aliases": ["erlang-vm-bytecode"],
+  "summary": "Bytecode for the Erlang VM, also used by Elixir, LFE, Gleam. Register-based, with operations modeling per-process heap, message passing, and pattern matching natively. Hot code reload is a first-class VM concept that shapes the bytecode design — module boundaries are kept swappable.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "BEAM is the bytecode for the Erlang VM, also used by Elixir, LFE, Gleam, and other BEAM languages. Register-based, with operations modeling Erlang's per-process heap, message passing, and pattern matching natively. Tail calls are first-class (every BEAM call site is potentially a tail call). The bytecode is loaded into the VM as `.beam` files, one per Erlang module.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "instance-of" },
+        { "target": "register-vs-stack-bytecode#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "Erlang Code Loading", "url": "https://www.erlang.org/doc/system/code_loading.html" }
+      ]
+    },
+    {
+      "id": "hot-reload-shape",
+      "title": "Hot reload as a first-class VM concept",
+      "tags": ["bytecode", "hot-reload", "modules"],
+      "content": "BEAM's distinctive feature: hot code reload is a first-class VM concept. Modules can be reloaded while processes continue executing the old version; the VM keeps two versions of each module active simultaneously, with local calls (`func()` within a module) continuing on the old version and fully-qualified calls (`my_module:func()`) dispatching to the current version.\n\nThis shapes the bytecode design — BEAM avoids cross-module inlining at the bytecode level, keeping module boundaries swappable. The cost is some peak performance vs an aggressively-inlining JIT; the benefit is decades of telecom-grade 99.999% uptime via in-place upgrades.",
+      "refs": [
+        { "target": "erlang-hot-reload#overview", "type": "powers" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Erlang Code Loading", "url": "https://www.erlang.org/doc/system/code_loading.html" }
+  ]
+}

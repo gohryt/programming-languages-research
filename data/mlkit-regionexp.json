@@ -1,0 +1,54 @@
+{
+  "kind": "concept",
+  "name": "MLKit RegionExp",
+  "aliases": [
+    "mlkit-region-ir",
+    "tofte-talpin"
+  ],
+  "summary": "MLKit's IR is a region-annotated lambda calculus (Tofte-Talpin, 1994). Every value lives in a region, every region has a stack-discipline lifetime, and every allocation is letregion ρ in e. The IR carries region variables on every type and effect signatures on every function.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "MLKit's IR is a region-annotated lambda calculus (Tofte-Talpin, 1994). Every value lives in a region, every region has a stack-discipline lifetime, and every allocation is `letregion ρ in e`. The IR carries region variables on every type and effect signatures on every function: `f : (int -> int) at ρ_1 with ε`.",
+      "refs": [
+        {
+          "target": "mid-level-ir#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "region-based-memory#overview",
+          "type": "implements"
+        },
+        {
+          "target": "linear-affine-types#overview",
+          "type": "complementary-discipline"
+        }
+      ],
+      "sources": [
+        {
+          "label": "MLKit",
+          "url": "https://elsman.com/mlkit/"
+        }
+      ]
+    },
+    {
+      "id": "region-inference-on-ir",
+      "title": "Region inference on annotated IR",
+      "tags": [
+        "regions",
+        "inference",
+        "compiler-ir"
+      ],
+      "content": "The region inference algorithm (Algorithm R, polymorphic-recursive) operates directly on this annotated IR. The IR shape is what makes inference tractable: effect annotations make it visible which regions a function may allocate in, so inference can place `letregion` boundaries optimally.\n\nThis is the canonical example of an IR designed around a specific compile-time discipline. The annotations are not auxiliary metadata; they are part of the type system the compiler enforces and the inference algorithm consumes.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "MLKit",
+      "url": "https://elsman.com/mlkit/"
+    }
+  ]
+}

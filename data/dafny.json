@@ -1,0 +1,36 @@
+{
+  "kind": "tool",
+  "name": "Dafny",
+  "aliases": ["dafny-language", "leino-dafny"],
+  "summary": "Microsoft Research auto-active verification language (K. Rustan M. Leino): refinement types plus loop invariants plus pre/post conditions, all SMT-discharged via Boogie. Used at AWS for the IAM policy engine (~10 KLOC verified Dafny replacing C++), at Cloudflare for proxy authority logic, and increasingly in Linux kernel verification work. The IAM deployment is the largest production codebase verified in any refinement-types system to date.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Dafny (Microsoft Research, K. Rustan M. Leino) is the canonical auto-active verification language: refinement types plus loop invariants plus pre/post conditions, all SMT-discharged via Boogie (`data/verification-intermediate-languages`).\n\nUsed at **AWS for the IAM policy engine** (~10 KLOC of verified Dafny replacing C++), at **Cloudflare** for proxy authority logic, and increasingly in **Linux kernel verification** work. The IAM deployment is the largest production codebase verified in any refinement-types system to date.",
+      "refs": [
+        { "target": "refinement-types#overview", "type": "implements" },
+        { "target": "verification-intermediate-languages#overview", "type": "compiled-to" }
+      ],
+      "sources": [
+        { "label": "Dafny verification language", "url": "https://dafny.org/" }
+      ]
+    },
+    {
+      "id": "auto-active-discipline",
+      "title": "Auto-active verification discipline",
+      "tags": ["verification", "smt"],
+      "content": "*Auto-active* names the design point between *automatic* (push-button: programmer writes only the program) and *interactive* (Coq/Lean style: programmer writes the proof). Dafny asks the programmer to supply *invariants and assertions* but not full proofs — the SMT solver discharges the obligations once invariants are strong enough.\n\nThis is the sweet spot for production verification: programmers learn to write loop invariants and post-conditions but never have to manipulate proof terms. The IAM deployment confirms the discipline scales: 10 KLOC of business logic verified by engineers who are software developers, not formal-methods specialists."
+    },
+    {
+      "id": "production-deployments",
+      "title": "Production deployments and the IAM lesson",
+      "tags": ["verification", "production"],
+      "content": "The AWS IAM deployment matters because it sets the production-scale baseline:\n\n- ~10 KLOC of verified Dafny replacing a C++ implementation;\n- the verification target is access-control policy decisions, where wrong answers are security-critical;\n- the engineering organisation is ordinary AWS service development, not a research lab;\n- the verification cost was reportedly comparable to ordinary feature work after the team had ramped up.\n\nFor language designers contemplating refinement-type integration, the Dafny+IAM data point is the strongest evidence that **narrow-domain refinement is shippable at significant scale**, provided the language and tooling let engineers learn invariants without learning proof assistants."
+    }
+  ],
+  "sources": [
+    { "label": "Dafny verification language", "url": "https://dafny.org/" }
+  ]
+}

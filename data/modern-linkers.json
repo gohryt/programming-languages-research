@@ -1,0 +1,36 @@
+{
+  "kind": "tool",
+  "name": "Modern Linkers — mold, wild, lld",
+  "aliases": ["mold", "wild", "lld", "modern linkers"],
+  "summary": "Three contenders for fast linking: lld (LLVM, 5–10× faster than ld.bfd), mold (Rui Ueyama 2020, 2–4× faster than lld via aggressive symbol-resolution parallelism), wild (David Lattimore 2024, incremental in-place relinks). The collective progress: linking large C++ from 30s to sub-second within a decade.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Linker throughput has become a first-class concern as C++ codebases grow. Three modern contenders:\n\n- **lld** (LLVM's linker, Rui Ueyama): 5–10× faster than GNU `ld.bfd` on large binaries, through aggressive parallelism and avoiding unnecessary I/O. Default linker in many LLVM-based toolchains since the mid-2010s.\n- **mold** (also Rui Ueyama, 2020): 2–4× faster than lld in many cases, primarily through more aggressive parallelism in symbol resolution and relocation processing. Mold pioneered techniques like parallel input-file parsing and lock-free output section packing.\n- **wild** (David Lattimore, 2024): an incremental linker written in Rust, focused on the \"relink after small change\" case. Wild remembers prior link structure and patches the output file in place rather than regenerating it. Status (as of 2026-04): targets <100ms relinks on medium binaries.",
+      "refs": [
+        { "target": "lto-thinlto#overview", "type": "interacts-with" }
+      ],
+      "sources": [
+        { "label": "mold linker", "url": "https://github.com/rui314/mold" }
+      ]
+    },
+    {
+      "id": "lesson",
+      "title": "Lesson — linking matters",
+      "tags": ["compiler", "build", "linker"],
+      "content": "The collective progress is dramatic: linking a large C++ project has gone from a 30-second bottleneck to a sub-second one within 10 years. The trade-off for a new language is between targeting the legacy linker (broader compatibility, slower link) and targeting mold or wild (faster link, narrower platform coverage); designing object files to suit modern linker algorithms keeps the option open.\n\nFor language designers, the lesson is that linking is a real performance budget item, not a free post-step. A language that produces object files easy for modern linkers to process — predictable section ordering, minimal redundant symbols, deterministic relocations — gets the linker speedup for free.",
+      "refs": [],
+      "sources": [
+        { "label": "wild linker", "url": "https://github.com/davidlattimore/wild" },
+        { "label": "lld", "url": "https://lld.llvm.org/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "mold", "url": "https://github.com/rui314/mold" },
+    { "label": "wild", "url": "https://github.com/davidlattimore/wild" },
+    { "label": "lld", "url": "https://lld.llvm.org/" }
+  ]
+}

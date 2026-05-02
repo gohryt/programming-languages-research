@@ -1,0 +1,7 @@
+{
+  "id": "domain-tracing",
+  "tag": "domain:tracing",
+  "name": "Domain: tracing",
+  "description": "Section concerns runtime tracing — emitting structured events and probes during normal execution for diagnostic or performance analysis.",
+  "axis": "domain"
+}

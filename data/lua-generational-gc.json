@@ -1,0 +1,33 @@
+{
+  "kind": "runtime",
+  "name": "Lua 5.4 — Optional Generational Mode",
+  "aliases": ["Lua GC", "Lua 5.4 generational GC"],
+  "summary": "Optional generational mode (opt-in via collectgarbage('generational')) added alongside the default incremental tricolor collector; not the default because it doesn't help large-data-structure workloads.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "tracing-gc", "generational-gc", "incremental-gc", "tricolor", "lua"],
+      "content": "Lua 5.4 added an **optional generational mode** (opt-in via `collectgarbage(\"generational\")`) alongside the default incremental tricolor collector — not the default because it doesn't help large-data-structure workloads.\n\nThe cleanest example of \"generational hypothesis is workload-specific\" — Lua makes it opt-in deliberately.",
+      "refs": [
+        { "target": "garbage-collection#v8-and-lua-collectors", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "two-cycle-aging",
+      "title": "Two-cycle aging",
+      "tags": ["generational-gc", "lua"],
+      "content": "**Two-cycle aging** (G_NEW → G_SURVIVAL → G_OLD0/1/G_OLD) — objects must survive *two* GC cycles to become old, fixing the inaccurate single-cycle promotion of the failed Lua 5.2 generational experiment.\n\nMinor / major multipliers (default 20% / 100% of last-major heap) tune frequency; can degrade to incremental temporarily under stress. Forward-barrier driven; old objects touched by a write transition to G_TOUCHED states tracked in a separate gray list."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Generational hypothesis is workload-specific",
+      "tags": ["lua", "garbage-collection"],
+      "content": "The cleanest example of \"generational hypothesis is workload-specific\" — Lua makes it opt-in deliberately. Lua 5.2 had tried generational GC as default and reverted because workloads with large persistent data structures (game state, configuration tables) violate the generational hypothesis: most objects do *not* die young in those settings.\n\nThe lesson: a runtime that defaults to incremental tricolor and offers generational as an opt-in is more honest than a runtime that defaults to generational and forces large-data-structure workloads to pay promotion costs."
+    }
+  ],
+  "sources": [
+    { "label": "Lua 5.4 manual", "url": "https://www.lua.org/manual/5.4/manual.html" },
+    { "label": "Lua 5.4 lgc.h source", "url": "https://www.lua.org/source/5.4/lgc.h.html" }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "kind": "concept",
+  "name": "Post-mortem and out-of-process debugging",
+  "aliases": [
+    "core dump",
+    "kdump",
+    "kgdb",
+    "kdb",
+    "minidump",
+    "embedded probe"
+  ],
+  "summary": "Analyzes execution artifacts such as core dumps, snapshots, vmcores, captured embedded probes, or production crash artifacts after the target has already failed or been detached; the artifact spans single failure-time images (core dumps, minidumps), checkpointed restartable state (CRIU, VS Snapshot), and probe-attached embedded targets (defmt, probe-rs, RTT).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint, a hardware-probe halt, or a curated crash artifact — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, the hardware substrate beneath embedded targets, the production pipelines that ship crash artifacts off failing machines, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (`data/record-and-replay#criu-checkpoint-restore`) is the non-crash sibling — checkpoint a *healthy* program for later inspection — and is contrasted with VS Snapshot (`data/record-and-replay#vs-snapshot-debugger`) in the record-and-replay chapter rather than repeated here.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:post-mortem`\n- **domain**: `domain:debugging`\n"
+    },
+    {
+      "id": "core-dumps-coredump-filter",
+      "title": "Core Dumps — ELF Cores, `coredump_filter`, On-Demand Snapshots",
+      "tags": [
+        "domain:debugging",
+        "family:post-mortem",
+        "linux"
+      ],
+      "content": "A core dump is a file written by the kernel (or by the process itself) containing the memory image and register state at a moment — typically a crash. On Linux/BSD, the format is ELF with `PT_LOAD` segments for each mapped region plus `PT_NOTE` segments carrying register state, signal info, `auxv`, and file-backed mapping metadata. GDB and LLDB both load cores directly: `gdb program core` and `lldb --core core`. LLDB uses a dedicated `elf-core` process plugin so core-debug and live-debug share the same API surface.\n\nThe original contribution relevant to language design is **`/proc/<pid>/coredump_filter`** — a kernel-level bitmask controlling which mapping types get dumped. The bits select among anonymous private, anonymous shared, file-backed private, file-backed shared, ELF headers, private huge pages, shared huge pages, DAX private, and DAX shared. Default is `0x33` (anonymous + ELF headers + private huge pages) — enough to debug most crashes, small enough to ship. `madvise(MADV_DONTDUMP)` marks specific regions as dump-excluded, used for large read-only mmaps or secrets. `ulimit -c` and `systemd-coredump` gate whether a dump is written at all.\n\n**On-demand self-dump** is supported via `gcore <pid>` (GDB), LLDB's `process save-core`, and at the protocol level by the `qSaveCore` gdb-remote packet plus platform-specific `PT_COREDUMP` (FreeBSD) and `PT_DUMPCORE` (NetBSD). The use case is \"snapshot a misbehaving process without killing it\" — comparable to VS Snapshot (`data/record-and-replay#vs-snapshot-debugger`) but without `fork()`'s copy-on-write semantics; the dumped process continues running.\n\n**Managed-runtime cores are often useless** to a generic debugger. A kernel-generated core of a .NET process captures the managed-heap *bytes* but not the object-header metadata needed to walk the heap without SOS (Son of Strike, the .NET debugger extension). The same is true of JVM cores without the SA (Serviceability Agent) plugin. The lesson: a language runtime that wants usable post-mortem support must provide a **runtime-aware dumper** (CoreCLR's `createdump`, HotSpot's `jcmd GC.heap_dump`, V8 heap snapshots) that emits a format its debugger understands, *in addition to* the generic core. Generic cores catch native-frame crashes; runtime-aware dumps catch managed-state bugs.",
+      "sources": [
+        {
+          "url": "https://www.sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html"
+        },
+        {
+          "url": "https://www.moritz.systems/blog/lldb-core-dump-support-improvements/"
+        }
+      ]
+    },
+    {
+      "id": "kdump-kexec-crash",
+      "title": "kdump — kexec Capture Kernel + the `crash` Utility",
+      "tags": [
+        "domain:debugging",
+        "family:post-mortem",
+        "kernel",
+        "linux"
+      ],
+      "content": "Kernel panics destroy the kernel's ability to write a dump — the memory you want to capture belongs to a machine whose scheduler has just wedged. kdump solves this by pre-loading a **second kernel in reserved memory** at boot via `kexec`, and transferring control to it on panic.\n\nThe mechanism: at boot, `kexec -p` loads a small capture kernel into a reserved region (typically 128–512 MB, configured via `crashkernel=` on the main kernel's command line). The primary kernel's memory is preserved across the kexec handoff because the capture kernel operates inside its own reserved region and the primary's pages are left untouched. On panic, kernel panic handlers jump into the capture kernel, which boots into a minimal userspace, reads the primary kernel's pages through `/proc/vmcore`, writes them (or a filtered subset) to disk or a network target, and reboots.\n\nThe **`crash` utility** (Dave Anderson, Red Hat) is a **kernel-aware debugger** for the resulting vmcore. Unlike GDB, which understands ELF+DWARF but not kernel data structures, `crash` understands `task_struct`, slab allocators, zone allocators, the kernel log ring buffer, and per-CPU data. Commands include `bt` (cross-task backtrace), `ps` (process list from `task_struct`s), `kmem -s` (slab contents), `rd`/`wr` (raw memory read/write), `files` (open files per task), `log` (ring buffer extraction). It links against `vmlinux`'s debug info (or a separate `-debuginfo` package) and cross-references structures by offset.\n\n**`makedumpfile`** shrinks the vmcore before write (full vmcore = physical RAM); `makedumpfile -c -d 31` compresses and excludes zero/free/cache/user pages, typically reducing the dump to 1–10% of original size.\n\n**`pstore`** is the embedded variant: no reserved capture-kernel memory, so the kernel writes oops/console-log to persistent storage (ACPI ERST, MTD flash, `ramoops` over DRAM that survives a soft reboot) for retrieval after the next boot.",
+      "sources": [
+        {
+          "url": "https://www.kernel.org/doc/html/v5.19/admin-guide/kdump/kdump.html"
+        },
+        {
+          "url": "https://kernel-internals.org/debugging/kdump/"
+        }
+      ]
+    },
+    {
+      "id": "kgdb-kdb",
+      "title": "KGDB + KDB — Dual Frontends Over a Shared Debug Core",
+      "tags": [
+        "domain:debugging",
+        "family:post-mortem",
+        "kernel",
+        "linux"
+      ],
+      "content": "For *live* kernel debugging — not post-crash analysis — Linux provides two frontends sharing one `debug_core`: **kgdb** (source-level via GDB Remote Serial Protocol) and **kdb** (shell-style, on-console, deadlock-safe). They are not competitors; `CONFIG_KGDB` builds both and the operator switches between them at runtime.\n\n**kgdb** exposes a GDB remote stub inside the kernel. A developer runs `gdb vmlinux` on a host machine, connects via serial or (net)console to the target, and debugs the kernel source-level: stepping, breakpoints on symbols, variable inspection. gdbserver's wire protocol is reused; only the target side is new.\n\n**kdb** is a shell the operator sees *on the target's own console* — keyboard, serial, or graphics console with KMS integration that saves and restores graphics modes around entry. It is deliberately **not source-level**: no DWARF parsing, no local-variable display, because those operations take locks and may touch paged-out memory. kdb's commands (`bt`, `md`, `mm`, `rd`, `go`, `ss`) are deliberately minimal to survive in any kernel state. This is kdb's original contribution: **a debugger that works even when the kernel is so broken that a source-level debugger would deadlock**.\n\nThe shared `debug_core` (in `kernel/debug/`) owns breakpoint management, single-step arming, thread snapshotting, and dispatch to the arch-specific implementation (`arch/*/kernel/kgdb.c`). I/O drivers (`kgdboc` for serial-over-console, `kgdbts` for tests) connect the debug core to the outside. Key invariants the core enforces: I/O drivers must not enable interrupts and must not take locks that could deadlock against the panicked state; breakpoint insertion must tolerate concurrent CPUs by stopping them at a barrier.\n\nThe dual-frontend design generalizes beyond kernels. For a language runtime, the same lesson applies: **a full, rich, source-level debugger is a luxury that requires a healthy runtime**. A second, minimal, shell-style debugger — usable when the runtime itself is compromised — is cheap insurance against the bug you actually hit.",
+      "sources": [
+        {
+          "url": "https://www.kernel.org/doc/html/latest/process/debugging/kgdb.html"
+        }
+      ]
+    },
+    {
+      "id": "embedded-defmt-probe-rs-rtt",
+      "title": "Embedded Target Debugging — defmt, probe-rs, RTT, ITM",
+      "tags": [
+        "domain:debugging",
+        "embedded",
+        "family:post-mortem",
+        "rust"
+      ],
+      "content": "Embedded debugging has constraints no desktop debugger faces: no OS, no filesystem, no network stack, no UART baud headroom for `printf`-style logging, and RAM measured in kilobytes. The Knurling / Ferrous Systems stack addresses this with a layered design whose key insight is **move all formatting off the target**.\n\n**`defmt` — deferred formatting.** Ordinary `printf` on a microcontroller drags the full formatter in, ballooning binary size. `defmt` instead emits a **compact binary frame** keyed to the format string's *index*; the format string itself is stored in a non-loaded `.debug` section of the ELF. The target writes a few bytes (level + format-string index + args), and the host decoder (`defmt-print` or probe-rs) reads the ELF, looks up the format string, and reconstructs the formatted message. On-target binary size drops by an order of magnitude versus `printf`, and log fidelity (structured args, typed encoding) increases.\n\n**RTT — Real-Time Transfer.** Instead of pushing logs over UART, the target writes into a **ring buffer in its own SRAM**, structured with a well-known header pattern the probe can locate by scanning RAM. The debug probe, connected over SWD or JTAG, polls the buffer over the debug interface and drains it. No UART pins, no baud-rate trade-offs, multi-MB/s throughput on some configurations.\n\n**ITM / SWO.** `defmt-itm` routes defmt frames through ARM Cortex-M's on-chip Instrumentation Trace Macrocell over a dedicated serial wire (SWO), letting the core's tracing hardware do the I/O without CPU polling or DMA burn. The ITM/ETM/SWO substrate itself is covered in `data/hardware-tracing`; the debugger-side workflow here is just \"use it as the defmt transport.\"\n\n**probe-rs** is the host-side Rust rewrite of OpenOCD + gdbserver. It speaks SWD/JTAG natively, flashes firmware, attaches/runs targets, and integrates with defmt and RTT out of the box. `probe-rs run` is a cargo target runner, so `cargo run` on an MCU project works like running a native binary, with defmt logs streaming to the host terminal and panic backtraces decoded by `panic-probe`. A DAP adapter is built in, so VS Code debugs MCUs the same way it debugs desktop processes. `probe-rs serve` even exposes the probe over a network so a CI machine's board farm can be driven from a developer's laptop.\n\nThe generalizable lesson is a pattern also seen in debuginfod (`data/dwarf-debug-info#debuginfod`): **the host is rich, the target is poor — push work to the host**. A language runtime targeting constrained environments should ask, for every runtime feature, what can be deferred, indexed, or decoded off-target. defmt is the `.debug_info` of embedded logging.",
+      "sources": [
+        {
+          "url": "https://github.com/knurling-rs/defmt"
+        },
+        {
+          "url": "https://probe.rs/docs"
+        }
+      ]
+    },
+    {
+      "id": "jtag-swd-openocd",
+      "title": "JTAG / SWD / OpenOCD Hardware Debugging",
+      "tags": [
+        "domain:debugging",
+        "embedded",
+        "family:post-mortem"
+      ],
+      "content": "Bare-metal targets often lack `ptrace`, signals, virtual memory, files, or an operating system. Debugging happens through a hardware probe. JTAG and ARM SWD let the host halt the core, read/write registers and memory, set hardware breakpoints/watchpoints, flash firmware, and sometimes stream trace data through CoreSight, ETM, ITM, or SWO.\n\nOpenOCD is the classic open-source bridge from probes to GDB remote protocol. `probe-rs` (covered in `data/post-mortem-debugging#embedded-defmt-probe-rs-rtt`) is the Rust-native replacement for many Cortex-M workflows. Flash breakpoints are a special constraint: code in flash cannot be patched with `INT3` cheaply, so debuggers rely on a limited number of hardware comparators or rewrite flash pages sparingly. Semihosting lets target code request host I/O through debugger traps, useful but slow.\n\nThe language-design lesson: **embedded debugging is a target ABI, not just a tool**. Panic formatting, stack unwinding, symbol names, frame pointers, no-std allocators, and debug sections must work when the only communication channel is a probe reading memory.",
+      "sources": [
+        {
+          "url": "https://openocd.org/doc/html/index.html"
+        },
+        {
+          "url": "https://developer.arm.com/documentation/ihi0031/latest/"
+        }
+      ]
+    },
+    {
+      "id": "production-crash-pipelines",
+      "title": "Production Crash Pipelines: Minidumps, Symbolication, and Grouping",
+      "tags": [
+        "domain:debugging",
+        "family:post-mortem"
+      ],
+      "content": "Core dumps (`data/post-mortem-debugging#core-dumps-coredump-filter`) are complete but often too large, too sensitive, or too platform-specific for deployed software. Production crash systems instead collect compact crash artifacts: Windows minidumps, Breakpad/Crashpad dumps, Apple crash reports with `.dSYM` symbolication, JavaScript stack traces with source maps, or Sentry-style event envelopes. Server-side symbolication then reconstructs source locations from build IDs, debug files, unwind tables, source maps, and inlining metadata.\n\nThis is a debugger technique because most deployed bugs are debugged after the fact, without the original process. The crash pipeline decides whether the developer gets a useful stack trace, async causality, registers, thread list, loaded module versions, panic payload, breadcrumbs, and privacy-filtered local variables — or only \"segmentation fault.\"\n\nThe language-design lesson: **standardize the crash artifact early**. A new language should define panic/crash metadata, build IDs, symbol lookup, async stack capture, source-map/debug-info integration, and privacy controls as part of its tooling story. The build-ID symbol distribution side is covered in `data/dwarf-debug-info#debuginfod` (debuginfod); minidumps are the artifact format that pairs with it.",
+      "sources": [
+        {
+          "url": "https://chromium.googlesource.com/breakpad/breakpad"
+        },
+        {
+          "url": "https://chromium.googlesource.com/crashpad/crashpad"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html"
+    },
+    {
+      "url": "https://www.moritz.systems/blog/lldb-core-dump-support-improvements/"
+    },
+    {
+      "url": "https://www.kernel.org/doc/html/v5.19/admin-guide/kdump/kdump.html"
+    },
+    {
+      "url": "https://kernel-internals.org/debugging/kdump/"
+    },
+    {
+      "url": "https://www.kernel.org/doc/html/latest/process/debugging/kgdb.html"
+    },
+    {
+      "url": "https://github.com/knurling-rs/defmt"
+    },
+    {
+      "url": "https://probe.rs/docs"
+    },
+    {
+      "url": "https://openocd.org/doc/html/index.html"
+    },
+    {
+      "url": "https://developer.arm.com/documentation/ihi0031/latest/"
+    },
+    {
+      "url": "https://chromium.googlesource.com/breakpad/breakpad"
+    },
+    {
+      "url": "https://chromium.googlesource.com/crashpad/crashpad"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "kind": "concept",
+  "name": "Polonius",
+  "aliases": ["polonius-borrow-checker", "polonius-alpha"],
+  "summary": "Niko Matsakis's reformulation of Rust borrow-checking as a per-CFG-point loan-liveness problem rather than NLL's region-as-set-of-points model. Origins are sets of loans with subset constraints computed at every CFG point. Original 2018 prototype was Datalog-based; the 2024 Polonius alpha landed in rustc behind -Zpolonius=next as a strict superset of NLL.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["polonius", "borrowing", "rust", "compile-time-safety", "lifetime"],
+      "content": "Niko Matsakis's **Polonius** is a reformulation of borrow-checking as a per-CFG-point *loan-liveness* problem rather than NLL's region-as-set-of-points model. Origins are sets of *loans* with subset constraints computed at every CFG point, which directly resolves \"NLL problem case #3\" and lending-iterator patterns (`fn next(&mut self) -> &mut T`) that NLL rejects.\n\nThe original 2018 prototype was Datalog-based (the `datafrog` engine, exporting `borrow_region` / `subset_base` / `loan_invalidated_at` facts); the 2024 \"Polonius alpha\" landed in `rustc` as a location-sensitive analysis behind `-Zpolonius=next` — a strict superset of NLL.",
+      "refs": [
+        { "target": "non-lexical-lifetimes", "type": "successor-of" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "ownership", "type": "related" },
+        { "target": "rust", "type": "exemplified-by" }
+      ],
+      "sources": [
+        { "label": "Polonius project", "url": "https://rust-lang.github.io/polonius/" },
+        { "label": "Polonius alpha update", "url": "https://blog.rust-lang.org/inside-rust/2023/10/06/polonius-update/" }
+      ]
+    },
+    {
+      "id": "co-development-and-goals",
+      "title": "Co-development with a-mir-formality",
+      "tags": ["polonius", "compiler", "static-analysis"],
+      "content": "Polonius is co-developed with `a-mir-formality`, a formal model of MIR + the trait system used to derive the location-insensitive subset that ships first. The end-state goal is a single reformulation of the borrow checker that passes more programs and is easier to reason about.\n\nLending-iterator patterns and method calls that consume self by mutable reference and re-yield a borrow of an internal field are the canonical example of programs Polonius accepts that NLL rejects.",
+      "refs": [
+        { "target": "non-lexical-lifetimes", "type": "successor-of" }
+      ],
+      "sources": [
+        { "label": "Polonius rust-project-goals 2026", "url": "https://rust-lang.github.io/rust-project-goals/2026/polonius.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Polonius project", "url": "https://rust-lang.github.io/polonius/" },
+    { "label": "Polonius alpha update", "url": "https://blog.rust-lang.org/inside-rust/2023/10/06/polonius-update/" },
+    { "label": "Polonius rust-project-goals 2026", "url": "https://rust-lang.github.io/rust-project-goals/2026/polonius.html" }
+  ]
+}

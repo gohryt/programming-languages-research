@@ -1,0 +1,43 @@
+{
+  "kind": "concept",
+  "name": "C/C++ Translation Units and #include",
+  "aliases": ["c-translation-units", "cpp-include", "header-files"],
+  "summary": "The textual-include + separate-compilation + linker triad that served as C and C++'s only modularity mechanism for 40 years; the preprocessor literally inserts header file contents at the include site, then the compiler parses the expanded translation unit, with cross-translation-unit references resolved by the linker.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "A C or C++ **translation unit** is the unit of compilation: a single `.c` / `.cpp` source file plus everything textually included by it after preprocessing. The preprocessor processes `#include` directives by literally inserting the named header file's text at the include site, then the compiler parses the expanded result. There is no semantic notion of \"the header\" after preprocessing; the contents simply become part of the translation unit.",
+      "refs": [
+        { "target": "cpp20-modules#overview", "type": "supplanted-by" }
+      ],
+      "sources": [
+        { "label": "cppreference — #include", "url": "https://en.cppreference.com/w/cpp/preprocessor/include" }
+      ]
+    },
+    {
+      "id": "strengths-and-weaknesses",
+      "title": "Strengths and weaknesses",
+      "tags": ["c", "cpp", "preprocessor"],
+      "content": "Strengths rooted in simplicity: any text editor can produce a working compilation unit; the language has no module-resolution machinery to specify; cross-translation-unit references are entirely the linker's job (resolving `extern` symbol references against object files and libraries); and the same header can be consumed by C, C++, and assembly with appropriate guards.\n\nWeaknesses also rooted in simplicity: every translation unit re-parses every transitively included header (the famous `<windows.h>` and `<iostream>` blowup, where a one-line `hello.cpp` expands to hundreds of thousands of tokens); macros leak across header boundaries unless carefully scoped; declaration order in a header determines what subsequent code sees, making header authoring a careful art; and there is no enforced visibility boundary — anything declared in a header is visible to everyone who includes it."
+    },
+    {
+      "id": "convention-defenses",
+      "title": "Convention-based defenses",
+      "tags": ["c", "cpp", "tooling"],
+      "content": "The defenses against `#include` weaknesses are conventions and tooling, not language features:\n\n- **Header guards** (`#ifndef FOO_H`, `#define FOO_H`, `#endif`) prevent multiple-inclusion within a single translation unit.\n- **Forward declarations** instead of `#include`s where possible, to reduce transitive header pull-in (the **Pimpl idiom** is one extreme expression).\n- **Precompiled headers (PCH)** cache the parsed token stream of a fixed set of headers. GCC, Clang, and MSVC all support PCH; they reduce compile times substantially but add fragility — the PCH must be rebuilt when any input changes, and the same PCH must be used in compatible configurations across a project.\n- **Include-what-you-use** static analysis tools (Google's `iwyu`, Clang's `-Wmissing-includes`) help police accidental transitive dependencies.",
+      "refs": []
+    },
+    {
+      "id": "no-module-identity",
+      "title": "No module identity at the source level",
+      "tags": ["c", "cpp", "module-identity"],
+      "content": "The semantic consequence is that **C and C++ translation units have no module identity at all**. The unit of distribution is the library (`.a`, `.so`, `.lib`, `.dll`), the unit of source organization is the header / source file pair, and the bridge between them is the symbol table managed by the linker. There is no \"what does this header export?\" beyond what its declarations and macros happen to define. There is no \"what does this header depend on?\" beyond what `#include` directives appear in it. The module graph is implicit in the include graph and emerges only after preprocessing.\n\nThis is why C and C++ build systems (Make, CMake, Bazel, Buck, Meson, Ninja) are so much more complex than build systems for languages with explicit modules: they must compute the include graph by re-running the preprocessor, track header timestamps for incremental rebuilds, and manage compilation-unit-level options (`-D`, `-I`, `-W`) that are not visible in the source.",
+      "refs": [
+        { "target": "module-identity#overview", "type": "contrasts-with" },
+        { "target": "name-mangling#overview", "type": "depends-on" }
+      ]
+    }
+  ]
+}

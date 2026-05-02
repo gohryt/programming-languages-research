@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "C dlopen Live Reload",
+  "aliases": ["live coding", "Handmade Hero pattern", "dlopen reload"],
+  "summary": "C/C++ build hot reload via `dlopen` / `LoadLibrary`: compile to a shared library, call functions through pointers, swap in a new `.so` / `.dll` by reloading and redirecting the pointers. Game-development discipline: keep mutable state in host-owned structures, put only stateless logic in the reloadable module. Casey Muratori's Handmade Hero is the canonical demonstration.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "C and C++ build hot reload via **dlopen** / **LoadLibrary**: compile to a shared library, call functions through pointers, and swap in a new `.so` / `.dll` by reloading and redirecting the pointers. The game-development community popularised the discipline: keep mutable state in host-owned structures, put only stateless logic in the reloadable module, re-bind pointers after each reload. Casey Muratori's Handmade Hero is the canonical live-coding demonstration.",
+      "refs": [
+        { "target": "dotnet-edit-and-continue#overview", "type": "compared-with" },
+        { "target": "erlang-hot-reload#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Handmade Hero", "url": "https://handmadehero.org/" }
+      ]
+    },
+    {
+      "id": "discipline",
+      "title": "The discipline",
+      "tags": ["live-coding", "c", "game-dev"],
+      "content": "The general principle: live reload requires a clean boundary between *code* (replaceable) and *state* (must survive). Languages designed for hot swap (Erlang, Lisp, Julia) put the boundary at the module level; C-family programmers draw it by hand.\n\nThe typical discipline:\n\n1. The host process owns all mutable state in a `GameState` struct allocated in a known location.\n2. The reloadable shared library exports stateless functions: `update(GameState*, Input*) -> void`, `render(GameState*) -> Texture`.\n3. The host calls these via function pointers obtained from `dlsym`.\n4. On detecting a file change, the host calls `dlclose`, recompiles, calls `dlopen`, and refreshes the function pointers. The state struct survives unchanged.\n\nThis works as long as the reloadable code does not change the layout of `GameState` (which would require a state migration). For game development with rapid iteration on rendering and gameplay logic but stable game-state shape, the discipline is highly productive.",
+      "refs": [],
+      "sources": [
+        { "label": "Handmade Hero Day 22", "url": "https://hero.handmade.network/episode/code/day022" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Handmade Hero", "url": "https://handmadehero.org/" },
+    { "label": "Handmade Hero Day 22", "url": "https://hero.handmade.network/episode/code/day022" }
+  ]
+}

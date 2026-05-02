@@ -1,0 +1,84 @@
+{
+  "kind": "concept",
+  "name": "Parser Tooling",
+  "aliases": ["parser-libraries", "parser-frameworks"],
+  "summary": "Specific parser-adjacent tools and libraries that fill slots the algorithm-centric chapters leave empty: ungrammar specifies the CST API without being a parser, syn ships recursive descent as a library (Rust macros), SwiftSyntax anchors compiler-plugin ecosystems, @babel/parser handles evolving JS standards, rust-analyzer's parser is the canonical resilient-LL reference, language workbenches generate parser+formatter+LSP from one grammar.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Specific tools and libraries outside the main algorithmic families that nonetheless carry load-bearing implementation ideas. The axis across the entries is \"what slot does this tool fill that the algorithm-centric chapters leave empty.\"",
+      "refs": []
+    },
+    {
+      "id": "ungrammar",
+      "title": "Ungrammar — generate the CST API, not the parser",
+      "tags": ["parser-tooling", "cst", "rust-analyzer"],
+      "content": "rust-analyzer's **ungrammar** is not a parser generator at all, and that is exactly why it is interesting. It specifies the **shape of the concrete syntax tree** as a schema and generates the typed API for navigating that tree. The parser itself can stay hand-written or otherwise independently engineered.\n\nThis addresses a real pain point: the grammar shape you need for parsing is often not the tree shape you want to expose to tools. Left-recursion elimination, precedence encoding, and recovery scaffolding distort parse trees. Ungrammar decouples \"how do I parse strings?\" from \"what typed tree API do I want clients to use?\"\n\nUngrammar cleanly separates parser mechanics from CST API design — ideal for IDE/tooling stacks and lossless trees — but it is not a parser, adds another specification layer, and is most useful only once you already care about a typed CST API.",
+      "refs": [
+        { "target": "flat-ast-representations#red-green-and-full-fidelity-trees", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Ungrammar announcement", "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html" }
+      ]
+    },
+    {
+      "id": "syn-and-rust-analyzer-parser",
+      "title": "syn and rust-analyzer's parser — Rust's two recursive-descent parsers",
+      "tags": ["parser-tooling", "rust", "macros"],
+      "content": "David Tolnay's **syn** is the parser used by virtually every Rust procedural macro. It is a hand-written recursive-descent parser for the full Rust grammar, shaped as a library rather than a compiler subsystem. The input is a `proc_macro2::TokenStream` — already lex-and-grouped by the compiler into a token tree with balanced delimiters — and output is a rich hierarchy of typed AST nodes, one Rust `struct` or `enum` per syntactic category.\n\nThe design point most worth copying is the `Parse` trait: every AST node type implements `fn parse(input: ParseStream) -> Result<Self>`, and arbitrary node types compose via `input.parse::<T>()?`. Users extend the parser by implementing `Parse` on their own types, typically combined with `custom_keyword!` to declare identifiers that should be treated as reserved words in a local DSL. The grammar *is* Rust type definitions.\n\n**rust-analyzer's** own parser lives in the `parser` crate and is distinct from syn: syn consumes an already-lex-and-grouped `proc_macro2::TokenStream`, while rust-analyzer's parser reads Rust source directly and produces a rowan concrete syntax tree. Architecturally it is hand-written recursive descent with **event-driven tree construction**: the parser emits a stream of `StartNode(kind)`, `FinishNode`, `Token`, and `Error` events, and a separate sink assembles them into a rowan green tree. The load-bearing design choice is **resilience**: the parser is built to produce a usable tree on *any* input, however broken. Each parsing function consumes a well-formed prefix and bails with an inline `ERROR` node rather than propagating failure. Compared with tree-sitter's parallel-strategies recovery, resilient LL is cheaper per parse (no speculative forking) but relies harder on the parser author encoding recovery points explicitly in each production.",
+      "refs": [
+        { "target": "recursive-descent#overview", "type": "exemplifies" },
+        { "target": "error-recovery#resilient-parsing-for-tooling", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "syn", "url": "https://github.com/dtolnay/syn" },
+        { "label": "rust-analyzer parser", "url": "https://github.com/rust-lang/rust-analyzer/tree/master/crates/parser" }
+      ]
+    },
+    {
+      "id": "swiftsyntax-and-babel",
+      "title": "SwiftSyntax and @babel/parser — production macro/plugin ecosystems",
+      "tags": ["parser-tooling", "macros", "javascript"],
+      "content": "**SwiftSyntax** is full-fidelity tree infrastructure for compiler plugins. Swift's macro system made the syntax tree a language extension boundary: user-written macros receive a full-fidelity tree and return rewritten syntax, so the parser must preserve every token, comment, and whitespace trivia needed for byte-exact round-tripping. SwiftSyntax is evidence that if macros operate on syntax rather than typed IR, losslessness is not optional.\n\n**@babel/parser** is the JavaScript / TypeScript parser used across the Babel, webpack, Rollup, and adjacent ecosystems. Its defining architectural choice is a **plugin-based grammar**: new syntactic features are compiled into the parser but dormant until enabled per-parse via an options bag (`{ sourceType, plugins: [\"jsx\", \"typescript\", \"decorators\"] }`). The same parser binary can simultaneously support stable ECMAScript, JSX, TypeScript, Flow, and any number of TC39 Stage-0 through Stage-3 proposals gated behind flags.\n\nThis architecture is directly driven by JavaScript's standards process: new syntax proposals land in the parser as plugins long before they become part of the language, so tooling, linters, and babel-transforms can experiment with them; when TC39 advances a proposal, the plugin is retained but enabled by default. Status (as of 2026-04): the plugin interface is documented as internal, not (yet) open to external plugins, because guaranteeing grammar composability across arbitrary third-party plugins remains unsolved.",
+      "refs": [],
+      "sources": [
+        { "label": "@babel/parser", "url": "https://babeljs.io/docs/babel-parser" }
+      ]
+    },
+    {
+      "id": "hand-written-tooling-parsers",
+      "title": "Hand-written tooling parsers — Oxc, Meriyah, TCC",
+      "tags": ["parser-tooling", "performance", "case-study"],
+      "content": "**Oxc** is a modern JavaScript/TypeScript parser and tooling stack written in Rust. The parser is hand-written recursive descent; AST nodes are allocated in a single arena; short strings are stored inline via `CompactString`; comments and trivia are preserved; and scope binding, symbol resolution, and some syntax errors are deliberately deferred to a later semantic-analysis phase. Oxc distinguishes `BindingIdentifier`, `IdentifierReference`, and `IdentifierName`, reducing ambiguity for downstream tooling.\n\n**Meriyah** is a 100% ECMAScript-compliant JavaScript parser. Key design: location tracking is opt-in via boolean flags (`ranges`, `loc`). When both are off, AST nodes carry zero location overhead. When on, the parser captures its current position into nodes. Useful pattern when different consumers have different needs: a bundler can parse without `ranges`/`loc`, while diagnostics, transforms, and tooling can enable them.\n\nFabrice Bellard's **Tiny C Compiler (TCC)** parses C and emits machine code in a single pass, with no AST. Source locations flow from the lexer's current position directly into DWARF debug info during code generation. The benefit is speed and simplicity: TCC compiles C faster than GCC can preprocess it. The cost is optimization — without an IR, there is no opportunity for analysis or transformation between parsing and code generation. TCC-compiled code runs 3–10x slower than GCC -O2. For interactive use cases, TCC's approach is compelling.",
+      "refs": [],
+      "sources": [
+        { "label": "Oxc", "url": "https://github.com/oxc-project/oxc/blob/main/ARCHITECTURE.md" },
+        { "label": "Oxc parser architecture", "url": "https://oxc-project.github.io/docs/learn/architecture/parser.html" },
+        { "label": "Meriyah", "url": "https://github.com/nicolo-ribaudo/meriyah" },
+        { "label": "TCC", "url": "https://bellard.org/tcc/" }
+      ]
+    },
+    {
+      "id": "language-workbenches",
+      "title": "Language workbenches and grammar-centered tooling",
+      "tags": ["parser-tooling", "language-workbench", "tooling"],
+      "content": "A newer line of parser-adjacent work treats the grammar not merely as input to a parser generator, but as the starting point for a **tooling stack**: parser, formatter, language-server integration, and sometimes reference resolution or editor services. The question is no longer only \"what algorithm recognizes this language?\" but \"how much of the surrounding tooling can be derived from one authoritative syntax specification?\"\n\n**AnyText** (SLE 2025) is a strong current example. It combines a scannerless, incremental packrat parser with left-recursion support, an EBNF-like grammar notation, formatting instructions that drive pretty-printing, and first-class LSP support from the same language definition.\n\nThe attraction is obvious. A language author wants one source of truth for syntax and enough generated infrastructure that adding a feature to the language does not require hand-maintaining the parser, pretty-printer, and editor support in lockstep. But the cost is also real. The 2025 MontiCore experience report on **Challenges of Modular Language Design** is a valuable counterweight: compositional language engineering introduces substantial infrastructure complexity, parser-composition edge cases, and pressure from the limitations of target languages and host compilers.\n\n**Structured editing**, **projectional editing**, and **hybrid editing** are the related editor-side question. JetBrains MPS is the clearest production reference point: the editor manipulates AST nodes directly, persistence and diff/merge operate on syntax structure with stable node identities, and language composition avoids grammar ambiguity by construction. Laurence Tratt's 2024 essay argues that **incremental parsing** is the practical bridge — letting users type ordinary text while maintaining a continuously updated parse tree in the background.",
+      "refs": [],
+      "sources": [
+        { "label": "AnyText (SLE 2025)", "url": "https://dl.acm.org/doi/10.1145/3732771.3742716" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Ungrammar announcement", "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html" },
+    { "label": "syn", "url": "https://github.com/dtolnay/syn" },
+    { "label": "@babel/parser", "url": "https://babeljs.io/docs/babel-parser" },
+    { "label": "Oxc", "url": "https://github.com/oxc-project/oxc/blob/main/ARCHITECTURE.md" },
+    { "label": "Oxc parser architecture", "url": "https://oxc-project.github.io/docs/learn/architecture/parser.html" },
+    { "label": "Meriyah", "url": "https://github.com/nicolo-ribaudo/meriyah" },
+    { "label": "TCC", "url": "https://bellard.org/tcc/" },
+    { "label": "AnyText (SLE 2025)", "url": "https://dl.acm.org/doi/10.1145/3732771.3742716" }
+  ]
+}

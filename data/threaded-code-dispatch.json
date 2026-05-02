@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Threaded Code Dispatch",
+  "aliases": ["dtc-itc-stc", "forth-threaded-code"],
+  "summary": "Forth's classical dispatch styles: Direct Threaded Code (DTC, address array + NEXT routine), Indirect Threaded Code (ITC, one extra indirection enabling DOES> uniformly), Subroutine Threaded Code (STC, native CALL/RET dispatch). All share: a compiled word is a sequence of references to other words; what differs is what each reference resolves to.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "The three classical Forth dispatch styles (DTC, ITC, STC) share a representation idea — a compiled word is a sequence of references to other words — and differ in *what each reference resolves to* and *who runs the dispatch*. Brad Rodriguez's \"Moving Forth Part 1\" is the canonical reference for all three.",
+      "refs": [
+        { "target": "forth-text-interpreter#overview", "type": "complements" },
+        { "target": "bytecode#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "Brad Rodriguez — Moving Forth Part 1 (Threading models)", "url": "https://www.bradrodriguez.com/papers/moving1.htm" }
+      ]
+    },
+    {
+      "id": "dtc",
+      "title": "Direct Threaded Code (DTC)",
+      "tags": ["forth", "dispatch", "compiler-ir"],
+      "content": "**Direct Threaded Code** is the historical default and the simplest of the three: the threaded code is literally an array of machine-code addresses. The inner loop is fetch → jump; each primitive ends with `NEXT`. No per-instruction overhead beyond the address itself. Modern fallback in GForth/VFX when advanced techniques don't apply.",
+      "refs": []
+    },
+    {
+      "id": "itc",
+      "title": "Indirect Threaded Code (ITC)",
+      "tags": ["forth", "dispatch", "compiler-ir"],
+      "content": "**Indirect Threaded Code** stores the address of a code-field word, which itself points to machine code — one extra indirection in the inner loop. ITC's extra indirection is what makes `DOES>` work uniformly: every word has a code field that the inner loop dispatches on, so primitives and user-defined words look identical to the dispatcher.",
+      "refs": []
+    },
+    {
+      "id": "stc",
+      "title": "Subroutine Threaded Code (STC)",
+      "tags": ["forth", "dispatch", "compiler-ir"],
+      "content": "**Subroutine Threaded Code** stores native `CALL` instructions. The CPU's call/return machinery handles dispatch — no inner loop, no `NEXT`. Larger code size (a `CALL` is 5 bytes on x86-64 vs an 8-byte address slot, but pays once per invocation); on modern branch predictors, STC's call/return pattern outperforms ITC/DTC. Used heavily by SwiftForth, VFX Forth, Mecrisp, zeptoforth.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Brad Rodriguez — Moving Forth Part 1", "url": "https://www.bradrodriguez.com/papers/moving1.htm" }
+  ]
+}

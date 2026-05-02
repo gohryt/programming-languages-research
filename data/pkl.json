@@ -1,0 +1,46 @@
+{
+  "kind": "language",
+  "name": "Pkl",
+  "aliases": ["pickle-config"],
+  "summary": "Apple's class-based typed configuration language (introduced February 2024, Apache 2.0) for generating JSON, YAML, plist, and other structured configuration formats; classes with inheritance, abstract members, late-binding, amend-and-extend overrides, refinement-typed integers/strings, native bindings for Java/Kotlin/Swift/Go/Node, URL-shaped imports with version pinning.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Apple's **Pkl** (introduced February 2024, open-source under Apache 2.0; pronounced \"Pickle\") is a typed configuration language that occupies the same design slot as CUE (`data/cue`): generate JSON, YAML, property lists, or other structured configuration formats from a typed source language. Where CUE's discipline is *unification on a lattice*, Pkl takes the *class-based object-oriented* path — classes with inheritance, abstract members, late-binding, and amend-and-extend overrides, all structurally typed and compile-time validated.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "cue#overview", "type": "design-counterpoint" }
+      ],
+      "sources": [
+        { "label": "Pkl language", "url": "https://pkl-lang.org/index.html" }
+      ]
+    },
+    {
+      "id": "distinguishing-properties",
+      "title": "Distinguishing properties",
+      "tags": ["pkl", "configuration", "type-system"],
+      "content": "- **Late binding with abstract members** — a base class can declare an abstract field that a subclass must override; the abstract designation is part of the type, and the type checker rejects instantiation of an abstract class.\n- **Type predicates** (`Int(this > 0)`, `String(matches(...))`) — refinement-typed integers and strings, validated at evaluation time. Integration-style predicate refinement, comparable to Ada SPARK's `Predicate` aspect but in a configuration context.\n- **Amend-and-extend** — `(existingObject) { foo = newValue }` produces a copy of `existingObject` with `foo` overridden. Composes deeply through nested objects without commitment to either declarative-merge (CUE) or imperative-mutate (Helm) semantics.\n- **Multi-format output** — one Pkl file can emit JSON, YAML, .plist, .pcf (Pkl Configuration Format), .properties, or arbitrary user-defined output via `output.text` and renderers. The same source generates Kubernetes manifests, GitHub Actions workflows, and Helm values without parallel maintenance.\n- **Native bindings** for Java, Kotlin, Swift, Go, and Node — Pkl files can be evaluated by host applications and produce typed records in the host language. This closes the typing loop: configuration written in Pkl is type-checked at evaluation time *and* type-checked at consumption time by the host.\n- **Module system with URL-shaped imports** — `import \"package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.uri@1.0.0#/URI.pkl\"` (URL-shaped imports with version pinning, similar to Deno).",
+      "refs": [
+        { "target": "module-identity#identity-models", "type": "url-shaped-example" }
+      ]
+    },
+    {
+      "id": "production-and-design-lesson",
+      "title": "Production use and design lesson",
+      "tags": ["pkl", "production", "design-guidance"],
+      "content": "Distinct from Jsonnet (a JSON-templating language pre-dating both): Pkl has a richer type system, while Jsonnet is dynamically typed. Distinct from HCL (Terraform's configuration language): HCL is declarative without a real type system; Pkl is class-based with type checking.\n\nProduction: Apple uses Pkl extensively internally for service configuration; external adoption includes several large-scale Kubernetes-and-Helm deployments where Helm's untyped templating became unmaintainable. Status (as of 2026-04): pre-1.0 (~0.27+) but production-stable per Apple's own usage.\n\nThe lesson generalises: **typed configuration languages are converging on \"real type system + multi-format output\"**, with the design choice between unification (CUE) and class-based (Pkl) reflecting whether the audience prefers declarative or object-oriented thinking. For language designers asking \"should I have a configuration sub-language?\" — the answer is increasingly yes, and the design space is now well-mapped.",
+      "refs": [],
+      "sources": [
+        { "label": "Pkl repository", "url": "https://github.com/apple/pkl" },
+        { "label": "Introducing Pkl", "url": "https://pkl-lang.org/blog/introducing-pkl.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Pkl", "url": "https://pkl-lang.org/index.html" },
+    { "label": "Pkl repository", "url": "https://github.com/apple/pkl" },
+    { "label": "Introducing Pkl", "url": "https://pkl-lang.org/blog/introducing-pkl.html" }
+  ]
+}

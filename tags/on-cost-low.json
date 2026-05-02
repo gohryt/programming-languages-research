@@ -1,0 +1,7 @@
+{
+  "id": "on-cost-low",
+  "tag": "on-cost:low",
+  "name": "Cost when on: low",
+  "description": "Active overhead is well under 5% (often sub-1%): a pointer chase, a memcpy, a single-cycle compiled branch, a hardware register read.",
+  "axis": "on-cost"
+}

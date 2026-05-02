@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Tree Borrows",
+  "aliases": ["tree-borrows-model"],
+  "summary": "Villani, Hostert, Dreyer, Jung (PLDI 2025) operational aliasing model that replaces Stacked Borrows' stack with a per-allocation tree of borrows, tracking per-pointer state (Reserved/Active/Frozen/Disabled) so reads from a parent don't kill a child borrow. Empirical evaluation on the top 30,000 crates rejects 54% fewer real programs than Stacked Borrows while preserving most optimizations and additionally licensing read-read reorderings. Experimental aliasing model available in Miri.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["tree-borrows", "aliasing", "unsafe", "rust", "memory-safety"],
+      "content": "Tree Borrows (Villani, Hostert, Dreyer, Jung — PLDI 2025) is an *operational aliasing model* for unsafe Rust that replaces Stacked Borrows' stack with a per-allocation tree of borrows, tracking per-pointer state (Reserved/Active/Frozen/Disabled) so that reads from a parent don't kill a child borrow.\n\nEmpirical evaluation on the top 30,000 crates rejects 54% fewer real programs than Stacked Borrows while preserving most optimizations and additionally licensing read-read reorderings. It is an experimental aliasing model available in Miri, not the established default model.",
+      "refs": [
+        { "target": "stacked-borrows", "type": "successor-of" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "ownership", "type": "related" },
+        { "target": "rust", "type": "exemplified-by" }
+      ],
+      "sources": [
+        { "label": "Tree Borrows (PLDI 2025)", "url": "https://dl.acm.org/doi/10.1145/3735592" }
+      ]
+    },
+    {
+      "id": "why-it-replaces-stacked-borrows",
+      "title": "Why a tree replaces a stack",
+      "tags": ["tree-borrows", "aliasing", "static-analysis"],
+      "content": "Stacked Borrows' single-stack-per-location structure forces a strict total order on coexisting borrows; reading through a parent pointer pops any child borrows it dominates. Tree Borrows organises borrows hierarchically — each borrow becomes a node whose ancestors and descendants share access without invalidating each other — capturing the actual semantic intent of `&mut` reborrows more faithfully.\n\nThe per-pointer state machine (Reserved → Active → Frozen → Disabled) replaces the implicit stack-position tracking with explicit transitions, making the aliasing rules less dependent on the order of operations and more on the structural relationship between borrows. Tree Borrows is the candidate being evaluated as a more permissive replacement that accepts more real unsafe-Rust patterns without giving up the optimization story.",
+      "refs": [
+        { "target": "stacked-borrows", "type": "successor-of" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Tree Borrows (PLDI 2025)", "url": "https://dl.acm.org/doi/10.1145/3735592" }
+  ]
+}

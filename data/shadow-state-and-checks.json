@@ -1,0 +1,78 @@
+{
+  "kind": "concept",
+  "name": "Shadow state and compiler-inserted checks",
+  "aliases": [
+    "sanitizers"
+  ],
+  "summary": "Mechanisms that maintain a parallel shadow of every piece of program state — each byte's addressability and definedness, each access's happens-before clock, each integer operation's overflow-free-ness — and verify it on every operation; the foundation under Valgrind Memcheck and the Clang/GCC sanitizer family.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mechanisms that maintain a parallel *shadow* of every piece of program state — each byte's addressability and definedness, each access's happens-before clock, each integer operation's overflow-free-ness — and verify it on every operation. The cost is always-on and heavy (2–50× slowdown depending on the tool), but the information is uniquely thorough: every byte is tracked, every invariant is checked, and the family composes with coverage-guided fuzzing (`data/coverage-guided-fuzzing`) to form the most effective automated bug-finding pipeline in current practice.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:heavyweight-instrumentation`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:always-on`\n- **on-cost**: `on-cost:dominant`, `on-cost:high`\n- **granularity**: `granularity:per-instruction`\n"
+    },
+    {
+      "id": "valgrind-memcheck",
+      "title": "Valgrind Memcheck — Shadow Memory",
+      "tags": [
+        "domain:debugging",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:dominant"
+      ],
+      "content": "Valgrind's Memcheck tool maintains a \"shadow\" for every byte of memory in the program. Each byte has two shadow bits: an \"A\" (addressability) bit indicating whether the byte is legally accessible, and \"V\" (validity) bits indicating whether the byte's value is defined.\n\nEvery memory operation — load, store, arithmetic — is instrumented by Valgrind's dynamic binary translator (VEX) to propagate shadow state. If an undefined value flows into a branch condition or a syscall argument, Memcheck reports it.\n\nThe overhead is 10–50x slowdown, which is enormous. But the technique — maintaining a parallel \"shadow\" of every piece of program state — is conceptually powerful. It is the most thorough form of runtime verification: every byte is tracked, every operation is checked. Shadow memory has been adapted for other tools: taint tracking (which bytes came from untrusted input?), race detection (which bytes were accessed by multiple threads?), and type tracking.\n\nThe general principle — \"for every real thing, maintain a shadow thing with metadata\" — applies far beyond memory checking. Applied to a bytecode VM, a shadow buffer tracking \"which instructions have been executed\" or \"what was the last value produced here\" is the same idea at a different granularity.",
+      "sources": [
+        {
+          "url": "https://valgrind.org/docs/shadow-memory2007.pdf"
+        }
+      ]
+    },
+    {
+      "id": "addresssanitizer-asan",
+      "title": "AddressSanitizer (ASan) — Shadow Memory for Memory Safety",
+      "tags": [
+        "compiler",
+        "domain:debugging",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:high"
+      ],
+      "content": "AddressSanitizer (Google, 2012) detects memory errors at runtime using compiler instrumentation and shadow memory. The compiler inserts checks before every memory access, and a runtime library manages a shadow memory map that tracks which bytes are valid to access.\n\nThe shadow memory scheme maps every 8 bytes of application memory to 1 byte of shadow memory. The shadow byte encodes how many of the 8 bytes are accessible (0 = all 8 accessible, k = first k accessible, negative = all inaccessible for various reasons). Before every load/store, the compiler inserts:\n\n```\nshadow_value = *(shadow_base + (addr >> 3))\nif (shadow_value != 0 && (shadow_value <= (addr & 7)))\n    report_error()\n```\n\nThis instrumentation adds one shadow-memory load plus compare/branch logic before the original application load/store; if counting the application access too, the fast path is effectively two memory accesses plus a branch. ASan detects use-after-free (by poisoning freed memory and quarantining it), heap/stack/global buffer overflows (by inserting poisoned \"red zones\" around allocations), and use-after-return."
+    },
+    {
+      "id": "tsan-msan-ubsan",
+      "title": "ThreadSanitizer, MemorySanitizer, UBSan — The Sanitizer Family",
+      "tags": [
+        "compiler",
+        "domain:debugging",
+        "family:heavyweight-instrumentation",
+        "granularity:per-instruction",
+        "off-cost:always-on",
+        "on-cost:high"
+      ],
+      "content": "The sanitizer family extends the shadow memory concept:\n\n- **ThreadSanitizer (TSan)**: detects data races by maintaining a shadow \"happens-before\" clock per memory location. Every read/write records the thread's vector clock; conflicting unsynchronized accesses are reported. Overhead: 5–15x slowdown, 5–10x memory.\n- **MemorySanitizer (MSan)**: detects use of uninitialized memory by tracking \"definedness\" bits — similar to Valgrind's V-bits but implemented via compiler instrumentation rather than binary translation, achieving 3x overhead vs Valgrind's 20x.\n- **UndefinedBehaviorSanitizer (UBSan)**: detects undefined behavior (signed integer overflow, null pointer dereference, misaligned access) via targeted compiler checks. Overhead: <5%, making it viable for production use.\n\nThe key insight: compiler-based instrumentation is dramatically cheaper than binary translation (Valgrind) because the compiler knows which accesses need checking and can optimize the checks. ASan's 2x overhead vs Valgrind's 20x is the difference between \"run it during development\" and \"run it only when desperate.\"\n\nAll sanitizers are integrated into Clang/LLVM and GCC. They compose with coverage-guided fuzzing (`data/coverage-guided-fuzzing`) to form the most powerful automated bug-finding pipeline available.",
+      "sources": [
+        {
+          "url": "https://github.com/google/sanitizers/wiki/addresssanitizeralgorithm"
+        },
+        {
+          "url": "https://releases.llvm.org/20.1.0/tools/clang/docs/AddressSanitizer.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://valgrind.org/docs/shadow-memory2007.pdf"
+    },
+    {
+      "url": "https://github.com/google/sanitizers/wiki/addresssanitizeralgorithm"
+    },
+    {
+      "url": "https://releases.llvm.org/20.1.0/tools/clang/docs/AddressSanitizer.html"
+    }
+  ]
+}

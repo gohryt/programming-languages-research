@@ -1,0 +1,44 @@
+{
+  "kind": "runtime",
+  "name": "MoarVM Lego and Expression JITs",
+  "aliases": ["MoarVM JIT", "lego JIT", "expression JIT"],
+  "summary": "Raku's MoarVM ships two JITs: the older 'lego' (template-based per-opcode JIT, DynASM-emitted) and the newer 'expression' JIT (BURS tile-based with cross-instruction optimisation). The two coexist; Bart Wiegmans's 2023 retrospective named 'failing to deprecate the lego JIT' as a mistake.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "MoarVM (Raku's VM) has two JITs that coexist. The older of the pair, the **lego JIT**, is a template-based direct-emit compiler: each MoarVM instruction has a hand-written template that maps directly to x86-64 machine code via DynASM. Compilation is a single linear pass over the bytecode, emitting machine code from the per-instruction templates with no IR in between.\n\nThe newer **expression JIT** uses a BURS-derived tiler with cross-instruction optimisation, linear-scan register allocation, and DynASM emission.",
+      "refs": [
+        { "target": "dynasm#overview", "type": "uses" },
+        { "target": "burg-burs#moarvm-expression-jit", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "MoarVM JIT overview", "url": "https://github.com/MoarVM/MoarVM/blob/master/docs/jit/overview.org" }
+      ]
+    },
+    {
+      "id": "lego-jit-design",
+      "title": "Lego JIT design",
+      "tags": ["jit", "moarvm", "raku"],
+      "content": "The lego JIT sits between copy-and-patch and DynASM macroassembly: like copy-and-patch, it treats each source opcode as a unit of machine code to stitch together; like DynASM, the \"templates\" are hand-written assembly rather than compiler-extracted stencils. It predates copy-and-patch in the literature.\n\nThe lego JIT survives alongside MoarVM's newer expression JIT because many MoarVM instructions either (a) have such simple one-to-one machine-code mappings that an expression tree adds no value, or (b) haven't yet been ported to the expression JIT's tile-template DSL. In production, MoarVM runs a mix — expression-JITted code for instructions that benefit from cross-instruction optimisation, lego-JITted code for everything else.",
+      "refs": [
+        { "target": "copy-and-patch#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "retrospective",
+      "title": "Retrospective and current state",
+      "tags": ["moarvm", "history"],
+      "content": "Bart Wiegmans's June 2023 retrospective is the postmortem: the unordered IR of the expression JIT prevents cross-basic-block optimisation, and \"failing to deprecate the lego JIT\" is named as a mistake. The broader design pattern — two JITs with different complexity/throughput trade-offs, dispatched per opcode — can be a reasonable transitional compromise when a VM's instruction set is large and heterogeneous. The cost is maintaining two codegen paths; the benefit is that simple instructions don't pay the overhead of the more sophisticated backend.\n\nStatus (as of 2026-04): no significant JIT codegen work has shipped since the retrospective, and **MoarVM on AArch64 (Apple Silicon, ARM64 Linux/macOS) runs the interpreter only** — there is no native JIT backend. Spesh optimisations are still active and Homebrew/distro packages support ARM64, but native code generation is x86-64-only.",
+      "refs": [],
+      "sources": [
+        { "label": "Retrospective of the MoarVM JIT (Bart Wiegmans, 2023)", "url": "http://brrt-to-the-future.blogspot.com/2023/06/retrospective-of-moarvm-jit.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "MoarVM JIT overview", "url": "https://github.com/MoarVM/MoarVM/blob/master/docs/jit/overview.org" },
+    { "label": "Wiegmans retrospective", "url": "http://brrt-to-the-future.blogspot.com/2023/06/retrospective-of-moarvm-jit.html" }
+  ]
+}

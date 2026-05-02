@@ -1,0 +1,36 @@
+{
+  "kind": "concept",
+  "name": "Dynamic Superinstructions",
+  "aliases": ["GForth superinstructions", "superinstructions", "instruction stitching"],
+  "summary": "GForth's runtime-formed superinstructions: identify common bytecode sequences, compile them into single superinstructions by copying machine-code routines into a contiguous block, eliminating dispatch boundaries. Sits between pure interpretation and JIT compilation. Ertl's ECOOP 2024 IP-update optimisations extend the idea.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "In bytecode interpreters, dispatch overhead (reading the next opcode and branching to its implementation) is a major bottleneck. Direct threaded code replaces opcodes with arrays of pointers directly to the machine code implementing each operation.\n\nTo further reduce dispatch overhead, systems like GForth use \"Dynamic Superinstructions.\" Instead of executing individual primitives (e.g., `dup`, `*`), the VM dynamically identifies common sequences of bytecodes and compiles them into a single \"superinstruction\" on the fly, copying the machine code routines into a contiguous block. This eliminates the dispatch boundaries between those instructions and allows the CPU to execute them as a single block of native code.\n\nThe result sits between a pure interpreter and a JIT compiler: ultra-lightweight native code stitching at runtime.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "fits-into" },
+        { "target": "copy-and-patch#overview", "type": "shares-design-space-with" }
+      ],
+      "sources": [
+        { "label": "Gforth — Dynamic Superinstructions (Vienna mirror)", "url": "https://www.complang.tuwien.ac.at/forth/gforth/Docs-html/Dynamic-Superinstructions.html" }
+      ]
+    },
+    {
+      "id": "ertl-ip-update-optimisations",
+      "title": "Ertl 2024 IP-update optimisations",
+      "tags": ["forth", "interpreter", "performance"],
+      "content": "Ertl's EuroForth 2023/2024 papers (\"The Performance Effects of Virtual-Machine Instruction Pointer Updates,\" published as ECOOP 2024) quantify how IP-update dependency chains dominate critical paths on modern out-of-order cores. The paper introduces three instruction-combining optimisations: `l` (loop), `c`/`ci` (combined+immediate), and `b` (branch) — each of which collapses certain IP-update chains into operations the branch predictor can handle better.\n\nReported speedups reach 2× on dispatch-bound benchmarks. The lesson generalises beyond Forth: any interpreter with a hot dispatch loop benefits from collapsing IP updates that chain critical-path dependencies through the next-instruction-fetch.",
+      "refs": [],
+      "sources": [
+        { "label": "EuroForth 2024 proceedings", "url": "http://www.euroforth.org/ef24/papers/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "EuroForth 2024", "url": "http://www.euroforth.org/ef24/papers/" },
+    { "label": "Anton Ertl EuroForth collection", "url": "https://www.complang.tuwien.ac.at/anton/euroforth/" },
+    { "label": "Gforth — Dynamic Superinstructions (Vienna mirror)", "url": "https://www.complang.tuwien.ac.at/forth/gforth/Docs-html/Dynamic-Superinstructions.html" }
+  ]
+}

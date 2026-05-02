@@ -1,0 +1,41 @@
+{
+  "kind": "concept",
+  "name": "Arborescent Garbage Collection — Synchronous Immediate Cycle Collection (ISMM 2025)",
+  "aliases": ["Arborescent GC", "Even-Shiloach GC"],
+  "summary": "Lahaie-Bertrand, Oest O'Leary, Melançon, Feeley, and Monnier's Arborescent GC (ISMM 2025 Best Paper) addresses the long-standing weakness of reference counting (cycles) by reclaiming unreachable cyclic structures immediately and synchronously at the moment the last external reference is dropped.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "cycle-collector", "research"],
+      "content": "Lahaie-Bertrand, Oest O'Leary, Melançon, Feeley, and Monnier's **Arborescent GC** (ISMM 2025 Best Paper) addresses the long-standing weakness of reference counting: cycles either leak (ARC, Lobster) or require a separate cycle-collection phase (ORC, Bacon trial-deletion) introducing latency spikes.\n\nArborescent GC instead reclaims unreachable cyclic structures **immediately and synchronously** at the moment the last external reference is dropped, using a dynamic-graph reachability algorithm inspired by Even and Shiloach's classical decremental-connectivity work.",
+      "refs": [
+        { "target": "garbage-collection#tracing-vs-reference-counting", "type": "instance-of" },
+        { "target": "reference-counting", "type": "extends" }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Arborescence and dynamic-graph reachability",
+      "tags": ["cycle-collector", "garbage-collection"],
+      "content": "The mechanism: every object maintains an **arborescence** — a spanning tree of incoming references rooted at a globally-reachable anchor. When an edge is removed, the algorithm checks whether the affected subtree can still reach the root via any remaining edge; if not, the entire subtree is unreachable and is reclaimed immediately.\n\nThe cost per edge update is bounded (related to the subtree's structure, not the heap size); cycles are *not* a special case — they are reclaimed by the same algorithm as acyclic structures."
+    },
+    {
+      "id": "comparison",
+      "title": "Comparison with existing cycle collectors",
+      "tags": ["cycle-collector", "trial-deletion", "garbage-collection"],
+      "content": "Compared to existing RC + cycle collectors:\n\n- **Bacon trial-deletion** (used in ORC, CPython): reclaims cycles asynchronously in batched scans; introduces unpredictable latency spikes.\n- **Backwards reference counting** (Vale-style generational refs): defers reclamation entirely; requires explicit programmer cooperation.\n- **Mark-and-sweep over RC** (some Lisp implementations): a separate full traversal; defeats RC's incremental property.\n\nArborescent GC reclaims with **bounded latency** in the strict real-time sense — every edge update is processed in time proportional to the size of the affected subtree, not the heap. The trade-off is bookkeeping: every object carries arborescence pointers, and edge updates are more expensive than plain RC's `inc`/`dec`."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Deterministic memory behaviour as a design point",
+      "tags": ["cycle-collector", "research"],
+      "content": "The empirical evaluation in the paper shows the technique competitive with mature tracing collectors on JavaScript-style workloads while delivering Erlang-class predictability.\n\nThe lesson: **for languages where deterministic memory behaviour matters more than peak throughput** (real-time, embedded, financial trading), incremental cycle reclamation via dynamic-graph reachability is now a practical alternative to either pure RC + leak-on-cycles or RC + asynchronous trial-deletion.\n\nStatus (as of 2026-04): research-grade, ISMM 2025 Best Paper artifact."
+    }
+  ],
+  "sources": [
+    { "label": "Lahaie-Bertrand et al. — Arborescent Garbage Collection (ISMM 2025)", "url": "https://oestoleary.com/papers/ISMM25.pdf" },
+    { "label": "Arborescent GC ACM DL", "url": "https://dl.acm.org/doi/10.1145/3735950.3735953" },
+    { "label": "Arborescent GC author copy (Université de Montréal)", "url": "https://www.iro.umontreal.ca/~feeley/papers/LahaieBertrandOestOLearyMelanconFeeleyMonnierISMM25.pdf" }
+  ]
+}

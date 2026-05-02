@@ -1,0 +1,233 @@
+{
+  "kind": "concept",
+  "name": "Region-Based Memory",
+  "aliases": [
+    "regions",
+    "region-systems"
+  ],
+  "summary": "Concept hub for memory-management techniques in which values are associated with regions whose lifetimes control allocation, access, or bulk reclamation; the design axis is *who specifies the region structure* (programmer, full inference, capability annotations, opt-in projection, runtime layout policy).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Region-based memory groups allocations by lifetime domain rather than reclaiming objects one by one. It offers a structured middle ground between tracing GC, reference counting, and strict ownership-only models.\n\nThe space covers both classic region systems — where lifetimes enable bulk deallocation — and newer region-like designs where regions act as isolation domains, borrowing/projection scopes, or allocator/runtime layout units. Compile-time RC and tracing GC sit at the two endpoints of \"no annotation\" approaches; regions are the structurally distinct middle ground.",
+      "refs": [
+        {
+          "target": "ownership#overview",
+          "type": "related"
+        },
+        {
+          "target": "garbage-collection#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": [
+        "regions",
+        "comparative-design",
+        "type-system"
+      ],
+      "content": "The dominant axis across region designs is **who specifies the region structure**:\n\n- **Programmer-specified regions**: explicit region variables on pointer types (Cyclone), explicit region annotations as concurrency isolation (Encore).\n- **Full inference**: zero-annotation region inference (Tofte-Talpin / MLKit) at the cost of classic \"stuck region\" pathologies; ASAP-style fully automatic dataflow analysis with no GC fallback.\n- **Capability annotations**: per-region reference capabilities (Verona's `iso`/`mut`/`imm`, Pony rcaps used as region transfers).\n- **Opt-in projection**: regions only where the programmer wants zero-overhead immutability (Vale's region borrowing on top of generational references).\n- **Runtime layout policy**: regions as a runtime allocator structure rather than a type-system feature (RC-Immix's mark-region heap, MLKit's per-region collectors).\n\nSecondary axes: lexical vs non-lexical lifetimes, single-region per object vs. region-polymorphic functions, uniform heap cells vs. sized allocations.",
+      "refs": [
+        {
+          "target": "cyclone",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "mlkit",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "verona",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "vale",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "regions-as-concurrency-isolation",
+      "title": "Regions as concurrency isolation",
+      "tags": [
+        "regions",
+        "concurrency",
+        "comparative-design"
+      ],
+      "content": "A modern strand uses regions as **isolation domains** rather than as a deallocation discipline. Verona makes every object live in exactly one of a forest of regions with one active mutable region per thread (Behaviour-Oriented Concurrency); Encore's reference-capability types control aliasing across active-object boundaries. The unifying design idea is that capabilities-as-regions can replace whole-program data-race avoidance with type-system-enforced unshared local heaps and capability-checked transfers.\n\nVale takes the opposite direction with regions as immutability projection: pure functions and `region` blocks temporarily make data immutable to elide generation checks, while the rest of the program runs on generational references. Per-region pluggable memory strategies (Verona) and group-borrowing (Vale's 2025 proposal) both relax the \"one collector for the whole heap\" assumption.",
+      "refs": [
+        {
+          "target": "verona",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "encore",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "vale",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "vale-generational-references",
+          "type": "exemplified-by"
+        }
+      ]
+    },
+    {
+      "id": "no-annotation-no-gc-asap",
+      "title": "Fully automatic, no-GC region-like analysis",
+      "tags": [
+        "regions",
+        "compiler",
+        "static-analysis"
+      ],
+      "content": "The most aggressive no-annotation, no-GC point in the design space is fully automatic dataflow analysis: the compiler emits per-program-point deallocation instructions, falling back to bounded runtime scans only when static info is insufficient. ASAP (Cambridge PhD 2017) is the canonical example, subsuming both linear types and Tofte-Talpin regions; given a linear/region-correct program, ASAP emits equivalent free instructions, and where static analysis can't decide it inserts specialised scan-and-deallocate code that is bounded (unlike a tracing GC).",
+      "refs": [
+        {
+          "target": "asap-region-inference",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "garbage-collection#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "non-lexical-and-hybrid-region-models",
+      "title": "Non-lexical and hybrid region models",
+      "tags": [
+        "lifetime",
+        "compile-time",
+        "comparative-design"
+      ],
+      "content": "Modern region systems often relax strict lexical stack discipline and combine regions with borrowing, ownership, or tracing. The general lesson is that region systems are not limited to lexical stack-shaped lifetimes — Spegion explicitly proposes implicit, non-lexical, sized-allocation regions as the modern reformulation, and Boyapati-Salcianu-Beebee-Rinard fused ownership types with region types on RTSJ Java to eliminate runtime scoped-memory checks.\n\nThe hybrid story extends to allocator-runtime layer: RC-Immix uses Immix's mark-region heap as the substrate for reference counting, blurring \"region\" with \"runtime block layout policy.\" The space is now an active design surface for languages searching for a middle point between GC, ownership, and arena allocation.",
+      "refs": [
+        {
+          "target": "spegion",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "boyapati-rtsj-regions",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "rc-immix",
+          "type": "exemplified-by"
+        },
+        {
+          "target": "borrowing#lifetimes-and-scope",
+          "type": "related"
+        },
+        {
+          "target": "garbage-collection#language-design-implications",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and design implications",
+      "tags": [
+        "regions",
+        "tradeoffs",
+        "design-guidance"
+      ],
+      "content": "Classic region systems use lifetimes so many values can be reclaimed together, reducing per-object reclamation cost and making allocation extremely cheap when lifetime structure is predictable. The trade-off is annotation burden vs. inference power vs. expressiveness across concurrency and runtime implementation.\n\nFor language designers: (1) is the goal bulk deallocation (classic regions, arenas), isolation (Verona, Encore), or zero-overhead immutability projection (Vale)? (2) is the annotation cost acceptable, or is full inference required? (3) do regions interact with concurrency boundaries, and if so do they replace actor-style mailboxes or compose with them? (4) is a hybrid with tracing GC (MLKit + GC, RC-Immix, ASAP fallback) acceptable, or is regions-only a hard requirement?",
+      "refs": [
+        {
+          "target": "ownership#tradeoffs",
+          "type": "related"
+        },
+        {
+          "target": "borrowing#lifetimes-and-scope",
+          "type": "related"
+        },
+        {
+          "target": "garbage-collection#hybrids-and-boundaries",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "per-technology-records",
+      "title": "Per-technology records",
+      "tags": [
+        "regions",
+        "index",
+        "mechanisms"
+      ],
+      "content": "Region-based mechanisms with their own per-technology records:\n\n- **Explicit lexical regions**: Cyclone (the canonical \"explicit regions, modest annotation cost\" reference and direct ancestor of Rust lifetimes).\n- **Inferred regions**: MLKit's region inference and the Tofte-Talpin region calculus that grounds it.\n- **Modern non-lexical / sized-allocation regions**: Spegion (ECOOP 2025).\n- **Regions as concurrency isolation**: Verona's per-region pluggable strategies; Encore's capability-checked active objects; Vale's opt-in region borrowing on top of generational references; Boyapati-Salcianu-Beebee-Rinard's RTSJ Java ownership+region fusion.\n- **No-annotation, no-GC analysis**: ASAP's dataflow-driven deallocation insertion.\n- **Runtime-layer region/RC hybrid**: RC-Immix's mark-region + reference-counted heap.\n- **Cross-related concepts**: ownership and borrowing for the structurally adjacent disciplines; garbage collection for the contrasting reclamation strategy.",
+      "refs": [
+        {
+          "target": "cyclone",
+          "type": "per-technology"
+        },
+        {
+          "target": "mlkit",
+          "type": "per-technology"
+        },
+        {
+          "target": "mlkit-regionexp",
+          "type": "per-technology"
+        },
+        {
+          "target": "verona",
+          "type": "per-technology"
+        },
+        {
+          "target": "encore",
+          "type": "per-technology"
+        },
+        {
+          "target": "vale",
+          "type": "per-technology"
+        },
+        {
+          "target": "vale-generational-references",
+          "type": "per-technology"
+        },
+        {
+          "target": "asap-region-inference",
+          "type": "per-technology"
+        },
+        {
+          "target": "boyapati-rtsj-regions",
+          "type": "per-technology"
+        },
+        {
+          "target": "rc-immix",
+          "type": "per-technology"
+        },
+        {
+          "target": "spegion",
+          "type": "per-technology"
+        },
+        {
+          "target": "ownership",
+          "type": "related-concept"
+        },
+        {
+          "target": "borrowing",
+          "type": "related-concept"
+        },
+        {
+          "target": "garbage-collection",
+          "type": "related-concept"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Region-based memory management overview",
+      "url": "https://en.wikipedia.org/wiki/Region-based_memory_management"
+    }
+  ]
+}

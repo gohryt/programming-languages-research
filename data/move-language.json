@@ -1,0 +1,107 @@
+{
+  "kind": "language",
+  "name": "Move — Resource Types and Abilities for Smart Contracts",
+  "aliases": [
+    "move",
+    "move-lang",
+    "aptos-move",
+    "sui-move"
+  ],
+  "summary": "Sam Blackshear et al. (Diem/Libra, 2019; production at Aptos and Sui, 2022+): largest production deployment of linear types in any language. Resource — a struct whose values must be linearly used: cannot be copied, cannot be silently dropped, cannot leak from the defining module. Ability system (copy, drop, key, store) replaces ad-hoc linearity; mandatory bytecode verifier enforces the discipline at trust boundaries.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Sam Blackshear et al.'s **Move** (Diem/Libra, 2019; now production at **Aptos** and **Sui**, 2022+) is the largest production deployment of linear types in any language, period. The core type-system primitive is the **resource** — a struct whose values must be linearly used: cannot be copied, cannot be silently dropped (must be explicitly destroyed via a constructor of the defining module), and cannot leak from the module that defined it.\n\nThis is exactly the discipline ATS (`data/ats-language`) and Linear Haskell (`data/linear-haskell-ir`) describe, but applied to digital assets where copying or losing a value is a real economic loss.",
+      "refs": [
+        {
+          "target": "linear-affine-types#overview",
+          "type": "production-instance-of"
+        },
+        {
+          "target": "move-bytecode-verifier#overview",
+          "type": "verified-by"
+        },
+        {
+          "target": "verification-intermediate-languages#overview",
+          "type": "extended-by-prover"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Aptos — Move Web3 Language and Runtime",
+          "url": "https://aptos.dev/network/blockchain/move"
+        },
+        {
+          "label": "Move Language Reference",
+          "url": "https://move-language.github.io/move/"
+        }
+      ]
+    },
+    {
+      "id": "ability-system",
+      "title": "Ability system — a 4-dimensional lattice",
+      "tags": [
+        "type-system",
+        "linearity"
+      ],
+      "content": "Move replaces ad-hoc linearity with an **ability system**: every type carries up to four abilities — `copy` (can be duplicated by `=`), `drop` (can be silently discarded at scope end), `key` (can be a top-level resource stored in global state), `store` (can be nested inside another resource).\n\n- A type *without* `copy + drop` is fully linear.\n- A type with only `key` is a top-level singleton.\n- A type with `key + store` can be moved into nested storage.\n\nFunction generics carry ability constraints (`fun foo<T: copy + drop>(x: T)`), making \"this function only works on duplicable types\" a first-class type-system concept.",
+      "sources": [
+        {
+          "label": "Sui Move abilities",
+          "url": "https://github.com/MystenLabs/sui/blob/main/external-crates/move/documentation/book/src/abilities.md"
+        }
+      ]
+    },
+    {
+      "id": "bytecode-verifier",
+      "title": "Mandatory bytecode verifier at the trust boundary",
+      "tags": [
+        "type-system",
+        "verification",
+        "bytecode"
+      ],
+      "content": "The **bytecode verifier** (mandatory before execution) statically enforces the ability discipline at the bytecode level — distinct from compile-time-only linearity in Haskell or Rust, because Move bytecode crosses trust boundaries (modules from different authors run on the same chain).\n\nThe verifier is similar in spirit to the BPF verifier (`data/ebpf-verifier-jit`): a small static analysis that gates execution. The **Move Prover** (covered as a Boogie frontend in `data/verification-intermediate-languages`) layers SMT-discharged functional correctness on top.",
+      "refs": [
+        {
+          "target": "move-bytecode-verifier#overview",
+          "type": "implements"
+        },
+        {
+          "target": "ebpf-verifier-jit#overview",
+          "type": "similar-in-spirit"
+        }
+      ]
+    },
+    {
+      "id": "sui-vs-aptos-divergence",
+      "title": "Sui and Aptos dialect divergence",
+      "tags": [
+        "languages",
+        "blockchain"
+      ],
+      "content": "The Sui and Aptos Move dialects diverged in 2022. Sui Move adds *object-centric* semantics where every resource has a globally unique ID and storage is owner-keyed; Aptos Move retains the original Diem account-centric model. Both share the ability system and bytecode verifier; the differences are in how resources are stored and how ownership is expressed at the language level.\n\nThe lesson generalises beyond blockchain: **a small, mandatory verifier checking linear/ability discipline at the trust boundary** is dramatically more deployable than full dependent-type or refinement-type machinery, and covers the asset-protection use cases that motivated linear types in the first place. For a language designer considering linear types, Move is the existence proof that an ability lattice with 2–4 dimensions can express most real linearity needs without the proof-engineering cost of QTT or ATS.",
+      "sources": [
+        {
+          "label": "Diem Move repository",
+          "url": "https://github.com/diem/move"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Aptos — Move Web3 Language and Runtime",
+      "url": "https://aptos.dev/network/blockchain/move"
+    },
+    {
+      "label": "Move Language Reference",
+      "url": "https://move-language.github.io/move/"
+    },
+    {
+      "label": "Sui Move abilities",
+      "url": "https://github.com/MystenLabs/sui/blob/main/external-crates/move/documentation/book/src/abilities.md"
+    }
+  ]
+}

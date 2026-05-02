@@ -1,0 +1,112 @@
+{
+  "kind": "language",
+  "name": "Rust",
+  "aliases": [],
+  "summary": "Systems programming language with memory safety via ownership/borrowing without GC; one of the repository's main hub examples for ownership, compiler architecture (rustc + LLVM), tooling integration (Cargo + rust-analyzer), three-layer module structure (package/crate/module), and package-layer design.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Rust is a systems programming language designed around memory safety, explicit control, and strong compile-time guarantees. In this repository it also serves as a major comparative anchor for how language design, compiler structure, ownership, and tooling can be integrated into one ecosystem.\n\nRust 1.0 shipped in May 2015. The language is sponsored by the Rust Foundation (since 2021) with a community-driven RFC governance model. Status (as of 2026-04): production-stable with quarterly release cadence; widely deployed in browser engines (Mozilla originally, now Servo project), operating system kernels (Linux 6.1+ allows Rust drivers, Asahi Linux GPU driver, Redox OS), embedded systems, blockchain runtimes, and a growing share of cloud infrastructure (parts of AWS, Microsoft Azure, Cloudflare Workers, Discord backend rewrites).",
+      "refs": [
+        { "target": "ownership#overview", "type": "related-concept" },
+        { "target": "llvm#overview", "type": "commonly-targets" },
+        { "target": "cargo#overview", "type": "ecosystem-anchor" }
+      ]
+    },
+    {
+      "id": "compiler",
+      "title": "Compiler architecture",
+      "tags": ["compiler", "backend", "incrementality"],
+      "content": "Rust compilation is centered on `rustc`, with multiple internal representations and strong emphasis on type-driven lowering, diagnostics, and correctness. LLVM is the dominant backend in mainstream Rust toolchains, though alternative backends and research implementations exist, making Rust a useful reference point for frontend-to-backend architecture.\n\nThe `rustc` pipeline: source → AST → HIR (High-level IR, post-name-resolution) → MIR (Mid-level IR, post-borrow-check, the canonical Rust analysis IR) → LLVM IR → machine code. Alternative backends include **rustc_codegen_cranelift** (Cranelift backend, faster compile times, used as default debug-build backend on x86-64 Linux as of 2024) and **rustc_codegen_gcc** (libgccjit backend, for GCC-supported targets where LLVM is unavailable).",
+      "refs": [
+        { "target": "llvm#overview", "type": "uses" },
+        { "target": "ssa#overview", "type": "related" },
+        { "target": "high-level-ir#overview", "type": "related" },
+        { "target": "mid-level-ir#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "type-system",
+      "title": "Type system and ownership",
+      "tags": ["type-system", "ownership", "memory-safety"],
+      "content": "Rust combines static typing with ownership, borrowing, and lifetime checking. This makes aliasing, mutation, and resource cleanup part of compile-time reasoning rather than relying primarily on runtime discipline or garbage collection, which is why Rust is such a common comparison point across multiple records in this repository.\n\nThe borrow checker enforces that `&mut T` is unique while `&T` is shared. NLL (Non-Lexical Lifetimes, stable in Rust 1.31, December 2018) reformulated borrow scopes from the lexical block boundary to liveness over the MIR control-flow graph. **Polonius** is the next reformulation (location-sensitive analysis behind `-Zpolonius=next` since 2024). Rust 1.75 (December 2023) stabilised `async fn` in traits via anonymous generic associated types. The Send/Sync auto-trait system gives Rust its distinctive concurrency story: ownership and borrowing apply not just to memory but to cross-thread sharing.",
+      "refs": [
+        { "target": "ownership#overview", "type": "uses" },
+        { "target": "borrowing#overview", "type": "uses" },
+        {
+          "target": "sendability#relation-to-ownership-and-capabilities",
+          "type": "related"
+        },
+        { "target": "ownership-as-type-constraint#overview", "type": "checker-architecture" },
+        { "target": "type-classes-traits#overview", "type": "uses" },
+        { "target": "chalk-trait-solver#overview", "type": "implemented-by" },
+        { "target": "linear-affine-types#overview", "type": "instance-of" }
+      ]
+    },
+    {
+      "id": "tooling",
+      "title": "Tooling and developer workflow",
+      "tags": ["tooling", "packaging", "language-server"],
+      "content": "Rust has an unusually integrated tooling story, with formatting, testing, package management, documentation, and editor support closely aligned with the language ecosystem. That integration is one reason Rust is often studied as a model for language-and-toolchain co-design rather than as a language specification in isolation.\n\n**Cargo** is the package manager and build tool. **rust-analyzer** is the language server, designed from scratch around demand-driven incrementality (Salsa framework). **rustfmt** is the formatter. **clippy** is the linter with hundreds of lints. **rustdoc** generates documentation from doc comments and includes runnable doc tests. **rustup** manages multiple toolchain versions. The integration is what makes Rust feel polished — any new project gets standard test discovery, doc generation, formatter integration, linter integration, and registry publishing without the user having to assemble these pieces from competing tool ecosystems.",
+      "refs": [
+        { "target": "cargo#overview", "type": "related" },
+        { "target": "language-server#overview", "type": "related" },
+        { "target": "reproducible-builds#why-it-matters", "type": "related" }
+      ]
+    },
+    {
+      "id": "modules-and-visibility",
+      "title": "Modules and visibility",
+      "tags": ["modules", "visibility", "tooling"],
+      "content": "Rust is frequently used as an example of a language with explicit visibility controls and a relatively legible module hierarchy. Its module system is relevant because it connects source structure, API curation, documentation, and tooling in a way that remains comparatively transparent to both users and compilers.\n\nVisibility is unusually rich: `pub`, `pub(crate)`, `pub(super)`, `pub(self)`, and `pub(in path)`. The privacy default is deliberately restrictive — items are private unless made visible. **`pub use` (re-exports)** make API curation a first-class module-system activity: a crate can hide an internal tree behind a flatter public facade. The downside is more conceptual surface area for learners.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "example" },
+        { "target": "visibility-and-exports#overview", "type": "example" },
+        {
+          "target": "module-identity#hierarchy-and-predictability",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "package-layering",
+      "title": "Package and crate layering",
+      "tags": ["packaging", "identity", "tooling"],
+      "content": "Rust is also relevant in packaging discussions because it separates source-level module structure from distribution-level package structure while still integrating them closely through Cargo. This makes it a strong example for discussing layered identity rather than collapsing modules, crates, and packages into one undifferentiated concept.\n\nThe three-level layering: **package** (Cargo's build/share/publish concept) → **crate** (compiler's compilation unit, library or binary) → **module tree** (formed by `mod` declarations). Workspaces add a fourth layer for related-package coordination. crates.io is the central registry; the flat global namespace has suffered from the typical name-squatting problems but the ecosystem otherwise functions well.",
+      "refs": [
+        {
+          "target": "package-management#module-identity-vs-package-identity",
+          "type": "related"
+        },
+        { "target": "cargo#dependency-resolution", "type": "related" },
+        { "target": "workspaces#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "concurrency-and-safe-sharing",
+      "title": "Concurrency and safe sharing",
+      "tags": ["concurrency", "memory-safety", "type-system"],
+      "content": "Rust is an important concurrency example not because it chooses one scheduler model, but because it couples concurrency boundaries tightly to ownership, borrowing, and sendability. This makes it a key reference point whenever the repository compares runtime concurrency models against type-driven safe-sharing disciplines.\n\nRust uses lazy futures and a poll/wake execution model — nothing happens unless an executor polls. Tokio, async-std, smol, and glommio are competing runtimes; the language ships only the `Future` trait and async/await syntax. The Send/Sync coloring problem applies: once a closure must be `Send`, every value it captures must be `Send`. **Pin/Unpin** is the library-level mechanism for address-stable async state machines.",
+      "refs": [
+        { "target": "sendability#overview", "type": "related" },
+        {
+          "target": "ownership#ownership-as-concurrency-control",
+          "type": "related"
+        },
+        { "target": "async-await#overview", "type": "contrasts-with" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Official Rust site",
+      "url": "https://www.rust-lang.org"
+    },
+    {
+      "label": "Rust reference",
+      "url": "https://doc.rust-lang.org/reference/"
+    }
+  ]
+}

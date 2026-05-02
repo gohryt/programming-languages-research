@@ -1,0 +1,102 @@
+{
+  "kind": "library",
+  "name": "Spritely Goblins — Object-Capability Library for Scheme",
+  "aliases": [
+    "goblins",
+    "guile-goblins",
+    "racket-goblins",
+    "ocapn"
+  ],
+  "summary": "Spritely Institute's ocap library for Racket and Guile Scheme. Implements CapTP and 'time-traveling' transactional ocap actors with quasi-functional actor turns enabling local rollback. Netlayer abstraction over Tor / I2P / libp2p; Hyptis / Brassica demonstrate composing ocap with CRDTs. Spritely Institute is a funded non-profit; Goblins is in beta as of 2026-04.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "spritely",
+        "ocap",
+        "object-capability",
+        "library",
+        "actors"
+      ],
+      "content": "**Spritely Goblins** is the Spritely Institute's object-capability library for Racket and Guile Scheme — a direct port of E's vat / eventual-send / CapTP model into the Scheme ecosystem. It is the most actively developed modern descendant of E and the reference implementation for the OCapN cross-language network protocol.\n\nGoblins is implemented as a **library**, not a separate language: a Racket or Guile program loads `spritely/goblins`, instantiates a vat, and is now writing ocap-discipline code on a standard Scheme runtime. This is the contrast with Monte and Newspeak (standalone runtimes) — Goblins gets ocap discipline at the cost of Scheme conventions for everything else, but inherits Scheme's mature tooling and ecosystem.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "e-language",
+          "type": "descended-from"
+        },
+        {
+          "target": "monte-language",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Spritely Goblins",
+          "url": "https://spritely.institute/goblins/"
+        }
+      ]
+    },
+    {
+      "id": "transactional-actors-and-time-travel",
+      "title": "Transactional actor turns and 'time travel'",
+      "tags": [
+        "spritely",
+        "actors",
+        "ocap",
+        "live-handle"
+      ],
+      "content": "Goblins's distinctive technical contribution is **quasi-functional actor turns** that enable local rollback — informally, \"time travel.\" Each actor turn is treated transactionally: state changes are deferred until the turn commits, and a turn that fails (raises, hits a timeout, gets explicitly aborted) leaves no observable trace.\n\nThis matters for ocap distributed systems for two reasons:\n\n- **Composability of failure-handling**: an actor can speculatively run a sub-computation, observe whether it succeeds, and either commit or roll back without leaking partial state.\n- **Auditable replay**: the deterministic-by-default turn log can be replayed for debugging or reproducibility, supporting the kind of `dotnet-edit-and-continue`-style live debugging that is otherwise hard to bolt onto an actor system.\n\nGoblins is also the canonical implementation venue for **OCapN** (the cross-implementation ocap-networking standard being co-developed with Agoric); the netlayer abstraction supports running Goblins peers over **Tor**, **I2P**, **libp2p**, or direct TCP — selecting transport per deployment without the application code knowing.",
+      "refs": [
+        {
+          "target": "actors",
+          "type": "instance-of"
+        },
+        {
+          "target": "capn-proto",
+          "type": "shares-protocol-family-with"
+        }
+      ]
+    },
+    {
+      "id": "ecosystem-and-status",
+      "title": "Ecosystem — Hyptis, Brassica, and current status",
+      "tags": [
+        "spritely",
+        "ocap",
+        "production"
+      ],
+      "content": "Status (as of 2026-04): **Spritely Institute** is a funded non-profit; **Goblins is in beta** with regular releases and a growing demo suite. The institute also funds related ocap work:\n\n- **Hyptis** — demonstrates composing ocap with CRDTs (conflict-free replicated data types) for collaborative editing under capability discipline. CRDT merge becomes a per-capability operation, so parties without authority cannot affect the converged state.\n- **Brassica** — a Goblins-on-Wasm port; the experiment of \"can ocap actors run inside a WASI Component?\" The motivation is composing the language-level ocap discipline (Goblins) with the binary-level ocap discipline (WASI Component Model) so the two work together rather than competing.\n- **Goblins JS** — a JavaScript port (in progress) that interoperates with `capn-web` and the broader Hardened JS ecosystem.\n\nGoblins is currently the most useful entry point for working ocap programmers: it is implemented in a mainstream language family (Scheme), it has tutorials and active community support, and it interoperates with Cap'n Proto / CapTP / OCapN for cross-system work.",
+      "refs": [
+        {
+          "target": "wasi-component-model",
+          "type": "complementary-with"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "complementary-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Spritely Goblins CapTP doc",
+          "url": "https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Spritely Goblins",
+      "url": "https://spritely.institute/goblins/"
+    },
+    {
+      "label": "Spritely Goblins CapTP doc",
+      "url": "https://files.spritely.institute/docs/guile-goblins/0.15.1/CapTP-The-Capability-Transport-Protocol.html"
+    }
+  ]
+}

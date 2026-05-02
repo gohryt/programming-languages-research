@@ -1,0 +1,62 @@
+{
+  "kind": "library",
+  "name": "LPeg",
+  "aliases": [],
+  "summary": "Roberto Ierusalimschy's Lua PEG library that compiles grammars to bytecode for a tiny parsing virtual machine. No memoization table, no linear-time guarantee, but very compact and cache-friendly.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Roberto Ierusalimschy's LPeg is Lua's PEG library. Its distinctive implementation choice is that the grammar is compiled not to recursive-descent code, nor to a packrat memoisation table, but to bytecode for a tiny parsing virtual machine.\n\nLPeg has displaced Lua's original pattern library for serious text processing inside the Lua ecosystem.",
+      "refs": [
+        { "target": "peg-parsing#overview", "type": "instance-of" },
+        { "target": "parser-combinators#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "parsing-virtual-machine",
+      "title": "Parsing virtual machine",
+      "tags": ["parser", "virtual-machine", "peg"],
+      "content": "Medeiros and Ierusalimschy's 2008 DLS paper specifies the VM directly: instructions like `Char c`, `Choice L`, `Commit L`, `PartialCommit L`, `Jump L`, `Call L`, `Return`, and `Fail`, running on two stacks (a backtrack stack and a call stack).\n\nEach PEG operator maps to a handful of instructions. For example, `A / B` becomes `Choice L1 ; <A> ; Commit L2 ; L1: <B> ; L2:`, with `Commit` discarding the backtrack entry on success.",
+      "refs": [
+        { "target": "bytecode#overview", "type": "exemplifies" },
+        { "target": "peg-parsing#overview", "type": "alternative-implementation" }
+      ],
+      "sources": [
+        {
+          "label": "Medeiros & Ierusalimschy — A Parsing Machine for PEGs (DLS 2008)",
+          "url": "https://www.inf.puc-rio.br/~roberto/docs/peg.pdf"
+        }
+      ]
+    },
+    {
+      "id": "performance-profile",
+      "title": "Performance profile",
+      "tags": ["performance", "parser", "runtime"],
+      "content": "The parsing machine gives LPeg a different performance profile than packrat PEG. There is no memoisation table, so worst-case complexity is exponential — but typical grammars run faster than interpreted packrat because the VM fits in instruction cache and the bytecode is compact.\n\nThe 2009 SPE journal version integrates the VM design with the Lua API and captures patterns-as-first-class-values in the host language (a close relative of parser combinators, but with a compiled runtime).",
+      "refs": [
+        { "target": "peg-parsing#packrat-parsing", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "parser", "peg"],
+      "content": "LPeg offers a compact, fast, allocation-light PEG runtime with clean semantics preservation. The cost: no linear-time guarantee (no packrat), a VM-specific mental model for debugging, and tight coupling to Lua as the host. As a design point, it is most useful as a concrete implementation strategy within the PEG family rather than as a portable parser-combinator answer.",
+      "refs": [
+        { "target": "peg-parsing#strengths-and-tradeoffs", "type": "inherits" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "LPeg site",
+      "url": "http://www.inf.puc-rio.br/~roberto/lpeg/"
+    },
+    {
+      "label": "Medeiros & Ierusalimschy — A Parsing Machine for PEGs (DLS 2008)",
+      "url": "https://www.inf.puc-rio.br/~roberto/docs/peg.pdf"
+    }
+  ]
+}

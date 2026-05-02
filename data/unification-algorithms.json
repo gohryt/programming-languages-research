@@ -1,0 +1,45 @@
+{
+  "kind": "concept",
+  "name": "Unification Algorithms for Type Systems",
+  "aliases": ["unification", "first-order-unification", "row-unification", "pattern-unification"],
+  "summary": "Solves equality between type expressions. Different type systems need different forms: first-order for ML inference, row unification for extensible records and effects, higher-order or pattern unification for dependent types, equality modulo type families and aliases for advanced systems. Proof-relevant unification frames unifiers as equivalences between solution spaces.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Unification solves equality between type expressions. The form depends on the type system's expressiveness:\n\n- **first-order unification** for ML-style inference (Robinson 1965; the bedrock of Algorithm W);\n- **row unification** for extensible records, polymorphic variants, and effect rows;\n- **higher-order or pattern unification** for dependent types, where unifiers must cope with metavariables under binders;\n- **equality modulo type families, associated types, aliases, reductions, and normalization** for systems with type-level computation;\n- **heterogeneous equality** in dependently typed pattern matching, where the types of the equated terms may themselves differ.\n\nThe distinguishing axis is what equational theory the algorithm has to respect. ML's first-order unification is fast and decidable; full higher-order unification is undecidable; pattern unification is the tractable middle ground that powers most modern dependent-type elaborators.",
+      "refs": [
+        { "target": "hindley-milner#overview", "type": "underlies" },
+        { "target": "row-polymorphism#overview", "type": "specializes" },
+        { "target": "dependent-types#overview", "type": "underlies" }
+      ]
+    },
+    {
+      "id": "row-and-projection-unification",
+      "title": "Row and projection unification",
+      "tags": ["row-polymorphism", "type-system"],
+      "content": "Row unification handles equality between record or variant types whose fields are partially known. A constraint like `{a: Int, ...r} = {a: Int, b: Bool, ...s}` decomposes into `r = {b: Bool, ...s}`. The algorithm has to handle field reordering, duplicate-label policies, and the difference between *open* (extensible) and *closed* (sealed) rows.\n\nProjection unification arises with associated types. A constraint like `Iterator.Item == Int` may not normalize until the implementing type is known; Chalk models this by emitting subgoals (`data/chalk-trait-solver`) rather than failing immediately. The trade-off is that unification produces obligations rather than substitutions, requiring the constraint solver to retry as more equality facts arrive.",
+      "refs": [
+        { "target": "row-polymorphism#overview", "type": "implements" },
+        { "target": "type-classes-traits#associated-types", "type": "implements" }
+      ]
+    },
+    {
+      "id": "pattern-unification-and-dependent-types",
+      "title": "Pattern unification for dependent types",
+      "tags": ["dependent-types", "type-system"],
+      "content": "Dependently typed languages often elaborate terms with holes and open unification constraints. Full higher-order unification — unifying terms involving metavariables of function type — is undecidable in general. Miller's *pattern fragment* restricts metavariable applications to distinct bound variables, recovering decidability and producing intuitive solutions.\n\nIdris elaborator reflection treats holes and guesses as proof-state objects that elaboration tactics can manipulate (`data/elaborator-reflection`); Lean's elaborator does similarly. Agda-related work on **proof-relevant unification** treats unifiers as equivalences between solution spaces rather than mere substitutions, replacing ad-hoc restrictions and making dependent pattern matching more soundly extensible.",
+      "refs": [
+        { "target": "elaborator-reflection#overview", "type": "consumed-by" },
+        { "target": "dependent-types#overview", "type": "supports" }
+      ],
+      "sources": [
+        { "label": "Cockx — Proof-relevant unification", "url": "https://jesper.sikanda.be/files/proof-relevant-unification.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Cockx — Proof-relevant unification", "url": "https://jesper.sikanda.be/files/proof-relevant-unification.pdf" }
+  ]
+}

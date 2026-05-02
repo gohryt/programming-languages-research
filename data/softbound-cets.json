@@ -1,0 +1,49 @@
+{
+  "kind": "concept",
+  "name": "SoftBound + CETS — Software Pointer-Bounds Research",
+  "aliases": ["SoftBound", "CETS", "SoftBound/CETS"],
+  "summary": "Paired research project from UPenn: SoftBound provides pure-software pointer-based spatial bounds via LLVM IR instrumentation with disjoint metadata; CETS adds identifier-based temporal safety. Combined overhead ~116%. Research only; influence visible in HWASan/MTE designs and CHERI's pointer-with-metadata model.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["software-pointer-bounds", "bounds-check", "research", "memory-safety"],
+      "content": "Pure software pointer-based bounds (SoftBound) and identifier-based temporal safety (CETS) via LLVM IR instrumentation with disjoint metadata. Overhead: SoftBound ~83% spatial, +CETS = ~116% combined.\n\nResearch only; never deployed in production toolchains. Worth naming for design genealogy: the influence is visible in HWASan/MTE designs (per-pointer metadata for memory safety) and CHERI's pointer-with-metadata model (capabilities are the hardware-enforced version of SoftBound's per-pointer bounds).",
+      "refs": [
+        { "target": "lowfat", "type": "related" },
+        { "target": "hwasan", "type": "related" },
+        { "target": "cheri", "type": "related" },
+        { "target": "arm-mte", "type": "related" }
+      ]
+    },
+    {
+      "id": "softbound-spatial",
+      "title": "SoftBound — spatial safety",
+      "tags": ["software-pointer-bounds", "bounds-check", "research"],
+      "content": "SoftBound (UPenn) is a compiler-instrumentation pass that maintains, for every pointer in the program, a separate `(base, bound)` metadata pair stored in disjoint shadow tables. Loads and stores check the pointer against its metadata. Spatial overhead ~83%.\n\nThe key contribution was the *disjoint metadata* design: the pointer representation itself is unchanged (still a regular C pointer), keeping ABI compatibility, while bounds live in a separate shadow.",
+      "refs": [
+        { "target": "shadow-memory", "type": "related" }
+      ],
+      "sources": [
+        { "label": "SoftBound project page", "url": "http://acg.cis.upenn.edu/softbound/" }
+      ]
+    },
+    {
+      "id": "cets-temporal",
+      "title": "CETS — temporal safety",
+      "tags": ["software-pointer-bounds", "use-after-free", "research"],
+      "content": "CETS (Compiler-Enforced Temporal Safety) extends SoftBound with a per-pointer *identifier* — a unique key — and a per-allocation lock; deallocation invalidates the lock so subsequent uses of the now-stale pointer fail the key/lock check. Combined SoftBound+CETS overhead ~116%.\n\nCETS established the key/lock pattern that recurs in later temporal-safety mechanisms (e.g. CHERI's tagged validity bit, CHERIoT's revocation).",
+      "refs": [
+        { "target": "cheri", "type": "related" },
+        { "target": "cheriot", "type": "related" }
+      ],
+      "sources": [
+        { "label": "CETS ISMM 2010 paper", "url": "https://acg.cis.upenn.edu/papers/ismm10_cets.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "SoftBound project page", "url": "http://acg.cis.upenn.edu/softbound/" },
+    { "label": "CETS ISMM 2010 paper", "url": "https://acg.cis.upenn.edu/papers/ismm10_cets.pdf" }
+  ]
+}

@@ -1,0 +1,305 @@
+{
+  "kind": "concept",
+  "name": "Bytecode and code patching tracing",
+  "aliases": [
+    "code patching tracing",
+    "patchable trace sites",
+    "NOP-to-CALL tracing"
+  ],
+  "summary": "Mechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site, with the cost-when-off axis ranging from a reserved NOP through a predicted short jump and a single-byte flag read to literally zero.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mechanisms that modify the target program's instruction stream — bytecode, native code, or both — to install a probe at a specific site. The common axis is the cost when a probe is *not* installed: a reserved NOP, a predicted short jump, a single-byte flag read, or literally nothing. Debugger breakpoints use many of the same tricks, but this chapter focuses on patch-site design and disabled-overhead tracing.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:direct-execution-interposition`\n- **domain**: `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-function`, `granularity:per-instruction`\n"
+    },
+    {
+      "id": "luau-lop-break",
+      "title": "Luau — LOP_BREAK",
+      "tags": [
+        "bytecode-patching",
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-instruction",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Luau (Roblox's Lua fork) rejects the standard Lua `debug.sethook()` model because a hook check on every instruction, line, or function entry creates a global tax even when no tool is active. Instead, it treats observation as bytecode patching: the target opcode is replaced with `LOP_BREAK`, while a parallel `debuginsn[]` array stores the original instruction for restoration.\n\nThe key point is the disabled-overhead model: patch only the requested sites, keep the normal bytecode stream identical when no probe is active, and pay dispatch cost only at enabled probes.",
+      "sources": [
+        {
+          "url": "https://luau.org/performance/",
+          "label": "\"Epsilon-overhead debugger\" section."
+        }
+      ]
+    },
+    {
+      "id": "beamasm-jump-target-patching",
+      "title": "Erlang BeamAsm — Jump Target Patching",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-function",
+        "off-cost:low",
+        "on-cost:low"
+      ],
+      "content": "Erlang's BeamAsm JIT emits a tiny function prologue with a predicted jump over a shared instrumentation fragment. Normal execution pays one predictable branch; enabling observation changes a jump offset so control falls through to the fragment. Because the patch is a single byte on x86, it can be installed cheaply, and BeamAsm's W^X-compatible dual mapping lets writes go through a writable alias while execution uses the executable alias.\n\nThe transferable idea is a compact per-function patch site with a shared slow path: function-entry observation can be enabled without rewriting whole functions or leaving a global hot-path hook active.",
+      "sources": [
+        {
+          "url": "https://www.erlang.org/doc/apps/erts/beamasm",
+          "label": "\"Tracing"
+        }
+      ]
+    },
+    {
+      "id": "ftrace-ebpf-nop-to-call",
+      "title": "Linux ftrace / eBPF — NOP-to-CALL Patching",
+      "tags": [
+        "domain:tracing",
+        "ebpf",
+        "family:direct-execution-interposition",
+        "granularity:per-function",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "Linux function tracing is built around compiler-emitted patch points, but the exact mechanism varies by kernel version, architecture, and configuration. Historically ftrace used `-pg`/`mcount`; modern kernels commonly use `__fentry__`, dynamic ftrace, and related patchable-entry schemes. When tracing is disabled, a call site is patched to a NOP; when enabled, it is patched to call a trampoline. `text_poke()` and architecture-specific machinery handle instruction-cache coherency and cross-CPU synchronization.\n\neBPF uses several different attachment mechanisms rather than one universal NOP-to-CALL path. BPF fentry/fexit attaches near function entry/exit through BPF trampolines and is much cheaper than kprobes, which rely on breakpoint-style instrumentation. Static tracepoints are a separate facility, commonly implemented with tracepoint call sites, static keys, and per-tracepoint metadata rather than the same function-entry patch as ftrace. The taxonomy of static tracepoints, kprobes, kretprobes, and BPF fentry/fexit is separated in `data/bytecode-and-code-patching#linux-kprobes-trace-event-fentry`.\n\nThe disabled cost is best described as near-zero dispatch overhead, not literally zero: NOP sites still consume code bytes and can affect layout, I-cache pressure, and decode bandwidth. Even so, patchable instrumentation is the gold standard for \"almost free when off, cheap when on\" tracing and has been battle-tested across billions of machines.",
+      "sources": [
+        {
+          "url": "https://docs.ebpf.io/linux/concepts/trampolines/"
+        }
+      ]
+    },
+    {
+      "id": "wasmtime-winch-nop-padding",
+      "title": "Wasmtime — NOP Padding with INT 3 Replacement",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-instruction",
+        "off-cost:low",
+        "on-cost:high"
+      ],
+      "content": "Wasmtime's Winch baseline compiler reserves patch space by inserting a `nop` between native-code fragments corresponding to WebAssembly instructions. A tool can replace that reserved byte with a trap instruction and recover the Wasm instruction from side metadata.\n\nSame principle as ftrace, applied to JIT-compiled code: reserve cheap patch sites while generating code, keep them inert when no tool is active, and use side tables to map patched native locations back to language-level positions.",
+      "sources": [
+        {
+          "url": "https://hackmd.io/@hvqFkDgPTuGNcu-NiycXZQ/SyXX166Yp"
+        }
+      ]
+    },
+    {
+      "id": "dtrace-usdt-is-enabled-probes",
+      "title": "DTrace USDT — Is-Enabled Probes",
+      "tags": [
+        "domain:tracing",
+        "dtrace",
+        "family:direct-execution-interposition",
+        "granularity:per-event",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "DTrace's User Statically Defined Tracing (USDT) probes allow application developers to place trace points in their code with very low disabled overhead. A USDT probe is a static probe site described by metadata so a tracing subsystem can find it, enable it, and collect its arguments when active. On many systems the inactive probe site is a NOP-like instruction sequence or otherwise arranged so the common path avoids the expensive tracing work.\n\n`is-enabled` probes are a related but distinct facility: they let user code cheaply ask whether a probe is active before constructing expensive arguments. That guard prevents wasted formatting, allocation, or data copying when no tracer is listening. Implementations differ in whether the guard is a memory load, a branch, a patched instruction, or a provider-specific fast path.\n\nThe key design pattern is stable across implementations: separate the \"is anyone listening?\" check from the \"prepare and emit probe data\" work. The expensive part only runs when the probe is active.",
+      "sources": [
+        {
+          "url": "https://blogs.oracle.com/linux/from-kernel-to-user-space-tracing"
+        }
+      ]
+    },
+    {
+      "id": "trapless-kernel-probes",
+      "title": "Trapless Kernel Probes (USENIX ATC 2024)",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-event",
+        "kernel",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "Standard Kprobes in Linux rely heavily on double traps, leading to severe penalties that prevent efficient kernel instrumentation on a large scale. IBM Research developed a trapless kernel probing mechanism that applies strategically placed NOPs, slightly modifying the code layout to bypass the typical restrictions of probe optimization. This yields a 10x improvement over standard Kprobes while preserving performance across 96% of the kernel code.",
+      "sources": [
+        {
+          "url": "https://research.ibm.com/publications/fast-trapless-kernel-probes-everywhere"
+        }
+      ]
+    },
+    {
+      "id": "ebpf-uprobes",
+      "title": "eBPF uprobes — Near-Zero-Disabled-Overhead User-Space Monitoring",
+      "tags": [
+        "domain:tracing",
+        "ebpf",
+        "family:direct-execution-interposition",
+        "granularity:per-function",
+        "off-cost:zero",
+        "on-cost:high"
+      ],
+      "content": "While kernel probes trace the OS, `uprobes` attach to user-space functions, offering near-zero overhead when no probe is attached. When enabled, they are commonly trap/breakpoint-style dynamic probes rather than the same NOP-to-CALL patching mechanism used by ftrace function entry. This is highly effective for profiling closed-source drivers like NVIDIA's CUDA Runtime API (`libcudart.so`). Tools can trace exact function arguments and timing (e.g., `cuMemAlloc`, `cuLaunchKernel`) using `uprobe` and `uretprobe` directly from user space without modifying the target process or requiring a context switch to a traditional debugger.",
+      "sources": [
+        {
+          "url": "https://medium.com/@kcl17/inside-cuda-building-ebpf-uprobes-for-gpu-monitoring-449519b236ed"
+        }
+      ]
+    },
+    {
+      "id": "ftrace-function-graph",
+      "title": "ftrace function_graph — Return-Trampoline Call Trees",
+      "tags": [
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-function",
+        "kernel",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "`data/bytecode-and-code-patching#ftrace-ebpf-nop-to-call` describes how ftrace patches a NOP at function entry into a CALL into a trampoline — enough to trace function *entry*. The `function_graph` tracer takes this further and emits an indented, C-like call tree with per-function durations, without needing a second patch site for returns. The trick is the **return trampoline**: on entry, ftrace records the current timestamp and **overwrites the caller's return address on the stack** with the address of a ftrace-owned trampoline. When the instrumented function returns, control lands in the trampoline instead of the real caller; the trampoline records the exit timestamp, restores the true return address from its own shadow stack, and jumps to it.\n\nThe consequence is that ftrace can produce entry+exit pairs for *every* kernel function with only one patch site per function (the entry NOP of `data/bytecode-and-code-patching#ftrace-ebpf-nop-to-call`). The return side is a runtime stack manipulation — no per-call-site patching, no per-function trampoline, one shared return handler for the whole kernel. The shadow-stack storage is per-task and bounded by current call depth, so the memory cost scales with concurrency, not with binary size.\n\nThe design pattern is broadly useful: whenever a tracer needs paired entry/exit events but can only afford to patch one location, **hijack the return address and share a single return handler**. The same pattern appears in user-space profilers (e.g., uftrace's `-P funcgraph`).",
+      "sources": [
+        {
+          "url": "https://docs.kernel.org/trace/ftrace.html"
+        },
+        {
+          "url": "https://lwn.net/Articles/370423/"
+        }
+      ]
+    },
+    {
+      "id": "ebpf-co-re-btf",
+      "title": "eBPF CO-RE — Load-Time Offset Relocation via BTF",
+      "tags": [
+        "domain:tracing",
+        "ebpf",
+        "family:direct-execution-interposition",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Every eBPF tracer that reads kernel data structures — bpftrace (`data/runtime-event-pipelines#dtrace-d-bpftrace`), Parca (`data/continuous-profiling#parca-frostdb`), Pyroscope, bcc's modern tool suite — depends on knowing the offset of each field it reads. Kernel struct layouts change across versions; a program compiled against one kernel's headers would read wrong offsets on another. Pre-CO-RE, the only workable answer was **BCC's runtime-compilation model**: ship a ~100 MB `clang` toolchain plus kernel-headers package with every tool, compile the BPF program on the target host at tool startup to burn in the right offsets for *this* kernel. Slow (seconds of `clang` per invocation), fat (unusable on minimal production images), and fragile (needed matching kernel-headers).\n\n**CO-RE (Compile Once — Run Everywhere)**, driven by Andrii Nakryiko's libbpf work in 2019–2020, replaced this with load-time relocation against **BTF (BPF Type Format)**. BTF is a deduplicated type-info section (`.BTF` in vmlinux, exposed at `/sys/kernel/btf/vmlinux`) describing every struct layout of the *running* kernel, generated at kernel build time by `pahole` lifting DWARF into the compact BTF encoding. A BPF object file carries its own BTF plus a CO-RE relocation table. At `BPF_PROG_LOAD` time, libbpf walks the relocation table, matches each local type descriptor against the running kernel's BTF, computes the actual field offset, and **patches the `ldx`/`stx` instructions in place** before handing the program to the verifier.\n\nThe payoff is a one-shot relocation with zero steady-state tax: the relocated program then executes as ordinary BPF code at its chosen attachment point, with normal memory loads and no per-event version dispatch or offset-lookup cost. Portability is *field-level*: the loader can adjust offsets, bitfield positions, array indices, and even widen or narrow load sizes. It cannot invent missing fields — those require `bpf_core_field_exists()` guards in the program source — but for everything short of that it is transparent.\n\nThe broader consequence is an entire tooling category becoming viable. Distributable precompiled BPF binaries (the modern bcc tools, Parca Agent, Pyroscope eBPF profiler) only became practical once CO-RE removed the runtime-clang dependency; bpftrace one-liners became kernel-version-portable for the same reason. The reusable pattern is simple: **ship a compact typed description of the target alongside the emitted code, and let the loader patch the offsets**.",
+      "sources": [
+        {
+          "url": "https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html"
+        },
+        {
+          "url": "https://nakryiko.com/posts/bpf-core-reference-guide/"
+        },
+        {
+          "url": "https://docs.kernel.org/bpf/btf.html"
+        },
+        {
+          "url": "https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html"
+        }
+      ]
+    },
+    {
+      "id": "llvm-xray",
+      "title": "LLVM XRay — Compiler-Inserted Patchable Function Sleds",
+      "tags": [
+        "compiler",
+        "domain:tracing",
+        "family:direct-execution-interposition",
+        "granularity:per-function",
+        "off-cost:low",
+        "on-cost:medium"
+      ],
+      "content": "LLVM XRay is the compiler-toolchain version of the same \"zero when off, patch when on\" design. When a program is compiled with `-fxray-instrument`, LLVM inserts patchable sleds into selected functions and emits an `xray_instr_map` section that describes where those sleds live. The runtime library can then patch individual sleds into calls to XRay trampolines, or unpatch them back to no-ops, without rebuilding the binary.\n\nThe important difference from ad-hoc function instrumentation is that XRay makes traceability an explicit ABI between the compiler and the runtime. The compiler decides which functions are eligible, lays down enough bytes to patch safely, and records a compact map from code locations to instrumentation points. The runtime owns the policy: patch everything before `main`, patch a selected function at runtime, sample a subset of functions, or emit only custom typed events.\n\nXRay supports multiple instrumentation kinds: function entry, function exit, tail-call handling on supported architectures, and user-defined `custom` / `typed` event points. The default \"basic\" mode records entry/exit events into trace files for later analysis with `llvm-xray`, while the runtime API exposes finer-grained patching such as `__xray_patch_function()` for targeted tracing.\n\nFor a new language, the reusable lesson is direct: **reserve patchable trace sleds in generated code and emit a side table that lets the runtime patch them selectively**. This gives the language an always-available production tracing surface without forcing every function call through a hook check.",
+      "sources": [
+        {
+          "url": "https://llvm.org/docs/XRay.html"
+        },
+        {
+          "url": "https://llvm.org/docs/XRayExample.html"
+        },
+        {
+          "url": "https://llvm.org/doxygen/XRayInstrumentation_8cpp_source.html"
+        }
+      ]
+    },
+    {
+      "id": "linux-kprobes-trace-event-fentry",
+      "title": "Linux kprobes, kretprobes, TRACE_EVENT, and BPF fentry/fexit",
+      "tags": [
+        "domain:tracing",
+        "ebpf",
+        "family:direct-execution-interposition",
+        "granularity:per-event",
+        "kernel",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "The Linux tracing stack is easiest to understand as a taxonomy of probe stability and cost. `TRACE_EVENT` static tracepoints are deliberate semantic events placed by kernel developers — `sched_switch`, block I/O events, syscall events — with stable names and structured fields. They are the production-friendly surface: a tool can depend on the event contract rather than reverse-engineering implementation details.\n\n`kprobes` and `kretprobes` are the opposite end of the spectrum: dynamic probes attached to arbitrary kernel instruction addresses or function returns. They are excellent for one-off investigation because they require no source change and no pre-existing tracepoint, but their contract is unstable: function names, argument registers, inlining, and instruction layouts can change across kernel versions. Traditional kprobes also pay trap overhead, which is why optimized kprobes, ftrace integration, and trapless probes (`data/bytecode-and-code-patching#trapless-kernel-probes`) exist.\n\nBPF `fentry` and `fexit` are the modern low-overhead middle ground. They attach eBPF programs to kernel function entry/exit paths using ftrace-style patching and BTF type metadata. Compared with kprobes, they avoid the INT 3 trap path and can expose typed arguments to the verifier and the BPF program. Compared with static tracepoints, they can target many functions that were never annotated as official events.\n\nThe language-runtime analogue is useful: a runtime should distinguish **stable semantic tracepoints** from **unstable implementation probes**. Stable events are for production tools and compatibility promises; implementation probes are for experts diagnosing a specific build.",
+      "sources": [
+        {
+          "url": "https://docs.kernel.org/trace/kprobetrace.html"
+        },
+        {
+          "url": "https://docs.kernel.org/trace/events.html"
+        },
+        {
+          "url": "https://docs.kernel.org/bpf/btf.html"
+        },
+        {
+          "url": "https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://luau.org/performance/",
+      "label": "\"Epsilon-overhead debugger\" section."
+    },
+    {
+      "url": "https://www.erlang.org/doc/apps/erts/beamasm",
+      "label": "\"Tracing"
+    },
+    {
+      "url": "https://docs.ebpf.io/linux/concepts/trampolines/"
+    },
+    {
+      "url": "https://hackmd.io/@hvqFkDgPTuGNcu-NiycXZQ/SyXX166Yp"
+    },
+    {
+      "url": "https://blogs.oracle.com/linux/from-kernel-to-user-space-tracing"
+    },
+    {
+      "url": "https://research.ibm.com/publications/fast-trapless-kernel-probes-everywhere"
+    },
+    {
+      "url": "https://medium.com/@kcl17/inside-cuda-building-ebpf-uprobes-for-gpu-monitoring-449519b236ed"
+    },
+    {
+      "url": "https://docs.kernel.org/trace/ftrace.html"
+    },
+    {
+      "url": "https://lwn.net/Articles/370423/"
+    },
+    {
+      "url": "https://facebookmicrosites.github.io/bpf/blog/2020/02/19/bpf-portability-and-co-re.html"
+    },
+    {
+      "url": "https://nakryiko.com/posts/bpf-core-reference-guide/"
+    },
+    {
+      "url": "https://docs.kernel.org/bpf/btf.html"
+    },
+    {
+      "url": "https://www.brendangregg.com/blog/2020-11-04/bpf-co-re-btf-libbpf.html"
+    },
+    {
+      "url": "https://llvm.org/docs/XRay.html"
+    },
+    {
+      "url": "https://llvm.org/docs/XRayExample.html"
+    },
+    {
+      "url": "https://llvm.org/doxygen/XRayInstrumentation_8cpp_source.html"
+    },
+    {
+      "url": "https://docs.kernel.org/trace/kprobetrace.html"
+    },
+    {
+      "url": "https://docs.kernel.org/trace/events.html"
+    },
+    {
+      "url": "https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/"
+    }
+  ]
+}

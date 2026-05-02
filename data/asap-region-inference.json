@@ -1,0 +1,44 @@
+{
+  "kind": "concept",
+  "name": "ASAP — As-Static-As-Possible",
+  "aliases": ["asap", "as-static-as-possible", "proust-asap"],
+  "summary": "Raphaël Proust's ASAP (Cambridge PhD 2017) is fully automatic, with no annotations and no GC: dataflow analyses (usage + aliasing) emit per-program-point deallocation instructions at compile time, falling back to bounded runtime scans only when static info is insufficient. Subsumes both linear types and Tofte-Talpin regions. The most aggressive no-annotation, no-GC point in the design space.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["region-inference", "research", "lifetime-region"],
+      "content": "Raphaël Proust's **ASAP** (Cambridge PhD 2017) is fully automatic, with no annotations and no GC: dataflow analyses (usage + aliasing) emit per-program-point deallocation instructions at compile time, falling back to bounded runtime scans only when static info is insufficient.\n\nIt is the **most aggressive no-annotation, no-GC point in the design space**: where Tofte-Talpin/MLKit infer region structure but assume a stack discipline, ASAP infers a per-program-point deallocation schedule directly, with no syntactic concept of \"region\" exposed to the source language.",
+      "refs": [
+        { "target": "region-based-memory#no-annotation-no-gc-asap", "type": "instance-of" },
+        { "target": "garbage-collection#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "ASAP (Cambridge PhD 2017)", "url": "https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-908.pdf" }
+      ]
+    },
+    {
+      "id": "subsumption-and-fallback",
+      "title": "Subsumes linear types and Tofte-Talpin regions",
+      "tags": ["region-inference", "research", "compiler"],
+      "content": "ASAP **subsumes both linear types and Tofte-Talpin regions**: given a linear/region-correct program, ASAP emits equivalent free instructions. Where static analysis can't decide, it inserts specialised scan-and-deallocate code (bounded, unlike a tracing GC). The bounded runtime fallback is the key design move: instead of a global tracing collector, ASAP emits *targeted* per-program-point scans whose work is statically bounded by the analysis.\n\nThis lets ASAP recover Tofte-Talpin behaviour when the program's lifetime structure is region-shaped, recover linear-type behaviour when the program is linear, and degrade gracefully (rather than catastrophically) when the program needs neither.",
+      "refs": [
+        { "target": "linear-affine-types#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "evaluation",
+      "title": "LLVM backend and Boehm-GC comparison",
+      "tags": ["region-inference", "research", "compiler"],
+      "content": "Followed up by **Nathan Corbyn's Cambridge Part II (2020)** with an LLVM backend and benchmarks vs. Boehm GC. The evaluation provides empirical evidence that the ASAP point in the design space is reachable: a real implementation, with a real backend, and competitive numbers against a well-tuned conservative tracing collector.\n\nStatus (as of 2026-04): research-grade. ASAP has not been adopted as a production compilation strategy by any mainstream language, but it is regularly cited as a feasibility proof for fully automatic, GC-free memory management.",
+      "refs": [],
+      "sources": [
+        { "label": "ASAP practical evaluation (Corbyn 2020)", "url": "https://nathancorbyn.com/nc513.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "ASAP (Cambridge PhD 2017)", "url": "https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-908.pdf" },
+    { "label": "ASAP practical evaluation (Corbyn 2020)", "url": "https://nathancorbyn.com/nc513.pdf" }
+  ]
+}

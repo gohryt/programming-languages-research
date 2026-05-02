@@ -1,0 +1,45 @@
+{
+  "kind": "language",
+  "name": "Kotlin",
+  "aliases": [],
+  "summary": "JetBrains JVM/Native/JS language with internal visibility scoped to the build-tool module (Gradle subproject, IntelliJ module) rather than a language-declared module; Kotlin Multiplatform extends modules with commonMain plus per-target source sets bridged by expect/actual declarations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Kotlin (JetBrains, 2010+; current K2 compiler frontend in stable use as of 2024-2025 — `data/kotlin-k2-fir`) is a JVM-first multi-platform language. Its module-system contribution is the build-tool-coupled `internal` visibility plus the multiplatform-module abstraction.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "kotlin-k2-fir#overview", "type": "compiler-of" }
+      ]
+    },
+    {
+      "id": "packages-and-internal-visibility",
+      "title": "Packages and the internal visibility level",
+      "tags": ["kotlin", "module-systems", "visibility"],
+      "content": "Kotlin's surface module story looks Java-like — files declare `package foo.bar`, types are organized into hierarchical namespaces, and JVM compilation produces standard `.class` files. The interesting differences are the visibility lattice and the multi-platform module abstraction.\n\nKotlin's visibility levels are `public` (default), `private` (file-scoped at top level, class-scoped within a class), `protected`, and **`internal`** — visible only within the same Kotlin **module**. A Kotlin module is a build-tool concept (a Gradle subproject, a Maven module, an IntelliJ module, an Ant target) rather than a language-level construct. The visibility level binds to the build-tool boundary, but there is no `module-info.kt` declaring it. The absence of a language-level module declaration is intentional: Kotlin treats \"module\" as a build-tool primitive, the way Go treats \"package\" as a directory primitive.\n\nThis is a useful design point. Kotlin gets `internal`-visibility encapsulation that respects build boundaries without inventing JPMS-style language syntax. The cost is that the boundary is implicit — you have to know the build configuration to know what counts as the same module. Tooling (IDE, kotlinc) handles the bookkeeping.",
+      "refs": [
+        { "target": "visibility-and-exports#visibility-granularity", "type": "example" }
+      ],
+      "sources": [
+        { "label": "Kotlin visibility modifiers", "url": "https://kotlinlang.org/docs/visibility-modifiers.html" }
+      ]
+    },
+    {
+      "id": "kotlin-multiplatform-modules",
+      "title": "Kotlin Multiplatform modules",
+      "tags": ["kotlin", "multiplatform", "expect-actual"],
+      "content": "**Kotlin Multiplatform** (formerly KMM, since 2017+) introduces a more elaborate module concept: a multiplatform module declares `commonMain` source plus per-target source sets (`jvmMain`, `iosMain`, `jsMain`, `wasmMain`, etc.). The module produces multiple artifacts simultaneously, with **`expect`/`actual` declarations** bridging platform-specific implementations.\n\nHere \"module\" means closer to \"library that compiles to several platforms with shared and platform-specific code partitioned by source set.\" This is a build-tool-and-language hybrid: the language has `expect`/`actual`, the build tool decides which source sets contribute to which target.\n\nFor a language designer, Kotlin Multiplatform is the cleanest production example of **the language-and-build-tool boundary being explicit on both sides**: the language carries `expect`/`actual` (a typed bridge) but defers to the build tool for source-set composition.",
+      "refs": [],
+      "sources": [
+        { "label": "Kotlin Multiplatform", "url": "https://kotlinlang.org/docs/multiplatform.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Kotlin visibility modifiers", "url": "https://kotlinlang.org/docs/visibility-modifiers.html" },
+    { "label": "Kotlin packages", "url": "https://kotlinlang.org/docs/packages.html" },
+    { "label": "Kotlin Multiplatform", "url": "https://kotlinlang.org/docs/multiplatform.html" }
+  ]
+}

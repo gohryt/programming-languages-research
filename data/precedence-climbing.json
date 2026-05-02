@@ -1,0 +1,64 @@
+{
+  "kind": "concept",
+  "name": "Precedence Climbing",
+  "aliases": ["operator-precedence parser"],
+  "summary": "Single-recursive-function expression parser parameterised by a minimum precedence. Provably equivalent to Pratt parsing; preferred when the operator set is small and fixed.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Precedence climbing (attributed to Keith Clarke, Martin Richards, and later Theodore Norvell) is a closely related alternative to Pratt parsing for expression grammars. Instead of keeping a table of `nud` and `led` functions keyed by token, the parser is a single recursive function parameterised by a minimum precedence:\n\n```\nfn parse_expr(min_prec):\n    left = parse_atom()\n    while is_binop(peek()) and prec(peek()) >= min_prec:\n        op = consume()\n        next_min = prec(op) + (1 if left_assoc(op) else 0)\n        right = parse_expr(next_min)\n        left = mk_binop(op, left, right)\n    return left\n```\n\nClang's `Parser::ParseExpression` (in `lib/Parse/ParseExpr.cpp`) is a production implementation: it calls `ParseCastExpression` for atoms and climbs precedence levels in exactly this shape.",
+      "refs": [
+        { "target": "pratt-parsing#overview", "type": "sibling" },
+        { "target": "recursive-descent#overview", "type": "commonly-used-with" }
+      ],
+      "sources": [
+        {
+          "label": "Eli Bendersky — Parsing Expressions by Precedence Climbing",
+          "url": "https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing"
+        },
+        {
+          "label": "Theodore Norvell — Parsing Expressions by Recursive Descent",
+          "url": "https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm"
+        }
+      ]
+    },
+    {
+      "id": "operator-handling",
+      "title": "Operator handling",
+      "tags": ["parser", "expressions", "associativity"],
+      "content": "The recursion threshold encodes associativity: for a left-associative operator, the next recursive call uses `prec(op) + 1`, so an operator at the same precedence terminates the inner expression; for a right-associative operator, the next recursive call uses `prec(op)`, so equal-precedence operators continue. Adjusting precedence and associativity is a table edit, not a structural change to the parser.",
+      "refs": [
+        { "target": "pratt-parsing#binding-power-model", "type": "equivalent-to" }
+      ]
+    },
+    {
+      "id": "equivalence-to-pratt",
+      "title": "Equivalence to Pratt parsing",
+      "tags": ["parser", "expressions", "algorithms"],
+      "content": "The equivalence with Pratt parsing is not controversial: Norvell's 2016 update explicitly states that precedence climbing and Top-Down Operator Precedence \"are pretty much the same algorithm, formulated a bit differently.\" The practical difference is pedagogical and ergonomic — Pratt centres per-operator functions (extensibility feels like adding methods), precedence climbing centres a single control-flow function (extensibility is a table edit).",
+      "refs": [{ "target": "pratt-parsing#overview", "type": "equivalent-to" }]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "When to prefer it",
+      "tags": ["parser", "tradeoffs", "design-guidance"],
+      "content": "For a language with a small, fixed operator set — C, C++, Rust expression position — precedence climbing is less code than Pratt. The whole expression parser is one function plus a precedence table. For languages that add operators late (extensible syntax systems, Haskell user-defined operators), Pratt's per-token dispatch is more natural because each new operator can carry its own behaviour without editing a central control-flow function.",
+      "refs": [
+        { "target": "pratt-parsing#tradeoffs", "type": "contrasts-with" },
+        { "target": "deterministic-ll-lr#overview", "type": "complements" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Eli Bendersky — Parsing Expressions by Precedence Climbing",
+      "url": "https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing"
+    },
+    {
+      "label": "Theodore Norvell — Parsing Expressions by Recursive Descent",
+      "url": "https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm"
+    }
+  ]
+}

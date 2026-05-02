@@ -1,0 +1,45 @@
+{
+  "kind": "tool",
+  "name": "MLton",
+  "aliases": ["MLton SML compiler", "whole-program SML"],
+  "summary": "Cejtin, Jagannathan, Weeks et al. (1998+): the canonical whole-program optimising compiler for Standard ML. Defunctionalisation + monomorphisation + contification across ~20 SSA passes. C-competitive performance on numeric SML; HOL4 production scale. No separate compilation; minutes-scale compile times.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**MLton** (Cejtin, Jagannathan, Weeks et al., 1998+) is the canonical whole-program optimising compiler for Standard ML and the most mature production-grade whole-program functional-language compiler in continuous use. It sits between Stalin and Virgil in the whole-program lineage: more aggressive than Virgil's reachability-first compilation (heavy monomorphisation, full defunctionalisation), but less radical than Stalin's flow-sensitive type inference (MLton starts from already-typed SML, so it skips the type-inference cost Stalin pays).",
+      "refs": [
+        { "target": "stalin-scheme#overview", "type": "compared-with" },
+        { "target": "virgil-aeneas#overview", "type": "compared-with" },
+        { "target": "defunctionalization#overview", "type": "uses" }
+      ],
+      "sources": [
+        { "label": "MLton home", "url": "http://mlton.org/" }
+      ]
+    },
+    {
+      "id": "architectural-pillars",
+      "title": "Architectural pillars",
+      "tags": ["compiler", "sml"],
+      "content": "- **Whole-program defunctionalisation**: every function value is replaced with a tagged sum of all syntactically-occurring lambdas in the program, plus a global `apply` dispatcher. Eliminates closures entirely in favour of first-order code that C-style optimisers can handle. Roc's lambda sets are the modern descendant of this design.\n- **Aggressive monomorphisation**: every polymorphic SML function is specialised at every used type instantiation. Combined with defunctionalisation, the post-compilation SSA has no polymorphism, no closures, and no higher-order functions left.\n- **Contification**: turning function calls into local jumps where the call has only one return point. This is a key MLton-specific optimisation — Cejtin, Jagannathan, Weeks's 1998 contification analysis identifies functions that can be \"lowered\" into the calling control-flow graph as basic blocks, eliminating entire call/return overhead and unlocking subsequent CFG-level optimisations.\n- **SSA-based optimiser pipeline** with ~20 distinct passes: contification, inlining, loop-invariant code motion, common subexpression elimination, useless-variable elimination, redundant-tuple elimination, and **ref-flattening** (turning `ref` cells into mutable struct fields when the alias graph permits).\n- **Native code generation** via either an in-tree backend (x86, AMD64, ARM64) or LLVM. Performance is competitive with hand-written C on numeric kernels.",
+      "refs": [
+        { "target": "ssa#overview", "type": "uses" }
+      ]
+    },
+    {
+      "id": "production-and-tradeoffs",
+      "title": "Production and trade-offs",
+      "tags": ["compiler", "production", "tradeoffs"],
+      "content": "The cost is the same shape Stalin's is: **no separate compilation** (the whole program must be available), **slow compilation** for large programs (whole-program analyses scale poorly — 100 KLOC SML programs commonly take minutes to compile), and **incompatibility with `eval` / dynamic loading**. MLton's `.mlb` (ML Basis) files are the project structure; large MLton programs partition into compilation units only at the build-system level, not at the language level.\n\nProduction: the **HOL4** theorem prover compiles to MLton for production performance; **Mythryl** (a syntactic variant of SML) ships on MLton; **MaPLe** parallel SML extension (PLDI 2021) is an MLton fork; **Roc's compiler** inherits MLton's defunctionalisation and contification techniques. Status (as of 2026-04): MLton is actively maintained but moves slowly; the codebase is roughly 200 KLOC of SML and stands as the longest-running production-grade whole-program functional-language compiler.",
+      "refs": [],
+      "sources": [
+        { "label": "Cejtin et al. — Flow-Directed Closure Conversion (POPL 2000)", "url": "https://www.cs.purdue.edu/homes/suresh/papers/popl00-camera-ready.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "MLton home", "url": "http://mlton.org/" },
+    { "label": "MLton repo", "url": "https://github.com/MLton/mlton" }
+  ]
+}

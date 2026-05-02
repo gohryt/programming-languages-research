@@ -1,0 +1,52 @@
+{
+  "kind": "concept",
+  "name": "Abstract Syntax Trees",
+  "aliases": ["ast"],
+  "summary": "Tree representation that discards trivia and minor syntactic detail in exchange for analysis-friendly structure. Layout choice (postfix array, token-indexed, arena+offset, tagged union, class hierarchy, schema-generated, first-class language objects) trades footprint, traversal cost, and serializability.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Abstract syntax trees discard trivia and minor syntactic detail in exchange for analysis-friendly structure. They are the first analysis-friendly representation after parsing and before more semantic or optimization-oriented lowering.\n\nThe distinguishing axis across implementations is node layout strategy: postfix-encoded (Cuik), token-indexed (Zig), arena+offset (HN-style C parsers, Rust `bumpalo`), tagged-union (Rust enums, OCaml ADTs), class-hierarchy (Java javac, Roslyn red layer), schema-generated (ESTree, ungrammar, ASDL), or first-class language objects (RakuAST). Each layout makes a different trade between memory footprint, traversal cost, and serializability.",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "contrasts-with" },
+        { "target": "high-level-ir#overview", "type": "lowers-to" }
+      ]
+    },
+    {
+      "id": "what-asts-simplify",
+      "title": "What ASTs simplify",
+      "tags": ["representation", "compiler"],
+      "content": "ASTs collapse grammar details — production names, layout punctuation, comments, whitespace — into explicit structural nodes. Precedence, grouping, and declaration forms become tree shapes rather than parser bookkeeping. This is what makes ASTs a useful substrate for semantic passes (name resolution, type checking, lints) without forcing an immediate move to CFG or SSA representations.",
+      "refs": [
+        { "target": "high-level-ir#what-high-level-ir-adds", "type": "extended-by" }
+      ]
+    },
+    {
+      "id": "common-layout-strategies",
+      "title": "Common layout strategies",
+      "tags": ["memory-layout", "representation"],
+      "content": "Production layout strategies span a wide range:\n\n- **Postfix flat array** (Cuik): expressions stored in reverse-Polish order, child references implicit from position. Excellent cache locality, no per-node pointer overhead, trivial serialization. Cost: random subtree access requires a walk.\n- **Token-indexed struct-of-arrays** (Zig `std.MultiArrayList`): parallel arrays of `tag`, `data`, `main_token`. Cache-friendly for whole-AST traversals; AST and token list can be discarded once ZIR is generated.\n- **Arena + 32-bit offsets** (Rust `bumpalo`, hand-written C parsers): bump-allocate nodes, refer to children by offset. Halves per-edge cost vs 64-bit pointers; whole arena freed at once.\n- **Tagged unions** (Rust `syn`, OCaml variants, Haskell sums): exhaustive pattern matching is compiler-checked. ~8 bytes discriminant overhead per node.\n- **Class hierarchies** (Java javac, IntelliJ PSI, Roslyn red layer): visitor-friendly, open extension; pay dynamic dispatch and lose exhaustiveness without sealed hierarchies.\n- **Schema-generated** (ESTree JSON, ungrammar, ASDL): the schema is authoritative; visitors and accessors are generated.\n- **First-class language objects** (RakuAST): AST nodes are language objects; macros traverse with ordinary language tools.",
+      "refs": [
+        { "target": "concrete-syntax-trees#what-csts-preserve", "type": "contrasts-with" },
+        { "target": "cuik-postfix-ast#overview", "type": "instance" },
+        { "target": "estree#overview", "type": "instance" },
+        { "target": "rakuast#overview", "type": "instance" },
+        { "target": "flat-ast-representations#overview", "type": "related" }
+      ]
+    },
+    {
+      "id": "trade-offs",
+      "title": "Trade-offs",
+      "tags": ["tradeoffs", "compiler"],
+      "content": "ASTs are better than CSTs for semantic analysis but still often too source-shaped for aggressive optimization or code generation. Many compilers therefore lower ASTs into HIR, MIR, SSA, or bytecode-oriented forms once the program becomes more explicit and less syntactic.\n\nThe modern tendency is *not* to pick one layout: large compilers (rustc, Roslyn, Swift) keep multiple representations and translate between them as needed. The AST's role is one stop on a chain, not the final analysis form.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "downstream" },
+        { "target": "bytecode#overview", "type": "downstream" },
+        { "target": "ssa#overview", "type": "downstream" }
+      ]
+    }
+  ],
+  "sources": []
+}

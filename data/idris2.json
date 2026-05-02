@@ -1,0 +1,47 @@
+{
+  "kind": "language",
+  "name": "Idris 2",
+  "aliases": ["idris", "idris-2"],
+  "summary": "Edwin Brady's dependently-typed language whose distinguishing contribution is Quantitative Type Theory: multiplicities (0, 1, ω) attached to every binder, integrating linearity, runtime erasure, and proof-vs-execution separation in one type-theoretic dimension. Effects library and dependent effects make protocol checking expressible in the type system.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Idris and Idris 2 are especially valuable when the boundary between type systems and effects becomes blurry. The Idris Effects library and later Idris 2's Quantitative Type Theory show how a language can track not only what type a computation returns, but also which resources, protocol states, or capabilities are available before and after an effectful action.",
+      "refs": [
+        { "target": "dependent-types#overview", "type": "instance-of" },
+        { "target": "idris2-qtt-ir#overview", "type": "ir-of" },
+        { "target": "linear-affine-types#overview", "type": "integrates" },
+        { "target": "elaborator-reflection#overview", "type": "exposes" }
+      ],
+      "sources": [
+        { "label": "Idris 2 documentation", "url": "https://idris2.readthedocs.io/" }
+      ]
+    },
+    {
+      "id": "dependent-effects",
+      "title": "Dependent effects — protocol-checking in the type system",
+      "tags": ["dependent-types", "effect-system"],
+      "content": "Dependent effects let the availability or shape of an effect depend on runtime outcomes that are then discharged by pattern matching. This is especially powerful for protocol checking: opening a file can yield a different postcondition depending on success, and the type checker can force the program to account for both outcomes.",
+      "sources": [
+        { "label": "Idris dependent effects", "url": "https://docs.idris-lang.org/en/latest/effects/depeff.html" },
+        { "label": "Brady — Programming and reasoning with algebraic effects and dependent types", "url": "https://www.type-driven.org.uk/edwinb/papers/effects.pdf" }
+      ]
+    },
+    {
+      "id": "qtt-design-contribution",
+      "title": "Quantitative Type Theory — multiplicities in the core",
+      "tags": ["dependent-types", "linearity", "qtt"],
+      "content": "Idris 2's **Quantitative Type Theory** adds multiplicities to binders, bringing linearity and erasure directly into the core type theory. The practical payoff is that type-level reasoning about resource use and protocol state can be expressed in one language rather than split across a type system and a separate effect discipline.\n\nEvery binder carries a multiplicity from {0, 1, ω}: 0-quantity values are erased before runtime; 1-quantity values must be used exactly once; ω-quantity values are unrestricted. Both type-level data and erased proof witnesses ride as 0; runtime values are 1 or ω. The IR consequence is owned by `data/idris2-qtt-ir`.\n\nQTT's design contribution is that one multiplicity dimension subsumes both Granule's grades (`data/granule`) and traditional erasure markers, keeping the IR simpler than carrying them as separate annotations. Compared to ATS (`data/ats-language`), QTT integrates linearity and dependent typing without the separate statics/dynamics strata, with cleaner ergonomics at the cost of a richer kernel.",
+      "sources": [
+        { "label": "Idris 2 QTT", "url": "https://www.type-driven.org.uk/edwinb/papers/idris-qtt.pdf" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Idris 2 documentation", "url": "https://idris2.readthedocs.io/" },
+    { "label": "Idris dependent effects", "url": "https://docs.idris-lang.org/en/latest/effects/depeff.html" },
+    { "label": "Idris 2 QTT", "url": "https://www.type-driven.org.uk/edwinb/papers/idris-qtt.pdf" }
+  ]
+}

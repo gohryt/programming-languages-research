@@ -1,0 +1,229 @@
+{
+  "kind": "concept",
+  "name": "Hardware tracing",
+  "aliases": [
+    "CPU trace",
+    "PMU tracing",
+    "on-chip trace fabric"
+  ],
+  "summary": "Mechanisms where a CPU, SoC, or physical substrate captures execution data without software cooperation — Intel PT/LBR/PEBS, AMD IBS, ARM CoreSight/SPE/ITM, and EM-emanation side channels — paid for in silicon area, memory bandwidth, dedicated trace pins, or ambient electromagnetic radiation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mechanisms where a CPU, SoC, or physical substrate captures execution data without software cooperation. The common axis is near-zero runtime overhead on the target — paid for in silicon area, memory bandwidth, dedicated trace pins, or (in one case) ambient electromagnetic emanation — with the decode cost offloaded to a kernel driver or an external capture device. Entries span x86 (PT, LBR, PEBS), AMD (IBS), ARM (CoreSight, SPE, Cortex-M ITM), and a physical-layer outlier (ZoP).\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:hardware-tracing`\n- **domain**: `domain:profiling`, `domain:tracing`\n- **off-cost**: `off-cost:zero`\n- **on-cost**: `on-cost:dominant`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`, `granularity:per-phase`\n"
+    },
+    {
+      "id": "intel-pt-magic-trace",
+      "title": "Intel Processor Trace / magic-trace — Hardware Branch Recording",
+      "tags": [
+        "domain:tracing",
+        "family:hardware-tracing",
+        "granularity:per-instruction",
+        "intel",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Intel Processor Trace (PT), available since Skylake, records taken branches into a compact hardware bitstream. The tracing value is that branch capture happens without compiler instrumentation; the cost is mainly trace bandwidth and post-processing decode.\n\nJane Street's `magic-trace` is the user-facing example: it runs PT in a circular buffer, snapshots recent control flow on a trigger, and converts the decoded stream into a function-call timeline viewable in Perfetto. Status (as of 2026-04): magic-trace is open-source and actively maintained; it requires Intel PT (Skylake or newer) and Linux. `data/record-and-replay#magic-trace-debugger-workflow` covers the retrospective debugging workflow; this section keeps the tracing substrate: hardware branch packets are cheap to collect but become useful only after symbolization, frame reconstruction, and timeline export.",
+      "sources": [
+        {
+          "url": "https://blog.janestreet.com/magic-trace/"
+        },
+        {
+          "url": "https://thume.ca/2023/12/02/tracing-methods/"
+        }
+      ]
+    },
+    {
+      "id": "hardware-lbr",
+      "title": "Hardware LBR (Last Branch Record) — Silent Branch History",
+      "tags": [
+        "domain:profiling",
+        "family:hardware-tracing",
+        "granularity:per-frame",
+        "intel",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "Intel processors maintain a hardware ring buffer called the Last Branch Record (LBR) which continually records the source and destination addresses of the last few dozen branches without any software overhead. The ring is updated by the CPU in the background and read at sample time, making it the cheapest possible \"recent history\" source for profiling and debugging.\n\nThe use case that makes LBR uniquely valuable is **Hardware Transactional Memory (TSX) debugging**. As noted by kernel developer Andi Kleen, any interrupt instantly aborts a TSX transaction, so normal profilers and breakpoint debuggers cannot observe transaction internals — the moment you interrupt to inspect state, the state is gone. LBR runs silently and does not perturb transactions, letting developers recover the exact branch history that led to an internal abort.\n\nBeyond TSX, LBR is the enabling primitive for two very different production uses:\n- **Per-sample call-stack capture** for profilers — `perf record --call-graph lbr` uses the branch ring as a zero-cost stack-walk shortcut. Covered as a dedicated mechanism in `data/sampling-profiling#lbr-call-stack-sampling`.\n- **PEBS record augmentation** — PEBS records (`data/hardware-tracing#precise-pmu-sampling`) can be configured to include the current LBR contents, correlating a precise sample with the branch history that led to it.",
+      "sources": [
+        {
+          "url": "https://lwn.net/Articles/680996/"
+        }
+      ]
+    },
+    {
+      "id": "arm-coresight-etm-ptm",
+      "title": "Arm CoreSight ETM / PTM — Dedicated On-Chip Trace Fabric",
+      "tags": [
+        "arm",
+        "domain:tracing",
+        "family:hardware-tracing",
+        "granularity:per-instruction",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "The Arm world has a family of tracing ideas under **CoreSight**. CoreSight is not a single feature; it is a **debug and trace architecture** with dedicated infrastructure for control, cross-triggering, routing, buffering, and off-chip export of trace data.\n\nThe standout piece is the Embedded Trace Macrocell / Program Trace Macrocell family. Arm's own documentation describes ETM-M33 as providing **non-intrusive program-flow trace**, generating the information needed for tools to reconstruct execution. It can trace all instructions, branch targets, exceptions, and cycle counts, with trigger/filter logic controlling exactly what is recorded. Other CoreSight components route this data onto the trace bus, into on-chip buffers such as ETB/ETF, or out through TPIU to external capture hardware.\n\nWhat is original here is that the \"tracer\" is not a patch, a signal, a runtime callback, or a debugger instruction. It is a **hardware trace fabric designed into the SoC**. That matters enormously for real-time and embedded systems, where even a single interrupt or breakpoint can destroy the timing bug you are trying to observe. Arm's own examples emphasize this: trace can capture execution history non-intrusively while the target continues to run at full speed.\n\nThe limitation is deployment reality. Whether CoreSight is useful depends on what the SoC actually implemented, how much trace buffer space exists, and whether you have the capture hardware and tooling to retrieve it. But conceptually it is one of the cleanest answers to \"how do I trace without perturbing timing?\"",
+      "sources": [
+        {
+          "url": "https://developer.arm.com/documentation/102520/latest/"
+        },
+        {
+          "url": "https://developer.arm.com/documentation/100232/latest/"
+        }
+      ]
+    },
+    {
+      "id": "zero-overhead-em-profiling",
+      "title": "Zero-Overhead Profiling via EM Emanations (ZoP)",
+      "tags": [
+        "domain:profiling",
+        "family:hardware-tracing",
+        "granularity:per-phase",
+        "off-cost:zero",
+        "on-cost:dominant"
+      ],
+      "content": "Zero-Overhead Profiling takes literal \"zero overhead\" to the physical layer by analyzing **electromagnetic (EM) emanations** — the radio-frequency signals that any switching CMOS circuit unintentionally radiates as it executes — rather than adding software instrumentation or hardware performance counters. ZoP runs a training phase to map EM waveforms to code paths, then records the uninstrumented program during actual execution. By matching the waveforms, it tracks the execution path with >94% accuracy, completely avoiding any modifications to the target system or memory footprint.",
+      "sources": [
+        {
+          "url": "https://sites.gatech.edu/ece-alenka/wp-content/uploads/sites/463/2016/09/ZoP.pdf"
+        }
+      ]
+    },
+    {
+      "id": "precise-pmu-sampling",
+      "title": "Precise PMU Sampling — Intel PEBS, AMD IBS, ARM SPE",
+      "tags": [
+        "domain:profiling",
+        "family:hardware-tracing",
+        "granularity:per-instruction",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "Ordinary PMU-overflow sampling is *imprecise*: when a performance counter overflows (cache miss, branch miss, retired instruction), the pipeline has already moved on by the time the interrupt fires, so the sampled PC is tens of instructions downstream of the instruction that actually caused the event. This \"skid\" makes naive `perf record -e cache-misses` attribute misses to the wrong source line. Three hardware families solve it, each with a different mechanical angle.\n\n**Intel PEBS (Precise Event-Based Sampling)** arms the hardware once a PEBS-enabled counter overflows: the next retiring precise event atomically writes a record (EventingIP, GPRs, TSC, optional LBR/XMM/data-linear-address) into a PEBS buffer. Variants include classic PEBS, **PEBS-LL** (Load Latency, threshold via `MSR_PEBS_LD_LAT`, for cache-miss profiling with data-linear-address + DSRC fields), **Precise Store** (data-linear-address for store bottlenecks, since Haswell), **Adaptive PEBS** (variable-layout groups `basic/mem/gpr/lbr/xmm/ssp`), and **Timed PEBS / TPEBS** (retire-latency field, enabling Top-down Microarchitecture Analysis from a single `perf record` pass). `perf_event_attr.precise_ip` (0/1/2/3) selects non-precise, off-by-one PEBS, skidless PEBS, or PEBS with LBR rewound to the true eventing IP.\n\n**AMD IBS (Instruction-Based Sampling)** inverts the model: it does not count to a threshold. Instead it **randomly tags** one fetch (IBS Fetch) or one dispatched op (IBS Op) per sampling interval and follows it through the pipeline, writing a record at retirement. IBS Op's op-count mode is explicitly *unbiased* across instruction mix (cycles mode is not). The records include retire latency, D-cache load/store addresses, branch targets, fetch latency, I-cache/ITLB details. Two dynamically-numbered PMUs expose this to `perf_event_open` at `/sys/bus/event_source/devices/ibs_{fetch,op}/type`.\n\n**ARM SPE (Statistical Profiling Extension)**, since ARMv8.2, is the cleanest formulation. Post-decode hardware picks an op every `PMSIRR` ops (plus pseudo-random jitter) and lets it walk the pipeline; a record — virtual address + physical address + latency + data source + branch info — is written to an **AUX buffer** via the perf ring, reusing the Intel-PT plumbing added to Linux in 2015. Will Deacon's SPE patches (2017) merged upstream as `arm_spe_pmu`; production users today include Apple M-series, Neoverse servers, and AWS Graviton.\n\nThe trade-off axis is cost vs precision vs attribution granularity. Cost when off is zero (MSRs clear). Cost when on is dominated by the memory bandwidth of the record buffer — PEBS records range from 64 bytes to ~200 bytes; Adaptive / arch-PEBS can balloon with LBR+XMM+SSP groups. Granularity is per-retired-instruction with the true causing PC, plus data-source metadata that no non-precise PMU can provide. Without these, BOLT/Propeller/AutoFDO (`data/pgo-instrumentation` and `data/autofdo`) consumes systematically wrong profiles; with them, compiler feedback loops point at the right basic blocks. Contrast with `data/hardware-tracing#intel-pt-magic-trace` Intel PT (full control-flow trace, complementary) and `data/hardware-tracing#hardware-lbr` LBR (16/32-entry branch ring, often combined with PEBS records).\n\nSkid is the *hardware* dual of the safepoint bias described in `data/cooperative-safepoints#safepoint-bias-async-get-call-trace`: both are \"the sample's reported PC is not the PC that actually caused the event,\" expressed at different layers. PEBS/IBS/SPE fix the hardware layer; JEP 509 / async-profiler / AGCT fix the software layer; a new language needs both.",
+      "sources": [
+        {
+          "url": "https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol3/o_fe12b1e2a880e0ce-711.html"
+        },
+        {
+          "url": "https://lwn.net/Articles/521959/"
+        },
+        {
+          "url": "http://www.paradyn.org/petascale2013/slides/eranian13.pdf"
+        },
+        {
+          "url": "https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/white-papers/AMD_IBS_paper_EN.pdf"
+        },
+        {
+          "url": "https://github.com/jlgreathouse/AMD_IBS_Toolkit/blob/master/ibs_with_perf_events.txt"
+        },
+        {
+          "url": "https://man7.org/linux/man-pages/man1/perf-arm-spe.1.html"
+        },
+        {
+          "url": "https://lwn.net/Articles/711591/"
+        },
+        {
+          "url": "https://www.intel.com/content/www/us/en/developer/articles/technical/timed-process-event-based-sampling-tpebs.html"
+        }
+      ]
+    },
+    {
+      "id": "arm-cortex-m-itm-swo",
+      "title": "ARM Cortex-M ITM / SWO — Application Instrumentation on One Debug Pin",
+      "tags": [
+        "arm",
+        "domain:tracing",
+        "embedded",
+        "family:hardware-tracing",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "`data/hardware-tracing#arm-coresight-etm-ptm` covers CoreSight ETM (full program-flow trace over a dedicated parallel trace bus, aimed at post-hoc instruction reconstruction). The embedded-instrumentation companion is **ITM (Instrumentation Trace Macrocell)**, a bank of 32 memory-mapped stimulus registers at `0xE0000000` that firmware writes to directly. Each write is one store instruction (~1–6 cycles, plus an optional FIFO-full check via the read-back flag); the ITM packetizes the write with a timestamp, muxes it into the CoreSight ATB, and the TPIU/SWO serializer emits it on **one pin** (SWO) at typically 1–6 Mbps Manchester-coded, optionally higher over UART NRZ. No RAM buffer on the target, no interrupt, no trace-port pin budget.\n\nThe DWT (Data Watchpoint and Trace) unit feeds the same ITM fabric. Four DWT comparators provide hardware watchpoint events; `DWT->CYCCNT` is a free-running cycle counter; `DWT->PCSR` is a program-counter sample register the debug probe can poll over SWD to produce a PC histogram at zero CPU cost. This is the Cortex-M analogue of x86 LBR / PT — much lower fidelity, but similarly non-intrusive because the probe reads the registers through the debug interface, not through the CPU.\n\nThe trade-off is bandwidth vs pin budget. Cost when off is literally zero (`TRCENA` bit clear in `CoreDebug->DEMCR`; stimulus writes to disabled ports silently drop). Cost when on per event is a single 32-bit store plus an optional FIFO-stall if the SWO link saturates — ITM ports support blocking or drop-on-full per port. The ceiling is the SWO link itself (commonly ≤2 Mbit/s practical; SEGGER's measurements put sustained throughput around 0.3–1 MB/s). That is orders of magnitude below ETM's parallel trace port, but ETM requires 4–8 dedicated trace-port pins and a trace-capable debug probe.\n\n**SEGGER RTT** is the counterpoint worth naming. Instead of serializing over a dedicated trace pin, the firmware writes to a RAM ring buffer, and the J-Link probe reads that RAM over the SWD debug link while the CPU runs — the Cortex-M debug AHB-AP supports coherent background memory access without halting. The cost is a small RAM buffer (~500 B ROM, ~1 KB RAM typical) and a `memcpy`-equivalent, but bandwidth jumps to 2 MB/s+ on a single standard debug pin with no TPIU/SWO clock configuration required. The broader mechanical argument worth extracting: **on architectures where the debug interface can do coherent background memory reads, treating the debugger as a polling consumer of a RAM buffer is strictly faster than any dedicated serial trace output short of full parallel trace.** See `data/post-mortem-debugging#embedded-defmt-probe-rs-rtt` for the on-target debug-probe workflow (defmt, probe-rs, RTT/ITM consumption from the host side).",
+      "sources": [
+        {
+          "url": "https://developer.arm.com/documentation/ddi0439/b/Instrumentation-Trace-Macrocell-Unit/ITM-functional-description"
+        },
+        {
+          "url": "https://developer.arm.com/documentation/ddi0439/b/Data-Watchpoint-and-Trace-Unit"
+        },
+        {
+          "url": "https://arm-software.github.io/CMSIS_6/v6.0.0/Core/group__ITM__Debug__gr.html"
+        },
+        {
+          "url": "https://kb.segger.com/SWO"
+        },
+        {
+          "url": "https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/"
+        },
+        {
+          "url": "https://blog.segger.com/current-state-of-the-trace-market/"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://blog.janestreet.com/magic-trace/"
+    },
+    {
+      "url": "https://thume.ca/2023/12/02/tracing-methods/"
+    },
+    {
+      "url": "https://lwn.net/Articles/680996/"
+    },
+    {
+      "url": "https://developer.arm.com/documentation/102520/latest/"
+    },
+    {
+      "url": "https://developer.arm.com/documentation/100232/latest/"
+    },
+    {
+      "url": "https://sites.gatech.edu/ece-alenka/wp-content/uploads/sites/463/2016/09/ZoP.pdf"
+    },
+    {
+      "url": "https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol3/o_fe12b1e2a880e0ce-711.html"
+    },
+    {
+      "url": "https://lwn.net/Articles/521959/"
+    },
+    {
+      "url": "http://www.paradyn.org/petascale2013/slides/eranian13.pdf"
+    },
+    {
+      "url": "https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/white-papers/AMD_IBS_paper_EN.pdf"
+    },
+    {
+      "url": "https://github.com/jlgreathouse/AMD_IBS_Toolkit/blob/master/ibs_with_perf_events.txt"
+    },
+    {
+      "url": "https://man7.org/linux/man-pages/man1/perf-arm-spe.1.html"
+    },
+    {
+      "url": "https://lwn.net/Articles/711591/"
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/developer/articles/technical/timed-process-event-based-sampling-tpebs.html"
+    },
+    {
+      "url": "https://developer.arm.com/documentation/ddi0439/b/Instrumentation-Trace-Macrocell-Unit/ITM-functional-description"
+    },
+    {
+      "url": "https://developer.arm.com/documentation/ddi0439/b/Data-Watchpoint-and-Trace-Unit"
+    },
+    {
+      "url": "https://arm-software.github.io/CMSIS_6/v6.0.0/Core/group__ITM__Debug__gr.html"
+    },
+    {
+      "url": "https://kb.segger.com/SWO"
+    },
+    {
+      "url": "https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/"
+    },
+    {
+      "url": "https://blog.segger.com/current-state-of-the-trace-market/"
+    }
+  ]
+}

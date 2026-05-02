@@ -1,0 +1,62 @@
+{
+  "kind": "language",
+  "name": "Swift Ownership — Law of Exclusivity and Noncopyable Types",
+  "aliases": ["swift-noncopyable", "swift-exclusivity"],
+  "summary": "Swift adds compile-time + runtime exclusivity enforcement on top of an ARC-managed language, then layers opt-in noncopyable types that get Rust-like static guarantees. SE-0176 Law of Exclusivity (Swift 4); SE-0390 noncopyable structs/enums (Swift 5.9, 2023); SE-0427 generics extension (Swift 6.0, 2024); SE-0377 consuming/borrowing parameter modifiers. Swift's clearest move into the Rust-adjacent design space — opt-in linearity layered on an ARC-managed language.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["swift", "ownership", "noncopyable", "borrowing", "memory-safety"],
+      "content": "Swift adds compile-time + runtime exclusivity enforcement on top of an ARC-managed language, then layers opt-in noncopyable types that get Rust-like static guarantees. This is Swift's clearest move into the Rust-adjacent design space — opt-in linearity layered on an ARC-managed language.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" },
+        { "target": "swift-sil", "type": "related" },
+        { "target": "reference-counting", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Swift Ownership Manifesto", "url": "https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md" }
+      ]
+    },
+    {
+      "id": "law-of-exclusivity",
+      "title": "Law of Exclusivity (SE-0176)",
+      "tags": ["swift", "aliasing", "memory-safety", "static-aliasing"],
+      "content": "The **Law of Exclusivity** (SE-0176, Swift 4): \"two accesses to the same variable may not overlap unless both are reads\" — enforced statically for locals/`inout`, dynamically (via per-variable access flags) for class properties and globals.\n\nThis is the foundation that makes `inout` parameters safe: `inout` is \"copy-in / copy-out\" semantically but compiles to in-place mutation under the exclusivity guarantee.",
+      "refs": [
+        { "target": "borrowing", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Swift Law of Exclusivity (SE-0176)", "url": "https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md" }
+      ]
+    },
+    {
+      "id": "noncopyable-types",
+      "title": "Noncopyable structs and enums (SE-0390, SE-0427)",
+      "tags": ["swift", "noncopyable", "linear-types", "ownership", "move-semantics"],
+      "content": "**SE-0390 noncopyable structs/enums** (Swift 5.9, 2023): `struct Foo: ~Copyable` suppresses the implicit `Copyable` conformance; values have unique ownership and may declare a `deinit`.\n\n**SE-0427** (Swift 6.0, 2024) extends noncopyable types to generics via a default `Copyable` constraint that can be suppressed with `~Copyable`. This makes the linear-typed slice of Swift compose with the rest of the standard library — generic algorithms can be written once for both copyable and noncopyable inputs.",
+      "refs": [
+        { "target": "linear-affine-types", "type": "related" }
+      ],
+      "sources": [
+        { "label": "SE-0390 noncopyable", "url": "https://github.com/apple/swift-evolution/blob/main/proposals/0390-noncopyable-structs-and-enums.md" }
+      ]
+    },
+    {
+      "id": "consuming-borrowing-modifiers",
+      "title": "Consuming / borrowing parameter modifiers (SE-0377)",
+      "tags": ["swift", "consuming-borrowing", "ownership", "borrowing"],
+      "content": "**SE-0377 parameter modifiers** make `consuming`/`borrowing` part of the API contract; `consuming` methods can use `discard self` to suppress `deinit`. Together with noncopyable types, this gives Swift a Rust-adjacent ownership API: consumers explicitly take ownership, borrowers explicitly do not, and the compiler enforces the discipline at the call boundary.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "borrowing", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Swift Law of Exclusivity (SE-0176)", "url": "https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md" },
+    { "label": "SE-0390 noncopyable", "url": "https://github.com/apple/swift-evolution/blob/main/proposals/0390-noncopyable-structs-and-enums.md" },
+    { "label": "Swift Ownership Manifesto", "url": "https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "kind": "runtime",
+  "name": "Memory Tiering in a Python Virtual Machine",
+  "aliases": ["Python memory tiering", "VMIL 2025 memory tiering"],
+  "summary": "Li et al.'s Memory Tiering in Python Virtual Machine (VMIL 2025) explores adapting a CPython-like runtime to heterogeneous memory. Memory tiering moves data among memory classes with different latency, bandwidth, capacity, or persistence characteristics based on runtime hotness and object behaviour.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["garbage-collection", "python", "cpython", "research"],
+      "content": "Li et al.'s **Memory Tiering in Python Virtual Machine** (VMIL 2025) explores adapting a CPython-like runtime to heterogeneous memory.\n\nMemory tiering moves data among memory classes with different latency, bandwidth, capacity, or persistence characteristics — for example DRAM plus slower large-capacity memory — based on runtime hotness and object behaviour.",
+      "refs": [
+        { "target": "garbage-collection#runtime-interaction-with-concurrency", "type": "related" }
+      ]
+    },
+    {
+      "id": "vm-vs-os",
+      "title": "VM-level vs OS-level tiering",
+      "tags": ["python", "research"],
+      "content": "The VM-level problem differs from OS-only page migration. A language runtime knows object types, allocation sites, container layouts, reference relationships, and interpreter hot paths; using that semantic information can guide placement better than page-level recency alone.\n\nIn a Python VM, the challenge is especially visible because **object overhead is high, pointer chasing is common, and container objects create rich graph structure**. CPython's `PyObject` header per value is the canonical example: a typical small-int or string occupies tens of bytes of header before any payload, and tiering decisions can move cold-but-rooted PyObjects to slower memory without a measurable performance cost."
+    },
+    {
+      "id": "design-lesson",
+      "title": "Placement policy alongside reclamation policy",
+      "tags": ["garbage-collection", "research"],
+      "content": "The design lesson: **future memory managers may need placement policy, not just reclamation policy**. Heap design can expose hot/cold object classification, allocation-site metadata, and profiling hooks so runtimes can target heterogeneous memory without rewriting user programs.\n\nThis is adjacent to allocators (which decide where to allocate within a single tier), GC layout (which decides how objects are organised on the heap), and tracing/profiling (because tiering decisions require runtime telemetry).\n\nStatus (as of 2026-04): research-grade, VMIL 2025 artifact.",
+      "refs": [
+        { "target": "allocators", "type": "complements" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Memory Tiering in Python Virtual Machine (VMIL 2025)", "url": "https://people.cs.vt.edu/~butta/docs/vmil25_mtp.pdf" },
+    { "label": "VMIL 2025 — Memory Tiering paper details", "url": "https://conf.researchr.org/details/icfp-splash-2025/vmil-2025/7/Memory-Tiering-in-Python-Virtual-Machine" }
+  ]
+}

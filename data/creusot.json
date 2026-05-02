@@ -1,0 +1,109 @@
+{
+  "kind": "tool",
+  "name": "Creusot — Prophetic Borrows in WhyML",
+  "aliases": [],
+  "summary": "Inria's Creusot is an auto-active verifier that translates Rust MIR to WhyML using a prophetic encoding to handle mutable borrows in a purely functional setting. The `^x` operator denotes the future final value of a borrow, allowing Rust mutable references to be encoded as (current, prophecy) pairs. Pearlite specification language with ML-style logical syntax; Why3 multi-prover backend dispatches VCs via Z3, CVC4/CVC5, Alt-Ergo simultaneously.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "formal-verification",
+        "auto-active-verifier",
+        "deductive-verification",
+        "rust-verifier"
+      ],
+      "content": "Inria's **Creusot** is an auto-active verifier that translates Rust MIR to WhyML (Why3's IR; covered in the verification-IL family at `data/verification-intermediate-languages`), using a \"prophetic\" encoding to handle mutable borrows in a purely functional setting.\n\n**Prophetic borrows**: the `^x` operator denotes the future final value of a borrow, allowing Rust mutable references to be encoded as (current, prophecy) pairs in a functional logic (RustHorn / RustHornBelt heritage). **Pearlite** specification language: ML-style logical syntax with ghost code, snapshots, and trait-aware predicates. **Why3 multi-prover backend** discharges VCs via Z3, CVC4/CVC5, Alt-Ergo simultaneously. Open-source v0.11 (April 2026); growing test suite with verified Vec/sort/binary-search/iterators; not yet shipping inside production-critical software.",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#whyml",
+          "type": "compiles-to"
+        },
+        {
+          "target": "rustbelt-lambda-rust#overview",
+          "type": "related"
+        },
+        {
+          "target": "prusti#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "verus#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Creusot paper (HAL)",
+          "url": "https://hal.inria.fr/hal-03737878/document"
+        },
+        {
+          "label": "Creusot repository",
+          "url": "https://github.com/creusot-rs/creusot"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Prophetic encoding of mutable borrows",
+      "tags": [
+        "prophetic-borrow",
+        "separation-logic",
+        "borrowing"
+      ],
+      "content": "Creusot's central technical contribution is the **prophetic encoding** of mutable borrows, inherited from RustHorn / RustHornBelt. A Rust mutable reference `&mut T` is modelled in a purely functional logic as a pair `(current, prophecy)` — the current value at the borrow's creation, and the *future final value* it will hold when the borrow expires. The user-facing operator `^x` reads the prophecy of `x`, letting the specification refer to the eventual state of a borrow without separation-logic permission tracking.\n\nThe specification language **Pearlite** is an ML-style logic with ghost code, snapshots, and trait-aware predicates. Specifications are written in an `#[ensures]`/`#[requires]` style similar to Prusti's, but the underlying semantics is purely functional rather than separation-logic-based. This makes Creusot's proof obligations look like Coq/HOL goals rather than permission-bearing assertions.",
+      "refs": [
+        {
+          "target": "borrowing#overview",
+          "type": "encodes"
+        }
+      ]
+    },
+    {
+      "id": "target-and-backend",
+      "title": "WhyML and multi-prover dispatch",
+      "tags": [
+        "whyml",
+        "smt-based",
+        "z3",
+        "cvc5"
+      ],
+      "content": "Creusot compiles Rust MIR to **WhyML** (Why3's intermediate language; see `verification-intermediate-languages.json`). Why3's distinctive design choice is **multi-prover backend dispatch**: a single Why3 verification condition is offered to Z3, CVC4/CVC5, Alt-Ergo, Vampire, and Coq simultaneously, with the user choosing which prover to pursue per goal. This makes Creusot proofs robust to per-prover regressions and lets users combine SMT speed with interactive-prover precision on hard goals.\n\nThis contrasts with **Prusti** (`prusti.json`), which compiles to Viper and dispatches to Z3 only. The two tools target the same source language (Rust) with deeply different proof models: Prusti uses separation logic with automatic permission inference from the borrow checker; Creusot uses purely functional logic with prophecy-based borrow encoding.",
+      "refs": [
+        {
+          "target": "verification-intermediate-languages#whyml",
+          "type": "compiles-to"
+        },
+        {
+          "target": "prusti#target-and-backend",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status and deployments",
+      "tags": [
+        "research",
+        "experimental"
+      ],
+      "content": "Status (as of 2026-04): open-source under creusot-rs/creusot, version 0.11 released April 2026. Growing test suite with verified `Vec`, sort, binary-search, and iterator implementations. Not yet shipping inside production-critical software; the toolchain is an active research project rather than a production verifier. Compared to Verus (Google kernel verification, Amazon deployments), Creusot is earlier in adoption but offers the multi-prover Why3 ecosystem that Verus's pure-Z3 approach does not.",
+      "refs": [
+        {
+          "target": "verus#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Creusot paper (HAL)",
+      "url": "https://hal.inria.fr/hal-03737878/document"
+    },
+    {
+      "label": "Creusot repository",
+      "url": "https://github.com/creusot-rs/creusot"
+    }
+  ]
+}

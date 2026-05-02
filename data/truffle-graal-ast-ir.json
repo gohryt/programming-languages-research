@@ -1,0 +1,38 @@
+{
+  "kind": "framework",
+  "name": "Truffle / Graal AST as IR",
+  "aliases": ["graalvm-truffle-ast"],
+  "summary": "In the GraalVM Truffle framework, the language implementer writes an AST interpreter — but the AST is also the IR. Partial evaluation specializes the AST against observed types and values, producing an effectively-compiled version of the same tree. Same data structure for source-faithful AST and optimization substrate.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "In the GraalVM Truffle framework, the language implementer writes an *AST interpreter* — but the AST is also the IR. Partial evaluation specializes the AST against observed types and values, producing an effectively-compiled version of the same tree. There is no separate IR phase; the AST nodes carry inline caches, profiling, and specialization metadata that make them executable both interpretively and (after Graal partial evaluation) as native code.",
+      "refs": [
+        { "target": "high-level-ir#overview", "type": "instance-of" },
+        { "target": "futamura-projections#overview", "type": "exemplifies" }
+      ],
+      "sources": [
+        { "label": "GraalVM Truffle Language Implementation Framework", "url": "https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/" }
+      ]
+    },
+    {
+      "id": "futamura-in-practice",
+      "title": "Futamura projection made concrete",
+      "tags": ["partial-evaluation", "compiler", "interpreter"],
+      "content": "This is the Futamura projection made concrete: the partial evaluator (Graal) plus the interpreter (the AST + node specializations) is the compiler. Truffle's contribution is showing that the same data structure can be both the source-faithful AST and the optimization substrate, eliminating a translation layer.\n\nThe approach is industrial-strength rather than academic: language implementers write specialised AST nodes (with `@Specialization` and inline-cache machinery) and let Graal's partial evaluator generate competitive native code from the resulting tree.",
+      "refs": []
+    },
+    {
+      "id": "production-languages",
+      "title": "Production languages on Truffle",
+      "tags": ["graalvm", "language-implementation"],
+      "content": "Production languages on Truffle as of 2026-04: **GraalJS** (V8-replacement for Java embedding), **GraalPy** (CPython-compatible Python with claimed competitive performance to PyPy on numeric workloads, Java-embedding-friendly), **TruffleRuby** (Ruby with C-extension support), **FastR** (R), **Espresso** (Java-on-Java for sandboxing), **Sulong** (LLVM bitcode interpreter for C/C++/Fortran).\n\nThe Truffle pattern proves that a *single partial-evaluator infrastructure* (Graal) hosting many language frontends produces competitive performance per language with much less per-language engineering than handwriting a JIT compiler. The cost is the GraalVM runtime dependency and Java-VM-shaped behaviour at the host boundary.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "GraalVM Truffle Language Implementation Framework", "url": "https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/" }
+  ]
+}

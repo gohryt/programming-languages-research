@@ -1,0 +1,236 @@
+{
+  "kind": "concept",
+  "name": "Debugger protocols and transport",
+  "aliases": [
+    "dap",
+    "debug-adapter-protocol",
+    "jdwp",
+    "cdp",
+    "DAP",
+    "JDWP",
+    "Chrome DevTools Protocol",
+    "gdbserver",
+    "lldb-server"
+  ],
+  "summary": "Transport and capability boundary between debug clients, runtimes, and debugger backends; production examples are DAP (language-neutral), JDWP (transport-neutral but Java-typed), CDP (Blink/V8-coupled, WebSocket-rich), and gdbserver/lldb-server.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Decoupling the debugger UI from the debugger runtime has become the dominant architecture — an N×M integration problem solved by standard protocols. Entries differ on **what the protocol commits to**: DAP is language-neutral and lowest-common-denominator; JDWP is transport-neutral but Java-typed; CDP is WebSocket-rich and Blink/V8-coupled; RemedyBG is shared-memory and proprietary; gdbserver vs. lldb-server differ on where authoritative environment knowledge lives; scripting APIs (GDB Python, LLDB formatters) turn the debugger itself into a programmable platform; and expression evaluation/state surgery is the in-debugger evaluator that all of these protocols expose. The Mirror principle (`data/debugger-protocols#mirrors-reflection`) names the design shape the others approximate with varying fidelity.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:debugger-protocol`\n- **domain**: `domain:debugging`\n"
+    },
+    {
+      "id": "remedybg",
+      "title": "RemedyBG — Debugger as Service with Protocol",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol",
+        "windows"
+      ],
+      "content": "RemedyBG is a Windows-only native debugger built by a solo developer, optimized for speed and simplicity. Its interesting contribution is the debug protocol: an external process communicates with RemedyBG via shared memory and events, allowing editors and tools to control the debugger programmatically.\n\nThis is philosophically aligned with DAP (Debug Adapter Protocol) but more lightweight and lower-latency. The shared-memory approach avoids the JSON serialization overhead of DAP for high-frequency operations like variable inspection.",
+      "sources": [
+        {
+          "url": "https://remedybg.handmade.network/blog/p/3631-remedybgs_debug_protocol"
+        }
+      ]
+    },
+    {
+      "id": "debug-adapter-protocol",
+      "title": "Debug Adapter Protocol — The LSP of Debugging",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "The Debug Adapter Protocol (Microsoft, 2016) does for debuggers what LSP did for language servers: it decouples the IDE from the debugger runtime via a standardized JSON message protocol with LSP-like framing. Before DAP, every IDE had to implement custom integrations with every debugger (Eclipse + JDI for Java, Visual Studio + COM for C++, etc.) — an N×M problem.\n\nDAP defines a standard set of requests (launch, attach, setBreakpoints, continue, stepIn, stackTrace, variables, evaluate) and events (stopped, output, terminated) that any IDE can send to any debug adapter. The debug adapter translates these into the native debugger's API (GDB/MI, LLDB, JDI, Chrome DevTools Protocol, etc.).\n\nKey design decisions:\n- **Stateful session model**: unlike LSP (which is largely stateless), DAP maintains a debugging session with lifecycle (initialize → launch/attach → running → stopped → terminated).\n- **Thread and stack frame model**: DAP abstracts threads, stack frames, scopes, and variables into a uniform hierarchy, regardless of the underlying runtime's representation.\n- **Evaluation**: the `evaluate` request allows arbitrary expression evaluation in the debugger's context, supporting watch expressions, conditional breakpoints, and REPL-style interaction.\n\nDAP is now supported by VS Code, Neovim, Emacs (dap-mode), Helix, Zed, and many other editors. Debug adapters exist for GDB, LLDB, Chrome/Node, Python (debugpy), Go (Delve), Rust (via CodeLLDB/LLDB), Java (JDI), and dozens more.\n\nThe limitation: DAP's abstraction is lowest-common-denominator. Advanced debugger features (rr's reverse execution, Pernosco's omniscient queries, RemedyBG's shared-memory speed) are hard to express in DAP's generic request/response model. Enet et al. (2023) studied DAP's suitability for domain-specific languages and found similar friction — DSL-specific debugging concepts (model-level stepping, constraint visualization) require protocol extensions.",
+      "sources": [
+        {
+          "url": "https://microsoft.github.io/debug-adapter-protocol/"
+        },
+        {
+          "url": "https://hal.science/hal-04245594v1/document"
+        }
+      ]
+    },
+    {
+      "id": "debugger-scripting-apis",
+      "title": "Debugger Scripting APIs — GDB Python, LLDB Formatters, pwndbg, gdb-dashboard",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "Both GDB and LLDB expose Python APIs that let users extend the debugger without recompiling it. The contribution is that **the debugger becomes a programmable platform**, not a fixed UI — the same mechanism that powers a one-off `std::vector` pretty-printer also hosts reverse-engineering plugins, CTF workflows, and entire alternative front-ends.\n\nGDB's Python API centers on `gdb.Value`, `gdb.Type`, and the `pretty_printer` protocol: a printer class implements `to_string()` for a scalar rendering and `children()` (with a `display_hint` of `'array'` / `'map'` / `'string'`) for a container. Frame filters reshape the backtrace display; xmethods intercept C++ member calls; inferior callbacks fire on thread events. The API is sufficient to ship whole new UIs as `.gdbinit` files.\n\nLLDB's API is richer and layers the problem into four pieces — **formats, summaries, filters, and synthetic children**. A *summary* is the one-line description (`type summary add --summary-string \"(${var.x}, ${var.y})\" MyVec3`) or a Python callback returning a string. A *filter* hides or reorders fields without any code. **Synthetic children** are virtual members that replace the debug-info-derived layout: `std::vector<T>` appears as `[0], [1], [2]` instead of three opaque pointers (`begin`, `end`, `capacity`). LLDB invokes the synthetic child provider *before* the summary, so summaries see the clean view. The subtle detail is `SetPreferSyntheticValue(True)`: without it, recursive inspection falls back to the real private members, defeating the abstraction.\n\nThe scripting surface is large enough to host **alternative front-ends** inside GDB/LLDB themselves. `gdb-dashboard` is a pure-Python `.gdbinit` that adds modular panels (source, registers, stack, threads, backtrace) refreshed on every stop; the user selects layouts with `dashboard -layout`. **pwndbg** is a GDB *and* LLDB plug-in focused on reverse engineering and exploit development — hex dumps, GOT/PLT inspection, `vmmap`, ROP-gadget search, qemu-user/qemu-system integration — loaded as a Python module with no debugger patches. GEF is an older sibling in the same niche.\n\nThe lesson for a language designer: a debugger scripting API turns \"the UI we shipped\" into \"the UI you want.\" The cost is a Python embedding and a stable object model for values, types, frames, and events.",
+      "sources": [
+        {
+          "url": "https://lldb.llvm.org/varformats.html"
+        },
+        {
+          "url": "https://github.com/cyrus-and/gdb-dashboard"
+        },
+        {
+          "url": "https://github.com/pwndbg/pwndbg"
+        }
+      ]
+    },
+    {
+      "id": "chrome-devtools-protocol",
+      "title": "Chrome DevTools Protocol — Domain-Structured Wire Protocol",
+      "tags": [
+        "browser",
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "Chrome DevTools Protocol (CDP) is the WebSocket wire protocol that connects Chrome/Chromium/Node.js to its inspector clients. It predates DAP (`data/debugger-protocols#debug-adapter-protocol`) and takes an opposite architectural stance: **rich, runtime-specific, domain-structured** instead of generic and lowest-common-denominator.\n\nCDP defines dozens of **domains** — DOM, Debugger, Network, Profiler, Runtime, Page, Performance, HeapProfiler, Tracing, Emulation, Input — each with its own commands and events. The canonical schema lives in two `.pdl` files in the Chromium tree: `browser_protocol.pdl` (browser-level domains) and `js_protocol.pdl` (V8-only domains, also usable for Node.js debugging). The `.pdl` is translated into typed C++, TypeScript, and JSON bindings, so every CDP consumer gets compile-time checking against the authoritative definition.\n\nThe architectural difference from DAP: CDP is a *persistent session* over a single WebSocket where agents in several processes (browser, renderer, Blink, V8) handle different subsets of commands. A single command may fall through *embedder → content → blink → V8*. This lets CDP expose deep browser internals (network waterfalls, heap snapshots, DOM mutation events, JS-level coverage, CPU profiler) that would not map onto a DAP request. The Puppeteer and Playwright automation libraries consume CDP directly. Chrome extensions access it through `chrome.debugger`.\n\nThe trade-off is sharp: CDP is powerful but tightly coupled to Blink/V8 semantics; DAP is weaker but portable. VS Code's own `vscode-js-debug` is a DAP adapter that **translates CDP to DAP** to bridge the two worlds — losing some CDP features along the way (e.g., fine-grained heap snapshots) because DAP cannot express them.",
+      "sources": [
+        {
+          "url": "https://chromedevtools.github.io/devtools-protocol/"
+        },
+        {
+          "url": "https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/devtools-protocol.md"
+        }
+      ]
+    },
+    {
+      "id": "jdwp-jpda",
+      "title": "JDWP + JPDA — Transport-Agnostic Language-Typed Protocol",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol",
+        "jvm"
+      ],
+      "content": "Sun's Java Platform Debugger Architecture (JPDA) predates DAP by two decades and already separated the concerns DAP standardized much later. It splits debugging into three layers: **JVMTI** (the in-VM tool interface, used by the debuggee's agent), **JDWP** (the wire protocol between agent and front-end), and **JDI** (the high-level Java API used by debuggers to talk to JDWP).\n\nJDWP's original contribution is **transport abstraction**. The specification defines packet format only (command packet, reply packet, command set + command number, length-prefixed payload) and explicitly does not define the transport. Reference implementations ship both a TCP socket transport and a shared-memory transport, and a Service Provider Interface lets third parties add their own. The same debugger binary speaks to a VM across a TCP network, across shared memory on the same host, or over a serial line with no code changes.\n\nUnlike DAP, JDWP is **stateful and type-aware**: command sets mirror JDI interfaces — VirtualMachine, ReferenceType, ClassType, ArrayType, ObjectReference, StringReference, ThreadReference — and their commands expose language-level operations the protocol can enforce. `RedefineClasses` hot-patches a class definition at runtime; `InvokeMethod` calls an arbitrary Java method in the debuggee and returns the result; `ForceEarlyReturn` makes a frame return *now* with a specified value; `PopFrames` unwinds frames and re-executes. DAP's `evaluate` string-in-string-out is the closest analogue and is strictly weaker.\n\nThe lesson for protocol design: **a debugger protocol tied to one language can expose operations a language-neutral protocol cannot**. DAP trades this away for multi-language reach; JDWP gets live class redefinition and typed frame manipulation as first-class protocol operations in exchange for being Java-only. A new language runtime can borrow JPDA's three-layer split (in-VM tool interface, wire protocol, client-side language API) without inheriting its Java-specific commands.",
+      "sources": [
+        {
+          "url": "https://docs.oracle.com/en/java/javase/24/docs/specs/jdwp/jdwp-spec.html"
+        },
+        {
+          "url": "https://docs.oracle.com/en/java/javase/21/docs/specs/jpda/architecture.html"
+        }
+      ]
+    },
+    {
+      "id": "remote-debugging-gdbserver-lldb-server",
+      "title": "Remote Debugging — gdbserver vs lldb-server + SBPlatform",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "Remote debugging — debugger on the dev workstation, debuggee on a phone, embedded board, or prod machine — needs a wire protocol, a stub running on the target, and a decision about *where the source of truth lives*. GDB and LLDB picked opposite answers, and the split is instructive.\n\nGDB's `gdbserver` is intentionally minimal: register read/write, memory read/write, single-step, continue, breakpoint insert. All symbol parsing, DWARF interpretation, and platform-specific logic lives on the **client** side; the client holds the authoritative view, the server handles physics only. The upside is that `gdbserver` can be tiny — useful on a Cortex-M microcontroller. The downside is that cross-target debugging requires configuring sysroot, libraries, and symbol paths correctly on the client, a perennial footgun.\n\nLLDB's `lldb-server` combines two roles in one statically linked binary: a **gdb-remote stub** (same wire protocol as gdbserver, with LLDB-specific extensions documented in `lldb-gdb-remote.txt`) and a **platform server**. The platform server is controlled from the client via an `SBPlatform` abstraction that exposes *remote* file system access, remote process listing, and remote shell execution. The remote becomes the source of truth about its own environment: LLDB asks the remote platform to find sysroot, list loaded modules, and copy symbol files across. Apple's `debugserver` fills the same role on macOS/iOS.\n\nBoth use the GDB Remote Serial Protocol at the wire level — `g`/`G` (registers), `m`/`M` (memory), `vCont` (execution control), `Z`/`z` (breakpoints) — over TCP, Unix sockets, serial lines, or pipes (useful for wrapping SSH). The protocol is shared; the division of labor is what differs.\n\nThe design question a language runtime inherits: **do we ship a thin stub and keep knowledge at the client, or a thick agent and let the target describe itself?** Thin is easier to port; thick is easier to operate cross-target. There is no universal right answer, but the LLDB model wears better when targets diverge from the host.",
+      "sources": [
+        {
+          "url": "https://lldb.llvm.org/use/remote.html"
+        },
+        {
+          "url": "https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html"
+        }
+      ]
+    },
+    {
+      "id": "mirrors-reflection",
+      "title": "Mirrors — Reflection as Debugger Primitive",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "Most mainstream reflection APIs — Java `Class.getMethods()`, Python `inspect`, C# `System.Reflection` — make the meta-level an ambient capability of every object. Gilad Bracha and David Ungar's \"Mirrors: Design Principles for Meta-level Facilities of Object-Oriented Programming Languages\" (OOPSLA 2004) articulates three principles such APIs violate and that **mirror-based reflection** upholds:\n\n1. **Encapsulation**: meta-level facilities must encapsulate their implementation. A program object should not automatically expose a reflection surface.\n2. **Stratification**: meta-level facilities must be separated from base-level functionality. You should not be able to reach the reflection machinery from an ordinary call site.\n3. **Ontological correspondence**: the ontology of the meta-level should mirror the language's own ontology. A class mirror exposes what classes *are*; a method mirror exposes what methods *are*. No leakage of implementation detail.\n\nThe implementation: reflective capability is isolated into **mirror objects** that must be obtained explicitly, not through ambient `.getClass()`. Without a mirror in hand, a program has *no* reflective power. Newspeak (Bracha's language) has no static state and no globals; the top-level object receives a `platform` parameter as its sole connection to the outside world, and `platform` is the only way to obtain mirrors — a capability-security design.\n\nThe consequence for debuggers is direct. A debugger is structurally a program holding mirrors on a target program. Mirror principles make this compose cleanly:\n- **Remote debugging** maps a mirror in the debugger process to an object in the target process — JDWP/JDI (`data/debugger-protocols#jdwp-jpda`) is the lived example of this shape; the Bracha paper names why it's right.\n- **Sandboxing**: untrusted base-level code that cannot obtain mirrors cannot introspect itself — a capability-security property, not a runtime check.\n- **Language-neutral protocols**: mirror interfaces generalize across implementations because the base language's ontology is what's mirrored, not the implementation's object layout.\n\nThe language-design lesson: **design reflection as the debugger's primitive**, not as a convenience bolt-on. If mirrors are the only way to reach the meta-level, remote debugging, secure sandboxes, and cross-implementation debug protocols fall out of the same mechanism.",
+      "sources": [
+        {
+          "url": "https://bracha.org/mirrors.pdf"
+        },
+        {
+          "url": "https://bracha.org/newspeak.pdf"
+        }
+      ]
+    },
+    {
+      "id": "moarvm-remote-debug-protocol",
+      "title": "MoarVM Remote Debug Protocol — Comma's Durable Artifact",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "Status (as of 2026-04): the **Comma IDE** is discontinued, but it drove substantial improvements to MoarVM's debug surface that survive Comma itself: a **TCP-based remote debug protocol** for Raku/MoarVM, plus an open-source Raku client library and CLI driver. The protocol shape mirrors the JDWP / DAP / CDP family (§`data/debugger-protocols#debug-adapter-protocol`, 5.4, 5.5) — connect to a port the running MoarVM listens on, exchange typed commands, receive event notifications. Distinctive features: stack-frame introspection that understands Raku's role in a multi-stage compilation pipeline (RakuAST nodes → QAST → MoarVM bytecode all addressable), and integration with MoarVM's spesh and inliner metadata so that debugging *specialized* code reconstructs the original frame layout (see `data/moarvm-spesh` on uninlining).\n\nThe product itself shut down, but the durable artifact — a documented language-specific debug protocol contributed back to a small-team VM — is a useful pattern for new languages: even a single commercial tooling vendor can leave behind a debug protocol that outlives them, *if* the protocol is upstreamed into the runtime rather than kept inside the IDE binary. The lesson is symmetric to `data/runtime-event-pipelines#moarvm-telemetry-snapper-heap-snapshots` (MoarVM Telemetry / heap snapshots): both originated as Comma-driven additions that became MoarVM mainline.",
+      "sources": [
+        {
+          "url": "https://commaide.com/features"
+        },
+        {
+          "url": "https://commaide.com/faq"
+        }
+      ]
+    },
+    {
+      "id": "debugger-expression-evaluation",
+      "title": "Debugger Expression Evaluation and State Surgery",
+      "tags": [
+        "domain:debugging",
+        "family:debugger-protocol"
+      ],
+      "content": "A debugger is not only an observer. Users expect to evaluate expressions in the current frame, call functions, assign variables, force returns, restart frames, and inspect values using language semantics. This requires a miniature evaluator whose environment is the paused program: current lexical scope, stack frame, registers, heap, generic instantiations, dynamic dispatch rules, and optimized-code location mappings.\n\nGDB has `print`, `call`, `set variable`, and `return`. LLDB embeds Clang to evaluate C/C++/Objective-C expressions. Chrome DevTools evaluates JavaScript in paused stack frames. JDWP exposes operations such as object invocation and `ForceEarlyReturn` (see `data/debugger-protocols#jdwp-jpda`). Smalltalk/Pharo and Common Lisp go further: the debugger is an interactive development environment where live frames can be inspected, edited, restarted, or resumed through restarts.\n\nThe hard part is safety. Calling arbitrary code from a paused thread can deadlock, allocate, throw, mutate state, or observe inconsistent invariants. A language can define a **debug expression subset**: pure field access, formatting, total helper functions, controlled mutation, or explicitly unsafe target calls.\n\nThe language-design lesson: **design the debugger evaluator as part of the language semantics, not as an afterthought**. If the compiler can emit enough metadata for lexical scopes, generic types, closures, effects, async frames, and optimized-out values, the debugger can evaluate expressions that feel like the source language instead of raw memory pokes.",
+      "sources": [
+        {
+          "url": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html"
+        },
+        {
+          "url": "https://lldb.llvm.org/use/tutorial.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://remedybg.handmade.network/blog/p/3631-remedybgs_debug_protocol"
+    },
+    {
+      "url": "https://microsoft.github.io/debug-adapter-protocol/"
+    },
+    {
+      "url": "https://hal.science/hal-04245594v1/document"
+    },
+    {
+      "url": "https://lldb.llvm.org/varformats.html"
+    },
+    {
+      "url": "https://github.com/cyrus-and/gdb-dashboard"
+    },
+    {
+      "url": "https://github.com/pwndbg/pwndbg"
+    },
+    {
+      "url": "https://chromedevtools.github.io/devtools-protocol/"
+    },
+    {
+      "url": "https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/devtools-protocol.md"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/24/docs/specs/jdwp/jdwp-spec.html"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/specs/jpda/architecture.html"
+    },
+    {
+      "url": "https://lldb.llvm.org/use/remote.html"
+    },
+    {
+      "url": "https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html"
+    },
+    {
+      "url": "https://bracha.org/mirrors.pdf"
+    },
+    {
+      "url": "https://bracha.org/newspeak.pdf"
+    },
+    {
+      "url": "https://commaide.com/features"
+    },
+    {
+      "url": "https://commaide.com/faq"
+    },
+    {
+      "url": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Expressions.html"
+    },
+    {
+      "url": "https://lldb.llvm.org/use/tutorial.html"
+    }
+  ]
+}

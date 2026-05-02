@@ -1,0 +1,58 @@
+{
+  "kind": "concept",
+  "name": "Mid-Level IR",
+  "aliases": ["mir", "middle-ir"],
+  "summary": "Analysis- and optimization-oriented intermediate representation: name-resolved, type-explicit, in CFG or graph form, but not yet target-specific. Examples: Rust MIR (borrow checking), Zig ZIR/AIR (comptime + analyzed), Mojo KGEN/POP (parametric MLIR), V8 Maglev/Turboshaft (JIT), HHVM HHIR (region-scoped JIT).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Mid-level IRs are where most analysis and optimization happens: name-resolved, type-explicit, in CFG or graph form, but not yet target-specific. The distinguishing axis across implementations is what each IR is the substrate for: borrow checking (Rust MIR), AOT-with-comptime evaluation (Zig ZIR), LLVM-frontend lowering (Mojo KGEN, Ballerina BIR), JIT speculation (V8 Maglev, JavaScriptCore DFG), or source-fidelity-preserving security analysis (Google JSIR).\n\nThe same operational structure (CFG of typed instructions) supports very different goals depending on what metadata each IR threads through it.",
+      "refs": [
+        { "target": "high-level-ir#boundary-with-lower-ir", "type": "extends" },
+        { "target": "ssa#overview", "type": "common-substrate" },
+        { "target": "rust-hir-thir-mir#overview", "type": "instance" },
+        { "target": "zig-zir-air#overview", "type": "instance" },
+        { "target": "mojo-kgen#overview", "type": "instance" },
+        { "target": "ballerina-bir#overview", "type": "instance" },
+        { "target": "ionmonkey-mir-lir#overview", "type": "instance" },
+        { "target": "v8-maglev#overview", "type": "instance" },
+        { "target": "jsc-dfg#overview", "type": "instance" },
+        { "target": "hhvm-hhir#overview", "type": "instance" },
+        { "target": "google-jsir#overview", "type": "instance" }
+      ]
+    },
+    {
+      "id": "typical-structure",
+      "title": "Typical structure",
+      "tags": ["compiler-ir", "control-flow", "optimization"],
+      "content": "Mid-level IRs commonly use a CFG of basic blocks, three-address operations (or SSA-form), explicit terminators (`Goto`, `SwitchInt`, `Drop`, `Call`, `Return`), and explicit drop / lifetime / region semantics where the language supports them.\n\nRust MIR is the canonical example: every variable has explicit drop semantics, every borrow has a region, every reference carries the lifetime that reaches it, and pattern matching is fully desugared to chains of comparisons. Introduced 2016 to give borrow checking a flow-sensitive substrate; subsequent borrow checkers (NLL, Polonius) inherit MIR's CFG shape.\n\nZig's two-IR cascade (ZIR for unanalyzed code that drives comptime, AIR for analyzed code that drives codegen) is the canonical \"comptime needs unresolved IR, codegen needs resolved IR\" split.",
+      "refs": [
+        { "target": "ssa#core-mechanics", "type": "uses" },
+        { "target": "llvm#ir", "type": "lowers-to" }
+      ]
+    },
+    {
+      "id": "why-this-layer-exists",
+      "title": "Why this layer exists",
+      "tags": ["compiler-design", "analysis"],
+      "content": "Many analyses are awkward on AST or HIR-like forms because important control and lifetime details are still implicit there. Mid-level IR exists to make those details explicit without yet becoming fully target-specific or machine-shaped.\n\nConcretely, a mid-level IR is the right home for: borrow checking (needs flow-sensitive view of references); drop elaboration (needs explicit destruction sites); exhaustiveness checking (needs decision-tree pattern lowering); const evaluation (needs typed three-address form); JIT speculation with deoptimization metadata (needs explicit guard points and bailout state).\n\nThe two-IR JIT pattern (V8 IonMonkey MIR/LIR, JavaScriptCore DFG/FTL+B3, Maglev/Turboshaft) splits the workload further: the higher mid-tier IR carries speculation and type metadata; the lower IR handles register allocation and machine-code emission.",
+      "refs": [
+        { "target": "high-level-ir#why-compilers-keep-this-layer", "type": "complements" },
+        { "target": "tiered-compilation#common-architecture-patterns", "type": "powers" }
+      ]
+    },
+    {
+      "id": "boundary-with-backend-forms",
+      "title": "Boundary with backend forms",
+      "tags": ["backend", "lowering"],
+      "content": "The boundary between mid-level IR and backend-facing forms is where register allocation, ABI details, lowering to machine instructions, or target-specific calling conventions begin to dominate the representation. LLVM's split (LLVM IR for target-independent optimization, Machine IR for target-dependent codegen) is the canonical version.\n\nThis boundary is one of the most strategically important layers in compiler design because it determines what cross-function optimizations are possible: anything beyond it sees fewer abstractions but more target detail.",
+      "refs": [
+        { "target": "llvm#backend-role", "type": "transitions-to" },
+        { "target": "cranelift#overview", "type": "alternative-target" }
+      ]
+    }
+  ],
+  "sources": []
+}

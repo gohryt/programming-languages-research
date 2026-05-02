@@ -1,0 +1,9 @@
+{
+  "id": "parser-generator",
+  "tag": "parser-generator",
+  "name": "Parser Generator",
+  "description": "Sections tagged with the Parser Generator concept. Documented as the canonical form after merging near-duplicate variants.",
+  "aliases": [
+    "parser-generators"
+  ]
+}

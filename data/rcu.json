@@ -1,0 +1,103 @@
+{
+  "kind": "concept",
+  "name": "RCU — Read-Copy-Update",
+  "aliases": [
+    "Read-Copy-Update",
+    "Linux RCU",
+    "userspace RCU",
+    "liburcu"
+  ],
+  "summary": "Paul McKenney's RCU (Linux 2002): readers execute lightweight critical sections; writers publish then wait a grace period — interval after which every CPU has passed a quiescent state — before reclaiming. Zero-overhead readers in non-preemptible kernels; hierarchical Tree RCU scales to thousands of CPUs. Foundational technique in the Linux kernel; userspace via liburcu; standardised as C++26 std::rcu (P2545).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "safe-memory-reclamation",
+        "read-copy-update",
+        "kernel-rcu",
+        "non-blocking"
+      ],
+      "content": "Paul McKenney's **RCU** (Linux 2002) is the canonical reader-friendly reclamation scheme: readers execute lightweight critical sections; writers publish then wait a *grace period* — an interval after which every CPU has passed a *quiescent state* — before reclaiming. The reader side has zero overhead in non-preemptible kernels (compiler barrier only, no atomics); the writer side waits for grace-period detection.\n\nHierarchical Tree RCU enables scalable grace-period detection across thousands of CPUs. The `rcu_assign_pointer` / `rcu_dereference` publish-subscribe pattern doubles as a memory-ordering API, so RCU is simultaneously a reclamation mechanism and a publication discipline.",
+      "refs": [
+        {
+          "target": "qsbr",
+          "type": "related"
+        },
+        {
+          "target": "hazard-pointers",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "epoch-based-reclamation",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Linux RCU Requirements",
+          "url": "https://www.kernel.org/doc/html/latest/RCU/Design/Requirements/Requirements.html"
+        }
+      ]
+    },
+    {
+      "id": "cost-model",
+      "title": "Cost model and trade-offs",
+      "tags": [
+        "reader-overhead",
+        "unbounded-memory-bound"
+      ],
+      "content": "Cost: reader 0–2 instructions (preempt-disable in classic kernel RCU); writer `synchronize_rcu()` blocks ms-scale; `call_rcu()` async. Worst-case retention: unbounded under stalled readers — a CPU never quiescing blocks a grace period and every reclamation behind it.\n\nThis unbounded-retention property is shared with epoch-based reclamation but for a different reason: in EBR a stalled pinned thread freezes reclamation; in RCU a CPU that never reaches a quiescent state (e.g. a CPU stuck in a long read-side critical section) does. The kernel mitigates with preemptible RCU, expedited grace periods, and watchdog stalls.",
+      "refs": [
+        {
+          "target": "epoch-based-reclamation#cost-model",
+          "type": "related"
+        },
+        {
+          "target": "hazard-pointers#cost-model",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "userspace-and-cpp26",
+      "title": "Userspace RCU and C++26 standardisation",
+      "tags": [
+        "userspace-rcu",
+        "cpp26",
+        "production"
+      ],
+      "content": "**liburcu** (Mathieu Desnoyers) brings RCU to userspace with multiple flavours: signal-based, membarrier-based, mb (full barrier), and bp (bullet-proof). Used by QEMU, gluster, lttng, and many production systems. DPDK provides a per-data-structure RCU variant (`rte_rcu_qsbr`) with QSBR semantics; see also `qsbr`.\n\n**C++26 `std::rcu_obj_base` / `std::rcu_synchronize`** (P2545) standardises userspace RCU as a language-level primitive alongside `std::hazard_pointer`. The C++26 form is essentially a packaging of liburcu's bp/membarrier flavours into a portable, allocator-friendly API.\n\nProduction footprint: Linux kernel uses RCU pervasively (VFS dcache, networking stack, modules, IDR/radix-tree, RCU-protected hash tables). McKenney's `Is Parallel Programming Hard, And, If So, What Can You Do About It?` is the standard reference.",
+      "refs": [
+        {
+          "target": "qsbr",
+          "type": "related"
+        },
+        {
+          "target": "cpp26-hazptr-rcu",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "liburcu",
+          "url": "https://liburcu.org/"
+        },
+        {
+          "label": "DPDK RCU",
+          "url": "https://doc.dpdk.org/guides-20.11/prog_guide/rcu_lib.html"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Linux RCU docs",
+      "url": "https://www.kernel.org/doc/html/latest/RCU/Design/Requirements/Requirements.html"
+    },
+    {
+      "label": "liburcu",
+      "url": "https://liburcu.org/"
+    }
+  ]
+}

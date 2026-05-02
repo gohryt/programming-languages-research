@@ -1,0 +1,95 @@
+{
+  "kind": "concept",
+  "name": "Source Location Strategies",
+  "aliases": [
+    "span-strategies",
+    "ast-positions"
+  ],
+  "summary": "Techniques for cheaply attaching file/line/column information to AST nodes; design axes are spans-per-node (rustc, swc, Go, Cuik) vs width-only/token-indexed (Roslyn, rowan, Zig) vs binary-search line-table resolution.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Source location strategies determine how a parser attaches file and line/column information to AST nodes. The primary axis is how much per-node storage the strategy pays, traded against the cost of resolving a byte offset back to a human-readable line/column on demand. Designs span spans-per-node (rustc, swc, Go, Cuik), width-only or token-indexed designs that store nothing absolute (Roslyn, rowan, Zig), and the shared binary-search line-table machinery that backs most of them.",
+      "refs": [
+        {
+          "target": "flat-ast-representations#overview",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "spans-on-ast-nodes",
+      "title": "Spans on AST nodes — rustc, swc, Go, Cuik",
+      "tags": [
+        "parser",
+        "ast",
+        "memory-layout"
+      ],
+      "content": "**rustc** went through three iterations of span size: 16 bytes → 4 bytes → 8 bytes. The current compact `Span` is 8 bytes and stores common byte-position and hygiene-context cases inline; rare cases spill to an interner rather than carrying a full `SpanData` everywhere. A separate `SourceMap` stores line-start offsets and converts byte positions to line/column lazily via binary search. The key decision: store byte offsets everywhere, compute line/column only when needed for diagnostics. This avoids the cost of tracking newlines during parsing.\n\n**swc** mirrors rustc: `Span { lo: BytePos(u32), hi: BytePos(u32), ctxt: SyntaxContext }` = 12 bytes per node. `BytePos(0)` is reserved for compiler-synthesized spans. The cost is real — on a large AST with millions of nodes, spans alone can consume tens of megabytes.\n\n**Go** uses compact `token.Pos` integers throughout the AST rather than storing full spans everywhere. All files in a compilation share a virtual address space via `FileSet.AddFile(name, base, size)`. Each file occupies `[base, base+size]`. Resolution is a binary search on the `FileSet`, then on the file's line-start table. Many AST nodes store a primary start position and compute `End()` structurally.\n\n**Cuik** packs source locations into `u32` with bit fields: 1 bit macro flag, 14 bits file ID, 17 bits file position. `SourceRange` is two of these = 8 bytes. The bit-packing is impressively tight but limits file size to 128KB and file count to 16384 — workable for hand-written C translation units, risky for generated code or amalgamated libraries.",
+      "refs": [
+        {
+          "target": "rust#compiler",
+          "type": "example"
+        },
+        {
+          "target": "go#compiler",
+          "type": "example"
+        }
+      ],
+      "sources": [
+        {
+          "label": "rustc diagnostics guide",
+          "url": "https://rustc-dev-guide.rust-lang.org/diagnostics.html"
+        },
+        {
+          "label": "swc Span",
+          "url": "https://rustdoc.swc.rs/swc_common/struct.Span.html"
+        },
+        {
+          "label": "Go token package",
+          "url": "https://pkg.go.dev/go/token"
+        }
+      ]
+    },
+    {
+      "id": "no-stored-positions",
+      "title": "No stored positions — Zig, Roslyn, rowan",
+      "tags": [
+        "parser",
+        "ast",
+        "incremental"
+      ],
+      "content": "Three production systems omit absolute positions from AST/tree nodes entirely.\n\n**Zig** AST nodes store token indices rather than byte offsets, with tokens themselves storing a start offset — so position lookup is a two-step dereference. The strategy is enabled by Zig's pipeline: once the typed-IR layer ZIR is emitted, the AST, token list, and source text can be freed.\n\n**Roslyn** and **rowan** both store widths (character counts) on green nodes rather than absolute offsets, so a separate red layer can compute positions by summing widths from the root on demand. Per-node absolute-position storage is zero; the motivation is incremental reparse-without-invalidation.",
+      "refs": [],
+      "sources": [
+        {
+          "label": "Zig std library",
+          "url": "https://github.com/ziglang/zig/tree/master/lib/std/zig"
+        },
+        {
+          "label": "Roslyn syntax",
+          "url": "https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax"
+        }
+      ]
+    },
+    {
+      "id": "line-position-resolution",
+      "title": "Line position resolution — binary-search line tables",
+      "tags": [
+        "parser",
+        "diagnostics",
+        "performance"
+      ],
+      "content": "Both Cuik and Go use the same fundamental approach for resolving byte offsets to line/column positions: a sorted array of line-start byte offsets. Given a byte position, binary search the array to find the line number, then subtract the line-start from the position to get the column.\n\nConstruction is a single linear scan of the source. Resolution is O(log lines) per query. Memory is one `u32` per source line — typically 1–4KB per file. Go's `FileSet` extends this to multiple files by giving each file a non-overlapping range in a virtual address space; two binary searches per `token.Pos`, constant per file.\n\nThe compiler-side counterparts — encoding these positions alongside compiled output (JVM `LineNumberTable`, CPython PEP 657, DWARF `.debug_line`, JS Source Maps) — are downstream debug-info concerns.",
+      "refs": [
+        {
+          "target": "dwarf-debug-info#dwarf-location-expressions",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": []
+}

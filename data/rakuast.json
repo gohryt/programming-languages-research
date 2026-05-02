@@ -1,0 +1,38 @@
+{
+  "kind": "framework",
+  "name": "RakuAST",
+  "aliases": ["Raku AST", "Raku class-based AST"],
+  "summary": "Rakudo's RakuAST replaces the QAST-based front-end with an AST whose nodes are Raku classes. AST nodes are first-class language objects: `.AST` parses to objects, `.DEPARSE` round-trips, `IMPL-TO-QAST` lowers for execution. User macros manipulate syntax with the same tools as any Raku object hierarchy.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Rakudo's RakuAST replaces the QAST-based front-end with an AST whose nodes are Raku classes under the `RakuAST::` package: `RakuAST::StatementList`, `RakuAST::Call::Name`, etc. (QAST = the older Q Abstract Syntax Tree, the runtime IR shared between NQP — \"Not Quite Perl,\" the bootstrap subset that implements Rakudo — and Raku.)\n\n`.AST` parses to objects, `.DEPARSE` round-trips back to source, and `IMPL-TO-QAST` lowers to QAST for execution.",
+      "refs": [
+        { "target": "moarvm-jit#overview", "type": "lowers-to" },
+        { "target": "raku#overview", "type": "compiler-frontend-of" }
+      ],
+      "sources": [
+        { "label": "RakuAST documentation", "url": "https://docs.raku.org/type/RakuAST" }
+      ]
+    },
+    {
+      "id": "first-class-language-objects",
+      "title": "AST nodes as first-class language objects",
+      "tags": ["raku", "metaprogramming"],
+      "content": "The radical move: AST nodes are *first-class language objects*. User macros construct, traverse, and rewrite syntax with the same tools used to manipulate any other Raku object hierarchy. Compile-time `$?SOURCE` and `$?CHECKSUM` (SHA-1) become available for runtime debuggers and packaging.\n\nThis differs from most macro systems where the AST is a separate data type accessed through a special API. In RakuAST, the AST nodes are ordinary Raku classes; macros are Raku code operating on Raku objects. The metaprogramming surface is the same surface Raku uses for everything else.",
+      "refs": []
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["raku", "compiler-architecture"],
+      "content": "The cost: every AST traversal goes through full language object dispatch, with measurable allocation pressure during compilation. RakuAST is heavier than a tagged-union AST or a flat-arena AST, both at construction time and at traversal time.\n\nThe lowering step (`IMPL-TO-QAST`) preserves the existing compiler pipeline below the AST level: RakuAST replaces the *frontend* AST while QAST remains the runtime IR. This dual structure adds a translation layer but allows incremental migration from QAST-based to RakuAST-based front-end work without invalidating the rest of the compiler.\n\nFor a language designer considering this approach: AST-as-first-class-objects is a powerful metaprogramming primitive, but only if the language design supports cheap object dispatch and the compiler can tolerate the allocation pressure.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "RakuAST", "url": "https://docs.raku.org/type/RakuAST" }
+  ]
+}

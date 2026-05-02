@@ -1,0 +1,56 @@
+{
+  "kind": "concept",
+  "name": "Reproducible Builds",
+  "aliases": ["reproducibility"],
+  "summary": "Ensures identical declared inputs produce identical resolved artifacts; modern mechanisms span content-hashed lockfiles, hermetic build environments (Nix flakes, Guix), Sigstore-signed provenance, SLSA attestation levels, and ecosystem-scale rebuild verification (OSS Rebuild).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Reproducible builds aim to ensure that the same declared inputs produce the same resolved outputs across machines and over time. They matter because debugging, caching, trust, and dependency maintenance all become harder when builds depend on hidden environmental variation.\n\nReproducibility comes in degrees, from \"the same dependency versions resolve\" (lockfile-based) up to \"the same bytes are emitted\" (hermetic-build-based). Each level adds stronger guarantees at the cost of more invasive infrastructure.",
+      "refs": [
+        { "target": "lockfiles#overview", "type": "related" },
+        { "target": "cargo#dependency-resolution", "type": "related" }
+      ]
+    },
+    {
+      "id": "main-mechanisms",
+      "title": "Main mechanisms — lockfiles, hermetic builds, Sigstore",
+      "tags": ["reproducibility", "lockfiles", "build-systems"],
+      "content": "The main practical mechanisms include lockfiles, content hashes, deterministic package resolution, and increasingly hermetic or sandboxed build environments. These mechanisms complement one another rather than acting as a single silver bullet.\n\n**Content-hashed lockfiles** (Cargo.lock, go.sum, pnpm-lock.yaml) pin not just version strings but the bytes of dependencies, defending against retroactive registry changes. Go's `sum.golang.org` checksum database goes further with a public log of every known module version's hash.\n\n**Nix flakes** and **Guix** make reproducibility a property of a hermetic package-definition language and a content-addressed store. Every package is a pure function from inputs to outputs; the build sandbox is hermetic by language-level construction. Two builds against the same `flake.lock` produce identical outputs byte for byte, regardless of when or where they run. **Spack** is the HPC-oriented variant adding combinatorial version selection.\n\n**Sigstore + SLSA + cosign** make the build process itself verifiable through cryptographic signatures and structured attestations. Sigstore uses keyless signing via short-lived OIDC-bound certificates issued by Fulcio and recorded in the Rekor transparency log; SLSA Levels 1–4 specify increasingly strong tamper-resistance guarantees; cosign ties them together. Status (as of 2026-04): GitHub Actions emits SLSA Level 3 build provenance via `actions/attest-build-provenance`; npm enforces Sigstore-signed publishing for trusted packages since 2024; PyPI Trusted Publishing uses the same OIDC-to-Sigstore flow.\n\n**Google's OSS Rebuild** (announced 2025) attempts to rebuild published packages at ecosystem scale and compare the result with the upstream artifact — continuous, third-party validation of public package ecosystems. The three layers compose end-to-end.",
+      "refs": [
+        { "target": "lockfiles#content-hashes-and-trust", "type": "related" },
+        { "target": "package-resolution#resolution-outputs", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Nix flakes", "url": "https://nixos.wiki/wiki/Flakes" },
+        { "label": "Sigstore", "url": "https://www.sigstore.dev/" }
+      ]
+    },
+    {
+      "id": "why-it-matters",
+      "title": "Why it matters",
+      "tags": ["reproducibility", "supply-chain", "tooling"],
+      "content": "Reproducibility improves CI stability, dependency debugging, cache reliability, and software supply-chain confidence. It also reduces the gap between what a package declaration seems to promise and what actually gets built in practice.\n\nLockfiles and content hashes help only after a consumer has decided which artifact to trust. Sigstore-style provenance proves the bytes came from an authorised build. SLSA describes how authorised that build was. OSS Rebuild independently re-derives the artifact. Together they attack the supply-chain problem at different points and compose end-to-end.\n\nFor a new package ecosystem, designing a registry so that all three are emitted by default — rather than retrofitted later under incident pressure — is dramatically cheaper than the npm/PyPI experience of bolting them on after years of typo-squatting and account-compromise incidents.",
+      "refs": [
+        {
+          "target": "language-server#design-constraints",
+          "type": "relevant-to"
+        },
+        { "target": "package-management#design-lessons", "type": "related" }
+      ]
+    },
+    {
+      "id": "practical-scope",
+      "title": "Practical scope",
+      "tags": ["reproducibility", "design-guidance", "packaging"],
+      "content": "Most ecosystems start with lockfile-based reproducibility and later add stronger supply-chain or build-environment guarantees. Full reproducibility is not one feature but a layering of identity, resolution, artifact pinning, and execution-environment control.\n\nCompared with Cargo, npm, or PyPI — which are *artifact distribution* systems with reproducibility added on — Nix and Guix are *build* systems with distribution as a side effect. The trade-off is acquisition cost (significant Nix learning curve, a separate package ecosystem to inhabit) for hermetic reproducibility that no lockfile-based system can match.\n\nFor a package manager designer, the question Nix and Guix raise is whether reproducibility is a *property of the lockfile* or a *property of the build*. Most modern systems pick the former; Nix shows the latter is achievable and structurally cleaner, at the cost of much higher complexity.",
+      "refs": [
+        { "target": "go#packaging", "type": "related" },
+        { "target": "cargo#dependency-resolution", "type": "related" }
+      ]
+    }
+  ],
+  "sources": []
+}

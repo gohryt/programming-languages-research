@@ -1,0 +1,119 @@
+{
+  "kind": "tool",
+  "name": "RefinedRust — Foundational Refinement Types",
+  "aliases": [
+    "radium"
+  ],
+  "summary": "Gaeher, Sammler, Jung, Krebbers, Dreyer (PLDI 2024) deliver a refinement-type system for Rust producing foundational Coq proofs (machine-checked, no trusted automation), sound w.r.t. an Iris/RustBelt model and supporting both safe and unsafe code. Radium provides a realistic operational semantics for real Rust including place semantics. Type checker is not in TCB; tool emits Coq scripts.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "formal-verification",
+        "mechanised-proof",
+        "rust-verifier",
+        "refinement-types",
+        "deductive-verification"
+      ],
+      "content": "Gaeher, Sammler, Jung, Krebbers, Dreyer (PLDI 2024) deliver a refinement-type system for Rust producing **foundational Coq proofs** (machine-checked, no trusted automation), sound w.r.t. an Iris/RustBelt model and supporting both safe and unsafe code.\n\n**Radium**: realistic operational semantics for real Rust (vs. RustBelt's idealized lambdaRust), including place semantics. **Refined ownership types** combine ownership with refinement predicates; semantic model in Iris extends RustBelt's lifetime logic with new borrow flavors for unsafe code. **Foundational guarantee**: tool emits Coq scripts; the type checker is not in TCB. Research prototype; case study verifies a variant of `std::Vec` including unsafe pointer manipulation.",
+      "refs": [
+        {
+          "target": "iris-separation-logic#overview",
+          "type": "built-on"
+        },
+        {
+          "target": "rustbelt-lambda-rust#overview",
+          "type": "extends"
+        },
+        {
+          "target": "refinement-types#overview",
+          "type": "implements"
+        },
+        {
+          "target": "verus#overview",
+          "type": "compared-with"
+        },
+        {
+          "target": "aeneas-verifier#overview",
+          "type": "compared-with"
+        }
+      ],
+      "sources": [
+        {
+          "label": "RefinedRust PLDI 2024",
+          "url": "https://iris-project.org/pdfs/2024-pldi-refinedrust.pdf"
+        },
+        {
+          "label": "RefinedRust PLDI 2024 (ACM DL)",
+          "url": "https://dl.acm.org/doi/10.1145/3656422"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "title": "Refined ownership and Radium semantics",
+      "tags": [
+        "refinement-types",
+        "lifetime-logic",
+        "ownership"
+      ],
+      "content": "RefinedRust combines two ideas: **refinement types** (logical predicates attached to base types) and **ownership types** (Rust's borrow-checked references). The refined-ownership type `&'a T | P` says \"a borrow of `T` valid for lifetime `'a` whose value satisfies predicate `P`\". The refinement predicates extend the source language's expressiveness; the ownership types continue to enforce aliasing.\n\nThe **Radium** operational semantics is the second contribution: where RustBelt's λRust uses an idealised abstract syntax, Radium models the **place semantics** of real Rust — the distinction between expression-positions that produce values and place-positions that produce locations. This brings the soundness proof closer to the actual Rust compiler's behaviour, important for verifying unsafe code that depends on the precise place semantics (raw pointer arithmetic, field projections through unions).",
+      "refs": [
+        {
+          "target": "refinement-types#overview",
+          "type": "specialises-for-rust"
+        },
+        {
+          "target": "ownership#overview",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "id": "target-and-backend",
+      "title": "Foundational Coq with no trusted automation",
+      "tags": [
+        "coq",
+        "mechanised-proof",
+        "proof-engineering"
+      ],
+      "content": "RefinedRust is **foundational**: the tool emits Coq scripts that are checked by the Coq kernel. The type checker is not in the TCB — a bug in the type checker manifests as a Coq proof that fails to type-check, not as a soundness hole. This contrasts with auto-active verifiers like Prusti, Verus, and Creusot, where the SMT solver and the verification-IL translator are part of the TCB.\n\nThe Iris/RustBelt model is the trusted base: the soundness proof of RefinedRust's type system is mechanised against the Iris-based semantics of Rust developed by RustBelt. New borrow flavors for unsafe code (raw pointers, owned pointers, mutable raw references) extend RustBelt's lifetime logic with corresponding Iris assertions.",
+      "refs": [
+        {
+          "target": "iris-separation-logic#overview",
+          "type": "trusts"
+        },
+        {
+          "target": "rustbelt-lambda-rust#overview",
+          "type": "trusts"
+        }
+      ]
+    },
+    {
+      "id": "case-study-and-status",
+      "title": "Vec verification and status",
+      "tags": [
+        "research",
+        "memory-safety-proof"
+      ],
+      "content": "The PLDI 2024 paper's headline case study verifies a variant of **`std::Vec`** including unsafe pointer manipulation — the canonical \"hard\" Rust verification target, since `Vec` mixes ownership of an allocation, length and capacity invariants, and raw pointer arithmetic. Verifying `Vec` foundationally puts RefinedRust in the same league as RustBelt's case studies (Arc, Rc, RefCell, Mutex) but with the additional benefit of refinement predicates over the type structure.\n\nStatus (as of 2026-04): research prototype. Compared to Verus (production deployments at Google/Amazon, SMT-backed automation) RefinedRust offers stronger guarantees (no trusted SMT) at significantly higher proof-engineering cost. The comparison is the standard one: foundational Coq proofs cost 10–30× engineering effort vs SMT-backed auto-active verification, and the choice depends on whether the verification target requires absolute trust in the proof artefact.",
+      "refs": [
+        {
+          "target": "verus#overview",
+          "type": "contrasts-with"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "RefinedRust PLDI 2024",
+      "url": "https://iris-project.org/pdfs/2024-pldi-refinedrust.pdf"
+    },
+    {
+      "label": "RefinedRust PLDI 2024 (ACM DL)",
+      "url": "https://dl.acm.org/doi/10.1145/3656422"
+    }
+  ]
+}

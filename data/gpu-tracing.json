@@ -1,0 +1,129 @@
+{
+  "kind": "concept",
+  "name": "GPU tracing",
+  "aliases": [
+    "NVTX",
+    "CUPTI",
+    "ROCm tracing",
+    "cross-clock-domain tracing"
+  ],
+  "summary": "GPU workloads cross a boundary that none of the prior tracing mechanisms handle cleanly — the GPU has its own clock domain, scheduler, and asynchronous queue model; placing CPU-side dispatches and GPU-side executions on one timeline requires hardware timestamps and cross-domain correlation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "GPU workloads cross a boundary that none of the prior mechanisms handle cleanly: the GPU has its *own* clock domain, its own scheduler, and its own asynchronous queue model. A `cuLaunchKernel` call returns in microseconds on the host; the kernel may not execute on the GPU until milliseconds later. To place CPU-side dispatches and GPU-side executions on one timeline requires hardware timestamps from the GPU's own clock and a cross-domain correlation mechanism.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:gpu-tracing`\n- **domain**: `domain:tracing`\n- **off-cost**: `off-cost:always-on`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`\n"
+    },
+    {
+      "id": "nvtx",
+      "title": "NVTX — Annotation Layer for Nsight",
+      "tags": [
+        "domain:tracing",
+        "family:gpu-tracing",
+        "gpu",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:low"
+      ],
+      "content": "**NVTX** (NVIDIA Tools Extension) is a lightweight API for in-application tracing annotations — `nvtxRangePush(\"frame\")` / `nvtxRangePop()` to mark scoped ranges, `nvtxMarkA(\"checkpoint\")` for instant events. When no profiler is attached, the library is a no-op stub (zero overhead). When Nsight Systems or Nsight Compute is attached, the ranges and markers appear as named spans on the timeline.\n\nThe \"registered string handles\" optimization is worth naming: `NVTX3_FUNC_RANGE` pre-interns range names so the hot-path call is a pointer push rather than a `strcmp` in the profiler — the cheap-guard / expensive-payload pattern (`data/bytecode-and-code-patching#dtrace-usdt-is-enabled-probes`) applied to GPU-workload annotations, and the direct analogue of Tracy's scoped zones (`data/instrumentation-profiling#tracy-spall`) and OpenTelemetry spans (`data/distributed-tracing#opentelemetry`) for the GPU domain.",
+      "sources": [
+        {
+          "url": "https://nvidia.github.io/NVTX/"
+        },
+        {
+          "url": "https://github.com/NVIDIA/NVTX"
+        }
+      ]
+    },
+    {
+      "id": "cupti-nsight-systems",
+      "title": "CUPTI + Nsight Systems — Cross-Clock-Domain Correlation",
+      "tags": [
+        "domain:tracing",
+        "family:gpu-tracing",
+        "gpu",
+        "granularity:per-event",
+        "nvidia",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "**CUPTI** (CUDA Profiling Tools Interface) is the low-level substrate below Nsight. It exposes two complementary APIs: a **Callback API** (synchronous entry/exit hooks on CUDA driver / runtime calls — high overhead, for deep diagnostics) and an **Activity API** (asynchronous buffered records of kernels, memcopies, driver calls — low overhead, for production sampling).\n\nThe load-bearing detail for GPU tracing is that CUPTI's `CUpti_ActivityKernel` record exposes **four separate timestamps per kernel launch**: `queued` (enqueued for submission), `submitted` (handed to GPU), `start` (began executing on an SM), `end` (finished execution). Each is on a different clock / queue domain, and only all four together reconstruct the full launch-to-finish latency breakdown — queueing latency, driver latency, execution latency are distinct sources of slowness that a single-timestamp view would blur together.\n\n**Nsight Systems** (NVIDIA's system profiler) composes NVTX + CUPTI + OS-level perf-like sampling into a single timeline, adding GPU metric sampling (SM occupancy, tensor-core activity, PCIe/NVLink throughput) as separate tracks. It is the production end-state of the \"universal timeline\" pattern `data/trace-storage-and-visualization#perfetto-fuchsia-trace-format` describes for general tracing, specialized for GPU workloads.\n\nThe cross-vendor convergence point is **Perfetto's `GpuRenderStageEvent` proto**, which models GPU work as per-hardware-queue timelines (graphics, compute, DMA, video-encode), each carrying submission IDs that correlate back to the CPU-side `vkQueueSubmit` / `glFlush` / `cuLaunchKernel` call. The \"one thing at a time per queue\" constraint is enforced by the representation — true GPU parallelism surfaces as additional queues, not overlapping events on one queue. Android Graphics Profiler, Google's GPU tracing for ANGLE, AMD's rocprof (`data/gpu-tracing#rocm-roctracer-rocprof`), and increasingly Nsight Systems all emit Perfetto-compatible output: GPU tracing's analogue of pprof's lingua-franca role for profiles.",
+      "sources": [
+        {
+          "url": "https://docs.nvidia.com/cupti/"
+        },
+        {
+          "url": "https://developer.nvidia.com/nsight-systems"
+        },
+        {
+          "url": "https://docs.nvidia.com/nsight-systems/UserGuide/"
+        },
+        {
+          "url": "https://github.com/google/perfetto/blob/main/protos/perfetto/trace/gpu/gpu_render_stage_event.proto"
+        }
+      ]
+    },
+    {
+      "id": "rocm-roctracer-rocprof",
+      "title": "ROCm rocTracer / rocprofiler — AMD Equivalent",
+      "tags": [
+        "amd",
+        "domain:tracing",
+        "family:gpu-tracing",
+        "gpu",
+        "granularity:per-event",
+        "off-cost:zero",
+        "on-cost:medium"
+      ],
+      "content": "AMD's ROCm stack mirrors NVIDIA's three-layer model: **rocTracer** for runtime-API callback tracing, **ROC-TX** for NVTX-equivalent application annotations, and **rocprof** / **ROCProfiler-SDK** for counter and hardware-trace collection. The legacy stack (rocTracer + rocprof v1/v2) is being superseded by **ROCprofiler-SDK / rocprofv3**. Scheduled for 2026-Q2: end-of-support for the legacy rocTracer + rocprof v1/v2 tools.\n\nThe distinctive detail is the output format: `rocprof` emits **Chrome-tracing-compatible JSON**, so AMD GPU traces can be loaded directly into Perfetto (`data/trace-storage-and-visualization#perfetto-fuchsia-trace-format`) or the Chrome DevTools tracing viewer without adapter code. This is a deliberate interoperability choice — AMD did not invent a new format, it adopted the one the existing tracing-viewer ecosystem already understood.",
+      "sources": [
+        {
+          "url": "https://rocm.docs.amd.com/projects/roctracer/en/latest/"
+        },
+        {
+          "url": "https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.6.0/rocprof.html"
+        }
+      ]
+    },
+    {
+      "id": "perfetto-gpu-render-stage-events",
+      "title": "Perfetto GPU Render-Stage Events",
+      "tags": [
+        "domain:tracing",
+        "family:gpu-tracing",
+        "gpu",
+        "granularity:per-event",
+        "off-cost:always-on",
+        "on-cost:medium"
+      ],
+      "content": "Folded into `data/gpu-tracing#cupti-nsight-systems` above (Perfetto's `GpuRenderStageEvent` is the cross-vendor GPU-trace interchange that Nsight Systems, AMD rocprof, and Android Graphics Profiler all converge on). Heading retained for cross-reference stability."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://nvidia.github.io/NVTX/"
+    },
+    {
+      "url": "https://github.com/NVIDIA/NVTX"
+    },
+    {
+      "url": "https://docs.nvidia.com/cupti/"
+    },
+    {
+      "url": "https://developer.nvidia.com/nsight-systems"
+    },
+    {
+      "url": "https://docs.nvidia.com/nsight-systems/UserGuide/"
+    },
+    {
+      "url": "https://github.com/google/perfetto/blob/main/protos/perfetto/trace/gpu/gpu_render_stage_event.proto"
+    },
+    {
+      "url": "https://rocm.docs.amd.com/projects/roctracer/en/latest/"
+    },
+    {
+      "url": "https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.6.0/rocprof.html"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-instruction",
+  "tag": "granularity:per-instruction",
+  "name": "Granularity: per instruction",
+  "description": "The mechanism observes or affects every instruction (or every basic block at the limit). Bytecode opcode patching, full DBI, sanitizer-inserted checks.",
+  "axis": "granularity"
+}

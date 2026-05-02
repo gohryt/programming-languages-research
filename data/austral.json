@@ -1,0 +1,57 @@
+{
+  "kind": "language",
+  "name": "Austral",
+  "aliases": ["austral-lang"],
+  "summary": "Fernando Borretti's Austral uses linearity (every linear value used exactly once) as the load-bearing safety primitive, not an opt-in. The linearity checker fits in roughly 600 lines of OCaml. Linear types double as capabilities: the entrypoint receives a RootCapability and APIs require passing capability values — supply-chain attacks become a type error since capabilities cannot be forged or stashed in globals. Region-tagged borrows re-enable shared/mutable references inside a lexical scope without losing the linearity invariant. Designed for fits-in-head simplicity. Status (2023): 1.0.0-alpha.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["austral", "linear-types", "ownership", "memory-safety", "compile-time-safety"],
+      "content": "Fernando Borretti's **Austral** uses linearity (every linear value used *exactly* once) as the load-bearing safety primitive, not an opt-in. The linearity checker fits in roughly 600 lines of OCaml.\n\nThe language is designed for \"fits-in-head\" simplicity: the linearity rules fit on one page; the compiler is small enough to be auditable.",
+      "refs": [
+        { "target": "ownership", "type": "related" },
+        { "target": "linear-affine-types", "type": "exemplifies" },
+        { "target": "capability-based-memory", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Austral spec", "url": "https://austral-lang.org/spec/spec.html" },
+        { "label": "Austral linearity", "url": "https://borretti.me/article/how-australs-linear-type-checker-works" }
+      ]
+    },
+    {
+      "id": "linear-types-as-capabilities",
+      "title": "Linear types as capabilities",
+      "tags": ["austral", "linear-types", "capability-based-memory"],
+      "content": "Linear types double as **capabilities**: the entrypoint receives a `RootCapability` and APIs require passing capability values (`EnvCap`, `FileSystemCap`, etc.) — supply-chain attacks become a type error since capabilities cannot be forged or stashed in globals.\n\nThe payoff is that capability discipline and resource discipline use the same type-system mechanism: a value either is or is not in the program's linear context, and that decides both whether it can be reused and whether the holder is authorised to perform the operation it represents.",
+      "refs": [
+        { "target": "capability-based-memory", "type": "related" }
+      ],
+      "sources": [
+        { "label": "Borretti — How capabilities work in Austral", "url": "https://borretti.me/article/how-capabilities-work-austral" }
+      ]
+    },
+    {
+      "id": "region-tagged-borrows",
+      "title": "Region-tagged borrows",
+      "tags": ["austral", "borrowing", "region-based", "linear-types"],
+      "content": "Region-tagged borrows (`borrow` statement introducing a fresh region type `R`) re-enable shared/mutable references inside a lexical scope without losing the linearity invariant, by ensuring references cannot escape the region. This recovers the ergonomics of borrowing for read-mostly code without giving up the linear discipline at the API boundary.",
+      "refs": [
+        { "target": "region-based-memory", "type": "related" },
+        { "target": "borrowing", "type": "related" }
+      ]
+    },
+    {
+      "id": "status",
+      "title": "Status",
+      "tags": ["austral"],
+      "content": "Status (2023): 1.0.0-alpha. The reference implementation is open source; production use is limited but the language is the cleanest available demonstration of \"linearity as the only mechanism\" — no opt-in linear types layered on a non-linear core, no escape hatches, no garbage collector.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Austral spec", "url": "https://austral-lang.org/spec/spec.html" },
+    { "label": "Austral linearity", "url": "https://borretti.me/article/how-australs-linear-type-checker-works" },
+    { "label": "Borretti — How capabilities work in Austral", "url": "https://borretti.me/article/how-capabilities-work-austral" }
+  ]
+}

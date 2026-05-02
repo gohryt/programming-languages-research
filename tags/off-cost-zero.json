@@ -1,0 +1,7 @@
+{
+  "id": "off-cost-zero",
+  "tag": "off-cost:zero",
+  "name": "Cost when off: zero",
+  "description": "Mechanism is genuinely zero-cost when no probe/session is active. Disabled paths add no instructions, no metadata reads, no register pressure.",
+  "axis": "off-cost"
+}

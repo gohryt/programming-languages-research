@@ -1,0 +1,80 @@
+{
+  "kind": "concept",
+  "name": "Actors",
+  "aliases": ["actor-model"],
+  "summary": "Concurrency model based on isolated stateful entities that process one message at a time through mailboxes; production examples span Erlang/BEAM (share-nothing), Akka (JVM with shared heap), Pony (static data-race freedom via reference capabilities), Swift (ARC-based isolation), and Orleans (runtime-managed virtual actors).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Actors are isolated stateful entities that communicate by sending messages rather than sharing mutable state directly. They are a major alternative to lock-based shared-memory concurrency and are especially important in systems that value isolation and fault containment.\n\nAn actor owns state, processes one message at a time, and communicates by sending messages. This gives a clear isolation boundary: actor-local mutable state does not require locks if only the actor can touch it. Actor systems differ on whether messages are ordered, typed, selective, bounded, durable, distributed, priority-aware, or supervised.",
+      "refs": [{ "target": "ownership#tradeoffs", "type": "contrasts-with" }]
+    },
+    {
+      "id": "isolation-and-mailboxes",
+      "title": "Isolation and mailboxes",
+      "tags": ["concurrency", "message-passing", "isolation"],
+      "content": "Each actor owns local state and processes incoming work through a mailbox. This shifts concurrency design toward message ordering, mailbox growth, and isolation policy rather than shared-lock discipline.\n\nBounded mailboxes give producers a backpressure signal; unbounded mailboxes shift the failure mode to memory growth. Erlang processes are lightweight units managed by BEAM, not OS processes; each has its own message queue scanned by `receive` against patterns. Selective receive is expressive but means mailbox scanning can become a performance concern.",
+      "refs": [{ "target": "channels#overview", "type": "contrasts-with" }],
+      "sources": [
+        { "label": "Erlang concurrent programming", "url": "https://www.erlang.org/doc/system/conc_prog.html" }
+      ]
+    },
+    {
+      "id": "supervision-and-fault-containment",
+      "title": "Supervision and fault containment",
+      "tags": ["concurrency", "fault-tolerance", "runtime"],
+      "content": "Many actor systems elevate failure handling into the concurrency model itself, using supervision trees and restarts. This makes actors relevant not only for parallelism but also for architectural fault containment and service resilience.\n\nErlang's deepest concurrency lesson is not only actors but supervised failure: processes can crash independently, supervisors restart children, and links/monitors make failure visible. A language runtime can treat failure propagation as part of the concurrency model rather than an afterthought. Lightbend's Akka extends this to the JVM with hierarchical supervision trees where a parent decides each child's failure (restart, resume, stop, escalate).",
+      "refs": [
+        {
+          "target": "structured-concurrency#failure-and-cancellation-propagation",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "akka-and-jvm-actors",
+      "title": "Akka — production actors on the JVM",
+      "tags": ["actors", "jvm", "production"],
+      "content": "Lightbend's **Akka** (Scala/Java, Jonas Bonér et al., 2009+) is the dominant production actor system on managed runtimes. Each Akka actor is a lightweight object with a typed mailbox; actors are organised hierarchically through a supervision tree. Distinct from BEAM and Pony: Akka runs on the JVM with shared-heap memory, so actor isolation is by convention rather than enforced by the language. **Akka Cluster** plus **Cluster Sharding** make \"millions of mostly-independent stateful entities\" a routing problem rather than a per-node problem. Full treatment, including the 2022 BSL relicense and the **Apache Pekko** fork, lives in `data/akka`.",
+      "refs": [
+        { "target": "akka#overview", "type": "deep-treatment" }
+      ]
+    },
+    {
+      "id": "orleans-virtual-actors",
+      "title": "Orleans — virtual actors and runtime-managed activation",
+      "tags": ["actors", "dotnet", "production"],
+      "content": "Microsoft Research's **Orleans** (OSDI 2014) introduced the **virtual actor** model. A *grain* has a logical identity that exists conceptually forever; the runtime materialises a grain on demand on whichever silo has capacity, deactivates it after idle, persists state, and resurrects it on the next call. The novelty vs Akka and BEAM: the developer never explicitly creates or destroys actors, so orphan references, location tracking, restart-after-crash, and supervisor-tree configuration all become the runtime's problem. Best-fit workloads are very large numbers of mostly-idle stateful entities (game lobbies, IoT device twins, per-user session state). Full treatment lives in `data/orleans`.",
+      "refs": [
+        { "target": "orleans#overview", "type": "deep-treatment" }
+      ]
+    },
+    {
+      "id": "swift-actors-and-pony",
+      "title": "Swift actors and Pony reference capabilities",
+      "tags": ["actors", "isolation", "type-system"],
+      "content": "Status (Swift 5.5+): Swift actors provide data isolation: mutable actor state is protected so only one thread accesses it at a time. Actor-isolated functions are reentrant; if a function suspends, other work may run on the actor before it resumes, so invariants must not be assumed across `await` without care.\n\nFrom the mailbox angle, Pony checks message payloads against reference-capability constraints so isolated or immutable data can cross the actor boundary without copying. Capability kinds — `iso` (unique, sendable), `val` (deeply immutable, freely shareable), `ref` (actor-local, not sendable), `tag` (opaque identity, send-only), and `trn`/`box` (transition forms) — determine which message payloads the compiler permits across the actor boundary, and the runtime relies on those guarantees to avoid runtime synchronization on transferred objects. This is the cleanest example of static data-race freedom by construction in an actor language.",
+      "refs": [],
+      "sources": [
+        { "label": "SE-0306 Actors", "url": "https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md" }
+      ]
+    },
+    {
+      "id": "reentrancy-and-scheduling",
+      "title": "Reentrancy and scheduling",
+      "tags": ["concurrency", "scheduling", "runtime"],
+      "content": "Actor systems differ substantially in scheduling policy, mailbox fairness, selective receive, and reentrancy behavior. Those choices often matter more in practice than the headline actor abstraction itself.\n\nBEAM runs one scheduler per core on multicore machines and balances work across scheduler run queues. Pony actors execute synchronously within an actor and communicate by asynchronous messages; reference capabilities gate what crosses actor boundaries. ActorForth combines a Forth-style concatenative core with static stack-type bookkeeping and BEAM-style actor semantics, suggesting that concatenative execution and actor isolation are not inherently incompatible.",
+      "refs": [{ "target": "work-stealing#overview", "type": "related" }]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs",
+      "tags": ["concurrency", "tradeoffs", "design-guidance"],
+      "content": "Actors provide strong isolation and fault containment, but they also introduce mailbox policy questions, message overhead, and backpressure concerns. They are a strong fit for some service and distributed designs, but not a universal replacement for all concurrency models.",
+      "refs": [{ "target": "sendability#overview", "type": "related" }]
+    }
+  ],
+  "sources": []
+}

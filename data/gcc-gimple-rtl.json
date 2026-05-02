@@ -1,0 +1,33 @@
+{
+  "kind": "concept",
+  "name": "GCC GIMPLE and RTL",
+  "aliases": ["gimple", "gcc-rtl"],
+  "summary": "GCC has two target-adjacent IRs: GIMPLE (high-level, target-agnostic SSA-form three-address code with C-like type system) and RTL (Register Transfer Language, target-specific S-expression-based language modeling machine instructions as register transfers).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "GCC has two target-adjacent IRs: GIMPLE (high-level, target-agnostic) and RTL (Register Transfer Language, target-specific). GIMPLE is SSA-form three-address code with C-like type system; RTL is an S-expression-based language modeling machine instructions as register transfers (`(set (reg:SI 0) (plus:SI (reg:SI 1) (reg:SI 2)))`).",
+      "refs": [
+        { "target": "ssa#overview", "type": "exemplifies" },
+        { "target": "llvm#overview", "type": "alternative-to" }
+      ],
+      "sources": [
+        { "label": "GCC GIMPLE", "url": "https://gcc.gnu.org/onlinedocs/gccint/GIMPLE.html" },
+        { "label": "GCC RTL", "url": "https://gcc.gnu.org/onlinedocs/gccint/RTL.html" }
+      ]
+    },
+    {
+      "id": "two-ir-pipeline",
+      "title": "Two-IR design predates LLVM",
+      "tags": ["compiler-ir", "gcc", "history"],
+      "content": "The two-IR design predates LLVM's MIR by decades. GIMPLE is the substrate for most GCC optimization passes (loop transformations, scalar optimizations, vectorization). RTL is for register allocation, scheduling, and machine-code emission. The transition between GIMPLE and RTL happens after target-independent optimization.\n\nGCC's separation of GIMPLE and RTL anticipated LLVM's later split between LLVM IR and Machine IR by roughly two decades. The recurring pattern across compilers — target-independent SSA above, target-specific lower-level form below — is what GCC pioneered in production.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "GCC GIMPLE", "url": "https://gcc.gnu.org/onlinedocs/gccint/GIMPLE.html" },
+    { "label": "GCC RTL", "url": "https://gcc.gnu.org/onlinedocs/gccint/RTL.html" }
+  ]
+}

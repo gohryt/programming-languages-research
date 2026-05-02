@@ -1,0 +1,53 @@
+{
+  "kind": "tool",
+  "name": "OSS Rebuild",
+  "aliases": ["google-oss-rebuild"],
+  "summary": "Google's ecosystem-scale rebuild verification project (announced 2025) that rebuilds published packages and compares with the upstream artifact; addresses the question 'should this artifact have been trusted in the first place?' against existing ecosystems (PyPI, npm, crates.io) without requiring authors to adopt hermetic build tooling.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Google's **OSS Rebuild** (announced 2025) is a newer point in the packaging design space: instead of asking every package author to adopt hermetic build tooling from day one, it attempts to **rebuild published packages at ecosystem scale** and compare the result with the upstream artifact. The goal is not merely reproducibility for one project, but **continuous, third-party validation of public package ecosystems**.",
+      "refs": [
+        { "target": "reproducible-builds#overview", "type": "extends" },
+        { "target": "sigstore-slsa#overview", "type": "complements" }
+      ],
+      "sources": [
+        { "label": "OSS Rebuild repository", "url": "https://github.com/google/oss-rebuild" },
+        { "label": "OSS Rebuild site", "url": "https://oss-rebuild.dev/" }
+      ]
+    },
+    {
+      "id": "trust-model",
+      "title": "Trust model — what registries currently rely on",
+      "tags": ["oss-rebuild", "supply-chain", "trust"],
+      "content": "This matters because most mainstream package managers still rely on a trust model of:\n\n- the registry served the bytes the author intended;\n- the author's CI/build pipeline was not compromised;\n- the published artifact actually corresponds to the public source.\n\nLockfiles and content hashes (`data/lockfiles`) help only after a consumer has decided which artifact to trust. OSS Rebuild addresses an earlier question: *should this artifact have been trusted in the first place?*",
+      "refs": [
+        { "target": "lockfiles#overview", "type": "extends" }
+      ]
+    },
+    {
+      "id": "vs-nix-and-sigstore",
+      "title": "Distinct from Nix/Guix and Sigstore",
+      "tags": ["oss-rebuild", "comparison"],
+      "content": "The design point is distinct from Nix/Guix (`data/nix-flakes`, `data/guix`). Nix and Guix make reproducibility a property of a hermetic package-definition language and a content-addressed store. OSS Rebuild instead works against **existing ecosystems** such as PyPI, npm, and crates.io with much lower ecosystem-wide migration cost: infer how a package was likely built, rebuild it, and compare outputs. This is weaker than fully hermetic package management, but far easier to deploy across large pre-existing ecosystems.\n\nThe complement to Sigstore + SLSA (`data/sigstore-slsa`): instead of cryptographically attesting the build process at publish time, OSS Rebuild attempts to *re-derive* the artifact from the public source after the fact. The two compose: Sigstore proves who built it, SLSA describes how, and OSS Rebuild independently confirms the bytes match.",
+      "refs": []
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson — registry-level rebuild verification",
+      "tags": ["oss-rebuild", "design-guidance"],
+      "content": "The broader design lesson is that **reproducibility can become a registry- or ecosystem-level validation service**, not just a local developer or CI concern. A new language ecosystem could choose to make this kind of rebuild verification a first-class registry feature from the start, rather than retrofitting it after supply-chain incidents.\n\nThe key insight: rebuild verification can be deployed unilaterally by a single party (Google, the registry, or a third-party security service) without requiring every package author to change their workflow. This makes it far cheaper to deploy than \"every package must be a Nix derivation\" or \"every author must adopt SLSA Level 3.\"",
+      "refs": [],
+      "sources": [
+        { "label": "Google Security Blog — Introducing OSS Rebuild", "url": "https://security.googleblog.com/2025/07/introducing-oss-rebuild-open-source.html" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "OSS Rebuild repository", "url": "https://github.com/google/oss-rebuild" },
+    { "label": "OSS Rebuild site", "url": "https://oss-rebuild.dev/" },
+    { "label": "Google Security Blog announcement", "url": "https://security.googleblog.com/2025/07/introducing-oss-rebuild-open-source.html" }
+  ]
+}

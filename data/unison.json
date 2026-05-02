@@ -1,0 +1,31 @@
+{
+  "kind": "language",
+  "name": "Unison",
+  "aliases": ["unison-lang"],
+  "summary": "Content-addressed functional language using *abilities* and *ability handlers* for effects. A function type may require an ability set, and handlers provide abilities in scope. The effect-system design is based on Frank's bidirectional discipline; the persistence model is content-addressed code (every term has a hash, not a name in a file).",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Unison uses *abilities* and *ability handlers*: a function type may require an ability set, and handlers provide abilities in scope. The effect-system design is based on Frank's bidirectional discipline (`data/frank-language`); programmers do not write effect variables in source — abilities propagate structurally through type checking.\n\nThe persistence model is the more famous design point: every term in a Unison codebase is identified by a *hash* of its content, not by a path-and-name. Modules and namespaces map names to hashes, and the storage substrate is canonical (`data/unison-codebase`). The combination of content-addressed storage with abilities-driven effects is unusual and closes the loop between language design and tooling: code can be moved, renamed, or merged without changing its identity.",
+      "refs": [
+        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "instance-of" },
+        { "target": "frank-language#overview", "type": "based-on" },
+        { "target": "unison-codebase#overview", "type": "complements" }
+      ],
+      "sources": [
+        { "label": "Unison abilities and handlers", "url": "https://unison-lang.org/docs/language-reference/abilities-and-ability-handlers" }
+      ]
+    },
+    {
+      "id": "abilities-vs-koka-rows",
+      "title": "Abilities versus Koka effect rows",
+      "tags": ["effect-system", "type-system"],
+      "content": "Unison's abilities differ from Koka effect rows in that the source language has no syntax for effect-row variables. Like Frank, the propagation is bidirectional: an ability required by an operation flows up the call stack until a handler provides it, and the type checker confirms the chain is consistent without needing the programmer to write `<state<S>|e>` explicitly.\n\nThe trade-off: Unison source is cleaner without effect-row noise, but error messages must be careful to expose the inferred ability set when bidirectional propagation fails."
+    }
+  ],
+  "sources": [
+    { "label": "Unison abilities and handlers", "url": "https://unison-lang.org/docs/language-reference/abilities-and-ability-handlers" }
+  ]
+}

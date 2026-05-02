@@ -1,0 +1,31 @@
+{
+  "kind": "concept",
+  "name": "D Allocator API",
+  "aliases": ["std.experimental.allocator", "D allocator building blocks"],
+  "summary": "D's `std.experimental.allocator`: a high-level interface plus composable building blocks (`Region`, `InSituRegion`, `free_list`, `fallback_allocator`, `segregator`, etc.) that experts assemble into domain-specific heaps rather than one blessed language policy.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": ["language-design", "allocator", "d", "ergonomics"],
+      "content": "D's `std.experimental.allocator` is an allocator-toolkit design: a high-level interface plus composable building blocks. The position is different from the others in the chapter 7.12 family — D does not pick a blessed allocator API (no implicit context allocator, no required parameter); instead it provides combinators that experts assemble into domain-specific heaps.\n\nThis matches D's broader meta-programming philosophy: `std.experimental.allocator` is a library, not a language feature, and the cost of allocation-policy choice is paid at the library boundary rather than pervasively through the language.",
+      "refs": [
+        { "target": "allocators#language-level-allocator-apis", "type": "part-of" },
+        { "target": "zig-allocator-api#overview", "type": "compared-with" }
+      ]
+    },
+    {
+      "id": "building-blocks",
+      "title": "Composable building blocks",
+      "tags": ["d", "language-design"],
+      "content": "The building-block palette includes `Region` (canonical bump allocator with three pointers, no general deallocation, `deallocateAll` to reuse), `InSituRegion`, `BorrowedRegion`, `SharedRegion`, `free_list`, `fallback_allocator`, `segregator`, `stats_collector`, `bucketizer`, and `affix_allocator`. A program assembles these into a stack — for example, a `segregator` that routes small allocations to a `free_list` and large ones to a `fallback_allocator(mmap)` with a `stats_collector` wrapper for telemetry.\n\nThe approach lets domain experts construct heaps appropriate to specific workloads (real-time, batch, GUI frame) without committing the language to one model. Trade-off: less guidance for non-experts; more flexibility for sophisticated users.",
+      "refs": [
+        { "target": "arena-allocation#overview", "type": "related" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "D std.experimental.allocator", "url": "https://dlang.org/phobos/std_experimental_allocator.html" },
+    { "label": "D allocator regions", "url": "https://dlang.org/phobos-prerelease/std_experimental_allocator_building_blocks_region.html" }
+  ]
+}

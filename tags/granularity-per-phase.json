@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-phase",
+  "tag": "granularity:per-phase",
+  "name": "Granularity: per phase",
+  "description": "Mechanism distinguishes coarse program phases or code-path classes rather than individual instructions/events.",
+  "axis": "granularity"
+}

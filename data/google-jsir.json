@@ -1,0 +1,42 @@
+{
+  "kind": "concept",
+  "name": "Google JSIR",
+  "aliases": ["jsir", "jsir-mlir"],
+  "summary": "Google's MLIR-based JavaScript IR designed for source-to-source analysis: deobfuscation, taint analysis, and decompilation of Hermes bytecode back to readable JS. Dual-dialect: jsir for SSA values, jshir for high-level structured control flow as MLIR regions.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Google's JSIR is an MLIR-based JavaScript IR designed for *source-to-source* analysis: deobfuscation, taint analysis, and decompilation of Hermes bytecode back to readable JS. The dual-dialect design (`jsir` for SSA values, `jshir` for high-level structured control flow as MLIR regions) is what distinguishes it from optimizer-oriented JS IRs (Maglev, DFG, IonMonkey MIR).",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "mlir#overview", "type": "built-on" },
+        { "target": "v8-maglev#overview", "type": "contrasts-with" }
+      ],
+      "sources": [
+        { "label": "Google JSIR", "url": "https://github.com/google/jsir" }
+      ]
+    },
+    {
+      "id": "regions-vs-cfg",
+      "title": "jshir as structured-region IR",
+      "tags": ["compiler-ir", "source-fidelity"],
+      "content": "`jshir` represents `if`/`while`/`for`/`logical_expression` as MLIR regions rather than CFG jumps, so the original control-flow structure is preserved. L-value vs r-value separation is explicit (`identifier_ref` vs `identifier`).\n\nStatus (as of 2025-07): round-trip back to the Babel AST is reported at 99.9%+ success, achieved via post-order traversal mapping that recursively reconstructs AST nesting from use-def chains. JSIR underpins Google's CASCADE LLM-powered deobfuscator (arXiv:2507.17691).",
+      "refs": [
+        { "target": "babel-pipeline#overview", "type": "round-trips-with" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson: security-analysis IR shape",
+      "tags": ["compiler-ir", "security-analysis"],
+      "content": "An IR designed for *security analysis* — taint propagation, dataflow tracking, source recovery — has different fidelity requirements than an IR designed for codegen. JSIR shows MLIR's region machinery accommodating both: structured control as regions for source fidelity, SSA values for dataflow.\n\nThe lesson generalises beyond JS: when an IR is consumed by tools that need to reproduce or reason about source structure, region-shaped representation is more useful than CFG-shaped representation, even if the final lowering still goes to a CFG.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Google JSIR", "url": "https://github.com/google/jsir" },
+    { "label": "CASCADE: LLM-Powered JavaScript Deobfuscator at Google (arXiv 2507.17691)", "url": "https://arxiv.org/abs/2507.17691" }
+  ]
+}

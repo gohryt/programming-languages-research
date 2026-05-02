@@ -1,0 +1,35 @@
+{
+  "kind": "concept",
+  "name": "Linear Haskell IR",
+  "aliases": ["linear-haskell-core"],
+  "summary": "GHC's Linear Haskell puts multiplicities on the function arrow — a %1 -> b is linear (consume exactly once), a %m -> b is multiplicity-polymorphic. The IR is an extended Core that carries multiplicities on every binding alongside its existing type and kind machinery.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Representation layout: GHC's Linear Haskell puts multiplicities on the function arrow — `a %1 -> b` is linear (consume exactly once), `a %m -> b` is multiplicity-polymorphic. The IR is an extended Core that carries multiplicities on every binding alongside its existing type and kind machinery.",
+      "refs": [
+        { "target": "ghc-core#overview", "type": "extends" },
+        { "target": "cps-anf#overview", "type": "shares-pattern-with" },
+        { "target": "linear-affine-types#overview", "type": "implements" },
+        { "target": "haskell#overview", "type": "extends" }
+      ],
+      "sources": [
+        { "label": "Linear Haskell (POPL 2018)", "url": "https://arxiv.org/abs/1710.09756" }
+      ]
+    },
+    {
+      "id": "implementation-cost",
+      "title": "Implementation cost and ride-on-Core",
+      "tags": ["compiler-ir", "haskell", "linearity"],
+      "content": "Status (as of GHC 9.0+, available since 2021-02): the GHC implementation cost was small (~1,150 lines, per the paper) because multiplicities ride on top of Core's existing type infrastructure. Type-system semantics live in `data/linear-affine-types` and the language-level treatment in `data/haskell`; resource-discipline framing for memory is in `data/ownership` (which covers Linear Haskell among other multiplicity systems).\n\nThe lesson is that adding linearity to an existing Core IR is much cheaper than designing a new IR around it: the type system already has the machinery for parameterised types, and multiplicities slot in as another parameter dimension.",
+      "refs": [
+        { "target": "linear-affine-types#linear-vs-uniqueness", "type": "discussed-in" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Linear Haskell (POPL 2018)", "url": "https://arxiv.org/abs/1710.09756" }
+  ]
+}

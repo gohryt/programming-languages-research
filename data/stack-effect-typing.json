@@ -1,0 +1,51 @@
+{
+  "kind": "concept",
+  "name": "Stack-Effect Type Systems",
+  "aliases": ["stack-types", "concatenative-typing", "factor-row-stacks"],
+  "summary": "Concatenative languages describe each word by what it consumes from and produces onto the stack, using composition of stack effects in place of function-type unification. Knaggs formalizes as algebra over stack-effect signatures; StrongForth proves strong static stack-effect checking is feasible in Forth-like languages; Factor extends with row-polymorphic stack effect variables (..a) so combinators talk about 'the rest of the stack'.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Concatenative languages suggest a different path for type-system design: instead of starting from variable-binding terms with ordinary function types, they describe each word by what it consumes from and produces onto the stack, and use composition of stack effects in place of function-type unification.\n\nKnaggs formalizes this as an algebra over stack-effect signatures; StrongForth is a production-style proof that strong static stack-effect checking is feasible in a Forth-like language (typed compile-time stack model, branch/loop consistency, overloads on stack types); Factor extends the idea with **row-polymorphic stack effect variables** such as `..a` so higher-order combinators can talk about \"the rest of the stack\" — a direct analogue of row polymorphism over stacks rather than records.",
+      "refs": [
+        { "target": "row-polymorphism#overview", "type": "analogous-to-but-on-stacks" },
+        { "target": "factor-language#overview", "type": "exemplified-by" },
+        { "target": "forth-text-interpreter#overview", "type": "applies-to" },
+        { "target": "static-stack-effect-verification#overview", "type": "implements" }
+      ],
+      "sources": [
+        { "label": "Knaggs — Type inference in stack based languages", "url": "https://dl.acm.org/doi/10.1007/BF01212404" }
+      ]
+    },
+    {
+      "id": "strongforth-static-checking",
+      "title": "StrongForth — static stack-effect checking in production",
+      "tags": ["forth", "type-system"],
+      "content": "**StrongForth** demonstrates that Forth's traditionally-untyped stack discipline can be statically checked without losing Forth's character. The compiler maintains a typed compile-time stack model; branches must produce consistent stack shapes at their join point; loops must preserve stack invariants across iterations; overloaded words can dispatch on stack types.\n\nThe key insight is that Forth's stack-effect comments (`( a b -- c )`) — already an established documentation convention — can be promoted to typed annotations the compiler enforces. This puts a static type system on top of Forth's idiomatic style without requiring programmers to abandon the discipline.",
+      "sources": [
+        { "label": "StrongForth homepage", "url": "https://www.stephan-becher.de/strongforth/" },
+        { "label": "StrongForth introduction", "url": "https://www.stephan-becher.de/strongforth/intro.htm" }
+      ]
+    },
+    {
+      "id": "factor-row-polymorphic-stacks",
+      "title": "Factor — row-polymorphic stack effect variables",
+      "tags": ["type-system", "factor", "row-polymorphism"],
+      "content": "Factor's stack checker extends the static-stack-effect idea with **row variables over stacks**: `..a` stands for an unknown number of stack elements, letting higher-order combinators be polymorphic in the depth of stack they manipulate. A combinator like `dip` (which executes a quotation underneath the top of stack) has the signature `( ..a x quot: ( ..a -- ..b ) -- ..b x )` — `..a` and `..b` are row variables.\n\nThis is the cleanest production example of row polymorphism applied to stacks rather than records. The lesson generalises: row-polymorphism's machinery is not specific to records and variants; it can express any \"the rest of an unknown-length sequence\" abstraction.\n\nA 2017 pluggable-typing thesis adds the lesson that stack-language checking can be configurable from underflow-only to stronger static consistency.",
+      "sources": [
+        { "label": "Factor stack checker", "url": "https://docs.factorcode.org/content/article-inference.html" },
+        { "label": "Factor stack effect row variables", "url": "https://docs.factorcode.org/content/article-effects-variables.html" },
+        { "label": "Factor paper on stack effects and row polymorphism", "url": "https://factorcode.org/littledan/dls.pdf" },
+        { "label": "Optional, pluggable typing for Forth", "url": "https://repositum.tuwien.at/handle/20.500.12708/7117" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Knaggs — Type inference in stack based languages", "url": "https://dl.acm.org/doi/10.1007/BF01212404" },
+    { "label": "StrongForth homepage", "url": "https://www.stephan-becher.de/strongforth/" },
+    { "label": "Factor stack checker", "url": "https://docs.factorcode.org/content/article-inference.html" },
+    { "label": "Factor paper on stack effects and row polymorphism", "url": "https://factorcode.org/littledan/dls.pdf" }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "kind": "runtime",
+  "name": "Luau Native Code Generation",
+  "aliases": ["Roblox Luau --!native", "Luau JIT"],
+  "summary": "Roblox's Luau native code generation (late 2023): per-script `--!native` directive triggers x86-64 / ARM64 codegen at module load. Distinctively type-annotation-driven: programmer-supplied gradual types directly drive specialisation, no speculation needed. Production at billions of script instances per day across the Roblox ecosystem.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Roblox's **Luau** added **native code generation** in late 2023, available per-script via the `--!native` directive and per-function via `@native`. The codegen is x86-64 and ARM64 (Android included by 2025), produced from Luau bytecode at module load time, with runtime fallback to the interpreter for unsupported constructs.",
+      "refs": [
+        { "target": "tiered-compilation#overview", "type": "compared-with" }
+      ],
+      "sources": [
+        { "label": "Roblox — Luau Native Code Generation", "url": "https://create.roblox.com/docs/luau/native-code-gen" }
+      ]
+    },
+    {
+      "id": "type-annotation-driven-specialisation",
+      "title": "Type-annotation-driven specialisation",
+      "tags": ["luau", "jit", "type-system"],
+      "content": "The distinctive design choice is that **type annotations actively drive specialisation**. Luau is gradually typed (annotations are optional); when present, the JIT uses them to elide type checks and emit specialised arithmetic. `local x: number` lets `x + 1` compile to a direct `addsd` rather than going through Luau's tagged-value arithmetic dispatch.\n\nProduction deployment (Roblox engine, billions of script instances per day) makes Luau one of the largest production gradual-typing-driven JITs.",
+      "refs": []
+    },
+    {
+      "id": "comparison-with-speculation-driven-jits",
+      "title": "Comparison with speculation-driven JITs",
+      "tags": ["luau", "jit", "tradeoffs"],
+      "content": "Distinct from V8's TurboFan and SpiderMonkey IonMonkey: those are speculation-driven (compile assuming observed types, deopt on guard failure); Luau native uses the *programmer-supplied types* directly without speculation, treating `--!native` as a contract that types at module boundaries are correct.\n\nThe trade-off is that wrong type annotations produce undefined behaviour rather than deopt — but in Roblox's user-script ecosystem, where the typed/native combination is opt-in by the script author, the discipline scales. The lesson generalises: **for gradually-typed languages with optional annotations, treating annotations as optimisation hints rather than only as documentation can substitute for speculative JITs**. The annotation surface becomes part of the optimiser's contract; the cost is annotation-correctness pressure on programmers rather than a deoptimisation machinery in the runtime.",
+      "refs": [],
+      "sources": [
+        { "label": "Luau Recap for 2025: Runtime", "url": "https://luau.org/news/2025-12-19-luau-recap-runtime-2025/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "Luau native code gen", "url": "https://create.roblox.com/docs/luau/native-code-gen" },
+    { "label": "Luau 2025 recap", "url": "https://luau.org/news/2025-12-19-luau-recap-runtime-2025/" }
+  ]
+}

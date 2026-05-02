@@ -1,0 +1,24 @@
+{
+  "kind": "language",
+  "name": "Elm",
+  "aliases": ["elm-lang"],
+  "summary": "Purely-functional ML-family language for building web frontends. Type-system-relevant lesson is restriction-as-design: refuses to expose imperative effects, FFI, runtime exceptions, or higher-kinded abstraction at all, so that ordinary Hindley-Milner inference and a small total subset of the surface remain enough to type the whole program.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Elm chooses the opposite discipline from Koka: the type-system-relevant lesson is **restriction-as-design** — the language refuses to expose imperative effects, FFI, runtime exceptions, or higher-kinded abstraction at all, so that ordinary Hindley-Milner inference and a small total subset of the surface remain enough to type the whole program.\n\nElm's task/effect architecture and concurrent-FRP runtime story is treated under `data/async-await#api-coloring-and-propagation` (Elm as the constrained-functional-asynchrony counterexample). The type-system contribution recorded here is purely about the design choice: by restricting the language to a small total subset, the type checker stays simple, error messages stay legible, and beginner-friendliness becomes a defensible property.",
+      "refs": [
+        { "target": "hindley-milner#overview", "type": "uses" },
+        { "target": "koka#overview", "type": "design-counterpoint" }
+      ]
+    },
+    {
+      "id": "restriction-as-design-lesson",
+      "title": "Restriction as design lesson",
+      "tags": ["language-design", "type-system"],
+      "content": "Elm and Koka represent opposite responses to the question \"how much semantic structure should the type system expose?\":\n\n- **Koka**: expose effects as first-class structure; let purity, exceptions, async, divergence, and user-defined operations all be visible to inference.\n- **Elm**: hide effects in a runtime-managed `Cmd`/`Sub` API; refuse to expose higher-kinded types at all; keep the type system small enough that error messages remain accessible to learners.\n\nNeither approach is universally right. The lesson is that **a language designer should pick a deliberate point on the expressiveness-vs-simplicity spectrum and commit to it**, rather than half-committing in either direction. Elm's success at production-grade beginner-friendliness depends on the restrictions; relaxing them would forfeit the property."
+    }
+  ]
+}

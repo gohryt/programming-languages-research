@@ -1,0 +1,34 @@
+{
+  "kind": "concept",
+  "name": "RustBelt λRust",
+  "aliases": ["lambda-rust", "rustbelt-ir"],
+  "summary": "RustBelt's λRust (Jung et al., POPL 2018) is a formal IR for a Rust subset, defined in Coq. λRust is the substrate for soundness proofs — every Rust unsafe library (Arc, Rc, Cell, RefCell, Mutex) gets a soundness statement in λRust, proven via lifetime logic.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "RustBelt's λRust (Jung et al., POPL 2018) is a formal IR for Rust subset, defined in Coq. λRust is the substrate for soundness proofs — every Rust unsafe library (Arc, Rc, Cell, RefCell, Mutex) gets a soundness statement in λRust, proven via lifetime logic. The IR is mechanized: every operation has a small-step semantics in Coq, and proofs are checked machine-by-machine.",
+      "refs": [
+        { "target": "verification-intermediate-languages#overview", "type": "related" },
+        { "target": "ownership-as-type-constraint#overview", "type": "formalises" },
+        { "target": "linear-affine-types#overview", "type": "formalises" }
+      ],
+      "sources": [
+        { "label": "RustBelt POPL 2018", "url": "https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf" }
+      ]
+    },
+    {
+      "id": "ir-as-formal-artifact",
+      "title": "IR-as-formal-artifact",
+      "tags": ["verification", "rust", "formal-methods"],
+      "content": "This is the IR-as-formal-artifact extreme: λRust is not compiled and run; it's defined and reasoned about. Yet it counts as a language representation because it captures what Rust *means* mathematically, and every other Rust-related verifier (Verus, Prusti, Creusot, Aeneas, RefinedRust) builds atop or adjacent to it.\n\nThis record is the canonical formal-soundness model for Rust's aliasing discipline (λRust + lifetime logic, mechanised in Coq via `data/iris-separation-logic`); other Rust-targeting verifiers — `data/verus`, `data/prusti`, `data/creusot`, `data/aeneas-verifier`, `data/refinedrust` — build on or adjacent to it.",
+      "refs": [
+        { "target": "verus#overview", "type": "underlies" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "RustBelt POPL 2018", "url": "https://plv.mpi-sws.org/rustbelt/popl18/paper.pdf" }
+  ]
+}

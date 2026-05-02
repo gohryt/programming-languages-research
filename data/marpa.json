@@ -1,0 +1,46 @@
+{
+  "kind": "tool",
+  "name": "Marpa",
+  "aliases": ["marpa-parser"],
+  "summary": "Jeffrey Kegler's practical general parser in the Earley/Leo family; aims to parse any BNF grammar exactly without conflict resolution while still achieving linear time on large practical classes; pairs with Ruby Slippers programmable error recovery.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Marpa is Jeffrey Kegler's practical general parser in the Earley/Leo family. The marquee property is that it aims to parse any BNF grammar exactly, without forcing arbitrary conflict resolution, while still achieving linear-time behavior on large practical classes of grammars. Unlike PEG, it is not based on ordered choice, so it keeps the exact CFG meaning instead of embedding parsing policy into the grammar.\n\nMarpa offers exact CFG semantics with unrestricted recursion, a programmable recovery/event model, and parse-forest-friendly output — at the cost of a smaller ecosystem, a less familiar mental model than recursive descent or LR, and ambiguity management that pushes complexity into later phases.",
+      "refs": [
+        { "target": "generalized-cfg-parsing#earley-and-leo", "type": "uses" }
+      ]
+    },
+    {
+      "id": "earley-leo-engine",
+      "title": "Earley + Leo engine",
+      "tags": ["parser", "general-cfg", "earley"],
+      "content": "Marpa's parsing engine is the Earley/Leo family. Earley parsing handles arbitrary CFGs in O(n³) worst case, O(n²) for unambiguous grammars, and O(n) for LR-compatible grammars. The classic weakness is right recursion (quadratic on right-recursive rules); Joop Leo's 1991 improvement avoids this by recognising right-recursion patterns and collapsing their Earley sets via deterministic reduction paths, restoring linear time on every LR(k) grammar.\n\nMarpa is the production existence proof that Earley + Leo is practical for real-world grammars, not just a theoretical anchor.",
+      "refs": []
+    },
+    {
+      "id": "ruby-slippers-recovery",
+      "title": "Ruby Slippers programmable recovery",
+      "tags": ["parser", "error-recovery", "marpa"],
+      "content": "Marpa's distinctive contribution beyond the Earley engine is **Ruby Slippers parsing**: rather than recovering only *after* the parser has fallen over, Marpa exposes what it is expecting at any input position and lets the surrounding application inject, substitute, or adjust tokens to keep the parse moving.\n\nThe interface flips error recovery from a fixed generator-side heuristic into a programmable callback — the host program decides which \"expected\" token to synthesise, on what evidence, and the parser resumes as if the input had always contained it. This is the natural fit for parsing forgiving formats (HTML-like dialects, configuration files with optional punctuation) where the recovery rules are domain knowledge rather than parser-generator choices.",
+      "refs": [
+        { "target": "error-recovery#programmable-and-minimum-distance", "type": "described-in" }
+      ],
+      "sources": [
+        { "label": "Marpa Ruby Slippers blog post", "url": "https://jeffreykegler.github.io/Ocean-of-Awareness-blog/individual/2011/11/marpa-and-the-ruby-slippers.html" }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design tradeoffs",
+      "tags": ["parser", "tradeoffs", "design-guidance"],
+      "content": "Marpa is the natural choice when the grammar is genuinely ambiguous and the parser must accept all valid interpretations — natural-language-adjacent formats, forgiving config languages, embedded DSLs with overlapping operator definitions. For programming-language compilers where ambiguity is a bug to detect at grammar-design time, LR or LL parsers are usually preferable because they surface conflicts at generator time rather than producing parse forests at runtime.\n\nThe smaller ecosystem and unfamiliar mental model are real adoption barriers. But for exact-CFG-semantics use cases where Ruby Slippers' programmable recovery matters, Marpa is the production-grade reference implementation.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Marpa", "url": "https://jeffreykegler.github.io/Marpa-web-site/" }
+  ]
+}

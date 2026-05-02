@@ -1,0 +1,51 @@
+{
+  "kind": "language",
+  "name": "Common Lisp",
+  "aliases": ["cl"],
+  "summary": "ANSI-standardised Lisp with the richest export-list mechanism in the survey: defpackage declares a package's :use, :nicknames, :shadow, :shadowing-import-from, :import-from, :export, :intern relationships in one form; namespaces symbols (not bindings); ASDF provides system-level distribution above packages.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Common Lisp (ANSI X3.226-1994) is a multi-paradigm Lisp dialect with the richest export-list mechanism among mainstream languages. Production implementations: SBCL (canonical optimising compiler — `data/sbcl`), CCL, ECL, ABCL (JVM), Allegro CL, LispWorks. This record covers the language-level module-system surface; image-based development and incremental redefinition live in `data/lisp-incremental-redefinition`.",
+      "refs": [
+        { "target": "module-systems#overview", "type": "instance-of" },
+        { "target": "lisp-incremental-redefinition#overview", "type": "complements" }
+      ]
+    },
+    {
+      "id": "defpackage-and-symbol-namespacing",
+      "title": "defpackage and symbol namespacing",
+      "tags": ["common-lisp", "module-systems", "symbols"],
+      "content": "A package declaration looks like:\n\n```lisp\n(defpackage #:my-app\n  (:use #:cl)\n  (:nicknames #:app)\n  (:shadow #:format)\n  (:shadowing-import-from #:alexandria #:hash-table-keys)\n  (:import-from #:bordeaux-threads #:make-thread)\n  (:export #:run #:configure)\n  (:intern #:helper))\n```\n\nThe distinguishing property of Common Lisp packages: **they namespace symbols, not bindings**. A symbol — the canonical name token — is *interned* in exactly one home package, but can be made *accessible* in many other packages via `use`, `import`, or qualified reference. Functions, variables, classes, and macros all live in symbols, so namespacing-by-symbol governs all of them uniformly.\n\nSix distinct relationships exist: present-and-internal (interned in the package, not exported), present-and-external (interned and exported), inherited (visible via a `:use`d package), shadowed (a local symbol blocks an inherited one of the same name), shadowing-imported (an imported symbol blocks an inherited one), and uninterned (`#:foo` syntax — a symbol belonging to no package).",
+      "refs": [
+        { "target": "visibility-and-exports#export-models", "type": "example" }
+      ],
+      "sources": [
+        { "label": "HyperSpec — defpackage", "url": "https://www.lispworks.com/documentation/HyperSpec/Body/m_defpkg.htm" }
+      ]
+    },
+    {
+      "id": "qualified-syntax-and-in-package",
+      "title": "Qualified syntax and in-package",
+      "tags": ["common-lisp", "module-systems", "syntax"],
+      "content": "Qualified syntax: `pkg::name` accesses an internal symbol (double-colon, by convention discouraged in client code); `pkg:name` accesses an exported symbol (single-colon, the public-API form). The lexical convention itself encodes the visibility distinction. `IN-PACKAGE` switches the current package for subsequent reads.\n\nThis is one of the cleanest production examples of **lexical syntax encoding visibility distinctions** without language-level visibility keywords. The double-colon is harder to type and read, which discourages reaching into another package's internals; the single-colon is the natural form for public API."
+    },
+    {
+      "id": "asdf-and-quicklisp",
+      "title": "ASDF and Quicklisp — system-level distribution",
+      "tags": ["common-lisp", "packaging", "tools"],
+      "content": "**ASDF (Another System Definition Facility)** is the system-definition layer that sits above packages — the equivalent of Cargo or npm. An ASDF system declared in a `.asd` file lists components (Lisp files) with dependencies, supports versions, and integrates with **Quicklisp** (the de facto package archive) for distribution.\n\nThe two-layer split is deliberate: packages are language-level symbol-namespace machinery; ASDF systems are ecosystem-level distribution units. They can be one-to-one but commonly aren't — a single ASDF system can define multiple packages.\n\nThe lesson: **a sufficiently rich symbol-namespace operation set (use, import, shadowing-import, intern, export, shadow) eliminates the need for separate \"import keyword variants\"**. Languages like Python and Java have one `import` keyword and accumulate workarounds for partial imports, renames, and conflicts; Common Lisp expresses all those operations as orthogonal options on `defpackage`. The cost is conceptual surface area — `:shadow` vs `:shadowing-import-from` vs `:import-from` is a non-obvious distinction.",
+      "refs": [],
+      "sources": [
+        { "label": "ASDF", "url": "https://asdf.common-lisp.dev/" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "HyperSpec — defpackage", "url": "https://www.lispworks.com/documentation/HyperSpec/Body/m_defpkg.htm" },
+    { "label": "HyperSpec — export", "url": "https://www.lispworks.com/documentation/HyperSpec/Body/f_export.htm" },
+    { "label": "ASDF", "url": "https://asdf.common-lisp.dev/" }
+  ]
+}

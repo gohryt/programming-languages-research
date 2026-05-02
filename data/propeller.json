@@ -1,0 +1,44 @@
+{
+  "kind": "tool",
+  "name": "Propeller — Profile-Guided Linker Optimisation",
+  "aliases": [
+    "Google Propeller"
+  ],
+  "summary": "Google 2021: BOLT's successor in post-link layout. Rather than rewriting the final binary (BOLT's approach), Propeller produces *relinkable* object files. Layout optimisation runs during the link step using profile data. Cleaner integration with build systems; comparable gains to BOLT (3–7% typical) at lower operational overhead.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Google's **Propeller** (2021) is BOLT's successor in the post-link layout-optimisation space. The twist: rather than rewriting the final binary (BOLT's approach, which is hard to run in production because the binary changes between the profile run and the optimised build), Propeller produces *relinkable* object files. The optimiser runs during the link step, using profile data to guide block placement and function ordering.",
+      "refs": [
+        {
+          "target": "bolt-binary-optimizer#overview",
+          "type": "successor-to"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Propeller paper (Google)",
+          "url": "https://storage.googleapis.com/pub-tools-public-publication-data/pdf/d753cb3608d6a8e8d71cf2b98a4deab80ec37d77.pdf"
+        }
+      ]
+    },
+    {
+      "id": "design-advantage",
+      "title": "Design advantage",
+      "tags": [
+        "compiler",
+        "linker"
+      ],
+      "content": "The architectural advantage: Propeller's output is a standard relinked binary, easier to integrate with existing build systems. The performance gains are comparable to BOLT — 3–7% typical — with lower operational overhead.\n\nThe message for language tooling: layout optimisation is valuable enough to be built into the linker. Designing an object-file format and linker that expose block-granularity layout control from the start is cheaper than retrofitting it later.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    {
+      "label": "Propeller Google paper",
+      "url": "https://storage.googleapis.com/pub-tools-public-publication-data/pdf/d753cb3608d6a8e8d71cf2b98a4deab80ec37d77.pdf"
+    }
+  ]
+}

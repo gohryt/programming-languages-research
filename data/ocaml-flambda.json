@@ -1,0 +1,40 @@
+{
+  "kind": "concept",
+  "name": "OCaml Flambda",
+  "aliases": ["flambda", "flambda2"],
+  "summary": "OCaml's optimizer between front-end and bytecode/native back-ends. Flambda's IR is ANF-like, with explicit closure representation and value-flow analysis. Flambda 2 (2020+) more aggressively unboxes values, specializes on known-shape arguments, and fuses pattern matches.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "OCaml's Flambda is the optimizer between the OCaml front-end and the bytecode/native back-ends. Flambda's IR is ANF-like, with explicit closure representation and value-flow analysis. The original Flambda 1 was rewritten as Flambda 2 in 2020+, with a new IR that more aggressively unboxes values, specializes on known-shape arguments, and fuses pattern matches.",
+      "refs": [
+        { "target": "cps-anf#overview", "type": "instance-of" },
+        { "target": "ocaml#overview", "type": "compiler-of" }
+      ],
+      "sources": [
+        { "label": "OCaml Manual — Flambda", "url": "https://v2.ocaml.org/manual/flambda.html" }
+      ]
+    },
+    {
+      "id": "strict-language-anf",
+      "title": "Strict-language ANF",
+      "tags": ["compiler-ir", "ocaml", "optimization"],
+      "content": "Flambda is interesting because it's an ANF IR designed for *aggressive value-representation optimization* in a strict language. Where GHC Core lives in a lazy world (where value representation matters less), Flambda assumes strict evaluation and exploits it: known-int-typed bindings unbox to raw machine integers, known-tuple-typed bindings unbox to multiple registers, known-closure-typed bindings inline aggressively.",
+      "refs": [
+        { "target": "ghc-core#overview", "type": "contrasts-with" }
+      ]
+    },
+    {
+      "id": "ocaml-pipeline",
+      "title": "OCaml pipeline: Lambda → Cmm",
+      "tags": ["compiler-pipeline"],
+      "content": "OCaml's IR cascade is shorter than GHC's: source → typed AST → Lambda (untyped lambda calculus with explicit closures) → Cmm (Caml-aware portable assembly) → native. Flambda is an optional optimization layer that operates on Lambda. The cascade is shorter because OCaml is strict and doesn't need the equivalent of STG.\n\nOCaml's Cmm is similar to GHC's Cmm in role but has Caml-specific concerns: blocks have headers tagged with type and size, GC allocation has specialized fast paths, exceptions thread through the code via a global handler chain.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "OCaml Manual — Flambda", "url": "https://v2.ocaml.org/manual/flambda.html" }
+  ]
+}

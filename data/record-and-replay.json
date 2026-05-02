@@ -1,0 +1,308 @@
+{
+  "kind": "concept",
+  "name": "Record and replay debugging",
+  "aliases": [
+    "deterministic replay",
+    "Pernosco",
+    "WinDbg TTD",
+    "UndoDB"
+  ],
+  "summary": "Record/replay debuggers turn execution into an artifact you can rewind or query; entries differ on what fraction of execution is re-derived on replay vs. captured at record time — rr records nondeterministic inputs and re-derives the rest, Pernosco post-processes rr traces into a searchable database, VS Snapshot and CRIU capture whole program state at chosen points.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Record/replay debuggers turn execution into an artifact you can rewind or query. Entries differ on **what fraction of execution is re-derived on replay vs. captured at record time**: rr records nondeterministic inputs and re-derives the rest; Pernosco post-processes rr traces into a searchable database; VS Snapshot and CRIU capture whole program state at chosen points; Magic Trace and Perfetto appear here only for their debugger workflows. Their tracing substrates are covered in `data/hardware-tracing` and `data/trace-storage-and-visualization`.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:hardware-tracing`, `family:record-replay`, `family:visualization-trace-interchange`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:medium`\n- **on-cost**: `on-cost:dominant`, `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`\n"
+    },
+    {
+      "id": "rr-deterministic-record-replay",
+      "title": "rr — Deterministic Record and Replay",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-instruction",
+        "on-cost:medium"
+      ],
+      "content": "Mozilla's `rr` records the execution of a Linux process with ~20% overhead by:\n1. Executing only one thread at a time (eliminating data race nondeterminism).\n2. Using CPU hardware performance counters (retired conditional branches) to measure application progress deterministically.\n3. Recording only the sources of nondeterminism: system call results, signal delivery points, context switch points.\n\nReplay re-executes the program using the same counter values to deliver signals and switch contexts at exactly the right points. This gives bit-for-bit identical replay.\n\nBecause replay is deterministic, GDB's reverse execution commands work: reverse-continue, reverse-step, reverse-next. `rr` implements these by restoring the nearest checkpoint and replaying forward to the desired point.\n\nThe critical insight: you don't need to record every instruction — only the nondeterministic inputs. The CPU deterministically re-derives everything else during replay. This makes recording nearly free for CPU-bound code. The ~20% overhead comes primarily from the single-threaded scheduling constraint.\n\nThe hardware performance counter approach is brittle — it depends on CPU-specific counter behavior and has been broken by various CPU microcode updates and errata. The rr team maintains a list of known-good CPU models. An alternative project, `rr.soft`, replaces hardware counters with lightweight dynamic instrumentation for environments where counters are unavailable (VMs, cloud, Apple Silicon via emulation).",
+      "sources": [
+        {
+          "url": "https://rr-project.org/"
+        },
+        {
+          "url": "https://queue.acm.org/detail.cfm?id=3688088"
+        }
+      ]
+    },
+    {
+      "id": "pernosco-omniscient",
+      "title": "Pernosco — Omniscient Debugging via Post-Hoc Analysis",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-event",
+        "on-cost:dominant"
+      ],
+      "content": "Status (as of 2026-04): commercial service. Robert O'Callahan (rr's creator) built Pernosco on top of rr recordings. Pernosco takes an rr trace, analyzes it using massive parallelism in the cloud, and builds a **searchable database of all program states at all points in time**. The result is an omniscient debugger that instantly answers:\n\n- \"What is the value at this memory address at time T?\"\n- \"When was this value last modified?\"\n- \"What is the dataflow path from this NULL to its origin?\"\n\nThe killer feature is **reverse dataflow tracking**: click on a NULL pointer, and Pernosco traces it back through registers and memory to the exact instruction that produced it — without re-executing anything. This is by far the most powerful debugging capability we encountered in the research.\n\nPernosco also demonstrates \"omniscient JS debugging\" by observing V8's internal operation and inferring JavaScript-level state without modifying V8's source code. This suggests that high-level language debugging can be implemented as a layer on top of low-level omniscient tracing.\n\nThe trade-off: Pernosco's analysis takes minutes to hours and writes tens of gigabytes. It is a post-hoc tool, not a live tool. But users report it is overwhelmingly faster than traditional debugging for complex bugs.",
+      "sources": [
+        {
+          "url": "https://pernos.co/"
+        },
+        {
+          "url": "https://robert.ocallahan.org/2024/10/debt-workshop.html"
+        }
+      ]
+    },
+    {
+      "id": "vs-snapshot-debugger",
+      "title": "Visual Studio Snapshot Debugger — Non-Breaking Production Snapshots",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-frame",
+        "on-cost:medium"
+      ],
+      "content": "Visual Studio's Snapshot Debugger for Azure App Service and Application Insights introduced \"snappoints\": non-breaking breakpoints that collect a point-in-time view of application state when a condition is hit in production. Unlike traditional breakpoints, a snappoint does not stop the live process for interactive stepping; it captures stack frames, locals, and related diagnostic data so the developer can inspect the recorded state later.\n\nThe important design pattern is not Unix `fork()` itself but **out-of-band snapshot collection**: the production request continues while the debugger receives a bounded artifact for later inspection. The implementation details vary by platform and runtime, and Microsoft documents the feature as a managed .NET snapshot/debugging facility rather than as a general fork-and-copy-on-write debugger.\n\nThis is a fundamentally different model from traditional debugging: snappoints don't stop execution. They create an inspectable point-in-time artifact, possibly collected from production, but you cannot freely step forward from it the way you would in a paused live process.",
+      "sources": [
+        {
+          "url": "https://devblogs.microsoft.com/visualstudio/snapshot-debugging-with-visual-studio-2017-now-ready-for-production/"
+        }
+      ]
+    },
+    {
+      "id": "qemu-record-replay",
+      "title": "QEMU Record/Replay — Full-System Deterministic Execution",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-instruction",
+        "on-cost:dominant"
+      ],
+      "content": "QEMU supports full-system record and replay by running in `icount` mode (instruction counting). All nondeterministic events — hardware interrupts, timer reads, network packets, disk I/O — are logged with their instruction count. During replay, events are injected at exactly the same instruction count, producing identical execution.\n\nUnlike rr (which only records userspace), QEMU records the entire virtual machine including the kernel, drivers, and all processes. The cost is running inside QEMU's TCG (Tiny Code Generator) JIT instead of native execution, which is typically 5–10x slower. But for kernel-level debugging or debugging across the user/kernel boundary, it is the only option.",
+      "sources": [
+        {
+          "url": "https://www.qemu.org/docs/master/devel/replay.html"
+        }
+      ]
+    },
+    {
+      "id": "windbg-time-travel-debugging",
+      "title": "WinDbg Time Travel Debugging (TTD) — Reverse Debugging + Queryable Trace Objects",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-instruction",
+        "on-cost:medium",
+        "windows"
+      ],
+      "content": "WinDbg's Time Travel Debugging is not just \"reverse execution on Windows.\" Its original contribution is the **query model** layered on top of the recording. Microsoft describes TTD as capturing a trace of process execution and replaying it forward or backward, but the really interesting part is that the trace is exposed as a set of **data-model objects** accessible via `dx`, JavaScript, and C++.\n\nThat makes TTD closer to a searchable execution database than to a traditional breakpoint-driven debugger. The most compelling example is the `TTD.Memory(begin, end, mask)` query interface, which returns a collection of memory-access objects for an arbitrary address range, including thread ID, IP, access type, time position, size, and value. This is a very different workflow from \"set a watchpoint and wait.\" Instead, you **search the recorded past**.\n\nThis also distinguishes TTD from rr in a useful way. rr's killer move is deterministic replay with hardware watchpoints and reverse-continue. TTD's killer move is that the recording is directly queryable with debugger-object infrastructure, which makes large-scale \"who touched this?\" investigations much more natural inside the debugger itself.\n\nThe trade-off is that TTD is still a recording-based system: it adds overhead while capturing, and it is Windows-centric. But as a debugger UX idea — execution history as a queryable object model — it deserves to be in any survey of original debugger designs.",
+      "sources": [
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-overview"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-object-model"
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-memory-objects"
+        }
+      ]
+    },
+    {
+      "id": "devops-rewind",
+      "title": "devops-rewind — Branching Terminal Session Debugger",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-event",
+        "on-cost:low"
+      ],
+      "content": "Bringing time-travel debugging concepts to the CLI, `devops-rewind` records every command (and its stdout/stderr, exit code, and context) as a numbered \"step\". When a multi-step deploy script or process fails, users can \"rewind\" to a specific step instead of restarting from scratch. The branching engine copies the session state from 0 through N into a new object and opens a new recorder, functioning like `git checkout` but for live terminal execution history.",
+      "sources": [
+        {
+          "url": "https://dev.to/lakshmisravyavedantham/i-built-a-terminal-session-debugger-with-rewind-breakpoints-and-branching-3gka"
+        }
+      ]
+    },
+    {
+      "id": "criu-checkpoint-restore",
+      "title": "CRIU — Checkpoint/Restore In Userspace",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-frame",
+        "linux",
+        "off-cost:medium",
+        "on-cost:medium"
+      ],
+      "content": "CRIU (pronounced \"kree-oo\") freezes a running Linux process or container, writes its complete state (memory, file descriptors, TCP connections, pipe contents, cgroups, timers) to disk, and later restores the process to continue executing as if no freeze happened. It ships as container-live-migration infrastructure, but the docs explicitly surface a debugging workflow called **deferred debug**: checkpoint a misbehaving production app, restart it immediately to preserve the SLA, and debug the dump file at leisure.\n\nThe original mechanism is the **\"CRIU morphs into the target\"** trick. During dump, CRIU uses `ptrace` to inject a *parasite blob* into the target's address space; the parasite reads memory from inside the target and writes it out, because much of the relevant state can only be captured from within the process's own mapping. During restore, CRIU forks, and the child process *unmaps itself and becomes the target* via a *restorer blob* — a small piece of code positioned to not overlap either CRIU's mappings or the target's — which runs `munmap`/`mmap` to install the target's original memory layout and jumps into it.\n\nThis puts CRIU in a different category from rr and VS Snapshot. It does not record execution over time; it captures one point and can re-launch the process from there. Multiple checkpoints can be stored, compared, or shipped as a bug report. Combined with rr or Pernosco, a CRIU dump can be the seed for deterministic replay analysis on another machine.\n\nThe limitations are concrete: not every resource can be C/R'd (GPUs, some kernel interfaces, raw sockets), and the restored process must land on a kernel and filesystem close enough to the dump to look the same from userspace. MPI and GPU-accelerated workloads often fail outright.",
+      "sources": [
+        {
+          "url": "https://criu.org/Main_Page"
+        },
+        {
+          "url": "https://criu.org/Assisted_debugging"
+        }
+      ]
+    },
+    {
+      "id": "undodb-liverecorder",
+      "title": "UndoDB / LiveRecorder — JIT-Instrumented Record/Replay",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-instruction",
+        "on-cost:high"
+      ],
+      "content": "Undo's UDB is a commercial time-travel debugger for Linux C/C++/Rust that differs from rr (`data/record-and-replay#rr-deterministic-record-replay`) in four architecturally interesting ways, each addressing a limitation that bit rr users in practice.\n\n**JIT binary instrumentation** replaces rr's dependence on hardware performance counters. UDB inserts instrumentation at runtime into the instruction stream to measure progress deterministically, so it runs on CPUs where rr cannot — including systems where microcode updates broke PMU determinism, virtualized environments that expose inconsistent counters, and ARM64. The trade-off is higher recording slowdown (roughly 2–4×) versus rr's ~20%, but portability across supported Linux CPU and virtualization environments is much broader.\n\n**Deferred recording mode** lets the debugger attach to a suspect process *with recording disabled*, and activate recording (`urecord`) only when something interesting is about to happen. Combined with **time limits** (`set time-limits min/max bbcount|percent|bookmark`) that constrain how far forward/reverse commands can move, this makes long recordings actually navigable — you bound the history region in focus rather than dragging the debugger across hours of irrelevant history.\n\n**Thread fuzzing** deterministically reproduces races by perturbing scheduler decisions during recording until a race manifests, after which the resulting recording replays the race identically on demand. This converts flaky multithreaded bugs into reproducible ones — a complementary approach to ThreadSanitizer (`data/concurrency-debugging#threadsanitizer-debugger-use`) for cases where you already have a race but cannot catch it live.\n\n**LiveRecorder** is the CI/production variant: UDB attached to a running service emits portable recordings shippable to a developer's machine. 99% of program state is reconstructed on demand from the minimal recording of nondeterministic inputs. UDB presents as GDB-compatible (100% of GDB commands plus `reverse-*` and `ugo time|undo|redo`), so existing VS Code / CLion / Emacs integrations work unchanged.\n\nrr and UDB together map the design space for record/replay: rr's hardware-counter route is fastest on supported CPUs; UDB's JIT route is more portable across CPUs and virtualized environments; both share the deterministic-replay-plus-reverse-execution core and produce traces that a GDB front-end can drive.",
+      "sources": [
+        {
+          "url": "https://undo.io/products/udb/"
+        },
+        {
+          "url": "https://docs.undo.io/GettingStartedWithUDB.html"
+        }
+      ]
+    },
+    {
+      "id": "totalview-replayengine",
+      "title": "TotalView ReplayEngine — MPI / HPC Reverse Debugging",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-instruction",
+        "hpc",
+        "on-cost:dominant"
+      ],
+      "content": "TotalView (Perforce) is the classic HPC parallel debugger; ReplayEngine is its reverse-execution add-on. Its distinctive contribution is applying the omniscient pattern **across MPI processes**: a `dload -replay program-path` or `dattach -replay program-path` starts recording, and reverse commands (back-to, step-back, reverse-continue) then navigate the execution history of any rank in a many-process MPI job.\n\nThe difficulty ReplayEngine addresses is that HPC parallel programs communicate via RDMA (Infiniband, Cray XT/XE/XK/XC, SGI XPMEM) — remote-DMA writes that bypass the kernel and slip past ordinary record/replay mechanisms. ReplayEngine injects environment variables at MPI launch to disable specific RDMA optimizations so the writes remain visible, handles SGI XPMEM's cross-process memory mapping with configurable caps (`MPI_MAPPED_HEAP_SIZE`, `MPI_MEMMAP_OFF`), and ships per-MPI-stack configuration in its `parallel_support.tvd` file.\n\nThis is the omniscient pattern applied to scientific parallel computing where bugs manifest only at scale — thousands of MPI ranks, weeks of wall time, non-reproducible races between ranks. rr (`data/record-and-replay#rr-deterministic-record-replay`) is single-threaded by construction; ReplayEngine lives in the opposite corner of the design space: heavy, coarse, but correct under multi-rank RDMA communication.\n\nThe design lesson: **deterministic replay must be negotiated with every nondeterminism source in the platform**. On a desktop, that means the scheduler and the kernel. On HPC, add MPI, RDMA, NUMA memory affinity, and GPU offload. A language runtime aiming at HPC has to expose hooks for each.",
+      "sources": [
+        {
+          "url": "https://help.totalview.io/classicTV/current/HTML/Splash/tvgettingstartedug-gettingStarted.3.30.html"
+        },
+        {
+          "url": "https://help.totalview.io/previous_releases/2024.2/HTML/TotalView/totalviewlhug-parallel-debugging-setup.19.46.html"
+        }
+      ]
+    },
+    {
+      "id": "magic-trace-debugger-workflow",
+      "title": "Magic Trace — Triggered Hardware-Trace Debugging",
+      "tags": [
+        "domain:debugging",
+        "family:hardware-tracing",
+        "granularity:per-instruction",
+        "intel",
+        "on-cost:medium"
+      ],
+      "content": "Jane Street's `magic-trace` is covered as a hardware-tracing mechanism in `data/hardware-tracing#intel-pt-magic-trace`; the debugger-specific contribution is the workflow. Intel Processor Trace records recent control flow into a circular buffer, and a trigger event snapshots the last ~10 ms into a call-stack timeline viewable in Perfetto.\n\nThis answers a narrower but highly practical question than full record/replay: **what executed immediately before the crash, latency spike, or suspicious state?** It does not provide arbitrary historical values, but it gives low-overhead retrospective control-flow debugging for production-like runs. The language-design lesson is that hardware traces become useful only after the runtime/compiler can reconstruct meaningful language frames from raw branch packets.",
+      "sources": [
+        {
+          "url": "https://github.com/janestreet/magic-trace"
+        },
+        {
+          "url": "https://blog.janestreet.com/magic-trace/"
+        }
+      ]
+    },
+    {
+      "id": "ocamldebug-fork-checkpoint",
+      "title": "`ocamldebug` — Fork-Checkpoint Reverse Execution (1991)",
+      "tags": [
+        "domain:debugging",
+        "family:record-replay",
+        "granularity:per-instruction",
+        "on-cost:medium"
+      ],
+      "content": "OCaml's built-in bytecode debugger has supported **reverse execution for three decades** — long predating rr, Pernosco, and most of this chapter. Commands: `reverse`, `backstep`, `previous` (step backward skipping calls), `start` (run backward to function entry), `goto time` (jump to an absolute instruction counter), `last` (undo the previous navigation command), `set history size`.\n\nThe implementation is a classic Unix fork-CoW checkpointing trick applied recursively for **time-travel**: the OCaml runtime periodically `fork()`s and suspends the child process as a **checkpoint**. Forward execution runs against the current process; reverse execution discards the current process and resumes the nearest checkpoint ≤ the target time, replaying forward to land exactly. Because each checkpoint is copy-on-write, memory overhead is proportional to post-checkpoint divergence, not to process size.\n\nThe restrictions are concrete: `ocamldebug` only works on bytecode (not native), only on Unix (Cygwin on Windows), and requires `-g` at compile time. But within those bounds, it demonstrates that **reverse execution is cheap in a language whose runtime controls process forking and whose instruction counter is deterministic** — two properties any new language can adopt at design time.\n\nOCaml's `ocamlearlybird` exposes this over the Debug Adapter Protocol (`data/debugger-protocols#debug-adapter-protocol`); the DAP `StepBack` and `ReverseContinue` requests map to the native `backstep` and `reverse` commands. The underlying checkpoint machinery is unchanged since the early 1990s.",
+      "sources": [
+        {
+          "url": "https://ocaml.org/manual/5.3/debugger.html"
+        }
+      ]
+    },
+    {
+      "id": "perfetto-traceprocessor-perfettosql",
+      "title": "Perfetto TraceProcessor + PerfettoSQL — Trace as Queryable Evidence",
+      "tags": [
+        "domain:debugging",
+        "family:visualization-trace-interchange",
+        "granularity:per-event",
+        "on-cost:medium"
+      ],
+      "content": "Perfetto's recorder, wire format, and visualization role are covered in `data/trace-storage-and-visualization#perfetto-fuchsia-trace-format`. The debugger-adjacent contribution is **TraceProcessor**: it ingests a trace and exposes execution events as SQLite-queryable relational tables.\n\nThat makes a trace more than a timeline. A debugger or investigation tool can ask structured questions over `slice`, `thread_slice`, `counter`, `process`, `thread`, `cpu`, and symbol tables instead of manually scrolling through rectangles. PerfettoSQL adds domain-specific table/function/view/macro support and reusable metrics, turning common performance-debugging questions into named queries.\n\nThe design lesson is narrow and important: if runtime events are emitted with stable typed schemas, a debugger can treat execution history as queryable evidence. Timeline UI is one view; SQL-like analysis is the more general interface.",
+      "sources": [
+        {
+          "url": "https://perfetto.dev/docs/analysis/perfetto-sql-getting-started"
+        },
+        {
+          "url": "https://perfetto.dev/docs/analysis/perfetto-sql-syntax"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://rr-project.org/"
+    },
+    {
+      "url": "https://queue.acm.org/detail.cfm?id=3688088"
+    },
+    {
+      "url": "https://pernos.co/"
+    },
+    {
+      "url": "https://robert.ocallahan.org/2024/10/debt-workshop.html"
+    },
+    {
+      "url": "https://devblogs.microsoft.com/visualstudio/snapshot-debugging-with-visual-studio-2017-now-ready-for-production/"
+    },
+    {
+      "url": "https://www.qemu.org/docs/master/devel/replay.html"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-overview"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-object-model"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-memory-objects"
+    },
+    {
+      "url": "https://dev.to/lakshmisravyavedantham/i-built-a-terminal-session-debugger-with-rewind-breakpoints-and-branching-3gka"
+    },
+    {
+      "url": "https://criu.org/Main_Page"
+    },
+    {
+      "url": "https://criu.org/Assisted_debugging"
+    },
+    {
+      "url": "https://undo.io/products/udb/"
+    },
+    {
+      "url": "https://docs.undo.io/GettingStartedWithUDB.html"
+    },
+    {
+      "url": "https://help.totalview.io/classicTV/current/HTML/Splash/tvgettingstartedug-gettingStarted.3.30.html"
+    },
+    {
+      "url": "https://help.totalview.io/previous_releases/2024.2/HTML/TotalView/totalviewlhug-parallel-debugging-setup.19.46.html"
+    },
+    {
+      "url": "https://github.com/janestreet/magic-trace"
+    },
+    {
+      "url": "https://blog.janestreet.com/magic-trace/"
+    },
+    {
+      "url": "https://ocaml.org/manual/5.3/debugger.html"
+    },
+    {
+      "url": "https://perfetto.dev/docs/analysis/perfetto-sql-getting-started"
+    },
+    {
+      "url": "https://perfetto.dev/docs/analysis/perfetto-sql-syntax"
+    }
+  ]
+}

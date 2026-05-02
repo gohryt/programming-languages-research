@@ -1,0 +1,39 @@
+{
+  "kind": "concept",
+  "name": "Tail Call Elimination",
+  "aliases": ["TCE", "tail call optimisation", "TCO", "proper tail calls"],
+  "summary": "Rewrites a call in tail position — where the caller does nothing after the callee returns — into a jump, reusing the current stack frame. Mandatory for languages relying on recursion for iteration (Scheme, OCaml, Erlang); LLVM exposes it via `musttail` (strict) and `tail` (opportunistic). WebAssembly added tail calls in 2023.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Tail call elimination (TCE) rewrites a call in tail position — where the caller does nothing after the callee returns — into a jump, reusing the current stack frame. This is mandatory for languages that rely on recursion for iteration: Scheme's \"proper tail calls\", OCaml, Erlang, Haskell in practice. Without TCE, an iterative algorithm written as recursion would exhaust the stack.\n\nThe mechanical transformation: after argument evaluation, overwrite the caller's arguments in place, deallocate locals, and `jmp` to the callee instead of `call`. The result is constant-stack-space tail recursion.",
+      "refs": [],
+      "sources": [
+        { "label": "LLVM call instruction and `musttail`", "url": "https://llvm.org/docs/LangRef.html#call-instruction" }
+      ]
+    },
+    {
+      "id": "implementation-and-abi-issues",
+      "title": "Implementation and ABI hazards",
+      "tags": ["compiler", "abi"],
+      "content": "LLVM exposes TCE via the `musttail` attribute (strict correctness — the call *must* be a tail call, error otherwise) and the `tail` hint (opportunistic — the optimiser may convert if profitable). Most production languages use `musttail` for language-mandated tail calls (Scheme's proper-tail-call requirement) and rely on `tail` for opportunistic backend conversion of accidentally-tail-positioned calls.\n\nThe implementation hazard is ABI compatibility. Tail calls interact awkwardly with ABIs that expect callee-cleanup or with stack-walking debuggers. Most C ABIs technically permit TCE but many legacy tooling assumptions (stack traces, unwinding, profilers) break if it happens. Languages that need reliable TCE either define it at the IR level (LLVM `musttail`, WebAssembly tail calls) or compile to trampolines when the target ABI is hostile.",
+      "refs": []
+    },
+    {
+      "id": "wasm-tail-calls",
+      "title": "WebAssembly tail calls",
+      "tags": ["wasm", "language-design"],
+      "content": "WebAssembly added tail calls in 2023 as the `return_call` and `return_call_indirect` instructions. The proposal (Andreas Rossberg et al.) was motivated by language compilers (Scheme, OCaml, Haskell) targeting Wasm needing reliable proper-tail-call semantics that don't depend on host-environment ABI cooperation.\n\nThe Wasm semantics are clean: `return_call f` evaluates the callee's arguments, deallocates the current frame, and transfers control to `f` as if `f` were called from the current function's caller. Stack space is bounded; arbitrary tail recursion compiles correctly. The same compositional property — predictable cross-language tail calls without ABI variance — that LLVM `musttail` provides for native code, Wasm now provides for browser-and-runtime deployment.",
+      "refs": [],
+      "sources": [
+        { "label": "WebAssembly Tail Call proposal", "url": "https://github.com/WebAssembly/tail-call" }
+      ]
+    }
+  ],
+  "sources": [
+    { "label": "LLVM LangRef — call/musttail", "url": "https://llvm.org/docs/LangRef.html#call-instruction" },
+    { "label": "WebAssembly tail calls", "url": "https://github.com/WebAssembly/tail-call" }
+  ]
+}

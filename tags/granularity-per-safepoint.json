@@ -1,0 +1,7 @@
+{
+  "id": "granularity-per-safepoint",
+  "tag": "granularity:per-safepoint",
+  "name": "Granularity: per safepoint",
+  "description": "Mechanism uses runtime-defined safepoints (loop back-edges, method boundaries) as its unit of observation/handoff.",
+  "axis": "granularity"
+}

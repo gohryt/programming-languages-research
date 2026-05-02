@@ -1,0 +1,129 @@
+{
+  "kind": "concept",
+  "name": "Reference Counting",
+  "aliases": ["automatic-reference-counting", "arc"],
+  "summary": "Concept hub for automatic memory management that tracks object liveness through reference counts; collects design axes (cycle handling, runtime vs. compile-time placement, in-place mutation enabling) and indexes per-language RC implementations.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "Reference counting reclaims an object when its reference count drops to zero. It provides deterministic destruction while remaining an automatic memory-management strategy, and has become the dominant alternative to tracing GC in languages prioritising latency predictability or interop with manual-memory ecosystems.\n\nThe modern design point is reference counting as a *compilation strategy* — the compiler inserts inc/dec/reset/reuse operations from a static analysis, not the programmer. The two driving axes are *how cycles are handled* and *how in-place mutation is enabled* (compile-time uniqueness proof vs. runtime RC == 1 check).",
+      "refs": [
+        {
+          "target": "garbage-collection#tracing-vs-reference-counting",
+          "type": "related"
+        },
+        { "target": "ownership#tradeoffs", "type": "related" }
+      ]
+    },
+    {
+      "id": "design-space-axes",
+      "title": "Design-space axes",
+      "tags": ["reference-counting", "comparative-design", "runtime"],
+      "content": "Reference-counting designs vary along several axes:\n\n- **Placement**: per-assignment runtime ops (Swift ARC), compiler-inserted ops with reuse analysis (Perceus, Lean 4, Roc Morphic, Lobster), language-level destructor hooks (Nim ARC).\n- **Cycle policy**: banned by linearity (Perceus / Koka), banned by language semantics (Lean 4 pure values), programmer-managed weak refs (Swift `weak`/`unowned`), trial-deletion cycle collector (Nim ORC, Bacon-Rajan), incremental dynamic-graph reachability (Arborescent GC).\n- **In-place mutation enabling**: compile-time uniqueness proof (Morphic, Lobster lifetime analysis), runtime RC == 1 check (Lean 4 `isExclusive`, Swift `is_unique`), reuse analysis matching constructor-pair sizes (Perceus reuse).\n- **Concurrency**: thread-local RC with promotion (Lean 4's sign-bit), atomic RC throughout (Swift), striped queues with deferred updates (Nim YRC proposal).\n- **Hybrid with regions or generational refs**: Vale's generational references replace RC with per-allocation generation IDs validated at dereference, sidestepping the cycle problem entirely.",
+      "refs": [
+        { "target": "perceus", "type": "exemplified-by" },
+        { "target": "lean4-rc", "type": "exemplified-by" },
+        { "target": "swift-arc", "type": "exemplified-by" },
+        { "target": "vale-generational-references", "type": "exemplified-by" }
+      ]
+    },
+    {
+      "id": "runtime-vs-compile-time-rc",
+      "title": "Runtime RC vs compile-time RC",
+      "tags": ["runtime", "compiler", "tradeoffs"],
+      "content": "Reference counting may be implemented as a straightforward runtime mechanism — Swift ARC inserts strong/weak/unowned ops on every assignment, with SIL-level optimization passes eliding redundant retain/release pairs — or as a compiler-inserted and optimized discipline where uniqueness proofs and reuse analysis can remove a substantial fraction of the apparent RC cost.\n\nThe most aggressive compile-time RC systems (Lean 4, Perceus / Koka, Lobster, Roc Morphic) push RC into the IR and rely on dataflow analysis to elide most operations. The compile-time approach also lets `isExclusive`-guarded primitives mutate in place when RC == 1, giving pure functional semantics with imperative speed. Swift's `is_unique` / COW primitive plays the same role at runtime for `Array`/`Set`/`String` value semantics.",
+      "refs": [
+        { "target": "swift-arc", "type": "exemplified-by" },
+        { "target": "lean4-rc", "type": "exemplified-by" },
+        { "target": "perceus", "type": "exemplified-by" },
+        { "target": "llvm#optimization", "type": "related" },
+        {
+          "target": "cranelift#optimization-scope-and-philosophy",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "lobster-and-roc-morphic",
+      "title": "Borrow-inference and lifetime-analysis variants",
+      "tags": ["compiler", "borrow-inference", "tradeoffs"],
+      "content": "A specific compile-time-RC strand uses borrow inference or flow-sensitive lifetime analysis to elide most RC ops without requiring a borrow checker at the surface. Lobster's flow-sensitive lifetime analysis elides ~95% of RC ops at compile time and uses a custom bump-style allocator for the rest, with a distributed memory model that keeps RC objects from crossing thread boundaries. Roc combines Morphic borrow-based RC inference with Perceus reuse — and in late 2024 Morphic surfaced an alias-analysis bug under joinpoint/jump back-edges, prompting a temporary downgrade to trivial analysis, a useful lesson on the difficulty of proving uniqueness across CFG back-edges.",
+      "refs": [
+        { "target": "lobster", "type": "exemplified-by" },
+        { "target": "roc-morphic", "type": "exemplified-by" }
+      ]
+    },
+    {
+      "id": "nim-arc-orc-yrc",
+      "title": "Nim ARC / ORC and threadsafe cycle collection",
+      "tags": ["runtime", "cycles", "compiler"],
+      "content": "Nim's `--gc:arc` desugars `ref` into hook-driven RC plus move semantics, while `--gc:orc` adds a Bacon-style cycle collector running on suspected cyclic types. Hand-written escape hatches like `.cursor` and `.acyclic` let the user statically prove an edge can't form a cycle, removing it from ORC's trial-deletion roots. Proposed YRC threadsafe cycle collector work explores striped per-thread queues for acyclic atomic RC plus a single global Bacon collector for cyclic refs. ARC alone leaks cycles; ORC catches them via Bacon trial-deletion. The Nim line illustrates the *programmer-managed escape hatch* design point inside otherwise automatic RC.",
+      "refs": [
+        { "target": "nim-arc-orc", "type": "exemplified-by" }
+      ]
+    },
+    {
+      "id": "determinism-cycles-and-weak-references",
+      "title": "Determinism, cycles, and weak references",
+      "tags": ["cycles", "runtime", "memory-management"],
+      "content": "Deterministic destruction is one of reference counting's main strengths, especially for resource cleanup and latency-sensitive code. Its canonical weakness is cycle handling: cycles either leak (Swift ARC, Lobster), require a separate cycle-collection phase (Nim ORC, Bacon trial-deletion) introducing latency spikes, or are banned by language rule (Lean 4, Perceus / Koka).\n\nA recent research direction reclaims unreachable cyclic structures *immediately and synchronously* via dynamic-graph reachability rather than asynchronous trial-deletion — at the cost of bookkeeping every object as part of a spanning arborescence. The lesson is that the cycle problem is not fundamentally tied to RC; it is tied to whether the system is willing to trade per-edge bookkeeping for predictable reclamation.",
+      "refs": [
+        { "target": "arborescent-gc", "type": "exemplified-by" },
+        { "target": "nim-arc-orc", "type": "exemplified-by" },
+        { "target": "garbage-collection#overview", "type": "contrasts-with" },
+        { "target": "ownership#tradeoffs", "type": "related" }
+      ]
+    },
+    {
+      "id": "optimization-and-uniqueness",
+      "title": "Optimization and uniqueness",
+      "tags": ["optimization", "uniqueness", "performance"],
+      "content": "Reference-counted systems often optimize around the common effectively-unique case. Copy-on-write, in-place reuse, and compiler-driven ARC elimination all depend on being able to prove or test that the current reference is unique enough for mutation or elision — Swift's `is_unique` / COW primitive, Lean 4's `isExclusive`-guarded `Array.set` / `Array.swap`, and Perceus's reuse analysis are three implementation points on the same axis. The design choice between *runtime* `RC == 1` test (Swift, Lean 4) and *compile-time* uniqueness proof (Morphic, Lobster, Perceus reuse) determines whether the system can avoid the runtime test entirely, and is one of the load-bearing decisions in modern RC-based language design.",
+      "refs": [
+        { "target": "ownership#overview", "type": "related" },
+        { "target": "swift-arc", "type": "exemplified-by" },
+        { "target": "lean4-rc", "type": "exemplified-by" },
+        { "target": "perceus", "type": "exemplified-by" },
+        { "target": "llvm#ir", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "title": "Trade-offs and design implications",
+      "tags": ["reference-counting", "tradeoffs", "design-guidance"],
+      "content": "RC offers deterministic destruction, predictable peak memory, and natural FFI compatibility (no relocating collector to fight). It pays in steady per-reference CPU overhead (Swift ARC's ~10–30% in pointer-heavy code), branch-heavy increment/decrement on hot paths, and the cycle problem.\n\nFor language designers: (1) is RC the *primary* mechanism, or a hybrid with tracing GC for cycles (Nim ORC, Python's gc module)? (2) is the language willing to ban cycles by linearity to eliminate the problem (Perceus / Koka), or does it accept weak references (Swift) or a cycle collector (Nim ORC)? (3) is the goal compile-time RC with reuse analysis (Lean 4, Perceus, Roc Morphic, Lobster) or runtime ARC (Swift)? (4) does in-place mutation come from compile-time uniqueness proof (Morphic) or a runtime `isExclusive` test (Lean 4, Swift)?",
+      "refs": [
+        { "target": "ownership#tradeoffs", "type": "related" },
+        { "target": "garbage-collection#hybrids-and-boundaries", "type": "related" },
+        { "target": "ownership", "type": "related" },
+        { "target": "llvm#ir", "type": "relevant-to" }
+      ]
+    },
+    {
+      "id": "per-technology-records",
+      "title": "Per-technology records",
+      "tags": ["reference-counting", "index", "languages"],
+      "content": "Languages and mechanisms in the reference-counting design space, each with its own per-technology record:\n\n- **Compile-time RC with reuse analysis**: Perceus (Koka's foundation, with Frame-Limited Reuse, FIP, and TRMC extending to a full compile-time imperative-from-functional model); Lean 4's IR with `isExclusive`-guarded mutation and the persistent-RC sentinel; Roc Morphic (borrow-based RC inference plus Perceus reuse) and Roc Lambda Sets; Lobster's flow-sensitive lifetime analysis eliding ~95% of RC ops at compile time.\n- **Runtime ARC**: Swift's strong/weak/unowned counters with the three-counter side-table model and aggressive SIL-level retain/release elision.\n- **Hybrid RC + cycle collector**: Nim's `--gc:arc` (ARC alone, leaks cycles) and `--gc:orc` (Bacon trial-deletion); proposed YRC threadsafe variant.\n- **Generational-reference alternative**: Vale's generational references replace RC with per-allocation generation IDs validated at dereference, eliminating the cycle problem entirely.\n- **Cross-related concepts**: ownership for compile-time alternatives that avoid RC ops outright; garbage collection for the tracing-side counterpart.",
+      "refs": [
+        { "target": "perceus", "type": "per-technology" },
+        { "target": "swift-arc", "type": "per-technology" },
+        { "target": "lobster", "type": "per-technology" },
+        { "target": "roc-morphic", "type": "per-technology" },
+        { "target": "roc-lambda-sets", "type": "per-technology" },
+        { "target": "nim-arc-orc", "type": "per-technology" },
+        { "target": "lean4-rc", "type": "per-technology" },
+        { "target": "vale-generational-references", "type": "per-technology" },
+        { "target": "ownership", "type": "related-concept" },
+        { "target": "garbage-collection", "type": "related-concept" }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Reference counting overview",
+      "url": "https://en.wikipedia.org/wiki/Reference_counting"
+    }
+  ]
+}

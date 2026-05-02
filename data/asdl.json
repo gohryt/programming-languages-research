@@ -1,0 +1,32 @@
+{
+  "kind": "tool",
+  "name": "ASDL",
+  "aliases": ["abstract-syntax-description-language"],
+  "summary": "Wang, Appel, Korn, Serra (1997): a language for describing tree-shaped data with sums, products, and optional fields. From one ASDL file, generators emit typed Python, C, C++, ML, or Java accessors. Predates ungrammar by two decades.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ASDL (Wang, Appel, Korn, Serra; 1997) is a language for describing tree-shaped data with sums, products, and optional fields. From one ASDL file, generators emit typed Python, C, C++, ML, or Java accessors. CPython's `Python.asdl` defines the canonical Python AST shape; Oil/OSH derived its lossless tree from ASDL; SML/NJ used it internally; CompCert uses an ASDL-like spec for its IR languages. ASDL predates ungrammar by two decades and occupies the same design slot.",
+      "refs": [
+        { "target": "concrete-syntax-trees#overview", "type": "schema-for" },
+        { "target": "abstract-syntax-trees#overview", "type": "schema-for" }
+      ],
+      "sources": [
+        { "label": "ASDL — Abstract Syntax Description Language (Wang, Appel, Korn, Serra)", "url": "https://www.cs.princeton.edu/research/techreps/TR-554-97" }
+      ]
+    },
+    {
+      "id": "schema-as-source-of-truth",
+      "title": "Schema as the source of truth",
+      "tags": ["cst", "schema-generation"],
+      "content": "The architectural pattern: a single ASDL file is authoritative. Visitors, type checkers, serializers, and language bindings are all generated from it rather than reinvented per consumer. CPython's `Python.asdl` is the canonical example — every change to Python's AST shape changes one file, and every consumer (the C parser, the AST printer, the disassembler, third-party tools) gets regenerated.\n\nThis pattern is what ungrammar adopts at the rust-analyzer scale, and what every modern language-tooling project that wants schema-driven CST/AST infrastructure rediscovers.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "ASDL paper", "url": "https://www.cs.princeton.edu/research/techreps/TR-554-97" },
+    { "label": "CPython ast module", "url": "https://docs.python.org/3/library/ast.html" }
+  ]
+}

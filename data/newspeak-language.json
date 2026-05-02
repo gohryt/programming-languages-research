@@ -1,0 +1,93 @@
+{
+  "kind": "language",
+  "name": "Newspeak",
+  "aliases": [
+    "newspeak-lang"
+  ],
+  "summary": "Gilad Bracha's Smalltalk-family object-capability language. Top-level classes are stateless module *definitions*; instantiation accepts a `platform` parameter that is the sole source of external authority — module composition becomes capability passing. Active OSS Smalltalk-descendant; canonical example of an ocap-disciplined module system.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "newspeak",
+        "ocap",
+        "object-capability",
+        "language-capability",
+        "no-ambient-authority"
+      ],
+      "content": "**Newspeak** (Gilad Bracha, 2007+) is a Smalltalk-family object-capability language designed around the thesis that authority is conveyed *only* by holding object references. There is no global namespace, no static state, and no ambient ability to do I/O — every effect requires receiving a reference from a creator.\n\nThe defining design choice: top-level classes are stateless module *definitions*, not running modules. Instantiation accepts a `platform` parameter that is the sole source of external authority — module composition becomes capability passing. A class that needs file access must be passed a filesystem capability at construction time; it cannot acquire one through a global.",
+      "refs": [
+        {
+          "target": "capability-based-memory",
+          "type": "instance-of"
+        },
+        {
+          "target": "e-language",
+          "type": "related"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Newspeak language paper",
+          "url": "https://bracha.org/newspeak.pdf"
+        }
+      ]
+    },
+    {
+      "id": "modules-as-capability-passing",
+      "title": "Modules as capability passing",
+      "tags": [
+        "newspeak",
+        "module-capability",
+        "capability",
+        "no-ambient-authority"
+      ],
+      "content": "Newspeak's module system is the cleanest example of \"the module *is* an object, instantiation *is* capability injection.\" A class definition has no ambient access to anything — even other classes in the same compilation unit are accessed via the enclosing class's reference graph, not via a top-level namespace lookup.\n\nThis aligns the module-system design with the ocap discipline: the only way to gain authority is to be handed a reference. The pattern generalises — Bracha's later \"modules as objects\" papers argue that top-level *static* state is the original sin of language-level module systems, and that treating modules as parameterised objects subsumes most of what import systems try to do via lexical resolution.\n\nNewspeak is also distinctive for its **mirror-based reflection**: reflection is performed through a separate mirror object passed in as a capability, not via a global `Class.forName`-style API — so a Newspeak component can be instantiated without reflection authority simply by not passing it a mirror.",
+      "refs": [
+        {
+          "target": "module-systems",
+          "type": "instance-of"
+        },
+        {
+          "target": "module-identity",
+          "type": "related"
+        },
+        {
+          "target": "import-semantics",
+          "type": "contrasts-with"
+        }
+      ]
+    },
+    {
+      "id": "implementations-and-status",
+      "title": "Implementations and status",
+      "tags": [
+        "newspeak",
+        "production",
+        "language-capability"
+      ],
+      "content": "Implementations: the canonical Newspeak runs on a Smalltalk-style VM (originally Squeak/Pharo derivatives, then dedicated Newspeak VMs). The language has had a consistent implementation since 2008 and is open source.\n\nStatus (as of 2026-04): active OSS niche language. Newspeak's primary influence in 2026 is conceptual: its module-as-object discipline shows up in WASI Component Model `world`s (modules as parameterised by imports), in Joe Duffy's Midori \"objects-as-capabilities\" framing, and in the SES/Hardened JS `Compartment` model. Bracha's continuing essays argue these are independent rediscoveries of the Newspeak module discipline.",
+      "refs": [
+        {
+          "target": "wasi-component-model",
+          "type": "influenced"
+        },
+        {
+          "target": "singularity-midori",
+          "type": "related"
+        },
+        {
+          "target": "ses-javascript",
+          "type": "related"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Newspeak language paper",
+      "url": "https://bracha.org/newspeak.pdf"
+    }
+  ]
+}

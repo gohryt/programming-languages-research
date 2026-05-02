@@ -1,0 +1,43 @@
+{
+  "kind": "language",
+  "name": "Yul",
+  "aliases": ["solidity-yul"],
+  "summary": "Solidity's compiler-internal mid-level IR since 0.8.13 (2022). Solidity → Yul → optimised Yul → EVM bytecode. Also exposed as a first-class language: developers can write inline-assembly Yul or whole contracts in pure Yul for fine-grained gas optimisation.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "**Yul** is the mid-level IR used by the **Solidity** compiler since the IR-based pipeline became the default in Solidity 0.8.13 (2022). Solidity source compiles to Yul (a small typed assembly-like language with named variables, `for`/`if`/`switch`, and direct EVM opcode access), Yul is optimised by the YulOptimizer (constant folding, common-subexpression elimination, dead-code elimination, structural simplification), and the optimised Yul is then translated to EVM bytecode.\n\nThe Solidity compiler also exposes Yul as a *first-class language*: developers can write inline-assembly Yul blocks within Solidity, or write whole contracts in pure Yul for fine-grained gas optimisation.",
+      "refs": [
+        { "target": "mid-level-ir#overview", "type": "instance-of" },
+        { "target": "bytecode#overview", "type": "lowers-to" }
+      ],
+      "sources": [
+        { "label": "Solidity Yul documentation", "url": "https://docs.soliditylang.org/en/latest/yul.html" }
+      ]
+    },
+    {
+      "id": "ir-as-user-language",
+      "title": "Mid-level IR exposed as language",
+      "tags": ["compiler-ir", "blockchain", "evm"],
+      "content": "Yul's distinctive role compared to other DSL IRs is that it bridges *two language ecosystems*: Solidity (high-level OO smart contracts) on one side and Vyper (Python-shaped, alternative Ethereum smart-contract language with a similar SSA-IR pipeline) historically targeted Yul-like IRs as well. As of 2026, Vyper's compiler has its own Venom IR but Yul remains the de facto interchange-IR-in-spirit for EVM toolchains: gas profilers, decompilers, and security analysers consume Yul as a more tractable target than EVM bytecode itself.",
+      "refs": [],
+      "sources": [
+        { "label": "Update on the Vyper compiler (Ethereum blog)", "url": "https://blog.ethereum.org/2020/01/08/update-on-the-vyper-compiler" }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "IR-as-public-contract trade-off",
+      "tags": ["compiler-design"],
+      "content": "The design lesson is narrow: **a typed mid-level IR exposed both as a compiler internal and as a user-writable language** is unusual and produces second-order benefits — toolchain authors target it, optimisations developed for one frontend benefit other frontends targeting the same IR, and the language designer can prototype new high-level features by lowering them to existing Yul ops without backend work. The cost is that the IR's semantics become a public contract that future evolution must respect.",
+      "refs": []
+    }
+  ],
+  "sources": [
+    { "label": "Solidity Yul documentation", "url": "https://docs.soliditylang.org/en/latest/yul.html" },
+    { "label": "Solidity IR-based pipeline notes", "url": "https://docs.soliditylang.org/en/latest/ir-breaking-changes.html" },
+    { "label": "Update on the Vyper compiler (Ethereum blog)", "url": "https://blog.ethereum.org/2020/01/08/update-on-the-vyper-compiler" }
+  ]
+}
