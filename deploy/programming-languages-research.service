@@ -1,6 +1,8 @@
-# systemd user unit. Install at ~/.config/systemd/user/research.service and
-# manage with `systemctl --user enable --now research.service`. Runs as the
-# invoking user — no sudo, no User= directive, no @-template.
+# systemd user unit. Install at
+#   ~/.config/systemd/user/programming-languages-research.service
+# and manage with
+#   systemctl --user enable --now programming-languages-research.service
+# Runs as the invoking user — no sudo, no User= directive, no @-template.
 #
 # Binding :80 and :443 from a user unit requires lowering the unprivileged
 # port floor system-wide (see README) — user units can't grant capabilities
@@ -17,10 +19,10 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=%h/.programming-languages-research
 ExecStart=/usr/bin/node source/research.js \
-    --host research.example.com \
+    --host programming-languages-research.example.com \
     --port 443 \
     --acme-email admin@example.com \
-    --allowed-host research.example.com
+    --allowed-host programming-languages-research.example.com
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production

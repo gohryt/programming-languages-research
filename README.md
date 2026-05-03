@@ -13,7 +13,7 @@ schema/                     # JSON Schemas for records and tag descriptors
 source/research.js          # entry: validates data/, writes summary/data.json, serves UI + /mcp
 source/lib/                 # supporting modules (records, schema, mcp, acme, serve)
 summary/index.html          # static site (consumes summary/data.json)
-deploy/research.service     # systemd user unit
+deploy/programming-languages-research.service  # systemd user unit
 ```
 
 ## Workflow
@@ -68,8 +68,13 @@ User units can't grant `CAP_NET_BIND_SERVICE` on their own, so lower the unprivi
 ```sh
 echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/50-unprivileged-ports.conf
 sudo sysctl --system
+sysctl net.ipv4.ip_unprivileged_port_start
+# expected: net.ipv4.ip_unprivileged_port_start = 80
+
 sudo loginctl enable-linger "$USER"
 ```
+
+If the verification line doesn't print `80`, the service will hit `EACCES` when binding `:80` for the ACME challenge.
 
 ### Install
 
@@ -81,14 +86,15 @@ cd ~/.programming-languages-research
 npm ci --omit=dev
 
 mkdir -p ~/.config/systemd/user
-cp deploy/research.service ~/.config/systemd/user/research.service
-$EDITOR ~/.config/systemd/user/research.service
-# replace research.example.com → your hostname
+cp deploy/programming-languages-research.service \
+   ~/.config/systemd/user/programming-languages-research.service
+$EDITOR ~/.config/systemd/user/programming-languages-research.service
+# replace programming-languages-research.example.com → your hostname
 # replace admin@example.com → your contact for Let's Encrypt expiry notices
 
 systemctl --user daemon-reload
-systemctl --user enable --now research.service
-journalctl --user -u research.service -f
+systemctl --user enable --now programming-languages-research.service
+journalctl --user -u programming-languages-research.service -f
 ```
 
 When you see `[acme] certificate provisioned (expires …)` followed by `Serving …`, the site is live.
@@ -101,7 +107,7 @@ Push to GitHub from your dev machine, then on the VPS:
 cd ~/.programming-languages-research
 git pull
 npm ci --omit=dev
-systemctl --user restart research.service
+systemctl --user restart programming-languages-research.service
 ```
 
 No `sudo` after the one-time system setup.
@@ -162,4 +168,4 @@ Use `refs` to point at canonical records / sections instead of duplicating prose
    ```
 2. Add a `refs` entry on at least one umbrella record's section so the new record is reachable.
 3. `npm run check` validates schema and resolves every cross-ref.
-4. Commit, push to GitHub, then on the VPS: `cd ~/.programming-languages-research && git pull && npm ci --omit=dev && systemctl --user restart research.service`.
+4. Commit, push to GitHub, then on the VPS: `cd ~/.programming-languages-research && git pull && npm ci --omit=dev && systemctl --user restart programming-languages-research.service`.

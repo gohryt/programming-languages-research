@@ -153,12 +153,20 @@ export function scheduleAcmeRenewal({ initialExpiry, renewFn, applyFn }) {
   const renewLeadMs = 30 * 24 * 60 * 60 * 1000; // 30 days
   const minDelay = 60 * 1000;
   const retryDelay = 60 * 60 * 1000; // 1 hour after failure
+  const checkInterval = 12 * 60 * 60 * 1000; // poll every 12h
   let timer = null;
 
   const arm = (expiry) => {
-    const target = expiry.getTime() - renewLeadMs;
-    const delay = Math.max(minDelay, target - Date.now());
+    const renewAt = expiry.getTime() - renewLeadMs;
+    const untilRenew = Math.max(minDelay, renewAt - Date.now());
+    // setTimeout's max delay is INT32_MAX (~24.8d); cap each tick at 12h and
+    // re-evaluate, so a 60-day wait doesn't overflow into a 1ms hot loop.
+    const delay = Math.min(untilRenew, checkInterval);
     timer = setTimeout(async () => {
+      if (Date.now() < renewAt) {
+        arm(expiry);
+        return;
+      }
       try {
         const result = await renewFn();
         applyFn(result);
@@ -168,6 +176,7 @@ export function scheduleAcmeRenewal({ initialExpiry, renewFn, applyFn }) {
           `[acme] renewal failed: ${error.message}. Retrying in 1 hour.`,
         );
         timer = setTimeout(() => arm(expiry), retryDelay);
+        timer.unref?.();
       }
     }, delay);
     timer.unref?.();
