@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import { SUMMARY_DIR, SUMMARY_DATA_PATH } from "./constants.js";
 import { ensureDirectory, nowIsoString, tagAxis } from "./util.js";
 import { loadAllRecords, loadAllTagDescriptors } from "./records.js";
@@ -64,7 +63,6 @@ export function deriveMentionLinks(section, aliasIndex, recordId) {
 
 export function summarizeRecords(recordsById) {
   const indexes = {
-    recordIds: Object.keys(recordsById).sort(),
     tags: [],
     kinds: [],
   };
@@ -180,19 +178,8 @@ export function collectTagAxes(tags, tagDescriptors) {
   return axes;
 }
 
-export function writeSummaryBundle(bundle, options) {
+export function writeSummaryBundle(bundle) {
   ensureDirectory(SUMMARY_DIR);
-  if (options.clean) {
-    for (const entry of fs.readdirSync(SUMMARY_DIR)) {
-      if (entry === "index.html" || entry === "app.js" || entry === "app.css") {
-        continue;
-      }
-      fs.rmSync(path.join(SUMMARY_DIR, entry), {
-        recursive: true,
-        force: true,
-      });
-    }
-  }
   const output = {
     generatedAt: bundle.generatedAt,
     version: bundle.version,
@@ -219,7 +206,5 @@ export function validateAndBuild() {
       ...tagDescriptors.warnings,
       ...tagWarnings,
     ],
-    recordCount: Object.keys(recordsById).length,
-    tagCount: Object.keys(tagDescriptors.byTag).length,
   };
 }

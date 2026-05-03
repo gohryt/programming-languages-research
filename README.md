@@ -34,8 +34,6 @@ npm run check            # validate only — for pre-commit / CI
 
 **Tools:** `list_records` (filter by kind / tag intersection / tag union / substring), `get_record` (full record or one section), `list_tags`, `get_tag`, `list_axes`, `get_axis`, `search` (snippets), `get_cross_refs` (resolved inbound + outbound).
 
-**Resources:** `research://index`, `research://record/{id}`, `research://record/{id}/{section}`, `research://tag/{tag}`, `research://axis/{axis}`.
-
 Claude Desktop / Claude Code config:
 
 ```json

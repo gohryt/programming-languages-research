@@ -4,17 +4,9 @@ export async function loadMcpModules() {
     const transportModule = await import(
       "@modelcontextprotocol/sdk/server/streamableHttp.js"
     );
-    let z;
-    try {
-      // SDK imports from the `zod/v4` subpath (Zod v4, or v3.25+'s shim).
-      z = await import("zod/v4");
-    } catch (_zodV4Error) {
-      const zodModule = await import("zod");
-      z = zodModule.z ?? zodModule.default ?? zodModule;
-    }
+    const z = await import("zod");
     return {
       McpServer: mcpModule.McpServer,
-      ResourceTemplate: mcpModule.ResourceTemplate,
       StreamableHTTPServerTransport:
         transportModule.StreamableHTTPServerTransport,
       z,
@@ -37,18 +29,6 @@ function jsonError(message) {
   };
 }
 
-function jsonResource(uri, value) {
-  return {
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify(value, null, 2),
-      },
-    ],
-  };
-}
-
 function safeTool(fn) {
   return async (...args) => {
     try {
@@ -57,14 +37,6 @@ function safeTool(fn) {
       return jsonError(error.message ?? String(error));
     }
   };
-}
-
-function safeResource(fn) {
-  return async (uri, vars) => jsonResource(uri, await fn(uri, vars));
-}
-
-function decoded(value) {
-  return decodeURIComponent(String(value));
 }
 
 function findRecord(bundle, id) {
@@ -116,24 +88,6 @@ function recordEntry(id, record) {
       tags: section.tags,
     })),
     tags: record.derivedTags ?? [],
-  };
-}
-
-function indexSummary(bundle) {
-  const records = bundle.records ?? {};
-  const entries = Object.entries(records)
-    .map(([id, record]) => ({
-      id,
-      kind: record.kind,
-      name: record.name,
-      summary: record.summary ?? "",
-      tags: record.derivedTags ?? [],
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return {
-    generatedAt: bundle.generatedAt ?? null,
-    count: entries.length,
-    records: entries,
   };
 }
 
@@ -367,7 +321,7 @@ function crossRefs(bundle, id, sectionId) {
   };
 }
 
-export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
+export function buildMcpServer({ McpServer, z, getBundle }) {
   const server = new McpServer({
     name: "programming-languages-research",
     version: "0.1.0",
@@ -562,76 +516,6 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
       },
     },
     safeTool(async ({ id, section }) => crossRefs(getBundle(), id, section)),
-  );
-
-  server.registerResource(
-    "index",
-    "research://index",
-    {
-      title: "Corpus index",
-      description:
-        "Compact list of every record in the corpus (id, kind, name, summary, derived tags) — the minimal map of what's available before drilling in.",
-      mimeType: "application/json",
-    },
-    safeResource(async () => indexSummary(getBundle())),
-  );
-
-  server.registerResource(
-    "record",
-    new ResourceTemplate("research://record/{id}", { list: undefined }),
-    {
-      title: "Record",
-      description:
-        "Full record JSON by id — every section with content, tags, refs, sources, plus build-derived backlinks and mentions.",
-      mimeType: "application/json",
-    },
-    safeResource(async (_uri, vars) =>
-      recordSummary(getBundle(), decoded(vars.id)),
-    ),
-  );
-
-  server.registerResource(
-    "section",
-    new ResourceTemplate("research://record/{id}/{section}", {
-      list: undefined,
-    }),
-    {
-      title: "Record section",
-      description:
-        "Single section of a record (content, tags, refs, sources, backlinks, mentions). Fetch `record/{id}` instead when you want the whole record at once.",
-      mimeType: "application/json",
-    },
-    safeResource(async (_uri, vars) =>
-      sectionSummary(getBundle(), decoded(vars.id), decoded(vars.section)),
-    ),
-  );
-
-  server.registerResource(
-    "tag",
-    new ResourceTemplate("research://tag/{tag}", { list: undefined }),
-    {
-      title: "Tag page",
-      description:
-        "A tag's descriptor (if defined under `tags/`) plus every section that carries it. Resource-form alternative to the `get_tag` tool.",
-      mimeType: "application/json",
-    },
-    safeResource(async (_uri, vars) =>
-      tagSummary(getBundle(), decoded(vars.tag)),
-    ),
-  );
-
-  server.registerResource(
-    "axis",
-    new ResourceTemplate("research://axis/{axis}", { list: undefined }),
-    {
-      title: "Axis page",
-      description:
-        "Comparison-table view of one axis — every tag value along it, with sections grouped under each. Resource-form alternative to the `get_axis` tool.",
-      mimeType: "application/json",
-    },
-    safeResource(async (_uri, vars) =>
-      axisSummary(getBundle(), decoded(vars.axis)),
-    ),
   );
 
   return server;

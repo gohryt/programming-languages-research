@@ -1,60 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR, TAGS_DIR } from "./constants.js";
-import { ensureDirectory, nowIsoString, tagToId } from "./util.js";
-import {
-  loadSchema,
-  loadTagSchema,
-  validateAgainstSchema,
-  validateTagDescriptor,
-} from "./schema.js";
-
-export function getRecordPath(recordId) {
-  return path.join(DATA_DIR, `${recordId}.json`);
-}
-
-export function loadRecord(recordId) {
-  return JSON.parse(fs.readFileSync(getRecordPath(recordId), "utf8"));
-}
-
-export function writeRecord(recordId, record) {
-  if (!record.provenance) {
-    record.provenance = {};
-  }
-  if (!record.provenance.createdAt) {
-    record.provenance.createdAt = nowIsoString();
-  }
-  record.provenance.updatedAt = nowIsoString();
-  fs.writeFileSync(
-    getRecordPath(recordId),
-    `${JSON.stringify(record, null, 2)}\n`,
-  );
-}
-
-export function createStarterRecord(kind, displayName) {
-  return {
-    kind,
-    name: displayName,
-    aliases: [],
-    summary: "",
-    sections: [
-      {
-        id: "overview",
-        title: "Overview",
-        tags: [],
-        content: "",
-        refs: [],
-      },
-    ],
-    sources: [],
-  };
-}
+import { ensureDirectory, tagToId } from "./util.js";
+import { validateRecord, validateTagDescriptor } from "./schema.js";
 
 export function loadAllRecords() {
   ensureDirectory(DATA_DIR);
   const recordsById = {};
   const warnings = [];
-  const schema = loadSchema();
   const dataFiles = fs
     .readdirSync(DATA_DIR)
     .filter((entry) => entry.endsWith(".json"))
@@ -64,7 +17,7 @@ export function loadAllRecords() {
     const record = JSON.parse(
       fs.readFileSync(path.join(DATA_DIR, filename), "utf8"),
     );
-    const validationErrors = validateAgainstSchema(schema, record);
+    const validationErrors = validateRecord(record);
     if (record.id && record.id !== recordId) {
       validationErrors.push(
         `Top-level id ${record.id} does not match filename ${recordId}.json`,
@@ -88,7 +41,6 @@ export function loadAllTagDescriptors() {
   if (!fs.existsSync(TAGS_DIR)) {
     return { byTag: {}, byId: {}, warnings: [] };
   }
-  const tagSchema = loadTagSchema();
   const byTag = {};
   const byId = {};
   const warnings = [];
@@ -101,7 +53,7 @@ export function loadAllTagDescriptors() {
     const descriptor = JSON.parse(
       fs.readFileSync(path.join(TAGS_DIR, filename), "utf8"),
     );
-    const errors = validateTagDescriptor(tagSchema, descriptor, filename);
+    const errors = validateTagDescriptor(descriptor, filename);
     if (descriptor.id && descriptor.id !== id) {
       errors.push(
         `${filename}: id ${descriptor.id} does not match filename ${id}.json`,

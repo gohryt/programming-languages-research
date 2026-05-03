@@ -1,86 +1,61 @@
-import fs from "node:fs";
-import path from "node:path";
 import http from "node:http";
 import https from "node:https";
+import express from "express";
+import cors from "cors";
 import { SUMMARY_DIR } from "./constants.js";
 import { parseCommaSeparated } from "./util.js";
 import { validateAndBuild, writeSummaryBundle } from "./summary.js";
 import { loadMcpModules, buildMcpServer } from "./mcp.js";
 import { setupAutoTls, scheduleAcmeRenewal } from "./acme.js";
 
-function readJsonBody(request, limitBytes = 8 * 1024 * 1024) {
-  return new Promise((resolve, reject) => {
-    let total = 0;
-    const chunks = [];
-    request.on("data", (chunk) => {
-      total += chunk.length;
-      if (total > limitBytes) {
-        reject(new Error("Request body exceeds size limit"));
-        request.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    request.on("end", () => {
-      try {
-        const text = Buffer.concat(chunks).toString("utf8");
-        if (!text) {
-          resolve(null);
-          return;
-        }
-        resolve(JSON.parse(text));
-      } catch (error) {
-        reject(error);
-      }
-    });
-    request.on("error", reject);
+function jsonRpcError(response, status, code, message) {
+  if (response.headersSent) return;
+  response.status(status).json({
+    jsonrpc: "2.0",
+    error: { code, message },
+    id: null,
   });
 }
 
-function applyMcpCors(response) {
-  response.setHeader("Access-Control-Allow-Origin", "*");
-  response.setHeader(
-    "Access-Control-Allow-Methods",
-    "POST, GET, DELETE, OPTIONS",
-  );
-  response.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Mcp-Session-Id, Last-Event-ID, Authorization",
-  );
-  response.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
-}
-
-function checkAllowedHost(request, allowedHosts) {
-  if (allowedHosts.length === 0) return true;
-  const hostHeader = request.headers.host ?? "";
-  const hostname = hostHeader.split(":")[0];
-  return allowedHosts.some(
-    (allowed) => allowed === hostname || allowed === hostHeader,
+function logMcpAccess(request, response, started, body) {
+  const ms = Date.now() - started;
+  const tool =
+    body && typeof body === "object"
+      ? body.method === "tools/call"
+        ? body.params?.name
+        : body.method
+      : null;
+  console.log(
+    `[mcp] ${request.method} ${tool ?? "?"} → ${response.statusCode} (${ms}ms)`,
   );
 }
 
-function contentTypeFor(filePath) {
-  if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
-  if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
-  if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
-  if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
-  return "application/octet-stream";
+function checkAllowedHost(allowedHosts) {
+  return (request, response, next) => {
+    if (allowedHosts.length === 0) return next();
+    const hostHeader = request.headers.host ?? "";
+    const hostname = hostHeader.split(":")[0];
+    const ok = allowedHosts.some(
+      (entry) => entry === hostname || entry === hostHeader,
+    );
+    if (ok) return next();
+    response.status(403).type("text/plain").send("Forbidden host");
+  };
 }
 
 export async function commandServe(options) {
   const port = Number(options.port ?? 8000);
   const host = String(options.host ?? "127.0.0.1");
-  const mcpDisabled = Boolean(options["no-mcp"]);
   const checkOnly = Boolean(options.check);
 
-  const allowedHosts = parseCommaSeparated(
-    options["allowed-host"] ?? options["allowed-hosts"] ?? "",
-  );
+  const allowedHosts = parseCommaSeparated(options["allowed-host"] ?? "");
 
-  const { bundle, warnings, recordCount, tagCount } = validateAndBuild();
+  const { bundle, warnings } = validateAndBuild();
   for (const warning of warnings) {
     console.warn(`Warning: ${warning}`);
   }
+  const recordCount = Object.keys(bundle.records).length;
+  const tagCount = Object.keys(bundle.tagDescriptors).length;
   console.log(
     `Validated ${recordCount} record(s), ${tagCount} tag descriptor(s).`,
   );
@@ -88,100 +63,73 @@ export async function commandServe(options) {
     return;
   }
 
-  writeSummaryBundle(bundle, {});
+  writeSummaryBundle(bundle);
 
   const acmeContext = await setupAutoTls({ host, port, options });
-  let tlsMode = "none";
-  let tlsContext = null;
-  if (acmeContext) {
-    tlsMode = "auto";
-    tlsContext = {
-      cert: acmeContext.bundle.cert,
-      key: acmeContext.bundle.key,
-    };
-  }
+  const tlsMode = acmeContext ? "auto" : "none";
 
   const getBundle = () => bundle;
 
-  let mcp = null;
-  if (!mcpDisabled) {
-    const loaded = await loadMcpModules();
-    if (loaded.error) {
-      console.warn(
-        "[mcp] SDK not available; /mcp endpoint disabled. Run `npm install` in the repo root to enable it.",
-      );
-      console.warn(`[mcp] reason: ${loaded.error.message}`);
-    } else {
-      mcp = loaded;
-    }
+  const mcpLoaded = await loadMcpModules();
+  if (mcpLoaded.error) {
+    console.warn(
+      "[mcp] SDK not available; /mcp endpoint disabled. Run `npm install` in the repo root to enable it.",
+    );
+    console.warn(`[mcp] reason: ${mcpLoaded.error.message}`);
   }
+  const mcp = mcpLoaded.error ? null : mcpLoaded;
 
-  const requestHandler = async (request, response) => {
-    if (!checkAllowedHost(request, allowedHosts)) {
-      response.writeHead(403, {
-        "Content-Type": "text/plain; charset=utf-8",
+  const app = express();
+  app.disable("x-powered-by");
+  app.use(checkAllowedHost(allowedHosts));
+
+  const mcpCors = cors({
+    origin: "*",
+    methods: ["POST", "GET", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Mcp-Session-Id",
+      "Last-Event-ID",
+      "Authorization",
+    ],
+    exposedHeaders: ["Mcp-Session-Id"],
+  });
+  const mcpJson = express.json({ limit: "8mb" });
+
+  app.use("/mcp", mcpCors);
+
+  app.post(
+    "/mcp",
+    (request, response, next) => {
+      // wrap mcpJson so its sync errors (entity.too.large, parse failure)
+      // become JSON-RPC errors with the right HTTP status instead of HTML 500.
+      mcpJson(request, response, (error) => {
+        if (!error) return next();
+        const started = Date.now();
+        if (error.type === "entity.too.large") {
+          jsonRpcError(response, 413, -32600, error.message);
+        } else {
+          jsonRpcError(response, 400, -32700, `Parse error: ${error.message}`);
+        }
+        logMcpAccess(request, response, started, null);
       });
-      response.end("Forbidden host");
-      return;
-    }
-
-    const url = new URL(request.url, `http://${host}:${port}`);
-    let requestPath = decodeURIComponent(url.pathname);
-
-    if (requestPath === "/mcp") {
-      applyMcpCors(response);
-      if (request.method === "OPTIONS") {
-        response.writeHead(204);
-        response.end();
-        return;
-      }
-      if (request.method !== "POST") {
-        response.writeHead(405, { "Content-Type": "application/json" });
-        response.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: { code: -32000, message: "Method not allowed." },
-            id: null,
-          }),
-        );
-        return;
-      }
+    },
+    async (request, response) => {
+      const started = Date.now();
       if (!mcp) {
-        response.writeHead(503, { "Content-Type": "application/json" });
-        response.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32603,
-              message:
-                "MCP support not available. Install dependencies with `npm install` in the repository root.",
-            },
-            id: null,
-          }),
+        jsonRpcError(
+          response,
+          503,
+          -32603,
+          "MCP support not available. Install dependencies with `npm install` in the repository root.",
         );
+        logMcpAccess(request, response, started, null);
         return;
       }
-      let body;
-      try {
-        body = await readJsonBody(request);
-      } catch (error) {
-        response.writeHead(400, { "Content-Type": "application/json" });
-        response.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32700,
-              message: `Parse error: ${error.message}`,
-            },
-            id: null,
-          }),
-        );
-        return;
-      }
+      const body = request.body ?? null;
       try {
         const mcpServer = buildMcpServer({
           McpServer: mcp.McpServer,
-          ResourceTemplate: mcp.ResourceTemplate,
           z: mcp.z,
           getBundle,
         });
@@ -198,53 +146,41 @@ export async function commandServe(options) {
         });
         await mcpServer.connect(transport);
         await transport.handleRequest(request, response, body);
+        logMcpAccess(request, response, started, body);
       } catch (error) {
         console.error(`[mcp] request error: ${error.stack ?? error.message}`);
-        if (!response.headersSent) {
-          response.writeHead(500, { "Content-Type": "application/json" });
-          response.end(
-            JSON.stringify({
-              jsonrpc: "2.0",
-              error: {
-                code: -32603,
-                message: String(error.message ?? error),
-              },
-              id: null,
-            }),
-          );
-        }
+        jsonRpcError(response, 500, -32603, String(error.message ?? error));
+        logMcpAccess(request, response, started, body);
       }
-      return;
-    }
+    },
+  );
 
-    if (requestPath === "/") {
-      requestPath = "/index.html";
-    }
-    const safePath = path.normalize(requestPath).replace(/^\/+/, "");
-    const filePath = path.join(SUMMARY_DIR, safePath);
-    if (!filePath.startsWith(SUMMARY_DIR)) {
-      response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-      response.end("Forbidden");
-      return;
-    }
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-      response.end("Not found");
-      return;
-    }
-    response.writeHead(200, { "Content-Type": contentTypeFor(filePath) });
-    fs.createReadStream(filePath).pipe(response);
-  };
+  app.all("/mcp", (request, response) => {
+    const started = Date.now();
+    jsonRpcError(response, 405, -32000, "Method not allowed.");
+    logMcpAccess(request, response, started, null);
+  });
+
+  app.use(express.static(SUMMARY_DIR, { index: "index.html" }));
+
+  app.use((_request, response) => {
+    response.status(404).type("text/plain").send("Not found");
+  });
 
   const server =
     tlsMode === "none"
-      ? http.createServer(requestHandler)
+      ? http.createServer(app)
       : https.createServer(
-          { cert: tlsContext.cert, key: tlsContext.key },
-          requestHandler,
+          { cert: acmeContext.bundle.cert, key: acmeContext.bundle.key },
+          app,
         );
 
-  if (tlsMode === "auto" && acmeContext) {
+  server.on("error", (error) => {
+    console.error(`Server error: ${error.message}`);
+    process.exit(1);
+  });
+
+  if (tlsMode === "auto") {
     scheduleAcmeRenewal({
       initialExpiry: acmeContext.bundle.expiry,
       renewFn: acmeContext.renew,
@@ -257,11 +193,20 @@ export async function commandServe(options) {
     });
   }
 
-  const cleanShutdown = () => {
-    server.close(() => process.exit(0));
+  let shuttingDown = false;
+  const cleanShutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    const closes = [new Promise((resolve) => server.close(() => resolve()))];
     if (acmeContext?.challengeServer) {
-      acmeContext.challengeServer.close();
+      closes.push(
+        new Promise((resolve) =>
+          acmeContext.challengeServer.close(() => resolve()),
+        ),
+      );
     }
+    await Promise.all(closes);
+    process.exit(0);
   };
   process.on("SIGINT", cleanShutdown);
   process.on("SIGTERM", cleanShutdown);
@@ -272,10 +217,8 @@ export async function commandServe(options) {
     console.log(`Open ${proto}://${host}:${port}`);
     if (mcp) {
       console.log(`MCP endpoint: ${proto}://${host}:${port}/mcp (POST)`);
-    } else if (mcpDisabled) {
-      console.log("MCP endpoint disabled by --no-mcp.");
     }
-    if (tlsMode === "auto" && acmeContext) {
+    if (tlsMode === "auto") {
       console.log(`TLS: auto (Let's Encrypt) for ${acmeContext.domain}`);
     } else {
       console.log("TLS: off (plain HTTP)");

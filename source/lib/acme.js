@@ -61,25 +61,15 @@ async function loadOrCreateAccountKey(acme, cacheDir) {
   return pem;
 }
 
-async function provisionCert({
-  acme,
-  domain,
-  email,
-  cacheDir,
-  staging,
-  challengeMap,
-}) {
+async function provisionCert({ acme, domain, email, cacheDir, challengeMap }) {
   const accountKey = await loadOrCreateAccountKey(acme, cacheDir);
-  const directoryUrl = staging
-    ? acme.directory.letsencrypt.staging
-    : acme.directory.letsencrypt.production;
-
-  const client = new acme.Client({ directoryUrl, accountKey });
+  const client = new acme.Client({
+    directoryUrl: acme.directory.letsencrypt.production,
+    accountKey,
+  });
   const [domainKey, csr] = await acme.crypto.createCsr({ altNames: [domain] });
 
-  console.log(
-    `[acme] requesting ${staging ? "staging" : "production"} certificate for ${domain}…`,
-  );
+  console.log(`[acme] requesting production certificate for ${domain}…`);
   const cert = await client.auto({
     csr,
     email: email || undefined,
@@ -108,11 +98,7 @@ async function provisionCert({
   return { cert: certPem, key: keyPem, expiry };
 }
 
-function startAcmeChallengeListener({
-  challengeMap,
-  challengePort,
-  redirectHttpsPort,
-}) {
+function startAcmeChallengeListener({ challengeMap, redirectHttpsPort }) {
   const handler = (request, response) => {
     if (request.url.startsWith("/.well-known/acme-challenge/")) {
       const token = request.url.split("/").pop();
@@ -140,10 +126,8 @@ function startAcmeChallengeListener({
   return new Promise((resolve, reject) => {
     const server = http.createServer(handler);
     server.once("error", reject);
-    server.listen(challengePort, "0.0.0.0", () => {
-      console.log(
-        `[acme] HTTP-01 challenge + HTTP→HTTPS redirect listener on :${challengePort}`,
-      );
+    server.listen(80, "0.0.0.0", () => {
+      console.log("[acme] HTTP-01 challenge + HTTP→HTTPS redirect listener on :80");
       resolve(server);
     });
   });
@@ -189,8 +173,7 @@ export function scheduleAcmeRenewal({ initialExpiry, renewFn, applyFn }) {
 }
 
 export async function setupAutoTls({ host, port, options }) {
-  const explicitDomain = options.domain ? String(options.domain) : null;
-  const domain = explicitDomain ?? (isHostnameLike(host) ? host : null);
+  const domain = isHostnameLike(host) ? host : null;
   if (!domain) {
     return null;
   }
@@ -205,18 +188,12 @@ export async function setupAutoTls({ host, port, options }) {
   }
   const { acme } = acmeResult;
 
-  const acmeCacheRoot = options["acme-cache"]
-    ? path.resolve(String(options["acme-cache"]))
-    : path.join(ROOT, ".acme");
-  const cacheDir = path.join(acmeCacheRoot, domain);
-  const staging = Boolean(options["acme-staging"]);
+  const cacheDir = path.join(ROOT, ".acme", domain);
   const email = options["acme-email"] ? String(options["acme-email"]) : null;
-  const challengePort = Number(options["acme-challenge-port"] ?? 80);
 
   const challengeMap = new Map();
   const challengeServer = await startAcmeChallengeListener({
     challengeMap,
-    challengePort,
     redirectHttpsPort: port,
   });
 
@@ -238,14 +215,7 @@ export async function setupAutoTls({ host, port, options }) {
     }
   }
   if (!bundle) {
-    bundle = await provisionCert({
-      acme,
-      domain,
-      email,
-      cacheDir,
-      staging,
-      challengeMap,
-    });
+    bundle = await provisionCert({ acme, domain, email, cacheDir, challengeMap });
   }
 
   return {
@@ -253,13 +223,6 @@ export async function setupAutoTls({ host, port, options }) {
     bundle,
     challengeServer,
     renew: () =>
-      provisionCert({
-        acme,
-        domain,
-        email,
-        cacheDir,
-        staging,
-        challengeMap,
-      }),
+      provisionCert({ acme, domain, email, cacheDir, challengeMap }),
   };
 }

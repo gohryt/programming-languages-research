@@ -25,15 +25,6 @@ export function tagAxis(tag) {
   return idx === -1 ? null : tag.slice(0, idx);
 }
 
-export function normalizeId(value) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/--+/g, "-");
-}
-
 export function parseCommaSeparated(value) {
   if (!value) {
     return [];
