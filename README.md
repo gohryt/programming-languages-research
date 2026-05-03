@@ -13,7 +13,7 @@ schema/                     # JSON Schemas for records and tag descriptors
 source/research.js          # entry: validates data/, writes summary/data.json, serves UI + /mcp
 source/lib/                 # supporting modules (records, schema, mcp, acme, serve)
 summary/index.html          # static site (consumes summary/data.json)
-deploy/research@.service    # systemd template unit (instance is the run-as user)
+deploy/research.service     # systemd user unit
 ```
 
 ## Workflow
@@ -53,7 +53,7 @@ For local development point the URL at `http://127.0.0.1:8000/mcp`.
 
 ## Production deployment
 
-Auto-TLS via Let's Encrypt is provisioned on first run when `--host` is a public hostname; cached under `.acme/<domain>/`, renewed ~30 days before expiry. `--allowed-host` in the systemd unit gates DNS-rebinding attacks. The bundled unit grants `CAP_NET_BIND_SERVICE` so the run-as user can bind `:80` and `:443` without root.
+Runs as a **systemd user unit** out of `~/.programming-languages-research`. Auto-TLS via Let's Encrypt is provisioned on first run when `--host` is a public hostname; cached under `.acme/<domain>/`, renewed ~30 days before expiry. `--allowed-host` gates DNS-rebinding attacks.
 
 ### Prerequisites
 
@@ -61,23 +61,34 @@ Auto-TLS via Let's Encrypt is provisioned on first run when `--host` is a public
 - Inbound `:80` (HTTP-01) and `:443` (TLS) reachable.
 - `git`, `node`, `npm` installed (`sudo pacman -S --noconfirm git nodejs npm` on Arch).
 
-### One-time setup
+### One-time system setup
+
+User units can't grant `CAP_NET_BIND_SERVICE` on their own, so lower the unprivileged port floor and enable lingering for the deploy user (so the service survives logout and starts at boot):
+
+```sh
+echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/50-unprivileged-ports.conf
+sudo sysctl --system
+sudo loginctl enable-linger "$USER"
+```
+
+### Install
 
 SSH in as the user the service should run as (e.g. `linuxuser`):
 
 ```sh
-sudo mkdir -p /srv/research && sudo chown "$USER:$USER" /srv/research
-git clone https://github.com/gohryt/programming-languages-research.git /srv/research
-cd /srv/research && npm ci --omit=dev
-```
+git clone https://github.com/gohryt/programming-languages-research.git ~/.programming-languages-research
+cd ~/.programming-languages-research
+npm ci --omit=dev
 
-Edit `deploy/research@.service` — replace `research.example.com` with your public hostname and `admin@example.com` with the address Let's Encrypt should use for expiry notices. Then install and start:
+mkdir -p ~/.config/systemd/user
+cp deploy/research.service ~/.config/systemd/user/research.service
+$EDITOR ~/.config/systemd/user/research.service
+# replace research.example.com → your hostname
+# replace admin@example.com → your contact for Let's Encrypt expiry notices
 
-```sh
-sudo cp deploy/research@.service /etc/systemd/system/research@.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now "research@$USER.service"
-sudo journalctl -u "research@$USER.service" -f
+systemctl --user daemon-reload
+systemctl --user enable --now research.service
+journalctl --user -u research.service -f
 ```
 
 When you see `[acme] certificate provisioned (expires …)` followed by `Serving …`, the site is live.
@@ -87,17 +98,13 @@ When you see `[acme] certificate provisioned (expires …)` followed by `Serving
 Push to GitHub from your dev machine, then on the VPS:
 
 ```sh
-cd /srv/research
+cd ~/.programming-languages-research
 git pull
 npm ci --omit=dev
-sudo systemctl restart "research@$USER.service"
+systemctl --user restart research.service
 ```
 
-To skip the sudo password on each deploy, drop a sudoers fragment at `/etc/sudoers.d/research-deploy` (replace `linuxuser` with your actual user):
-
-```
-linuxuser ALL=(root) NOPASSWD: /bin/systemctl restart research@linuxuser.service
-```
+No `sudo` after the one-time system setup.
 
 ## Record shape
 
@@ -155,4 +162,4 @@ Use `refs` to point at canonical records / sections instead of duplicating prose
    ```
 2. Add a `refs` entry on at least one umbrella record's section so the new record is reachable.
 3. `npm run check` validates schema and resolves every cross-ref.
-4. Commit, push to GitHub, then on the VPS: `cd /srv/research && git pull && npm ci --omit=dev && sudo systemctl restart "research@$USER.service"`.
+4. Commit, push to GitHub, then on the VPS: `cd ~/.programming-languages-research && git pull && npm ci --omit=dev && systemctl --user restart research.service`.
