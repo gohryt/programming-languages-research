@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import path from "node:path";
+import zlib from "node:zlib";
 import { SUMMARY_DIR, SUMMARY_DATA_PATH } from "./constants.js";
 import { ensureDirectory, nowIsoString, tagAxis } from "./util.js";
 import { loadAllRecords, loadAllTagDescriptors } from "./records.js";
@@ -176,6 +178,23 @@ export function collectTagAxes(tags, tagDescriptors) {
     axes[axis] = Array.from(new Set(axes[axis])).sort();
   }
   return axes;
+}
+
+// Brotli quality 4 is the canonical HTTP-server default (Cloudflare, ngx_brotli):
+// near-optimal ratio at a fraction of the CPU cost of quality 11. We run this
+// once at startup, then express-static-gzip serves the precompressed file as-is.
+export function preCompressSummary() {
+  const brotli = {
+    params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
+  };
+  for (const entry of fs.readdirSync(SUMMARY_DIR)) {
+    if (entry.endsWith(".gz") || entry.endsWith(".br")) continue;
+    const filePath = path.join(SUMMARY_DIR, entry);
+    if (!fs.statSync(filePath).isFile()) continue;
+    const data = fs.readFileSync(filePath);
+    fs.writeFileSync(`${filePath}.gz`, zlib.gzipSync(data, { level: 9 }));
+    fs.writeFileSync(`${filePath}.br`, zlib.brotliCompressSync(data, brotli));
+  }
 }
 
 export function writeSummaryBundle(bundle) {

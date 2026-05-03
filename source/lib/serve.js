@@ -1,11 +1,15 @@
 import http from "node:http";
 import https from "node:https";
 import express from "express";
-import compression from "compression";
+import expressStaticGzip from "express-static-gzip";
 import cors from "cors";
 import { SUMMARY_DIR } from "./constants.js";
 import { parseCommaSeparated } from "./util.js";
-import { validateAndBuild, writeSummaryBundle } from "./summary.js";
+import {
+  validateAndBuild,
+  writeSummaryBundle,
+  preCompressSummary,
+} from "./summary.js";
 import { loadMcpModules, buildMcpServer } from "./mcp.js";
 import { setupAutoTls, scheduleAcmeRenewal } from "./acme.js";
 
@@ -65,6 +69,7 @@ export async function commandServe(options) {
   }
 
   writeSummaryBundle(bundle);
+  preCompressSummary();
 
   const acmeContext = await setupAutoTls({ host, port, options });
   const tlsMode = acmeContext ? "auto" : "none";
@@ -162,11 +167,15 @@ export async function commandServe(options) {
     logMcpAccess(request, response, started, null);
   });
 
-  // Compression for static responses only — declared after /mcp so SSE
-  // responses on /mcp aren't gzip-buffered (which would defeat streaming).
-  app.use(compression());
-
-  app.use(express.static(SUMMARY_DIR, { index: "index.html" }));
+  // Pre-compressed .br / .gz siblings are written by preCompressSummary at
+  // startup; express-static-gzip picks the right variant per Accept-Encoding.
+  app.use(
+    expressStaticGzip(SUMMARY_DIR, {
+      enableBrotli: true,
+      orderPreference: ["br"],
+      index: "index.html",
+    }),
+  );
 
   app.use((_request, response) => {
     response.status(404).type("text/plain").send("Not found");

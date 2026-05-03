@@ -1,4 +1,8 @@
 node_modules
+
 .acme
 
 data.json
+
+summary/*.gz
+summary/*.br
