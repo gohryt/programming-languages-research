@@ -1,6 +1,7 @@
 import http from "node:http";
 import https from "node:https";
 import express from "express";
+import compression from "compression";
 import cors from "cors";
 import { SUMMARY_DIR } from "./constants.js";
 import { parseCommaSeparated } from "./util.js";
@@ -160,6 +161,10 @@ export async function commandServe(options) {
     jsonRpcError(response, 405, -32000, "Method not allowed.");
     logMcpAccess(request, response, started, null);
   });
+
+  // Compression for static responses only — declared after /mcp so SSE
+  // responses on /mcp aren't gzip-buffered (which would defeat streaming).
+  app.use(compression());
 
   app.use(express.static(SUMMARY_DIR, { index: "index.html" }));
 
