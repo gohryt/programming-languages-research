@@ -372,8 +372,8 @@ function renderTagView(tag, entries, data) {
 
   return `
     <section class="panel compact-panel">
-      <h2>Tag: <code>${escapeHtml(tag)}</code></h2>
-      <p class="muted">${entries.length} matching section(s)${descriptor ? "" : " — no descriptor file under <code>tags/</code>"}</p>
+      <h2>Tag <code>${escapeHtml(tag)}</code></h2>
+      <p class="muted">Sections across the corpus that carry this tag — ${entries.length} match${entries.length === 1 ? "" : "es"}${descriptor ? "" : ". No descriptor file under <code>tags/</code> for this one yet."}</p>
       ${renderTagDescriptorBlock(descriptor)}
     </section>
     ${body}
@@ -385,8 +385,8 @@ function renderAxisView(axis, data, tagIndex) {
   if (tags.length === 0) {
     return `
       <section class="panel compact-panel">
-        <h2>Axis: <code>${escapeHtml(axis)}</code></h2>
-        <p class="muted">No tags found under this axis.</p>
+        <h2>Axis <code>${escapeHtml(axis)}</code></h2>
+        <p class="muted">No tags registered under this axis yet.</p>
       </section>
     `;
   }
@@ -412,8 +412,8 @@ function renderAxisView(axis, data, tagIndex) {
     .join("");
   return `
     <section class="panel compact-panel">
-      <h2>Axis: <code>${escapeHtml(axis)}</code></h2>
-      <p class="muted">${tags.length} tag value(s) on this axis. Tagged sections grouped below — comparable to a summary-of-mechanisms table.</p>
+      <h2>Axis <code>${escapeHtml(axis)}</code></h2>
+      <p class="muted">Side-by-side comparison along this axis — ${tags.length} tag value${tags.length === 1 ? "" : "s"}, sections grouped under each. Use this view to scan how different records position themselves on one dimension.</p>
     </section>
     ${groups}
   `;
@@ -434,7 +434,8 @@ function renderKindView(kind, entries) {
 
   return `
     <section class="panel compact-panel">
-      <h2>Kind: ${escapeHtml(kind)}</h2>
+      <h2>Records of kind <code>${escapeHtml(kind)}</code></h2>
+      <p class="muted">${entries.length} record${entries.length === 1 ? "" : "s"} classified under <code>${escapeHtml(kind)}</code>.</p>
       <ul class="record-list">${list}</ul>
     </section>
   `;
@@ -459,16 +460,18 @@ function renderSearchView(query, entries) {
 
   return `
     <section class="panel compact-panel">
-      <h2>Search: ${escapeHtml(query)}</h2>
-      <p class="muted">${filtered.length} result(s)</p>
+      <h2>Search results for <code>${escapeHtml(query)}</code></h2>
+      <p class="muted">${filtered.length} match${filtered.length === 1 ? "" : "es"} across record metadata, section content, and tags.</p>
       <ul class="record-list">${body}</ul>
     </section>
   `;
 }
 
 function renderIndex(data) {
-  const list = Object.entries(data.records)
-    .sort((left, right) => left[1].name.localeCompare(right[1].name))
+  const entries = Object.entries(data.records).sort((left, right) =>
+    left[1].name.localeCompare(right[1].name),
+  );
+  const list = entries
     .map(
       ([recordId, record]) => `
       <li>
@@ -483,7 +486,8 @@ function renderIndex(data) {
 
   return `
     <section class="panel compact-panel">
-      <h2>Records</h2>
+      <h2>All records <span class="muted">(${entries.length})</span></h2>
+      <p class="muted">Browse the corpus alphabetically. Use the controls above to narrow by kind or axis, or search across the whole corpus.</p>
       <ul class="record-list">${list}</ul>
     </section>
   `;
@@ -504,7 +508,7 @@ async function main() {
   if (route.record) {
     const record = data.records[route.record];
     if (!record) {
-      body += `<section class="panel compact-panel"><h2>Not found</h2><p>No record named ${escapeHtml(route.record)}.</p></section>`;
+      body += `<section class="panel compact-panel"><h2>Record not found</h2><p>No record named <code>${escapeHtml(route.record)}</code> in the corpus. Check the <a href="#index">index</a> for valid ids.</p></section>`;
     } else {
       body += renderRecordView(
         route.record,
@@ -538,7 +542,7 @@ async function main() {
 window.addEventListener("hashchange", () => {
   main().catch((error) => {
     document.getElementById("content").innerHTML =
-      `<section class="panel"><h2>Error</h2><pre>${escapeHtml(String(error))}</pre></section>`;
+      `<section class="panel"><h2>Failed to load corpus</h2><pre>${escapeHtml(String(error))}</pre></section>`;
   });
 });
 

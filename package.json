@@ -1,8 +1,8 @@
 {
-  "name": "mage-research",
+  "name": "programming-languages-research",
   "private": true,
   "version": "0.1.0",
-  "description": "Research corpus for the Mage language: CLI, static site, and MCP server.",
+  "description": "Programming-languages research corpus served as a static site and an MCP endpoint.",
   "license": "MIT",
   "type": "module",
   "engines": {

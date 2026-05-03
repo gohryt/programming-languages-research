@@ -369,7 +369,7 @@ function crossRefs(bundle, id, sectionId) {
 
 export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
   const server = new McpServer({
-    name: "mage-research-corpus",
+    name: "programming-languages-research",
     version: "0.1.0",
   });
 
@@ -378,8 +378,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     {
       title: "List records",
       description:
-        "List records in the research corpus, optionally filtered by kind, tag(s), or text match. " +
-        "Use `tag` for AND-style filtering (every tag must match a section); use `tag_any` for OR-style.",
+        "Enumerate records in the programming-languages research corpus (languages, frameworks, tools, runtimes, concepts, libraries) with optional filtering. " +
+        "`tag` requires every listed tag to appear on at least one section of the record (intersection); `tag_any` requires any one (union); `match` is a case-insensitive substring filter over id, name, summary, aliases, and section titles/tags. " +
+        "Returns each match's id, kind, name, summary, aliases, derived tag set, and a section list (id/title/tags). Use `search` instead when you need snippets across full section content.",
       inputSchema: {
         kind: z
           .enum([
@@ -433,9 +434,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
   server.registerTool(
     "get_record",
     {
-      title: "Get record",
+      title: "Get a record",
       description:
-        "Return one record by id, or one section if `section` is supplied. Includes content, refs, sources, and (for sections) backlinks and mentions.",
+        "Return a single record's full JSON — metadata (kind, name, summary, aliases, provenance) plus an ordered list of sections, each with `tags`, `content` (markdown), `refs` (typed cross-references to other records/sections), `sources` (URLs), and the build-time-derived `backlinks` (inbound refs) and `mentions` (alias auto-detections in body text). When `section` is supplied, returns just that one section.",
       inputSchema: {
         id: z.string().describe("Record id (kebab-case)."),
         section: z
@@ -458,7 +459,7 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     {
       title: "List tags",
       description:
-        "Return all tags used in the corpus, with usage counts and any descriptor metadata. Optionally filter to one axis.",
+        "Return every tag that appears on any section in the corpus, with usage count and the descriptor (if `tags/<id>.json` exists for it). Tags are kebab-case strings; axis-prefixed tags use the form `axis:value` (e.g. `family:cooperative-safepoints`, `off-cost:zero`). Use `axis` to narrow to one axis.",
       inputSchema: {
         axis: z
           .string()
@@ -476,7 +477,7 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     {
       title: "Get tag",
       description:
-        "Return the descriptor (if any) for a tag along with every section that uses it.",
+        "Return a tag's descriptor (if one is defined under `tags/`) plus every section across the corpus that carries it. Useful for cross-cutting views — e.g. every section tagged `compiler`, or every section under `family:cooperative-safepoints`.",
       inputSchema: {
         tag: z
           .string()
@@ -493,7 +494,7 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     {
       title: "List tag axes",
       description:
-        "Return all tag axes (the colon-prefix grouping) with the values that appear under each.",
+        "Return every tag axis with the values that appear under it. An axis is a `colon-prefix` shared by several tags so the corpus can be compared along one dimension; conventional axes are `domain`, `family`, `off-cost`, `on-cost`, and `granularity` (see README for tier values).",
       inputSchema: {},
     },
     safeTool(async () => listAxesSummary(getBundle())),
@@ -504,7 +505,7 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     {
       title: "Get axis grouping",
       description:
-        "Return all tag values along an axis with the sections grouped under each value (the comparison-table view from the static site).",
+        "Return every tag value along one axis with the sections grouped under each — the comparison-table view from the static site. Useful for surveys like 'which mechanism families are recorded?' or 'which records are tagged `off-cost:zero`?'.",
       inputSchema: {
         axis: z
           .string()
@@ -519,9 +520,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
   server.registerTool(
     "search",
     {
-      title: "Full-text search",
+      title: "Search corpus",
       description:
-        "Substring search (case-insensitive) over record/section content. Returns matched records and/or sections with short snippets.",
+        "Case-insensitive substring search across record names, summaries, aliases, section titles, section body content, and tags. Returns hits with short snippets around the match. Default `scope` is `both` (records and sections); use `record` or `section` to narrow. Reach for this when you need full-text content matches; use `list_records` when filtering structurally by kind/tag.",
       inputSchema: {
         query: z.string().min(1).describe("Search string."),
         scope: z
@@ -547,9 +548,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
   server.registerTool(
     "get_cross_refs",
     {
-      title: "Get cross references",
+      title: "Get cross-references",
       description:
-        "Return outbound refs (this record/section → others) and inbound backlinks (others → this) with resolved record/section names.",
+        "Return both outbound `refs` (this record/section → others) and inbound `backlinks` (others → this), with destination record/section names resolved. Each edge carries a kebab-case `type` (e.g. `related`, `contrasts-with`, `instance-of`, `compared-with`). Use this to understand what a record builds on and what depends on it.",
       inputSchema: {
         id: z.string().describe("Record id."),
         section: z
@@ -567,8 +568,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     "index",
     "research://index",
     {
-      title: "Research corpus index",
-      description: "Compact list of every record (id, kind, name, summary).",
+      title: "Corpus index",
+      description:
+        "Compact list of every record in the corpus (id, kind, name, summary, derived tags) — the minimal map of what's available before drilling in.",
       mimeType: "application/json",
     },
     safeResource(async () => indexSummary(getBundle())),
@@ -579,7 +581,8 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     new ResourceTemplate("research://record/{id}", { list: undefined }),
     {
       title: "Record",
-      description: "Full record JSON by id.",
+      description:
+        "Full record JSON by id — every section with content, tags, refs, sources, plus build-derived backlinks and mentions.",
       mimeType: "application/json",
     },
     safeResource(async (_uri, vars) =>
@@ -595,7 +598,7 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     {
       title: "Record section",
       description:
-        "One section of a record. Use `record/{id}` for the full record.",
+        "Single section of a record (content, tags, refs, sources, backlinks, mentions). Fetch `record/{id}` instead when you want the whole record at once.",
       mimeType: "application/json",
     },
     safeResource(async (_uri, vars) =>
@@ -607,8 +610,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     "tag",
     new ResourceTemplate("research://tag/{tag}", { list: undefined }),
     {
-      title: "Tag",
-      description: "Tag descriptor and all sections that use it.",
+      title: "Tag page",
+      description:
+        "A tag's descriptor (if defined under `tags/`) plus every section that carries it. Resource-form alternative to the `get_tag` tool.",
       mimeType: "application/json",
     },
     safeResource(async (_uri, vars) =>
@@ -620,8 +624,9 @@ export function buildMcpServer({ McpServer, ResourceTemplate, z, getBundle }) {
     "axis",
     new ResourceTemplate("research://axis/{axis}", { list: undefined }),
     {
-      title: "Axis",
-      description: "Tag values along an axis with sections grouped under each.",
+      title: "Axis page",
+      description:
+        "Comparison-table view of one axis — every tag value along it, with sections grouped under each. Resource-form alternative to the `get_axis` tool.",
       mimeType: "application/json",
     },
     safeResource(async (_uri, vars) =>
