@@ -1,2 +1,4 @@
-node_modules/
-.acme/
+node_modules
+.acme
+
+data.json
