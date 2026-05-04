@@ -1,7 +1,8 @@
+import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
+import path from "node:path";
 import express from "express";
-import expressStaticGzip from "express-static-gzip";
 import cors from "cors";
 import { SUMMARY_DIR } from "./constants.js";
 import { parseCommaSeparated } from "./util.js";
@@ -45,6 +46,90 @@ function checkAllowedHost(allowedHosts) {
     );
     if (ok) return next();
     response.status(403).type("text/plain").send("Forbidden host");
+  };
+}
+
+function acceptsEncoding(request, encoding) {
+  const header = request.headers["accept-encoding"];
+  if (!header) return false;
+  return String(header)
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .some((entry) => {
+      const [name, ...parameters] = entry.split(";").map((part) => part.trim());
+      if (name !== encoding && name !== "*") return false;
+      const quality = parameters.find((parameter) =>
+        parameter.startsWith("q="),
+      );
+      return !quality || Number(quality.slice(2)) > 0;
+    });
+}
+
+function staticRequestPath(request) {
+  try {
+    const url = new URL(request.url, "http://localhost");
+    const decodedPath = decodeURIComponent(url.pathname);
+    return decodedPath.endsWith("/") ? `${decodedPath}index.html` : decodedPath;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function collectStaticFiles(root) {
+  const filesByRequestPath = new Map();
+  const visitDirectory = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const filePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visitDirectory(filePath);
+        continue;
+      }
+      if (
+        !entry.isFile() ||
+        entry.name.endsWith(".gz") ||
+        entry.name.endsWith(".br")
+      ) {
+        continue;
+      }
+      const relativePath = path
+        .relative(root, filePath)
+        .split(path.sep)
+        .join("/");
+      filesByRequestPath.set(`/${relativePath}`, {
+        filePath,
+        compressed: [
+          { encoding: "br", filePath: `${filePath}.br` },
+          { encoding: "gzip", filePath: `${filePath}.gz` },
+        ].filter((variant) => fs.existsSync(variant.filePath)),
+      });
+    }
+  };
+  visitDirectory(root);
+  return filesByRequestPath;
+}
+
+function servePrecompressedStatic(root) {
+  const uncompressedStatic = express.static(root, { index: "index.html" });
+  const filesByRequestPath = collectStaticFiles(root);
+  return (request, response, next) => {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return uncompressedStatic(request, response, next);
+    }
+    const requestPath = staticRequestPath(request);
+    if (!requestPath) return next();
+    const entry = filesByRequestPath.get(requestPath);
+    if (!entry) {
+      return uncompressedStatic(request, response, next);
+    }
+
+    for (const variant of entry.compressed) {
+      if (!acceptsEncoding(request, variant.encoding)) continue;
+      response.vary("Accept-Encoding");
+      response.setHeader("Content-Encoding", variant.encoding);
+      response.type(path.extname(entry.filePath));
+      return response.sendFile(variant.filePath);
+    }
+    return uncompressedStatic(request, response, next);
   };
 }
 
@@ -167,15 +252,10 @@ export async function commandServe(options) {
     logMcpAccess(request, response, started, null);
   });
 
-  // Pre-compressed .br / .gz siblings are written by preCompressSummary at
-  // startup; express-static-gzip picks the right variant per Accept-Encoding.
-  app.use(
-    expressStaticGzip(SUMMARY_DIR, {
-      enableBrotli: true,
-      orderPreference: ["br"],
-      index: "index.html",
-    }),
-  );
+  // Pre-compressed .br / .gz siblings are written by preCompressSummary before
+  // the server starts. The static middleware rewrites only the file path it
+  // passes to sendFile, so requests never pay runtime compression cost.
+  app.use(servePrecompressedStatic(SUMMARY_DIR));
 
   app.use((_request, response) => {
     response.status(404).type("text/plain").send("Not found");
