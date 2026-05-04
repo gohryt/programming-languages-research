@@ -131,10 +131,7 @@ function servePrecompressedStatic(root, staticFiles) {
         if (!error) return;
         if (response.headersSent) return next(error);
         response.removeHeader("Content-Encoding");
-        response
-          .status(error.statusCode ?? 500)
-          .type("text/plain")
-          .send("Static asset unavailable");
+        return uncompressedStatic(request, response, next);
       });
     }
     return uncompressedStatic(request, response, next);
