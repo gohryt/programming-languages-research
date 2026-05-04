@@ -49,20 +49,30 @@ function checkAllowedHost(allowedHosts) {
   };
 }
 
-function acceptsEncoding(request, encoding) {
+function parseAcceptEncoding(request) {
   const header = request.headers["accept-encoding"];
-  if (!header) return false;
-  return String(header)
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .some((entry) => {
-      const [name, ...parameters] = entry.split(";").map((part) => part.trim());
-      if (name !== encoding && name !== "*") return false;
-      const quality = parameters.find((parameter) =>
-        parameter.startsWith("q="),
-      );
-      return !quality || Number(quality.slice(2)) > 0;
-    });
+  if (!header) return new Map();
+  const accepted = new Map();
+  for (const entry of String(header).split(",")) {
+    const [rawName, ...parameters] = entry
+      .trim()
+      .toLowerCase()
+      .split(";")
+      .map((part) => part.trim());
+    if (!rawName) continue;
+    const qualityParameter = parameters.find((parameter) =>
+      parameter.startsWith("q="),
+    );
+    const quality = qualityParameter ? Number(qualityParameter.slice(2)) : 1;
+    accepted.set(rawName, Number.isFinite(quality) ? quality : 0);
+  }
+  return accepted;
+}
+
+function acceptsEncoding(acceptedEncodings, encoding) {
+  return (
+    (acceptedEncodings.get(encoding) ?? acceptedEncodings.get("*") ?? 0) > 0
+  );
 }
 
 function staticRequestPath(request) {
@@ -75,42 +85,31 @@ function staticRequestPath(request) {
   }
 }
 
-function collectStaticFiles(root) {
+function requireRegularFile(filePath, label) {
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile()) {
+    throw new Error(`${label} is not a regular file: ${filePath}`);
+  }
+}
+
+function createStaticIndex(staticFiles) {
   const filesByRequestPath = new Map();
-  const visitDirectory = (directory) => {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const filePath = path.join(directory, entry.name);
-      if (entry.isDirectory()) {
-        visitDirectory(filePath);
-        continue;
-      }
-      if (
-        !entry.isFile() ||
-        entry.name.endsWith(".gz") ||
-        entry.name.endsWith(".br")
-      ) {
-        continue;
-      }
-      const relativePath = path
-        .relative(root, filePath)
-        .split(path.sep)
-        .join("/");
-      filesByRequestPath.set(`/${relativePath}`, {
-        filePath,
-        compressed: [
-          { encoding: "br", filePath: `${filePath}.br` },
-          { encoding: "gzip", filePath: `${filePath}.gz` },
-        ].filter((variant) => fs.existsSync(variant.filePath)),
-      });
+  for (const staticFile of staticFiles) {
+    requireRegularFile(staticFile.filePath, "Static file");
+    for (const variant of staticFile.compressed) {
+      requireRegularFile(variant.filePath, "Precompressed static file");
     }
-  };
-  visitDirectory(root);
+    filesByRequestPath.set(staticFile.requestPath, staticFile);
+  }
   return filesByRequestPath;
 }
 
-function servePrecompressedStatic(root) {
+function servePrecompressedStatic(root, staticFiles) {
   const uncompressedStatic = express.static(root, { index: "index.html" });
-  const filesByRequestPath = collectStaticFiles(root);
+  const filesByRequestPath = createStaticIndex(staticFiles);
+  console.log(
+    `Indexed ${filesByRequestPath.size} precompressed static file(s).`,
+  );
   return (request, response, next) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return uncompressedStatic(request, response, next);
@@ -122,12 +121,21 @@ function servePrecompressedStatic(root) {
       return uncompressedStatic(request, response, next);
     }
 
+    const acceptedEncodings = parseAcceptEncoding(request);
     for (const variant of entry.compressed) {
-      if (!acceptsEncoding(request, variant.encoding)) continue;
+      if (!acceptsEncoding(acceptedEncodings, variant.encoding)) continue;
       response.vary("Accept-Encoding");
       response.setHeader("Content-Encoding", variant.encoding);
       response.type(path.extname(entry.filePath));
-      return response.sendFile(variant.filePath);
+      return response.sendFile(variant.filePath, (error) => {
+        if (!error) return;
+        if (response.headersSent) return next(error);
+        response.removeHeader("Content-Encoding");
+        response
+          .status(error.statusCode ?? 500)
+          .type("text/plain")
+          .send("Static asset unavailable");
+      });
     }
     return uncompressedStatic(request, response, next);
   };
@@ -154,7 +162,7 @@ export async function commandServe(options) {
   }
 
   writeSummaryBundle(bundle);
-  preCompressSummary();
+  const staticFiles = preCompressSummary();
 
   const acmeContext = await setupAutoTls({ host, port, options });
   const tlsMode = acmeContext ? "auto" : "none";
@@ -255,7 +263,7 @@ export async function commandServe(options) {
   // Pre-compressed .br / .gz siblings are written by preCompressSummary before
   // the server starts. The static middleware rewrites only the file path it
   // passes to sendFile, so requests never pay runtime compression cost.
-  app.use(servePrecompressedStatic(SUMMARY_DIR));
+  app.use(servePrecompressedStatic(SUMMARY_DIR, staticFiles));
 
   app.use((_request, response) => {
     response.status(404).type("text/plain").send("Not found");

@@ -180,21 +180,58 @@ export function collectTagAxes(tags, tagDescriptors) {
   return axes;
 }
 
+function writeFileAtomic(filePath, data) {
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(temporaryPath, data);
+  fs.renameSync(temporaryPath, filePath);
+}
+
+function listCompressibleFiles(directory) {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const filePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listCompressibleFiles(filePath));
+      continue;
+    }
+    if (
+      entry.isFile() &&
+      !entry.name.endsWith(".gz") &&
+      !entry.name.endsWith(".br")
+    ) {
+      files.push(filePath);
+    }
+  }
+  return files;
+}
+
 // Brotli quality 4 is the canonical HTTP-server default (Cloudflare, ngx_brotli):
 // near-optimal ratio at a fraction of the CPU cost of quality 11. We run this
-// once at startup, then express-static-gzip serves the precompressed file as-is.
+// before routing is installed, then serve the precompressed files directly.
 export function preCompressSummary() {
   const brotli = {
     params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
   };
-  for (const entry of fs.readdirSync(SUMMARY_DIR)) {
-    if (entry.endsWith(".gz") || entry.endsWith(".br")) continue;
-    const filePath = path.join(SUMMARY_DIR, entry);
-    if (!fs.statSync(filePath).isFile()) continue;
+  const files = listCompressibleFiles(SUMMARY_DIR);
+  const staticFiles = [];
+  for (const filePath of files) {
     const data = fs.readFileSync(filePath);
-    fs.writeFileSync(`${filePath}.gz`, zlib.gzipSync(data, { level: 9 }));
-    fs.writeFileSync(`${filePath}.br`, zlib.brotliCompressSync(data, brotli));
+    const gzipPath = `${filePath}.gz`;
+    const brotliPath = `${filePath}.br`;
+    writeFileAtomic(gzipPath, zlib.gzipSync(data, { level: 9 }));
+    writeFileAtomic(brotliPath, zlib.brotliCompressSync(data, brotli));
+    const requestPath = `/${path.relative(SUMMARY_DIR, filePath).split(path.sep).join("/")}`;
+    staticFiles.push({
+      requestPath,
+      filePath,
+      compressed: [
+        { encoding: "br", filePath: brotliPath },
+        { encoding: "gzip", filePath: gzipPath },
+      ],
+    });
   }
+  console.log(`Pre-compressed ${staticFiles.length} static file(s).`);
+  return staticFiles;
 }
 
 export function writeSummaryBundle(bundle) {
