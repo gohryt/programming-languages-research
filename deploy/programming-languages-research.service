@@ -8,7 +8,7 @@
 # port floor system-wide (see README) — user units can't grant capabilities
 # on their own.
 #
-# Edit --host, --acme-email, and --allowed-host before enabling.
+# Edit --host, --email, and --allowed-host before enabling.
 
 [Unit]
 Description=Programming languages research corpus
@@ -18,15 +18,13 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=%h/.programming-languages-research
-ExecStart=/usr/bin/node source/research.js \
+ExecStart=%h/.programming-languages-research/programming-languages-research \
     --host programming-languages-research.example.com \
     --port 443 \
-    --acme-email admin@example.com \
+    --email admin@example.com \
     --allowed-host programming-languages-research.example.com
 Restart=on-failure
 RestartSec=5
-Environment=NODE_ENV=production
-
 NoNewPrivileges=yes
 
 [Install]

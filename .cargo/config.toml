@@ -1,0 +1,5 @@
+[target.'cfg(target_os = "linux")']
+rustflags = ["--cfg", "tracing_unstable", "-C", "link-arg=-fuse-ld=mold"]
+
+[target.'cfg(not(target_os = "linux"))']
+rustflags = ["--cfg", "tracing_unstable"]

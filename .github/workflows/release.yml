@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build release artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release --bin programming-languages-research
+
+      - name: Build static content
+        run: |
+          ./target/release/programming-languages-research --build-summary
+          test -f static/data.json
+
+      - name: Create release bundle directory
+        run: |
+          rm -rf bundle
+          mkdir -p bundle/static
+          cp target/release/programming-languages-research bundle/
+          cp -R static/. bundle/static/
+
+      - name: Create archives
+        run: |
+          tar -czf programming-languages-research-bundle.tar.gz bundle
+          tar -czf programming-languages-research-static.tar.gz bundle/static
+
+      - name: Delete previous latest release
+        run: gh release delete latest --cleanup-tag --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest main build
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: |
+            programming-languages-research-bundle.tar.gz
+            programming-languages-research-static.tar.gz
+          fail_on_unmatched_files: true
+          overwrite_files: true

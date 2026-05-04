@@ -10,9 +10,8 @@ Records are language-agnostic. Write "a new language" or "a compiler" — not pr
 data/                       # research records, one JSON file per record
 tags/                       # optional tag descriptors
 schema/                     # JSON Schemas for records and tag descriptors
-source/research.js          # entry: validates data/, writes summary/data.json, serves UI + /mcp
-source/lib/                 # supporting modules (records, schema, mcp, acme, serve)
-summary/index.html          # static site (consumes summary/data.json)
+research.rs                 # Rust entry: validates data/, writes static/data.json, serves UI + /mcp
+static/index.html           # static site (consumes static/data.json)
 deploy/programming-languages-research.service  # systemd user unit
 ```
 
@@ -20,13 +19,19 @@ deploy/programming-languages-research.service  # systemd user unit
 
 Edit JSON files in `data/` directly; commit with git.
 
+Local development:
+
 ```sh
-npm install              # one-time
-npm start                # validate, write summary/data.json, serve UI + /mcp
-npm run check            # validate only — for pre-commit / CI
+cargo build --release
+cargo run --release --
+cargo run --release -- --build-summary
 ```
 
-`npm start` is `node source/research.js`. Run with `--help` for flags.
+Install directly from GitHub:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/gohryt/programming-languages-research/main/install.sh | sh -s -- --host programming-languages-research.example.com --email admin@example.com
+```
 
 ## MCP server
 
@@ -51,64 +56,48 @@ For local development point the URL at `http://127.0.0.1:8000/mcp`.
 
 ## Production deployment
 
-Runs as a **systemd user unit** out of `~/.programming-languages-research`. Auto-TLS via Let's Encrypt is provisioned on first run when `--host` is a public hostname; cached under `.acme/<domain>/`, renewed ~30 days before expiry. `--allowed-host` gates DNS-rebinding attacks.
+Runs as a **systemd user unit** out of `~/.programming-languages-research`. When `--host` is a public hostname, the Rust server provisions and renews Let's Encrypt certificates automatically via ACME; the account and certificates are cached under `.acme/<domain>/`. `--allowed-host` still gates DNS-rebinding attacks.
 
 ### Prerequisites
 
 - DNS A/AAAA record points at the VPS.
-- Inbound `:80` (HTTP-01) and `:443` (TLS) reachable.
-- `git`, `node`, `npm` installed (`sudo pacman -S --noconfirm git nodejs npm` on Arch).
+- Inbound `:80` and `:443` reachable.
 
 ### One-time system setup
 
-User units can't grant `CAP_NET_BIND_SERVICE` on their own, so lower the unprivileged port floor and enable lingering for the deploy user (so the service survives logout and starts at boot):
+User units cannot grant `CAP_NET_BIND_SERVICE`, so lower the unprivileged port floor system-wide and enable lingering for the deploy user:
 
 ```sh
 echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/50-unprivileged-ports.conf
 sudo sysctl --system
-sysctl net.ipv4.ip_unprivileged_port_start
-# expected: net.ipv4.ip_unprivileged_port_start = 80
 
 sudo loginctl enable-linger "$USER"
 ```
 
-If the verification line doesn't print `80`, the service will hit `EACCES` when binding `:80` for the ACME challenge.
-
 ### Install
 
-SSH in as the user the service should run as (e.g. `linuxuser`):
+SSH in as the user the service should run as (e.g. `linuxuser`) and run the installer:
 
 ```sh
-git clone https://github.com/gohryt/programming-languages-research.git ~/.programming-languages-research
-cd ~/.programming-languages-research
-npm ci --omit=dev
-
-mkdir -p ~/.config/systemd/user
-cp deploy/programming-languages-research.service \
-   ~/.config/systemd/user/programming-languages-research.service
-$EDITOR ~/.config/systemd/user/programming-languages-research.service
-# replace programming-languages-research.example.com → your hostname
-# replace admin@example.com → your contact for Let's Encrypt expiry notices
-
-systemctl --user daemon-reload
-systemctl --user enable --now programming-languages-research.service
-journalctl --user -u programming-languages-research.service -f
+curl -fsSL https://raw.githubusercontent.com/gohryt/programming-languages-research/main/install.sh | sh -s -- --host programming-languages-research.example.com --email admin@example.com
 ```
 
-When you see `[acme] certificate provisioned (expires …)` followed by `Serving …`, the site is live.
+To update later, run the same command again.
 
-### Deploying updates
+The installer downloads the latest bundle release, installs it under `~/.programming-languages-research`, writes the systemd user unit, reloads the user daemon, and starts the service.
 
-Push to GitHub from your dev machine, then on the VPS:
+When you see ACME events followed by `Serving ...`, the site is live.
 
-```sh
-cd ~/.programming-languages-research
-git pull
-npm ci --omit=dev
-systemctl --user restart programming-languages-research.service
-```
+No `sudo` is needed after the one-time system setup.
 
-No `sudo` after the one-time system setup.
+## GitHub Releases
+
+A GitHub Actions workflow at `.github/workflows/release.yml` builds release artifacts on every push to `main` and on manual dispatch using the nightly toolchain. It publishes:
+
+- `programming-languages-research-bundle.tar.gz` — primary bundle archive containing the executable and generated static assets
+- `programming-languages-research-static.tar.gz` — static-only archive containing `static/`
+
+The workflow generates `static/data.json` via `--build-summary`, then packages the resulting `static/` contents into the release.
 
 ## Record shape
 
@@ -165,5 +154,5 @@ Use `refs` to point at canonical records / sections instead of duplicating prose
    }
    ```
 2. Add a `refs` entry on at least one umbrella record's section so the new record is reachable.
-3. `npm run check` validates schema and resolves every cross-ref.
-4. Commit, push to GitHub, then on the VPS: `cd ~/.programming-languages-research && git pull && npm ci --omit=dev && systemctl --user restart programming-languages-research.service`.
+3. `cargo run --release -- --build-summary` validates and rebuilds the generated summary without starting the server.
+4. Commit and push to `main`; GitHub Actions publishes updated release artifacts. On the VPS, rerun the installer or replace static assets from the latest release and restart the service.

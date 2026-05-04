@@ -1,8 +1,8 @@
-node_modules
+target
 
 .acme
 
-data.json
+static/data.json
 
-summary/*.gz
-summary/*.br
+static/*.gz
+static/*.br
