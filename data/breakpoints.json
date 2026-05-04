@@ -12,7 +12,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "A breakpoint mechanism stops execution at a target condition and reliably resumes afterward — often on code that other threads are executing concurrently. Entries in this chapter differ on *where the stop condition lives*: patched into the instruction stream (`INT 3`, compiled conditional), wired into the CPU's memory-access pipeline (hardware debug registers), repurposed from a protection-boundary feature (RISC-V PMP, page-table permissions), built on the runtime's own event taxonomy (exceptions, syscalls, library loads, allocator events), or expressed as language-level invariants (assertions, contracts, semantic preconditions). The progression is from physical to logical: lower entries cost a CPU trap; higher entries cost a runtime-managed predicate evaluation.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:breakpoint-mechanism`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`\n"
+      "content": "A breakpoint mechanism stops execution at a target condition and reliably resumes afterward — often on code that other threads are executing concurrently. Entries in this chapter differ on *where the stop condition lives*: patched into the instruction stream (`INT 3`, compiled conditional), wired into the CPU's memory-access pipeline (hardware debug registers), repurposed from a protection-boundary feature (RISC-V PMP, page-table permissions), built on the runtime's own event taxonomy (exceptions, syscalls, library loads, allocator events), or expressed as language-level invariants (assertions, contracts, semantic preconditions). The progression is from physical to logical: lower entries cost a CPU trap; higher entries cost a runtime-managed predicate evaluation.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:breakpoint-mechanism`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "debugger-protocols#overview",
+          "type": "reported-through"
+        },
+        {
+          "target": "compiler-inserted-tracing#overview",
+          "type": "shares-code-patching-with"
+        },
+        {
+          "target": "time-travel-debugging#overview",
+          "type": "contrasts-with"
+        }
+      ]
     },
     {
       "id": "gdb-int3-displaced-stepping",
@@ -150,6 +168,26 @@
         },
         {
           "url": "https://cppreference.dev/w/cpp/language/contracts"
+        }
+      ]
+    },
+    {
+      "id": "state-machine-example",
+      "title": "Breakpoint state-machine example",
+      "tags": [
+        "debugging",
+        "runtime-design",
+        "tooling"
+      ],
+      "content": "A robust breakpoint is a small state machine, not just a trap byte. A generic native-code breakpoint flow is:\n\n```text\ninstall(location): save original instruction bytes; patch trap; flush icache\non_trap(thread, pc): identify site; report stopped event; keep other threads safe\nresume(thread): execute original instruction out-of-line or temporarily unpatch\nafter_step(thread): restore trap; continue or stop according to debugger command\nremove(location): restore original bytes; flush icache\n```\n\nThe hard parts are concurrency and identity: another thread may hit the site while it is temporarily unpatched, optimized code may have several machine locations for one source line, and hot reload may invalidate addresses. A language runtime can make breakpoints easier by emitting stable source-to-code mappings and reserving semantic stop points above raw machine addresses.",
+      "refs": [
+        {
+          "target": "compiler-inserted-tracing#patch-table-example",
+          "type": "shares-patching-concerns"
+        },
+        {
+          "target": "debugger-protocols#request-response-example",
+          "type": "reported-through"
         }
       ]
     }

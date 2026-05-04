@@ -1,7 +1,10 @@
 {
   "kind": "concept",
   "name": "High-Level IR",
-  "aliases": ["hir", "source-adjacent-ir"],
+  "aliases": [
+    "hir",
+    "source-adjacent-ir"
+  ],
   "summary": "Source-adjacent intermediate representation that adds semantic refinement beyond the AST while preserving enough structure for language-aware analysis, macro expansion, and round-tripping. Examples: Rust HIR, Rust THIR, Swift SIL, C# Roslyn semantic model, Hermes HIR, Truffle AST-as-IR, Babel pipeline AST, Kotlin K2 FIR.",
   "sections": [
     {
@@ -10,45 +13,131 @@
       "tags": [],
       "content": "High-level IRs sit close to the source — close enough to round-trip, name-resolve, or run macro expansion against. The distinguishing axis across implementations is what semantic refinement the IR adds beyond the AST: name-resolved bindings (Rust HIR), type-checked operands and explicit coercions (Rust THIR), SSA-form with closure analysis (Swift SIL), partial evaluation traces (Truffle), or transformation-pipeline state (Babel).\n\nThese IRs are deliberately not designed for codegen — that role belongs to mid-level IRs.",
       "refs": [
-        { "target": "abstract-syntax-trees#overview", "type": "extends" },
-        { "target": "mid-level-ir#overview", "type": "lowers-to" },
-        { "target": "rust-hir-thir-mir#overview", "type": "instance" },
-        { "target": "swift-sil#overview", "type": "instance" },
-        { "target": "roslyn-semantic-model#overview", "type": "instance" },
-        { "target": "hermes-hir#overview", "type": "instance" },
-        { "target": "truffle-graal-ast-ir#overview", "type": "instance" },
-        { "target": "babel-pipeline#overview", "type": "instance" },
-        { "target": "kotlin-k2-fir#overview", "type": "instance" }
+        {
+          "target": "abstract-syntax-trees#overview",
+          "type": "extends"
+        },
+        {
+          "target": "mid-level-ir#overview",
+          "type": "lowers-to"
+        },
+        {
+          "target": "rust-hir-thir-mir#overview",
+          "type": "instance"
+        },
+        {
+          "target": "swift-sil#overview",
+          "type": "instance"
+        },
+        {
+          "target": "roslyn-semantic-model#overview",
+          "type": "instance"
+        },
+        {
+          "target": "hermes-hir#overview",
+          "type": "instance"
+        },
+        {
+          "target": "truffle-graal-ast-ir#overview",
+          "type": "instance"
+        },
+        {
+          "target": "babel-pipeline#overview",
+          "type": "instance"
+        },
+        {
+          "target": "kotlin-k2-fir#overview",
+          "type": "instance"
+        },
+        {
+          "target": "compiler-pipeline-architecture#overview",
+          "type": "pipeline-context"
+        },
+        {
+          "target": "tooling-first-language-design#frontend-api-contract",
+          "type": "tooling-context"
+        }
       ]
     },
     {
       "id": "what-high-level-ir-adds",
       "title": "What high-level IR adds beyond the AST",
-      "tags": ["compiler-ir", "semantic-analysis"],
+      "tags": [
+        "compiler-ir",
+        "semantic-analysis"
+      ],
       "content": "Concrete refinements high-level IRs add over the AST:\n\n- **Name resolution and stable IDs**: rustc's HIR is the desugared, name-resolved form of the AST. Macro expansion has run; `for` loops have become `loop` + `match`. Stable IDs are assigned to every body and binding so cross-references resolve without re-walking the tree.\n- **Explicit types and coercions**: Rust THIR has all types explicit, all coercions concrete, all method calls resolved to specific function bodies. Pattern matching is desugared to a decision tree.\n- **Swift-aware operations**: SIL is SSA-form but with Swift-specific operations (`apply`, `partial_apply`, `class_method`, `witness_method`, ARC retain/release pairs) that LLVM IR cannot represent.\n- **Lazy semantic queries**: Roslyn's semantic model is a lazy view layered on top of the syntax tree, computed on demand for IDE features.\n- **Frontend optimization substrate**: Hermes HIR runs SSA-form optimizations (eager type narrowing, scope flattening, stack promotion of captured variables) before lowering to register-based bytecode.\n- **Compiler-vs-IDE separation**: Kotlin K2 FIR is a purpose-built immutable compiler frontend IR replacing the IntelliJ-PSI-based K1 frontend, yielding 1.7×–2× faster compilation and better inference precision.",
       "refs": [
-        { "target": "language-server#editor-features", "type": "powers" },
-        { "target": "ssa#overview", "type": "contrasts-with" }
+        {
+          "target": "language-server#editor-features",
+          "type": "powers"
+        },
+        {
+          "target": "ssa#overview",
+          "type": "contrasts-with"
+        }
       ]
     },
     {
       "id": "why-compilers-keep-this-layer",
       "title": "Why compilers keep this layer",
-      "tags": ["compiler-design", "tradeoffs"],
+      "tags": [
+        "compiler-design",
+        "tradeoffs"
+      ],
       "content": "Compilers keep a high-level IR layer because it preserves enough source and semantic structure for diagnostics, linting, macro systems, and language-aware transformations. Lowering too early can make these tasks harder even if it benefits later optimization passes.\n\nThe rustc cascade (AST → HIR → THIR → MIR → LLVM IR) is the canonical example of why one IR is not enough: HIR is what type checking and lints see; THIR is what pattern exhaustiveness checking sees; MIR is what borrow checking sees. Each level discards information the next-lower level doesn't need. A two-level cascade would force compromises somewhere in the chain.",
       "refs": [
-        { "target": "language-server#design-constraints", "type": "essential-for" },
-        { "target": "mlir#multi-level-lowering", "type": "generalizes" }
+        {
+          "target": "language-server#design-constraints",
+          "type": "essential-for"
+        },
+        {
+          "target": "mlir#multi-level-lowering",
+          "type": "generalizes"
+        },
+        {
+          "target": "compiler-pipeline-architecture#how-many-irs",
+          "type": "decision-guide"
+        }
       ]
     },
     {
       "id": "boundary-with-lower-ir",
       "title": "Boundary with lower IR",
-      "tags": ["lowering", "compiler-ir"],
+      "tags": [
+        "lowering",
+        "compiler-ir"
+      ],
       "content": "The boundary between high-level and lower IR is where control flow becomes more explicit (basic blocks, terminators), temporary values become materialized, and source-level constructs give way to optimization-oriented forms. The exact split varies by compiler — Rust splits HIR/THIR/MIR, Swift splits AST/SIL/LLVM, GHC splits Core/STG/Cmm — but the transition is architecturally significant in every multi-level pipeline.\n\nLowering across this boundary is also where source-faithful debug metadata is most fragile: every transformation must thread `!dbg`-style metadata forward, and DWARF correctness depends on this discipline.",
       "refs": [
-        { "target": "mid-level-ir#why-this-layer-exists", "type": "downstream" },
-        { "target": "llvm#backend-role", "type": "downstream" }
+        {
+          "target": "mid-level-ir#why-this-layer-exists",
+          "type": "downstream"
+        },
+        {
+          "target": "llvm#backend-role",
+          "type": "downstream"
+        }
+      ]
+    },
+    {
+      "id": "running-example",
+      "title": "Running example: source to high-level IR",
+      "tags": [
+        "compiler-ir",
+        "semantic-analysis",
+        "lowering"
+      ],
+      "content": "A small source function illustrates what high-level IR normally adds:\n\n```text\nfn abs(x: Int) -> Int {\n  if x < 0 { -x } else { x }\n}\n```\n\nA high-level IR keeps source-shaped structure but attaches semantic facts:\n\n```text\nFunction id=f0 name=abs type=(Int) -> Int\n  Param id=v0 name=x type=Int\n  Body type=Int\n    If type=Int source_span=...\n      Condition: Call builtin:<(v0, IntLiteral(0)) -> Bool\n      Then: Call builtin:neg(v0) -> Int\n      Else: VarRef target=v0 type=Int\n```\n\nThis is still recognizable as the source program, but names are resolved, builtins are identified, spans are stable, and each expression has a type. That is why this layer is valuable for diagnostics, refactoring, macro expansion, and language-aware rewrites before CFG lowering erases source shape.",
+      "refs": [
+        {
+          "target": "mid-level-ir#running-example",
+          "type": "lowers-to"
+        },
+        {
+          "target": "language-server#analysis-flow-example",
+          "type": "serves"
+        }
       ]
     }
   ],

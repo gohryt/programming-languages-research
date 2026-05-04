@@ -1,0 +1,10 @@
+{
+  "tag": "decision:runtime-observability",
+  "name": "Decision: runtime observability",
+  "description": "Sections that help design tracing, profiling, debugging, breakpoint, record/replay, and runtime event metadata as compiler/runtime ABI choices.",
+  "axis": "decision",
+  "examples": [
+    "observability-first-runtime-design"
+  ],
+  "id": "decision-runtime-observability"
+}

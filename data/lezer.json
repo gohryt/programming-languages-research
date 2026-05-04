@@ -10,38 +10,97 @@
       "tags": [],
       "content": "Lezer is the parser system built for CodeMirror 6. Like tree-sitter, it is designed for incremental parsing, error tolerance, and providing a syntax tree for editor tooling. Unlike tree-sitter's C/C++ foundation, Lezer generates JavaScript modules that run directly in the browser without WebAssembly overhead.",
       "refs": [
-        { "target": "tree-sitter#overview", "type": "sibling" },
-        { "target": "incremental-parsing#overview", "type": "exemplifies" }
+        {
+          "target": "tree-sitter#overview",
+          "type": "sibling"
+        },
+        {
+          "target": "incremental-parsing#overview",
+          "type": "exemplifies"
+        }
       ]
     },
     {
       "id": "parser-architecture",
       "title": "Parser architecture",
-      "tags": ["parser", "algorithms"],
+      "tags": [
+        "parser",
+        "algorithms"
+      ],
       "content": "Lezer uses an LR parsing algorithm with opt-in GLR for grammars that need it, highly specialized for JavaScript's execution model. The focus is throughput and predictability inside a JS runtime rather than parser-theoretic generality.",
       "refs": [
-        { "target": "deterministic-ll-lr#overview", "type": "uses" },
-        { "target": "tree-sitter#parser-architecture", "type": "contrasts-with" }
+        {
+          "target": "deterministic-ll-lr#overview",
+          "type": "uses"
+        },
+        {
+          "target": "tree-sitter#parser-architecture",
+          "type": "contrasts-with"
+        }
       ]
     },
     {
       "id": "tree-shape",
       "title": "Compact non-abstract syntax tree",
-      "tags": ["representation", "incrementality"],
+      "tags": [
+        "representation",
+        "incrementality"
+      ],
       "content": "Lezer outputs a compact, non-abstract syntax tree: nodes keep track of their width and structure rather than being full JavaScript objects. This minimizes memory consumption and improves cache locality, both critical when the parser runs inside a browser tab.",
       "refs": [
-        { "target": "concrete-syntax-trees#overview", "type": "exemplifies" },
-        { "target": "tree-sitter#incrementality", "type": "contrasts-with" }
+        {
+          "target": "concrete-syntax-trees#overview",
+          "type": "exemplifies"
+        },
+        {
+          "target": "tree-sitter#incrementality",
+          "type": "contrasts-with"
+        }
       ]
     },
     {
       "id": "error-recovery",
       "title": "Error recovery",
-      "tags": ["error-recovery", "parser"],
+      "tags": [
+        "error-recovery",
+        "parser"
+      ],
       "content": "The parser seamlessly recovers from syntax errors, guaranteeing that the editor always has a workable syntax tree for highlighting and code navigation. Like tree-sitter, this is the load-bearing property: an editor cannot afford parse failures on the half-typed program in the buffer.",
       "refs": [
-        { "target": "tree-sitter#error-recovery", "type": "sibling" },
-        { "target": "language-server#overview", "type": "relevant-to" }
+        {
+          "target": "tree-sitter#error-recovery",
+          "type": "sibling"
+        },
+        {
+          "target": "language-server#overview",
+          "type": "relevant-to"
+        }
+      ]
+    },
+    {
+      "id": "grammar-and-incremental-example",
+      "title": "Grammar and incremental-edit example",
+      "tags": [
+        "parser",
+        "incrementality",
+        "tooling"
+      ],
+      "content": "A browser-oriented parser generator is attractive when the grammar and runtime must ship to every editor tab. A small grammar fragment has the shape:\n\n```text\n@top SourceFile { item* }\nitem { Function | Struct }\nFunction { \"fn\" identifier ParamList Block }\nParamList { \"(\" list<Param, \",\">? \")\" }\nExpression { identifier | number | Expression operator Expression }\n```\n\nThe important API pattern is incremental rather than syntactic: `new_tree = parser.parse(new_text, old_tree, changed_ranges)`. The old tree carries enough position information for the parser to reuse unaffected subtrees. A new language can treat this as an editor contract: every keystroke updates syntax cheaply and produces a tree even when the file is invalid.",
+      "refs": [
+        {
+          "target": "tree-sitter#incrementality",
+          "type": "compared-with"
+        },
+        {
+          "target": "incremental-parsing#tree-reuse-and-partial-updates",
+          "type": "implements"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Lezer guide",
+          "url": "https://lezer.codemirror.net/docs/guide/"
+        }
       ]
     }
   ],

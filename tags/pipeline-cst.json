@@ -1,0 +1,11 @@
+{
+  "tag": "pipeline:cst",
+  "name": "Pipeline: concrete syntax tree",
+  "description": "Sections concerning lossless or source-faithful concrete syntax tree layers, including trivia, error nodes, incremental reparsing, and source-preserving tooling.",
+  "axis": "pipeline",
+  "examples": [
+    "frontend-architecture",
+    "concrete-syntax-trees"
+  ],
+  "id": "pipeline-cst"
+}

@@ -1,0 +1,132 @@
+{
+  "kind": "concept",
+  "name": "Backend Selection for New Compilers",
+  "aliases": [
+    "backend-selection",
+    "codegen-selection",
+    "compiler-backend-choice"
+  ],
+  "summary": "Decision framework for choosing among an interpreter, bytecode VM, QBE, Cranelift, LLVM, MLIR, copy-and-patch, or a custom backend. The right choice depends on bootstrap speed, compile latency, code quality, platform reach, tooling, and runtime model.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "decision:backend",
+        "backend:vm",
+        "backend:qbe",
+        "backend:cranelift",
+        "backend:llvm",
+        "backend:mlir",
+        "compiler-architecture"
+      ],
+      "content": "Backend choice is one of the largest architecture commitments in a compiler. It determines not only performance, but also compile latency, dependency footprint, debug-info quality, sanitizer access, supported platforms, JIT feasibility, and how much language-specific semantics must be lowered away early.\n\nThere is no universal best backend. A small language may start with a tree-walk interpreter to validate semantics, move to bytecode for portability, target QBE or Cranelift for fast native code, and later use LLVM for optimized AOT builds. Domain compilers may use MLIR because they need several abstraction levels before machine code.",
+      "refs": [
+        {
+          "target": "bytecode#overview",
+          "type": "option"
+        },
+        {
+          "target": "qbe#overview",
+          "type": "option"
+        },
+        {
+          "target": "cranelift#overview",
+          "type": "option"
+        },
+        {
+          "target": "llvm#overview",
+          "type": "option"
+        },
+        {
+          "target": "mlir#overview",
+          "type": "option"
+        },
+        {
+          "target": "copy-and-patch#overview",
+          "type": "option"
+        },
+        {
+          "target": "tiered-compilation#overview",
+          "type": "context"
+        },
+        {
+          "target": "webassembly#overview",
+          "type": "portable-target-option"
+        }
+      ]
+    },
+    {
+      "id": "decision-table",
+      "title": "Decision table",
+      "tags": [
+        "decision:backend",
+        "tradeoffs",
+        "codegen"
+      ],
+      "content": "| Goal | Likely backend path | Trade-off |\n|---|---|---|\n| Fastest semantic bootstrap | Tree-walk interpreter | Slow execution; excellent for language design iteration. |\n| Portable runtime and introspection | Bytecode VM | Requires VM design and bytecode compatibility policy. |\n| Small native backend | QBE | Limited optimization and target ecosystem. |\n| Fast JIT or debug backend | Cranelift | Less peak optimization than LLVM. |\n| Best mature AOT optimization | LLVM | Large dependency and compile-time cost. |\n| Many domain-specific lowering levels | MLIR | Framework/dialect complexity. |\n| Dynamic-language hot tier | Bytecode + quickening + later JIT | More runtime engineering, but staged performance. |\n| Extremely low-latency baseline JIT | Copy-and-patch or template codegen | Harder portability and optimization limits. |\n\nA backend can be staged. Many successful systems use one backend for development latency and another for release quality.",
+      "refs": [
+        {
+          "target": "bytecode-quickening#design-lesson",
+          "type": "staged-option"
+        },
+        {
+          "target": "copy-and-patch#stencil-based-code-generation",
+          "type": "staged-option"
+        },
+        {
+          "target": "tiered-compilation#why-tiering-exists",
+          "type": "context"
+        }
+      ]
+    },
+    {
+      "id": "selection-questions",
+      "title": "Selection questions",
+      "tags": [
+        "decision:backend",
+        "compiler-design"
+      ],
+      "content": "Useful backend-selection questions:\n\n- Is compilation on the user-facing critical path? If yes, avoid heavyweight optimization in the first tier.\n- Is source distribution or sandboxing important? If yes, bytecode or WebAssembly-like validation may matter.\n- Is peak numeric performance central? If yes, LLVM or domain-specific MLIR lowering becomes more attractive.\n- Is the compiler intended to bootstrap itself early? If yes, dependency footprint and backend comprehensibility matter.\n- Does the runtime need precise stack maps, GC maps, deoptimization, or patch points? If yes, choose a backend that can expose those contracts.\n- Are debugger quality and sanitizer support immediate product requirements? If yes, LLVM infrastructure can be decisive.\n\nThe best backend is the one whose failure mode matches the language goal: slow compile, slower code, less portability, more dependency weight, or more implementation work.",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#runtime-abi",
+          "type": "requires-metadata-for"
+        },
+        {
+          "target": "garbage-collection#overview",
+          "type": "may-require-stackmaps"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-fit",
+      "title": "Where the backend fits in the pipeline",
+      "tags": [
+        "decision:backend",
+        "pipeline:mir",
+        "pipeline:ssa",
+        "pipeline:bytecode"
+      ],
+      "content": "Backends consume different source shapes. LLVM and Cranelift want low-level SSA-like IR. QBE wants a small typed SSA IL. A bytecode VM wants an instruction set and verifier/loader contract. MLIR wants dialects and conversion passes. Copy-and-patch wants high-level operation templates and runtime metadata.\n\nThis means backend choice can force upstream IR shape. A frontend that lowers too directly to LLVM may lose language-specific facts needed for borrow checking or diagnostics. A bytecode-first implementation may accidentally freeze language semantics into opcodes. A new compiler should keep at least one language-owned IR above the backend boundary.",
+      "refs": [
+        {
+          "target": "compiler-pipeline-architecture#information-boundaries",
+          "type": "depends-on"
+        },
+        {
+          "target": "llvm#frontend-to-backend-boundary",
+          "type": "example"
+        },
+        {
+          "target": "cranelift#ir-design-and-ssa-form",
+          "type": "example"
+        },
+        {
+          "target": "qbe#ir-example",
+          "type": "example"
+        }
+      ]
+    }
+  ]
+}

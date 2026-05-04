@@ -1,7 +1,9 @@
 {
   "kind": "tool",
   "name": "Babel AST + Plugin Pipeline",
-  "aliases": ["babel"],
+  "aliases": [
+    "babel"
+  ],
   "summary": "Babel transforms JavaScript via plugins, each operating on the ESTree-shaped AST. The IR is the AST itself, mutated in place by visitor functions; plugins register interest in specific node types and rewrite them. Optimised for transformation throughput, not optimisation depth.",
   "sections": [
     {
@@ -10,24 +12,66 @@
       "tags": [],
       "content": "Babel transforms JavaScript via plugins, each operating on the ESTree-shaped AST. The \"IR\" in Babel is the AST itself, mutated in place by visitor functions; plugins register interest in specific node types and rewrite them. The transformation pipeline composes plugins in order, but each plugin sees the AST as-is — there is no separate intermediate form.",
       "refs": [
-        { "target": "abstract-syntax-trees#overview", "type": "instance-of" },
-        { "target": "estree#overview", "type": "consumes" }
+        {
+          "target": "abstract-syntax-trees#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "estree#overview",
+          "type": "consumes"
+        }
       ],
       "sources": [
-        { "label": "@babel/parser", "url": "https://babeljs.io/docs/babel-parser" },
-        { "label": "@babel/parser source", "url": "https://github.com/babel/babel/tree/master/packages/babel-parser" }
+        {
+          "label": "@babel/parser",
+          "url": "https://babeljs.io/docs/babel-parser"
+        },
+        {
+          "label": "@babel/parser source",
+          "url": "https://github.com/babel/babel/tree/master/packages/babel-parser"
+        }
       ]
     },
     {
       "id": "transformation-throughput",
       "title": "Transformation-throughput focus",
-      "tags": ["compiler-ir", "tooling", "javascript"],
+      "tags": [
+        "compiler-ir",
+        "tooling",
+        "javascript"
+      ],
       "content": "The pragmatic consequence: Babel's representation is the same shape across all phases, which makes plugin authoring trivial and plugin composition near-free. The cost is that some optimizations want a different shape (SSA, sea-of-nodes, etc.) and Babel cannot offer those without breaking its plugin contract.\n\nBabel optimizes for *transformation* throughput, not *optimization* depth — which fits its actual use case (transpiling, bundling, minifying) better than a heavyweight optimizer would. The Rust-based modern alternatives (swc, oxc, Rolldown) preserve this AST-centric model while implementing the visitor pipeline in a faster systems language.",
       "refs": []
+    },
+    {
+      "id": "visitor-rewrite-example",
+      "title": "Visitor rewrite example",
+      "tags": [
+        "compiler-ir",
+        "tooling",
+        "ast"
+      ],
+      "content": "The AST-as-pipeline-IR pattern is easiest to see in a visitor rewrite. In pseudocode, a plugin can replace one syntactic form with another:\n\n```javascript\nexport default function plugin({ types }) {\n  return {\n    visitor: {\n      BinaryExpression(path) {\n        if (path.node.operator === \"**\") {\n          path.replaceWith(\n            types.callExpression(types.identifier(\"pow\"), [\n              path.node.left,\n              path.node.right\n            ])\n          );\n        }\n      }\n    }\n  };\n}\n```\n\nThe generic pattern is powerful when a language wants third-party syntactic transforms: every pass speaks one stable tree API, and plugins compose by mutating or replacing nodes. The cost is that the API freezes source-shaped structure; deeper optimizations usually want a separate IR with explicit control flow, values, and effects.",
+      "refs": [
+        {
+          "target": "high-level-ir#why-compilers-keep-this-layer",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "abstract-syntax-trees#trade-offs",
+          "type": "uses"
+        }
+      ]
     }
   ],
   "sources": [
-    { "label": "@babel/parser", "url": "https://babeljs.io/docs/babel-parser" },
-    { "label": "@babel/parser source", "url": "https://github.com/babel/babel/tree/master/packages/babel-parser" }
+    {
+      "label": "@babel/parser",
+      "url": "https://babeljs.io/docs/babel-parser"
+    },
+    {
+      "label": "@babel/parser source",
+      "url": "https://github.com/babel/babel/tree/master/packages/babel-parser"
+    }
   ]
 }

@@ -12,7 +12,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Live visualization abandons the stop-inspect-resume loop in favor of continuous execution with behavior projected as an overlay. Entries differ on **what surface the behavior is projected onto**: the source code itself (WhiteBox), a timeline slider (Bret Victor, Light Table, Observable), a reactive-cell dependency graph (Excel's Trace Precedents), the game viewport (Unreal Gameplay Debugger), a captured GPU frame (RenderDoc, NSight, PIX), or the state chart the user already wrote (XState). Each asks what the user's mental model is and renders debugging in that model, not in the machine's.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:live-visualization`\n- **domain**: `domain:debugging`\n- **on-cost**: `on-cost:dominant`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`\n"
+      "content": "Live visualization abandons the stop-inspect-resume loop in favor of continuous execution with behavior projected as an overlay. Entries differ on **what surface the behavior is projected onto**: the source code itself (WhiteBox), a timeline slider (Bret Victor, Light Table, Observable), a reactive-cell dependency graph (Excel's Trace Precedents), the game viewport (Unreal Gameplay Debugger), a captured GPU frame (RenderDoc, NSight, PIX), or the state chart the user already wrote (XState). Each asks what the user's mental model is and renders debugging in that model, not in the machine's.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:live-visualization`\n- **domain**: `domain:debugging`\n- **on-cost**: `on-cost:dominant`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "time-travel-debugging#overview",
+          "type": "related-ux"
+        },
+        {
+          "target": "runtime-event-pipelines#overview",
+          "type": "can-use"
+        },
+        {
+          "target": "debugger-protocols#overview",
+          "type": "can-integrate-with"
+        }
+      ]
     },
     {
       "id": "whitebox-live-visualization",

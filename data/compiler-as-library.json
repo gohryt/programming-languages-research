@@ -1,7 +1,10 @@
 {
   "kind": "concept",
   "name": "Compiler as Library",
-  "aliases": ["reusable-compiler", "compiler-frontend-as-service"],
+  "aliases": [
+    "reusable-compiler",
+    "compiler-frontend-as-service"
+  ],
   "summary": "A type checker should be designed as a reusable component, not only a batch compiler phase. Language servers, documentation generators, linters, formatters with semantic needs, refactoring tools, test generators, and debuggers may all need typed information. GHC modularity work highlights the tension between batch compilation and reusable compiler library.",
   "sections": [
     {
@@ -10,21 +13,46 @@
       "tags": [],
       "content": "A type checker should be designed as a reusable component, not only a batch compiler phase. Language servers, documentation generators, linters, formatters with semantic needs, refactoring tools, test generators, and debuggers may all need typed information.\n\nThe distinguishing axis across designs is whether the compiler exposes a *stable internal API* (rust-analyzer reuses rustc components selectively, but rustc's internals are not a stable API) or a *task-specific view* (gopls computes its own types-and-cross-references store separate from `go build`). Each approach has predictable trade-offs.",
       "refs": [
-        { "target": "language-server#frontend-architecture-requirements", "type": "consumed-by" },
-        { "target": "incremental-type-checking#overview", "type": "depends-on" }
+        {
+          "target": "language-server#frontend-architecture-requirements",
+          "type": "consumed-by"
+        },
+        {
+          "target": "incremental-type-checking#overview",
+          "type": "depends-on"
+        },
+        {
+          "target": "tooling-first-language-design#overview",
+          "type": "design-context"
+        }
       ]
     },
     {
       "id": "ghc-modularity-tension",
       "title": "GHC modularity — IDE versus batch",
-      "tags": ["compiler-architecture", "tooling"],
+      "tags": [
+        "compiler-architecture",
+        "tooling"
+      ],
       "content": "GHC modularity work highlights the tension between a batch compiler and reusable compiler library: IDEs need low-latency frontend components, while the compiler pipeline traditionally assumes one-shot compilation. Successive GHC API revisions have tried to expose stable surfaces; HLS (Haskell Language Server) consumes those surfaces; the iteration cost has been high because the GHC internals were not designed as a public API.\n\nThe lesson for new languages is that **compiler-as-library should be a design constraint from day one**, not a retrofit. Once the type checker, name resolver, and trait solver are designed against a public surface, language-server, refactoring, and documentation-generation tools can consume the same components without forcing the compiler to maintain two implementations.",
       "sources": [
-        { "label": "Modularizing GHC", "url": "https://hsyl20.fr/home/files/papers/2022-ghc-modularity.pdf" }
+        {
+          "label": "Modularizing GHC",
+          "url": "https://hsyl20.fr/home/files/papers/2022-ghc-modularity.pdf"
+        }
+      ],
+      "refs": [
+        {
+          "target": "tooling-first-language-design#tooling-checklist",
+          "type": "design-guide"
+        }
       ]
     }
   ],
   "sources": [
-    { "label": "Modularizing GHC", "url": "https://hsyl20.fr/home/files/papers/2022-ghc-modularity.pdf" }
+    {
+      "label": "Modularizing GHC",
+      "url": "https://hsyl20.fr/home/files/papers/2022-ghc-modularity.pdf"
+    }
   ]
 }

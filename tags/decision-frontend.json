@@ -1,0 +1,10 @@
+{
+  "tag": "decision:frontend",
+  "name": "Decision: frontend architecture",
+  "description": "Sections that help choose parser, CST/AST, schema, error-recovery, and incremental frontend architecture for a language implementation.",
+  "axis": "decision",
+  "examples": [
+    "frontend-architecture"
+  ],
+  "id": "decision-frontend"
+}

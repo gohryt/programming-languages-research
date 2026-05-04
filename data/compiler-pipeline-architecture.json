@@ -1,0 +1,126 @@
+{
+  "kind": "concept",
+  "name": "Compiler Pipeline Architecture",
+  "aliases": [
+    "compiler-pipeline",
+    "ir-pipeline",
+    "multi-ir-pipeline"
+  ],
+  "summary": "Decision framework for how many representations a compiler should keep and what each lowering boundary should preserve or discard. The pipeline usually moves from source-faithful syntax to semantic IR, explicit control flow, SSA or bytecode, then backend-specific forms.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "decision:pipeline",
+        "pipeline:ast",
+        "pipeline:hir",
+        "pipeline:mir",
+        "pipeline:ssa",
+        "pipeline:bytecode",
+        "compiler-architecture"
+      ],
+      "content": "A compiler pipeline is a sequence of information trade-offs. Early representations preserve source shape for diagnostics and tooling; middle representations make names, types, control flow, effects, and lifetimes explicit; late representations commit to VM or machine-level execution details.\n\nA common shape is:\n\n```text\nsource\n  -> tokens\n  -> CST\n  -> AST / typed syntax facade\n  -> HIR: resolved names, types, desugarings\n  -> MIR: CFG, temporaries, explicit drops/effects\n  -> SSA or bytecode\n  -> backend IR / machine code / VM execution\n```\n\nThe question is not whether every compiler needs every layer. The question is which analyses become simpler if a layer exists, and which clients suffer if a layer is skipped.",
+      "refs": [
+        {
+          "target": "frontend-architecture#layered-shape",
+          "type": "starts-from"
+        },
+        {
+          "target": "high-level-ir#overview",
+          "type": "uses"
+        },
+        {
+          "target": "mid-level-ir#overview",
+          "type": "uses"
+        },
+        {
+          "target": "ssa#overview",
+          "type": "uses"
+        },
+        {
+          "target": "bytecode#overview",
+          "type": "alternative-execution-form"
+        }
+      ]
+    },
+    {
+      "id": "information-boundaries",
+      "title": "Information boundaries",
+      "tags": [
+        "decision:pipeline",
+        "lowering",
+        "compiler-ir"
+      ],
+      "content": "Each lowering boundary should be deliberate:\n\n| Boundary | Gains | Loses or weakens |\n|---|---|---|\n| CST -> AST | Analysis-friendly nodes | Exact source trivia unless retained separately. |\n| AST -> HIR | Resolved names, stable IDs, types | Some raw syntactic choices. |\n| HIR -> MIR | Explicit CFG, temporaries, drops, effects | Source expression shape. |\n| MIR -> SSA | Direct value-flow, optimization substrate | Some structured control and language-specific semantics. |\n| MIR/SSA -> bytecode | Portable executable contract | Easy IR evolution; bytecode becomes ABI. |\n| IR -> machine code | Peak execution path | Portability and inspectability. |\n\nDiagnostics, debuggers, and refactoring tools often need side tables to recover information lost by lower layers. If those tables are not designed with the lowering, they are usually incomplete.",
+      "refs": [
+        {
+          "target": "abstract-syntax-trees#trade-offs",
+          "type": "starts-at"
+        },
+        {
+          "target": "high-level-ir#boundary-with-lower-ir",
+          "type": "explains"
+        },
+        {
+          "target": "mid-level-ir#boundary-with-backend-forms",
+          "type": "explains"
+        },
+        {
+          "target": "llvm#debug-info-and-tooling-implications",
+          "type": "debug-metadata-example"
+        }
+      ]
+    },
+    {
+      "id": "running-example-index",
+      "title": "Running example across IR layers",
+      "tags": [
+        "decision:pipeline",
+        "pipeline:hir",
+        "pipeline:mir",
+        "pipeline:ssa",
+        "pipeline:bytecode"
+      ],
+      "content": "The corpus uses a small `abs` function as a running example across layers. Read these records in order to see the same computation move from source-shaped semantic IR to explicit control flow, SSA joins, and bytecode dispatch:\n\n1. High-Level IR — source with resolved names and types.\n2. Mid-Level IR — control-flow graph and block parameters.\n3. SSA — φ-functions versus block parameters.\n4. Bytecode — stack versus register encoding.\n\nThis kind of running example is valuable for compiler teams because it exposes exactly where information moves from syntax to semantics to execution.",
+      "refs": [
+        {
+          "target": "high-level-ir#running-example",
+          "type": "step-1"
+        },
+        {
+          "target": "mid-level-ir#running-example",
+          "type": "step-2"
+        },
+        {
+          "target": "ssa#running-example",
+          "type": "step-3"
+        },
+        {
+          "target": "bytecode#running-example",
+          "type": "step-4"
+        }
+      ]
+    },
+    {
+      "id": "how-many-irs",
+      "title": "How many IRs should a compiler have?",
+      "tags": [
+        "decision:pipeline",
+        "tradeoffs",
+        "compiler-design"
+      ],
+      "content": "A small compiler can begin with AST -> bytecode or AST -> backend IR. That is often the right bootstrap. Extra IR layers become worth it when they own a distinct responsibility:\n\n- HIR is worth it when diagnostics, macros, lints, or language-server features need resolved but source-adjacent structure.\n- MIR is worth it when control-flow-sensitive analyses matter: borrow checking, definite assignment, drop elaboration, effect ordering, async lowering, or pattern-match compilation.\n- SSA is worth it when optimization and register allocation need direct value-flow.\n- Bytecode is worth it when portability, introspection, sandboxing, or tiered execution matter.\n- MLIR-style dialects are worth it when several domain-specific abstraction levels must coexist.\n\nThe anti-pattern is one universal IR that is simultaneously source-faithful, easy to type check, easy to optimize, easy to execute, and easy to debug. Production compilers generally stop trying to make one representation serve all clients.",
+      "refs": [
+        {
+          "target": "mlir#multi-level-lowering",
+          "type": "generalizes"
+        },
+        {
+          "target": "backend-selection#overview",
+          "type": "feeds"
+        }
+      ]
+    }
+  ]
+}

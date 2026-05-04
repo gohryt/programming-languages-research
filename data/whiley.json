@@ -1,7 +1,9 @@
 {
   "kind": "language",
   "name": "Whiley",
-  "aliases": ["whiley-lang"],
+  "aliases": [
+    "whiley-lang"
+  ],
   "summary": "Standalone refinement-typed systems language (David J. Pearce). Refinement types are first-class in the language design rather than layered on top; the type checker integrates SMT discharge with ordinary type checking, so verified properties travel through compilation as part of every value's type.",
   "sections": [
     {
@@ -10,14 +12,39 @@
       "tags": [],
       "content": "Whiley (David J. Pearce) is a standalone refinement-typed systems language. Where LiquidHaskell layers refinement on top of Haskell and Stainless on top of Scala, Whiley *is* a refinement-typed language — the integration of refinement and ordinary typing is part of the language semantics rather than a tooling overlay.\n\nThe practical consequence is that every Whiley type carries refinement information by default, the compiler can use refinement facts in optimisation, and there is no separate \"verified\" subset to opt into.",
       "refs": [
-        { "target": "refinement-types#overview", "type": "first-class-implementation" }
+        {
+          "target": "refinement-types#overview",
+          "type": "first-class-implementation"
+        }
       ],
       "sources": [
-        { "label": "Whiley language", "url": "https://whiley.org/" }
+        {
+          "label": "Whiley language",
+          "url": "https://whiley.org/"
+        }
+      ]
+    },
+    {
+      "id": "refinement-example",
+      "title": "Refinement example",
+      "tags": [
+        "type-system",
+        "verification",
+        "language-design"
+      ],
+      "content": "A refinement-typed surface can make common preconditions part of ordinary types. In pseudocode close to Whiley style:\n\n```text\ntype Nat is (int x) where x >= 0\ntype NonEmptyList<T> is (List<T> xs) where length(xs) > 0\n\nfunction head<T>(NonEmptyList<T> xs) -> T:\n  return xs[0]\n```\n\nThe call site must prove that the list is non-empty before `head` is accepted. The generic design point is not the syntax but the integration: refinement checking is part of normal type checking, so verified facts travel through the compiler rather than living in a separate linter.",
+      "refs": [
+        {
+          "target": "refinement-types#bounded-index-example",
+          "type": "example-of"
+        }
       ]
     }
   ],
   "sources": [
-    { "label": "Whiley language", "url": "https://whiley.org/" }
+    {
+      "label": "Whiley language",
+      "url": "https://whiley.org/"
+    }
   ]
 }

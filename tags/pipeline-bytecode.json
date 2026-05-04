@@ -1,0 +1,11 @@
+{
+  "tag": "pipeline:bytecode",
+  "name": "Pipeline: bytecode",
+  "description": "Sections concerning bytecode as a portable executable IR, VM boundary, interpreter/JIT substrate, verification target, or runtime ABI.",
+  "axis": "pipeline",
+  "examples": [
+    "bytecode",
+    "compiler-pipeline-architecture"
+  ],
+  "id": "pipeline-bytecode"
+}

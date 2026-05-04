@@ -1,0 +1,11 @@
+{
+  "tag": "backend:vm",
+  "name": "Backend: virtual machine",
+  "description": "Sections where an interpreter or bytecode virtual machine is the execution backend or primary code generation target.",
+  "axis": "backend",
+  "examples": [
+    "bytecode",
+    "backend-selection"
+  ],
+  "id": "backend-vm"
+}

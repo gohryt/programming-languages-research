@@ -1,7 +1,9 @@
 {
   "kind": "language",
   "name": "Granule",
-  "aliases": ["granule-lang"],
+  "aliases": [
+    "granule-lang"
+  ],
   "summary": "Research language whose IR layers graded modal types on top of linearity: a [n] means use a exactly n times where n ranges over a user-chosen semiring (naturals, intervals, security levels, capabilities). Co-effects beyond linearity, expressed as graded annotations on every binding.",
   "sections": [
     {
@@ -10,22 +12,57 @@
       "tags": [],
       "content": "Granule's IR layers *graded modal types* on top of linearity: `a [n]` means \"use `a` exactly `n` times\" where `n` ranges over a user-chosen semiring (naturals, intervals, security levels, capabilities). The IR carries these grades on every binding and propagates them through every operation.",
       "refs": [
-        { "target": "linear-haskell-ir#overview", "type": "generalises" },
-        { "target": "linear-affine-types#overview", "type": "implements" }
+        {
+          "target": "linear-haskell-ir#overview",
+          "type": "generalises"
+        },
+        {
+          "target": "linear-affine-types#overview",
+          "type": "implements"
+        }
       ],
       "sources": [
-        { "label": "Granule project", "url": "https://granule-project.github.io/" }
+        {
+          "label": "Granule project",
+          "url": "https://granule-project.github.io/"
+        }
       ]
     },
     {
       "id": "grades-vs-linearity",
       "title": "Grades vs linearity",
-      "tags": ["compiler-ir", "type-system"],
+      "tags": [
+        "compiler-ir",
+        "type-system"
+      ],
       "content": "The point of grades is to express co-effects — properties of how a value is consumed — that simple linearity cannot. Security levels (low, high) distinguish public and secret data; intervals bound how many times a function can be called.\n\nGranule remains research-grade but its IR design is a clean exemplar of how graded modal types layer onto a typed lambda calculus. The user-chosen semiring is the key feature: rather than baking in one specific co-effect (linearity, security, count-of-uses), the IR lets each application choose the resource semiring relevant to its problem.",
       "refs": []
+    },
+    {
+      "id": "graded-usage-example",
+      "title": "Graded usage example",
+      "tags": [
+        "type-system",
+        "linear-types",
+        "language-design"
+      ],
+      "content": "A graded type system generalizes linearity by replacing the binary question \"used once or not?\" with an application-chosen grade. In pseudocode:\n\n```text\nconsume_once: FileHandle [1] -> Unit\nlog_twice: Logger [2] -> Unit\npublic_view: Secret [0] -> PublicSummary\n```\n\nThe grade can mean use count, sensitivity, capability level, time step, or another semiring-defined resource. The language-design lesson is that resource tracking can be parameterized rather than hard-coded. The ergonomic challenge is making grades inferable and explainable; otherwise every ordinary program becomes a proof about resource arithmetic.",
+      "refs": [
+        {
+          "target": "linear-affine-types#overview",
+          "type": "generalizes"
+        },
+        {
+          "target": "ats-language#two-stratum-architecture",
+          "type": "contrasts-with"
+        }
+      ]
     }
   ],
   "sources": [
-    { "label": "Granule project", "url": "https://granule-project.github.io/" }
+    {
+      "label": "Granule project",
+      "url": "https://granule-project.github.io/"
+    }
   ]
 }

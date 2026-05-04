@@ -12,7 +12,21 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Classical profiling is point-in-time: run `perf` on one box when it's slow, save the flame graph, close the terminal. **Continuous profiling** is the qualitatively different discipline of *always-on, statistically-sampled, fleet-wide* profiling — designed to be left running in production indefinitely, aggregating across thousands of instances, and attributing performance trends back to code changes.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:continuous-fleet-scale`, `family:visualization-trace-interchange`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-sample`\n"
+      "content": "Classical profiling is point-in-time: run `perf` on one box when it's slow, save the flame graph, close the terminal. **Continuous profiling** is the qualitatively different discipline of *always-on, statistically-sampled, fleet-wide* profiling — designed to be left running in production indefinitely, aggregating across thousands of instances, and attributing performance trends back to code changes.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:continuous-fleet-scale`, `family:visualization-trace-interchange`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:always-on`, `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-sample`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "sampling-profiling#overview",
+          "type": "depends-on"
+        },
+        {
+          "target": "runtime-event-pipelines#overview",
+          "type": "complements"
+        }
+      ]
     },
     {
       "id": "google-wide-profiling",
@@ -112,6 +126,26 @@
         },
         {
           "url": "https://docs.datadoghq.com/profiler/"
+        }
+      ]
+    },
+    {
+      "id": "profile-shape-example",
+      "title": "Profile shape example",
+      "tags": [
+        "profiling",
+        "observability",
+        "runtime-design"
+      ],
+      "content": "A profile is usually not a log of events; it is an aggregation of samples. A generic pprof-like shape is:\n\n```text\nProfile\n  SampleType: cpu_nanoseconds\n  Sample(value=10000000, locations=[main, parse, scan_token], labels={build_id, thread})\n  Sample(value=3000000,  locations=[main, type_check, unify], labels={build_id, thread})\n  StringTable: interned function names, file names, labels\n  Mapping: binary/shared-library build IDs\n```\n\nThe runtime or agent samples stacks, interns symbols, attaches build identity, and ships compact aggregates. For a new runtime, profile compatibility is often more valuable than novelty: emitting an existing profile schema lets users plug into existing flame-graph, diff, and continuous-profiling systems.",
+      "refs": [
+        {
+          "target": "runtime-event-pipelines#event-schema-example",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "sampling-profiling#frame-pointers",
+          "type": "depends-on"
         }
       ]
     }

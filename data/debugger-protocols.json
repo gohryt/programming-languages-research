@@ -18,7 +18,29 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Decoupling the debugger UI from the debugger runtime has become the dominant architecture — an N×M integration problem solved by standard protocols. Entries differ on **what the protocol commits to**: DAP is language-neutral and lowest-common-denominator; JDWP is transport-neutral but Java-typed; CDP is WebSocket-rich and Blink/V8-coupled; RemedyBG is shared-memory and proprietary; gdbserver vs. lldb-server differ on where authoritative environment knowledge lives; scripting APIs (GDB Python, LLDB formatters) turn the debugger itself into a programmable platform; and expression evaluation/state surgery is the in-debugger evaluator that all of these protocols expose. The Mirror principle (`data/debugger-protocols#mirrors-reflection`) names the design shape the others approximate with varying fidelity.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:debugger-protocol`\n- **domain**: `domain:debugging`\n"
+      "content": "Decoupling the debugger UI from the debugger runtime has become the dominant architecture — an N×M integration problem solved by standard protocols. Entries differ on **what the protocol commits to**: DAP is language-neutral and lowest-common-denominator; JDWP is transport-neutral but Java-typed; CDP is WebSocket-rich and Blink/V8-coupled; RemedyBG is shared-memory and proprietary; gdbserver vs. lldb-server differ on where authoritative environment knowledge lives; scripting APIs (GDB Python, LLDB formatters) turn the debugger itself into a programmable platform; and expression evaluation/state surgery is the in-debugger evaluator that all of these protocols expose. The Mirror principle (`data/debugger-protocols#mirrors-reflection`) names the design shape the others approximate with varying fidelity.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:debugger-protocol`\n- **domain**: `domain:debugging`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "breakpoints#overview",
+          "type": "controls"
+        },
+        {
+          "target": "record-and-replay#overview",
+          "type": "can-expose"
+        },
+        {
+          "target": "time-travel-debugging#overview",
+          "type": "can-extend-to"
+        },
+        {
+          "target": "tooling-first-language-design#overview",
+          "type": "editor-integration-context"
+        }
+      ]
     },
     {
       "id": "remedybg",
@@ -173,6 +195,26 @@
         },
         {
           "url": "https://lldb.llvm.org/use/tutorial.html"
+        }
+      ]
+    },
+    {
+      "id": "request-response-example",
+      "title": "Request/response shape example",
+      "tags": [
+        "debugging",
+        "protocol",
+        "tooling"
+      ],
+      "content": "Debugger protocols turn runtime state into a client-visible object model. A generic request sequence is:\n\n```text\nclient -> initialize(capabilities)\nclient -> launch(program, arguments)\nruntime -> stopped(reason=\"breakpoint\", thread=7)\nclient -> stackTrace(thread=7)\nruntime -> frames=[{id: 1, name: \"parse\", line: 42}]\nclient -> scopes(frame=1)\nclient -> variables(scope=\"locals\")\nclient -> evaluate(frame=1, expression=\"token.kind\")\n```\n\nThe protocol design question is what becomes portable. Threads, frames, scopes, variables, and expression evaluation are common; reverse execution, effect-handler stacks, coroutine state, actor mailboxes, or borrow/ownership views often require extensions. A new language should define its debugger object model before the wire format freezes it accidentally.",
+      "refs": [
+        {
+          "target": "language-server#editor-features",
+          "type": "parallel-protocol-pattern"
+        },
+        {
+          "target": "time-travel-debugging#query-model-example",
+          "type": "extended-by"
         }
       ]
     }

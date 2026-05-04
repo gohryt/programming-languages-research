@@ -1,7 +1,11 @@
 {
   "kind": "language",
   "name": "ATS — Applied Type System",
-  "aliases": ["ats", "applied-type-system", "ats-lang"],
+  "aliases": [
+    "ats",
+    "applied-type-system",
+    "ats-lang"
+  ],
   "summary": "Hongwei Xi (2003+): one of the few production systems languages combining linear types (proof obligations consumed on use), dependent types (types parametric over runtime values), and C interoperability. Compiles to portable C; targets kernels, embedded systems, cryptography. Two-stratum architecture: a total decidable statics layer for proofs, a linear-typed dynamics layer for runtime values.",
   "sections": [
     {
@@ -10,33 +14,83 @@
       "tags": [],
       "content": "Hongwei Xi's **ATS** (Applied Type System, 2003+) is one of the few production systems languages combining **linear types** (proof obligations consumed on use), **dependent types** (types parametric over runtime values), and **C interoperability**. ATS compiles to portable C and targets the systems-programming domain — kernels, embedded systems, cryptography — where Rust's ownership model would be preferred today, but ATS shipped a more expressive type system a decade earlier.",
       "refs": [
-        { "target": "linear-affine-types#overview", "type": "instance-of" },
-        { "target": "dependent-types#overview", "type": "instance-of" },
-        { "target": "ownership-as-type-constraint#overview", "type": "predates" }
+        {
+          "target": "linear-affine-types#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "dependent-types#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "ownership-as-type-constraint#overview",
+          "type": "predates"
+        }
       ],
       "sources": [
-        { "label": "ATS language home", "url": "http://www.ats-lang.org/" },
-        { "label": "ATS overview (Boston University)", "url": "https://www.cs.bu.edu/~hwxi/ATS/ATS.html" }
+        {
+          "label": "ATS language home",
+          "url": "http://www.ats-lang.org/"
+        },
+        {
+          "label": "ATS overview (Boston University)",
+          "url": "https://www.cs.bu.edu/~hwxi/ATS/ATS.html"
+        }
       ]
     },
     {
       "id": "distinctive-combination",
       "title": "Linear plus dependent types in production",
-      "tags": ["type-system", "systems-programming"],
+      "tags": [
+        "type-system",
+        "systems-programming"
+      ],
       "content": "The distinctive combination: every value carries a linear-type obligation (consumed exactly once unless the type is non-linear), and types can mention values, so an array's type includes its length, a list's type includes its sortedness, and a file handle's type encodes whether it is currently open. This lets the type system express invariants that Rust's borrow checker cannot: \"this loop body must consume the iterator exactly once and produce a result that maintains the sortedness invariant\" becomes a type-check obligation discharged statically."
     },
     {
       "id": "two-stratum-architecture",
       "title": "Statics versus dynamics",
-      "tags": ["type-system", "language-design"],
+      "tags": [
+        "type-system",
+        "language-design"
+      ],
       "content": "The internal architecture has two strata:\n\n- **Statics**: the dependent-type and proof language, which is total and decidable. Statics terms are erased at runtime.\n- **Dynamics**: the linear-typed runtime language, where every value is tracked by linearity, and proof terms from the statics layer can be threaded as ghost arguments to discharge invariants.\n\nThe ergonomic cost is real: ATS's dependent types interact with linearity in ways that produce verbose annotations and intricate proof obligations. The language has not seen wide adoption despite shipping useful production code (the Postiats compiler is itself written in ATS, plus several embedded-systems and cryptography projects). Compare Idris 2's QTT (`data/idris2-qtt-ir`): QTT aims for similar expressivity with cleaner ergonomics, leveraging multiplicities in binders rather than separate linear-and-dependent type strata.\n\nThe lesson is that **combining linearity with dependent types is feasible at production scale** but ergonomically demanding; modern designs (QTT, Granule — `data/granule`) attempt cleaner integrations of the same expressive power.",
       "sources": [
-        { "label": "ATS practical aspects", "url": "https://www.cs.bu.edu/~hwxi/atslangweb/ATS2/COURSES/PRACTAlT/HTML/x46.html" }
+        {
+          "label": "ATS practical aspects",
+          "url": "https://www.cs.bu.edu/~hwxi/atslangweb/ATS2/COURSES/PRACTAlT/HTML/x46.html"
+        }
+      ]
+    },
+    {
+      "id": "dependent-linear-example",
+      "title": "Dependent-linear example",
+      "tags": [
+        "type-system",
+        "systems-programming",
+        "verification"
+      ],
+      "content": "The transferable ATS idea is that runtime resources can carry proofs about values and must be consumed linearly. A language-agnostic sketch for arrays is:\n\n```text\narray_get: forall n.\n  (array: Array<T, n>, index: { i: Int | 0 <= i && i < n }) -> T\n\nfile_close: (handle: FileHandle [open]) -> FileHandle [closed]\n```\n\nThe array type depends on a value-level length; the file-handle state changes linearly so an open handle cannot be closed twice or forgotten. This is more expressive than ownership alone, but every extra invariant becomes a proof obligation that the programmer or solver must discharge.",
+      "refs": [
+        {
+          "target": "refinement-types#bounded-index-example",
+          "type": "uses"
+        },
+        {
+          "target": "granule#graded-usage-example",
+          "type": "related"
+        }
       ]
     }
   ],
   "sources": [
-    { "label": "ATS language home", "url": "http://www.ats-lang.org/" },
-    { "label": "ATS overview (Boston University)", "url": "https://www.cs.bu.edu/~hwxi/ATS/ATS.html" }
+    {
+      "label": "ATS language home",
+      "url": "http://www.ats-lang.org/"
+    },
+    {
+      "label": "ATS overview (Boston University)",
+      "url": "https://www.cs.bu.edu/~hwxi/ATS/ATS.html"
+    }
   ]
 }

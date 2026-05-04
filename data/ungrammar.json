@@ -1,0 +1,86 @@
+{
+  "kind": "tool",
+  "name": "ungrammar",
+  "aliases": [
+    "grammar-as-ast-schema"
+  ],
+  "summary": "Schema format used by rust-analyzer to describe the typed syntax-tree API generated on top of a lossless concrete syntax tree. Unlike a parser grammar, ungrammar specifies the AST/CST facade that tools consume: node variants, children, optional fields, and lists.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [],
+      "content": "ungrammar is a small schema language for describing the typed syntax-tree API that sits on top of a lossless concrete syntax tree. Its main lesson is architectural: the grammar that accepts text and the schema that tools consume do not have to be the same artifact. A parser may preserve every token and error node, while a generated typed facade exposes only meaningful nodes, fields, and lists.\n\nThe pattern is useful for any new language with formatter, refactoring, macro, or language-server ambitions: keep parsing lossless, then generate typed accessors that give tools a stable source-adjacent API.",
+      "refs": [
+        {
+          "target": "rowan#content-agnostic-library",
+          "type": "commonly-paired-with"
+        },
+        {
+          "target": "concrete-syntax-trees#what-csts-preserve",
+          "type": "facade-over"
+        },
+        {
+          "target": "asdl#schema-as-source-of-truth",
+          "type": "modern-sibling"
+        }
+      ],
+      "sources": [
+        {
+          "label": "Introducing ungrammar",
+          "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html"
+        },
+        {
+          "label": "rust-analyzer ungrammar repository",
+          "url": "https://github.com/rust-analyzer/ungrammar"
+        }
+      ]
+    },
+    {
+      "id": "schema-example",
+      "title": "Schema example",
+      "tags": [
+        "schema-generation",
+        "tooling",
+        "cst"
+      ],
+      "content": "A schema describes the tree API rather than the parse automaton. A tiny expression language might describe declarations and expressions like this:\n\n```text\nSourceFile = Item*\nItem = Function | Struct\nFunction = Name ParamList Block\nParamList = Param*\nParam = Name TypeRef\nExpression = Literal | NameRef | BinaryExpression | CallExpression\nBinaryExpression = lhs:Expression operator:Token rhs:Expression\nCallExpression = callee:Expression ArgList\nArgList = Expression*\n```\n\nA generator can turn this into typed node wrappers (`Function`, `Expression`, `CallExpression`) over a lossless tree. The wrappers do not own the syntax; they interpret it. This lets the parser remain error-tolerant while tools get precise APIs such as `function.parameters()` or `call.arguments()`.",
+      "refs": [
+        {
+          "target": "language-server#typed-syntax-and-semantic-models",
+          "type": "supports"
+        },
+        {
+          "target": "abstract-syntax-trees#common-layout-strategies",
+          "type": "schema-generated-variant"
+        }
+      ]
+    },
+    {
+      "id": "design-lesson",
+      "title": "Design lesson",
+      "tags": [
+        "language-design",
+        "tooling",
+        "compiler-architecture"
+      ],
+      "content": "For a new language, the reusable design is to make syntax shape explicit and generated. Hand-written accessors drift from the grammar; schema-generated accessors make every tool consume the same tree contract. The trade-off is that the schema becomes an API compatibility surface: renaming a node or field is not an internal parser edit once formatters, refactorings, macros, and language-server features depend on it.",
+      "refs": [
+        {
+          "target": "compiler-as-library#overview",
+          "type": "supports"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "label": "Introducing ungrammar",
+      "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html"
+    },
+    {
+      "label": "rust-analyzer ungrammar repository",
+      "url": "https://github.com/rust-analyzer/ungrammar"
+    }
+  ]
+}

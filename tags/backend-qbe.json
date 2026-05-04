@@ -1,0 +1,11 @@
+{
+  "tag": "backend:qbe",
+  "name": "Backend: QBE",
+  "description": "Sections discussing QBE as a compact native compiler backend choice.",
+  "axis": "backend",
+  "examples": [
+    "qbe",
+    "backend-selection"
+  ],
+  "id": "backend-qbe"
+}

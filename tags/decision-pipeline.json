@@ -1,0 +1,10 @@
+{
+  "tag": "decision:pipeline",
+  "name": "Decision: compiler pipeline",
+  "description": "Sections that compare compiler pipeline and IR layering choices: AST, HIR, MIR, SSA, bytecode, backend forms, and lowering boundaries.",
+  "axis": "decision",
+  "examples": [
+    "compiler-pipeline-architecture"
+  ],
+  "id": "decision-pipeline"
+}

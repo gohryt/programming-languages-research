@@ -1,0 +1,151 @@
+{
+  "kind": "concept",
+  "name": "Frontend Architecture for Language Tooling",
+  "aliases": [
+    "frontend-architecture",
+    "syntax-architecture",
+    "tooling-frontend"
+  ],
+  "summary": "Decision framework for designing the parser, lossless syntax tree, AST facade, semantic model, and incremental analysis layers of a new language frontend. The central trade-off is source fidelity for tools versus simplified structure for semantic analysis.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "decision:frontend",
+        "pipeline:cst",
+        "pipeline:ast",
+        "tooling",
+        "compiler-architecture"
+      ],
+      "content": "A modern language frontend usually serves two clients with different needs: batch compilation wants a clean semantic representation, while editors, formatters, refactoring engines, and macro systems need byte-faithful source structure. Treating the parser as only the first compiler phase usually leads to duplicated tooling infrastructure later.\n\nThe reusable architecture is layered: parse into a lossless concrete syntax tree when source fidelity matters; expose generated typed facades for tools; lower into AST or high-level IR for semantic analysis; keep stable identities and source spans across every layer. Small languages can start with a simpler AST-only parser, but should understand what tooling capability they are postponing.",
+      "refs": [
+        {
+          "target": "concrete-syntax-trees#overview",
+          "type": "uses"
+        },
+        {
+          "target": "abstract-syntax-trees#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "language-server#analysis-flow-example",
+          "type": "supports"
+        },
+        {
+          "target": "compiler-pipeline-architecture#overview",
+          "type": "feeds"
+        },
+        {
+          "target": "recursive-descent#overview",
+          "type": "simple-option"
+        },
+        {
+          "target": "parser-combinators#overview",
+          "type": "simple-option"
+        },
+        {
+          "target": "error-recovery#overview",
+          "type": "requires"
+        },
+        {
+          "target": "incremental-parsing#overview",
+          "type": "advanced-option"
+        }
+      ]
+    },
+    {
+      "id": "decision-table",
+      "title": "Decision table",
+      "tags": [
+        "decision:frontend",
+        "tooling",
+        "tradeoffs"
+      ],
+      "content": "Common frontend choices map to different product goals:\n\n| Need | Prefer | Why |\n|---|---|---|\n| Fast first compiler | Hand-written parser to AST | Smallest implementation surface. |\n| Formatter or exact refactoring | Lossless CST | Comments, whitespace, delimiters, and invalid syntax survive. |\n| IDE parse-on-keystroke | Incremental error-tolerant CST | Invalid files still produce navigable trees. |\n| Stable syntax API | Schema-generated typed facade | Tools share one contract instead of hand-written accessors. |\n| Browser-hosted editor tooling | Small generated parser runtime | Download size and JavaScript/Wasm startup dominate. |\n| Macro expansion over source | CST or source-adjacent HIR | Expansion must preserve spans and diagnostics. |\n| Compiler-only prototype | AST plus source spans | Enough for type checking and code generation; weak for refactoring. |\n\nThe table is not a maturity ladder. Some languages deliberately keep a simple AST pipeline; others pay for a full lossless/incremental stack because tooling is part of the language product.",
+      "refs": [
+        {
+          "target": "tree-sitter#grammar-example-and-tooling-contract",
+          "type": "example"
+        },
+        {
+          "target": "lezer#grammar-and-incremental-example",
+          "type": "example"
+        },
+        {
+          "target": "rowan#typed-facade-example",
+          "type": "example"
+        },
+        {
+          "target": "ungrammar#schema-example",
+          "type": "example"
+        },
+        {
+          "target": "asdl#schema-example",
+          "type": "example"
+        },
+        {
+          "target": "recursive-descent#overview",
+          "type": "fast-bootstrap-option"
+        },
+        {
+          "target": "parser-combinators#tradeoffs",
+          "type": "fast-bootstrap-option"
+        },
+        {
+          "target": "error-recovery#overview",
+          "type": "editor-requirement"
+        },
+        {
+          "target": "incremental-parsing#overview",
+          "type": "editor-requirement"
+        }
+      ]
+    },
+    {
+      "id": "layered-shape",
+      "title": "Layered frontend shape",
+      "tags": [
+        "decision:frontend",
+        "pipeline:cst",
+        "pipeline:ast",
+        "pipeline:hir"
+      ],
+      "content": "A tooling-friendly frontend often has this shape:\n\n```text\nsource text\n  -> token stream with trivia\n  -> lossless CST with error nodes\n  -> typed syntax facade generated from schema\n  -> name-resolved AST or HIR\n  -> semantic query database for editor features\n```\n\nEach boundary should have an explicit answer to three questions: what information is discarded, what stable identity is introduced, and which clients consume the layer. Discarding comments before formatting, source spans before diagnostics, or declaration IDs before rename support usually creates expensive retrofits.",
+      "refs": [
+        {
+          "target": "high-level-ir#running-example",
+          "type": "continues-as"
+        },
+        {
+          "target": "name-resolution#symbols-and-stable-identity",
+          "type": "depends-on"
+        },
+        {
+          "target": "incremental-parsing#overview",
+          "type": "depends-on"
+        }
+      ]
+    },
+    {
+      "id": "implementation-checklist",
+      "title": "Implementation checklist",
+      "tags": [
+        "decision:frontend",
+        "tooling",
+        "compiler-design"
+      ],
+      "content": "A practical checklist for a new language frontend:\n\n- Preserve source ranges on every syntax and semantic node.\n- Decide whether comments/whitespace are trivia, tokens, or attached syntax.\n- Make parse errors nodes in the tree, not fatal absence of a tree.\n- Generate typed accessors if multiple tools will consume syntax.\n- Keep stable declaration and binding IDs separate from text positions.\n- Make module/import resolution deterministic enough for editor use.\n- Treat formatter, linter, macro, and language-server clients as first-class frontend consumers.\n\nThe core lesson is generic: source fidelity and semantic simplicity are both valuable, so production frontends normally keep more than one representation.",
+      "refs": [
+        {
+          "target": "tooling-first-language-design#frontend-api-contract",
+          "type": "expanded-by"
+        },
+        {
+          "target": "module-identity#design-implications",
+          "type": "related"
+        }
+      ]
+    }
+  ]
+}

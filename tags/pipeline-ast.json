@@ -1,0 +1,11 @@
+{
+  "tag": "pipeline:ast",
+  "name": "Pipeline: abstract syntax tree",
+  "description": "Sections concerning AST layers, schema-generated ASTs, typed syntax facades, and source-shaped transformation APIs.",
+  "axis": "pipeline",
+  "examples": [
+    "frontend-architecture",
+    "abstract-syntax-trees"
+  ],
+  "id": "pipeline-ast"
+}

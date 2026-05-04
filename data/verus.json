@@ -1,7 +1,9 @@
 {
   "kind": "tool",
   "name": "Verus — Spec/Proof/Exec IR",
-  "aliases": ["verus-rust"],
+  "aliases": [
+    "verus-rust"
+  ],
   "summary": "Verus's IR has three modes: spec (uncomputable, unrestricted), proof (linear, ghost), and exec (compiled, runs at runtime). The three modes share the same surface syntax but are tracked separately in the IR — the compiler erases spec and proof code before runtime, leaving only exec.",
   "sections": [
     {
@@ -10,26 +12,71 @@
       "tags": [],
       "content": "Verus's IR has three modes: `spec` (uncomputable, unrestricted, used in specifications), `proof` (linear, ghost, used in proofs), and `exec` (compiled, runs at runtime). The three modes share the same surface syntax but are tracked separately in the IR — the compiler erases `spec` and `proof` code before runtime, leaving only `exec`.",
       "refs": [
-        { "target": "mid-level-ir#overview", "type": "instance-of" },
-        { "target": "rust-hir-thir-mir#overview", "type": "extends" },
-        { "target": "refinement-types#overview", "type": "implements" },
-        { "target": "dependent-types#overview", "type": "uses-restricted-form" }
+        {
+          "target": "mid-level-ir#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "rust-hir-thir-mir#overview",
+          "type": "extends"
+        },
+        {
+          "target": "refinement-types#overview",
+          "type": "implements"
+        },
+        {
+          "target": "dependent-types#overview",
+          "type": "uses-restricted-form"
+        }
       ],
       "sources": [
-        { "label": "Verus repository", "url": "https://github.com/verus-lang/verus" }
+        {
+          "label": "Verus repository",
+          "url": "https://github.com/verus-lang/verus"
+        }
       ]
     },
     {
       "id": "ir-design-contribution",
       "title": "Verification artifacts at zero runtime cost",
-      "tags": ["verification", "compiler-ir", "rust"],
+      "tags": [
+        "verification",
+        "compiler-ir",
+        "rust"
+      ],
       "content": "The contribution: a typed mode system that makes verification artifacts (proofs, specifications) coexist with compiled code in the same IR without affecting runtime cost. Linear ghost permissions in the `proof` mode let ghost code carry capability tokens (e.g., raw-pointer permissions) borrow-checked exactly like real Rust.\n\nThis is what makes Verus deployable on production Rust codebases: a `spec` block sits next to ordinary code and contributes nothing to the binary, while a `proof` block discharges obligations that would otherwise need an external verifier with its own copy of the source.",
       "refs": [
-        { "target": "verification-intermediate-languages#overview", "type": "alternative-to" }
+        {
+          "target": "verification-intermediate-languages#overview",
+          "type": "alternative-to"
+        }
+      ]
+    },
+    {
+      "id": "mode-example",
+      "title": "Mode example",
+      "tags": [
+        "verification",
+        "compiler-ir",
+        "language-design"
+      ],
+      "content": "A three-mode verification IR separates executable code from specification and proof artifacts:\n\n```text\nspec function sorted(xs: Seq<Int>) -> Bool\n\nexec function first(xs: Vec<Int>) -> Int\n  requires xs.len() > 0\n  ensures result == xs[0]\n{\n  proof { assert(xs.len() > 0); }\n  xs[0]\n}\n```\n\nThe `spec` declaration is logical, the `proof` block exists only to discharge obligations, and the `exec` body is what reaches runtime. The generic design lesson is to make erasure explicit in the IR: verification artifacts can be rich without paying runtime cost, provided the compiler tracks which mode each expression belongs to.",
+      "refs": [
+        {
+          "target": "refinement-types#bounded-index-example",
+          "type": "supports"
+        },
+        {
+          "target": "mid-level-ir#why-this-layer-exists",
+          "type": "extends"
+        }
       ]
     }
   ],
   "sources": [
-    { "label": "Verus repository", "url": "https://github.com/verus-lang/verus" }
+    {
+      "label": "Verus repository",
+      "url": "https://github.com/verus-lang/verus"
+    }
   ]
 }

@@ -13,7 +13,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Every sampling profiler — perf, pprof, async-profiler, py-spy, Parca, VTune — is built on two primitives: first, *interrupt or observe a thread often enough to get statistically useful samples*; second, *given that snapshot, reconstruct the call stack*. The choice of sampling substrate determines bias, delivery cost, signal-safety constraints, and lost-sample behavior. The choice of unwinding mechanism determines whether production sampling is viable once a sample has been taken. This section catalogs both layers, with the main trade-off axis for unwinding being **cost-at-walk-time vs cost-at-steady-state**.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:sampling-substrate`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-frame`, `granularity:per-sample`\n"
+      "content": "Every sampling profiler — perf, pprof, async-profiler, py-spy, Parca, VTune — is built on two primitives: first, *interrupt or observe a thread often enough to get statistically useful samples*; second, *given that snapshot, reconstruct the call stack*. The choice of sampling substrate determines bias, delivery cost, signal-safety constraints, and lost-sample behavior. The choice of unwinding mechanism determines whether production sampling is viable once a sample has been taken. This section catalogs both layers, with the main trade-off axis for unwinding being **cost-at-walk-time vs cost-at-steady-state**.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:sampling-substrate`\n- **domain**: `domain:profiling`\n- **off-cost**: `off-cost:medium`, `off-cost:zero`\n- **on-cost**: `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-frame`, `granularity:per-sample`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "continuous-profiling#overview",
+          "type": "substrate-for"
+        },
+        {
+          "target": "hardware-tracing#overview",
+          "type": "can-use"
+        },
+        {
+          "target": "dwarf-debug-info#overview",
+          "type": "depends-on"
+        }
+      ]
     },
     {
       "id": "statistical-sampling-substrates",

@@ -1,7 +1,9 @@
 {
   "kind": "library",
   "name": "rowan",
-  "aliases": ["rust-analyzer-rowan"],
+  "aliases": [
+    "rust-analyzer-rowan"
+  ],
   "summary": "Rust port of Roslyn's red-green tree design, used by rust-analyzer and a growing number of language servers (Lelwel, Typst, several research projects). Adds green-node interning by hash, thin SyntaxNode handles (~16 bytes), and trivia attached to tokens rather than separate trivia nodes.",
   "sections": [
     {
@@ -10,25 +12,67 @@
       "tags": [],
       "content": "rowan is the Rust port of Roslyn's red-green design, used by rust-analyzer and a growing number of language servers (Lelwel, Typst's parser, several research projects). The red/green split is the same as Roslyn's; the distinctive additions are green-node interning by hash, thin `SyntaxNode` handles (~16 bytes), and attaching trivia to tokens rather than synthesising separate trivia nodes.",
       "refs": [
-        { "target": "concrete-syntax-trees#overview", "type": "instance-of" },
-        { "target": "roslyn-red-green#overview", "type": "ports" }
+        {
+          "target": "concrete-syntax-trees#overview",
+          "type": "instance-of"
+        },
+        {
+          "target": "roslyn-red-green#overview",
+          "type": "ports"
+        }
       ],
       "sources": [
-        { "label": "rowan (rust-analyzer)", "url": "https://github.com/rust-analyzer/rowan" }
+        {
+          "label": "rowan (rust-analyzer)",
+          "url": "https://github.com/rust-analyzer/rowan"
+        }
       ]
     },
     {
       "id": "content-agnostic-library",
       "title": "Content-agnostic CST library",
-      "tags": ["cst", "library", "language-server"],
+      "tags": [
+        "cst",
+        "library",
+        "language-server"
+      ],
       "content": "rowan is content-agnostic: the language-specific node kind enum is supplied by the consumer. The same library powers Rust, Typst, Lelwel-generated grammars, and several DSL projects. This separation of concrete-syntax-tree mechanics from language-specific node types is what makes rowan a reusable lossless-tree library rather than a Rust-specific component.",
       "refs": [
-        { "target": "language-server#overview", "type": "powers" }
+        {
+          "target": "language-server#overview",
+          "type": "powers"
+        }
+      ]
+    },
+    {
+      "id": "typed-facade-example",
+      "title": "Typed facade example",
+      "tags": [
+        "cst",
+        "tooling",
+        "language-server"
+      ],
+      "content": "The reusable pattern is to keep the underlying tree untyped and lossless, then layer typed wrappers over it. In pseudocode:\n\n```text\nenum SyntaxKind { Function, Name, ParameterList, Parameter, Block, Whitespace, Comment, Error }\n\nrecord SyntaxNode { kind: SyntaxKind, text_range: Range, children: [SyntaxElement] }\n\nrecord FunctionNode { syntax: SyntaxNode }\nFunctionNode.name() -> Option<NameNode>\nFunctionNode.parameters() -> Iterator<ParameterNode>\nFunctionNode.body() -> Option<BlockNode>\n```\n\nThe parser produces `SyntaxNode` values including whitespace, comments, and error nodes. Semantic passes use `FunctionNode` and friends. This separation lets formatter/refactoring tools preserve source fidelity while type checking and name resolution see a small, meaningful API.",
+      "refs": [
+        {
+          "target": "ungrammar#schema-example",
+          "type": "generated-from"
+        },
+        {
+          "target": "language-server#typed-syntax-and-semantic-models",
+          "type": "supports"
+        }
       ]
     }
   ],
   "sources": [
-    { "label": "rowan (rust-analyzer)", "url": "https://github.com/rust-analyzer/rowan" },
-    { "label": "Introducing ungrammar (rust-analyzer blog)", "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html" }
+    {
+      "label": "rowan (rust-analyzer)",
+      "url": "https://github.com/rust-analyzer/rowan"
+    },
+    {
+      "label": "Introducing ungrammar (rust-analyzer blog)",
+      "url": "https://rust-analyzer.github.io/blog/2020/10/24/introducing-ungrammar.html"
+    }
   ]
 }

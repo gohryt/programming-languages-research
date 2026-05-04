@@ -1,0 +1,10 @@
+{
+  "tag": "decision:tooling",
+  "name": "Decision: tooling architecture",
+  "description": "Sections that frame compiler APIs, language-server support, stable identity, refactoring, formatting, and package/module determinism as language design decisions.",
+  "axis": "decision",
+  "examples": [
+    "tooling-first-language-design"
+  ],
+  "id": "decision-tooling"
+}

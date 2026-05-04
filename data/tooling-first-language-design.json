@@ -1,0 +1,113 @@
+{
+  "kind": "concept",
+  "name": "Tooling-First Language Design",
+  "aliases": [
+    "tooling-first-design",
+    "compiler-as-tooling-platform",
+    "language-tooling-architecture"
+  ],
+  "summary": "Design principle that a language should treat compiler APIs, stable syntax/semantic identity, language-server incrementality, formatting, refactoring, package resolution, and debug metadata as first-class constraints rather than post-1.0 tooling work.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "decision:tooling",
+        "tooling",
+        "compiler-architecture"
+      ],
+      "content": "Tooling-first language design treats the compiler as a platform for editors, formatters, linters, documentation generators, refactoring tools, debuggers, and build systems. The compiler still produces executable artifacts, but it also exposes stable syntax and semantic APIs.\n\nThe key shift is timing. Tooling architecture is not a polish task after the language stabilizes; it feeds back into syntax representation, name resolution, module identity, package resolution, diagnostics, debug metadata, and build graph design from the beginning.",
+      "refs": [
+        {
+          "target": "compiler-as-library#overview",
+          "type": "foundation"
+        },
+        {
+          "target": "language-server#overview",
+          "type": "requires"
+        },
+        {
+          "target": "frontend-architecture#overview",
+          "type": "requires"
+        }
+      ]
+    },
+    {
+      "id": "frontend-api-contract",
+      "title": "Frontend API contract",
+      "tags": [
+        "decision:tooling",
+        "pipeline:cst",
+        "pipeline:hir",
+        "tooling"
+      ],
+      "content": "A tooling-first frontend exposes at least four stable contracts:\n\n1. Syntax contract: lossless or sufficiently precise tree, source ranges, and error nodes.\n2. Semantic contract: bindings, types, symbol identity, overload resolution, and diagnostics.\n3. Incremental contract: what changes invalidate which derived facts.\n4. Transformation contract: how formatters, code actions, macros, and refactorings rewrite source without losing user intent.\n\nThese contracts can be internal at first, but they should exist. If every tool re-parses, re-resolves, or re-types independently, the ecosystem will fragment and behavior will disagree between compiler and editor.",
+      "refs": [
+        {
+          "target": "language-server#typed-syntax-and-semantic-models",
+          "type": "example"
+        },
+        {
+          "target": "rowan#typed-facade-example",
+          "type": "syntax-contract"
+        },
+        {
+          "target": "high-level-ir#why-compilers-keep-this-layer",
+          "type": "semantic-contract"
+        },
+        {
+          "target": "salsa-incremental#overview",
+          "type": "incremental-contract"
+        }
+      ]
+    },
+    {
+      "id": "identity-and-resolution",
+      "title": "Identity and resolution",
+      "tags": [
+        "decision:tooling",
+        "modules",
+        "packaging"
+      ],
+      "content": "Editor features depend on deterministic identity. Rename needs to know which references target the same binding; go-to-definition needs a stable declaration ID; auto-import needs deterministic package/module resolution; diagnostics need spans that survive macro expansion and generated code.\n\nLanguage design can make this easy or hard. Static imports, deterministic package graphs, stable module identities, and explicit workspace roots make language servers straightforward. Environment-sensitive import search, runtime code loading, implicit globals, and build-system-dependent source discovery push complexity into every tool.",
+      "refs": [
+        {
+          "target": "name-resolution#symbols-and-stable-identity",
+          "type": "requires"
+        },
+        {
+          "target": "module-systems#tooling-implications",
+          "type": "related"
+        },
+        {
+          "target": "package-resolution#determinism-and-conflict-handling",
+          "type": "related"
+        },
+        {
+          "target": "module-identity#design-implications",
+          "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "tooling-checklist",
+      "title": "Tooling checklist",
+      "tags": [
+        "decision:tooling",
+        "language-design",
+        "tradeoffs"
+      ],
+      "content": "A generic tooling-first checklist:\n\n- Can the parser return useful trees for incomplete programs?\n- Does the compiler expose syntax-to-symbol and symbol-to-definition mappings?\n- Are declaration IDs stable across edits?\n- Can diagnostics be produced with partial type information?\n- Is package/module resolution deterministic without executing user code?\n- Can the formatter preserve comments and user grouping?\n- Can code actions rewrite source through a shared tree API?\n- Are source maps, debug metadata, and generated-code spans designed before optimization erases structure?\n\nThe goal is not to over-engineer the first compiler. The goal is to avoid choices that make good tooling impossible without a second frontend.",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "runtime-counterpart"
+        },
+        {
+          "target": "dwarf-debug-info#overview",
+          "type": "debug-metadata"
+        }
+      ]
+    }
+  ]
+}

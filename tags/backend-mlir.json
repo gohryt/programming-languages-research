@@ -1,0 +1,11 @@
+{
+  "tag": "backend:mlir",
+  "name": "Backend: MLIR",
+  "description": "Sections discussing MLIR as a multi-dialect compiler infrastructure and progressive-lowering framework.",
+  "axis": "backend",
+  "examples": [
+    "mlir",
+    "backend-selection"
+  ],
+  "id": "backend-mlir"
+}

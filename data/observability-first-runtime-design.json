@@ -1,0 +1,159 @@
+{
+  "kind": "concept",
+  "name": "Observability-First Runtime Design",
+  "aliases": [
+    "observability-first-design",
+    "runtime-observability-architecture",
+    "debuggable-runtime-design"
+  ],
+  "summary": "Design principle that tracing, profiling, debugging, breakpoints, record/replay, and runtime event schemas should be treated as runtime/compiler ABI concerns from the beginning. Observability is cheapest when generated code and runtime metadata reserve the right hooks early.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "tags": [
+        "decision:runtime-observability",
+        "tracing",
+        "debugging",
+        "profiling",
+        "runtime-design"
+      ],
+      "content": "Observability-first runtime design treats debugging, tracing, profiling, and post-mortem inspection as part of the runtime contract rather than as external tools bolted on later. Generated code, bytecode, stack maps, event schemas, patch sites, source maps, and debugger object models all become ABI surfaces.\n\nThe payoff is large: low-overhead production tracing, useful profiles in existing tools, precise breakpoints, reliable stack inspection, and the possibility of record/replay or time-travel workflows. The cost is that metadata and hooks must survive optimization, inlining, JIT tiering, and runtime evolution.",
+      "refs": [
+        {
+          "target": "runtime-event-pipelines#overview",
+          "type": "uses"
+        },
+        {
+          "target": "compiler-inserted-tracing#overview",
+          "type": "uses"
+        },
+        {
+          "target": "continuous-profiling#overview",
+          "type": "uses"
+        },
+        {
+          "target": "debugger-protocols#overview",
+          "type": "uses"
+        },
+        {
+          "target": "tooling-first-language-design#tooling-checklist",
+          "type": "tooling-counterpart"
+        },
+        {
+          "target": "dwarf-debug-info#overview",
+          "type": "debug-metadata"
+        },
+        {
+          "target": "sampling-profiling#overview",
+          "type": "profiling-substrate"
+        },
+        {
+          "target": "post-mortem-debugging#overview",
+          "type": "debugging-artifact"
+        }
+      ]
+    },
+    {
+      "id": "runtime-abi",
+      "title": "Runtime observability ABI",
+      "tags": [
+        "decision:runtime-observability",
+        "runtime-design",
+        "compiler"
+      ],
+      "content": "A runtime observability ABI can include:\n\n- Event schemas for GC, scheduler, allocation, async, module loading, and user events.\n- Patchable trace sites and side tables for function entry, loop backedges, safepoints, or bytecode offsets.\n- Stack maps, frame descriptors, and source-position tables for profilers and debuggers.\n- Stable object model for debugger values, scopes, tasks, actors, effects, and frames.\n- Build IDs and symbol maps so profiles and traces can be attributed after deployment.\n- Optional nondeterminism logs or checkpoint formats for record/replay.\n\nOnce production tools consume these artifacts, they are compatibility surfaces. Version them deliberately.",
+      "refs": [
+        {
+          "target": "runtime-event-pipelines#event-schema-example",
+          "type": "event-schema"
+        },
+        {
+          "target": "compiler-inserted-tracing#patch-table-example",
+          "type": "patch-sites"
+        },
+        {
+          "target": "continuous-profiling#profile-shape-example",
+          "type": "profile-format"
+        },
+        {
+          "target": "record-and-replay#nondeterminism-log-example",
+          "type": "replay-format"
+        }
+      ]
+    },
+    {
+      "id": "decision-table",
+      "title": "Decision table",
+      "tags": [
+        "decision:runtime-observability",
+        "tradeoffs",
+        "runtime-design"
+      ],
+      "content": "| Need | Runtime design choice | Trade-off |\n|---|---|---|\n| Low-overhead production events | Structured event pipeline | Event schema/versioning burden. |\n| Almost-free disabled tracing | Patchable sleds or bytecode probes | Code size and patching complexity. |\n| Ecosystem profile compatibility | Emit pprof-like profiles | Must map runtime frames to existing schema. |\n| Good editor debugger integration | DAP-compatible adapter plus language extensions | Generic protocols may not express advanced runtime concepts. |\n| Precise conditional stops | Semantic breakpoints/contracts | Runtime predicate cost and semantics policy. |\n| Reverse debugging | Record nondeterministic inputs or snapshots | Recording overhead and storage. |\n| Omniscient debugging | Queryable execution database | Heavy post-processing and identity metadata. |\n\nThe general rule: if users will need it in production, design for disabled cost first. If users will need it in development, design for semantic identity first.",
+      "refs": [
+        {
+          "target": "breakpoints#state-machine-example",
+          "type": "breakpoint-model"
+        },
+        {
+          "target": "debugger-protocols#request-response-example",
+          "type": "protocol-model"
+        },
+        {
+          "target": "time-travel-debugging#query-model-example",
+          "type": "history-model"
+        }
+      ]
+    },
+    {
+      "id": "optimization-interactions",
+      "title": "Interaction with optimization and tiering",
+      "tags": [
+        "decision:runtime-observability",
+        "optimization",
+        "jit",
+        "debugging"
+      ],
+      "content": "Optimization can destroy observability unless the compiler treats metadata as part of correctness. Inlining merges frames; code motion moves source locations; escape analysis removes allocations users may expect to inspect; register allocation hides variables; JIT tiering changes code addresses while a debugger is attached.\n\nThe runtime therefore needs policies: whether optimized-out variables are reported, whether source-level stepping follows lexical order or machine order, whether trace sites are preserved through inlining, how deoptimization reconstructs frames, and how profiles attribute inlined costs. These are language UX decisions as much as compiler engineering details.",
+      "refs": [
+        {
+          "target": "llvm#debug-info-and-tooling-implications",
+          "type": "example"
+        },
+        {
+          "target": "ssa#jit-and-runtime-relevance",
+          "type": "interacts-with"
+        },
+        {
+          "target": "tiered-compilation#common-architecture-patterns",
+          "type": "interacts-with"
+        },
+        {
+          "target": "osr-deoptimization#overview",
+          "type": "may-require"
+        }
+      ]
+    },
+    {
+      "id": "implementation-checklist",
+      "title": "Implementation checklist",
+      "tags": [
+        "decision:runtime-observability",
+        "runtime-design",
+        "tooling"
+      ],
+      "content": "A practical checklist for an observable runtime:\n\n- Emit build IDs and preserve symbol/source mappings.\n- Define event schemas with units, stability policy, and versioning.\n- Reserve patchable sites only where disabled overhead is acceptable.\n- Keep stack/frame maps accurate across optimization and JIT tiers.\n- Provide a debugger object model for values, scopes, tasks, and runtime-specific entities.\n- Support standard interchange formats where possible before inventing new ones.\n- Decide which semantic events are stable API and which probes are implementation detail.\n- Test observability features under optimized builds, not only debug builds.\n\nThe central lesson is generic: observability becomes expensive when reconstructed from machine code alone; it becomes tractable when the compiler and runtime cooperate.",
+      "refs": [
+        {
+          "target": "backend-selection#selection-questions",
+          "type": "backend-input"
+        },
+        {
+          "target": "post-mortem-debugging#overview",
+          "type": "related"
+        }
+      ]
+    }
+  ]
+}

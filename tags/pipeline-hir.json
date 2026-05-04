@@ -1,0 +1,11 @@
+{
+  "tag": "pipeline:hir",
+  "name": "Pipeline: high-level IR",
+  "description": "Sections concerning source-adjacent semantic IR layers with resolved names, stable IDs, types, desugarings, and diagnostic/tooling metadata.",
+  "axis": "pipeline",
+  "examples": [
+    "high-level-ir",
+    "compiler-pipeline-architecture"
+  ],
+  "id": "pipeline-hir"
+}

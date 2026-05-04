@@ -10,7 +10,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Tools that build a per-span or per-event record explicitly at sites the developer (or the language) chose, in contrast to the sampling profilers of `data/sampling-profiling` and `data/continuous-profiling` that interrupt arbitrary code at a fixed cadence. The cost model is per-annotated-site, not per-wall-clock-sample, and the distinguishing engineering challenge is making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production builds. The chapter also covers the vendor-maintained microarchitecture-aware production analysers — Intel **VTune** and AMD **μProf** for Linux/Windows microarchitectural diagnostics; Microsoft **PerfView** and **Windows Performance Analyzer (WPA)** for ETW-native .NET-and-kernel profiling — that pair tightly with the runtime/OS event providers no third-party tool maintains as comprehensively.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`, `family:direct-execution-interposition`, `family:hardware-tracing`\n- **domain**: `domain:profiling`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-function`, `granularity:per-instruction`\n"
+      "content": "Tools that build a per-span or per-event record explicitly at sites the developer (or the language) chose, in contrast to the sampling profilers of `data/sampling-profiling` and `data/continuous-profiling` that interrupt arbitrary code at a fixed cadence. The cost model is per-annotated-site, not per-wall-clock-sample, and the distinguishing engineering challenge is making each span cheap enough (nanoseconds) to leave on continuously in development and sometimes production builds. The chapter also covers the vendor-maintained microarchitecture-aware production analysers — Intel **VTune** and AMD **μProf** for Linux/Windows microarchitectural diagnostics; Microsoft **PerfView** and **Windows Performance Analyzer (WPA)** for ETW-native .NET-and-kernel profiling — that pair tightly with the runtime/OS event providers no third-party tool maintains as comprehensively.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`, `family:direct-execution-interposition`, `family:hardware-tracing`\n- **domain**: `domain:profiling`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-function`, `granularity:per-instruction`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "sampling-profiling#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "continuous-profiling#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "runtime-event-pipelines#overview",
+          "type": "uses-event-pipeline"
+        }
+      ]
     },
     {
       "id": "tracy-spall",

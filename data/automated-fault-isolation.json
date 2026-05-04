@@ -14,7 +14,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), aggregated value-histories (Daikon's dynamic invariants), or whole-program SMT formulae over bounded executions (CBMC). The debugger becomes an automated search engine with a domain-specific query.\n\nA unifying design lesson runs through §`data/automated-fault-isolation#whyline-interrogative`–8.11: **make values, computations, and intent observable at semantic program points**. Whyline reifies the connection from outputs back to the code that produced them (provenance); Shapiro's algorithmic debugging reifies the computation tree so the user can answer yes/no on each subgoal's intended result (semantic intent); Daikon mines invariants over instrumented runs (population-statistics intent). Each technique requires the compiler/runtime to expose more than raw memory reads — function entries/exits, loop heads, algebraic constructors, effect boundaries, output provenance — and rewards languages that emit such events with debuggers users do not have to translate from machine state into mental model.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:fault-isolation`\n- **domain**: `domain:debugging`\n"
+      "content": "Automated fault isolation treats debugging as search: given a failure and a test oracle, a program analysis narrows the cause. Entries differ on **what the search ranges over** — inputs (delta debugging, fuzzer triage), commit histories (`git bisect`), statements (program slicing), lines (Tarantula), predicates (CBI), program states (cause-effect chains), execution paths (KLEE), MIR operations (Miri), trace events indexed by question (Whyline), computation-tree nodes (Shapiro), aggregated value-histories (Daikon's dynamic invariants), or whole-program SMT formulae over bounded executions (CBMC). The debugger becomes an automated search engine with a domain-specific query.\n\nA unifying design lesson runs through §`data/automated-fault-isolation#whyline-interrogative`–8.11: **make values, computations, and intent observable at semantic program points**. Whyline reifies the connection from outputs back to the code that produced them (provenance); Shapiro's algorithmic debugging reifies the computation tree so the user can answer yes/no on each subgoal's intended result (semantic intent); Daikon mines invariants over instrumented runs (population-statistics intent). Each technique requires the compiler/runtime to expose more than raw memory reads — function entries/exits, loop heads, algebraic constructors, effect boundaries, output provenance — and rewards languages that emit such events with debuggers users do not have to translate from machine state into mental model.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:fault-isolation`\n- **domain**: `domain:debugging`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "record-and-replay#overview",
+          "type": "can-use"
+        },
+        {
+          "target": "time-travel-debugging#overview",
+          "type": "can-query"
+        },
+        {
+          "target": "debugger-protocols#overview",
+          "type": "can-surface-through"
+        }
+      ]
     },
     {
       "id": "delta-debugging",

@@ -13,7 +13,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Record/replay debuggers turn execution into an artifact you can rewind or query. Entries differ on **what fraction of execution is re-derived on replay vs. captured at record time**: rr records nondeterministic inputs and re-derives the rest; Pernosco post-processes rr traces into a searchable database; VS Snapshot and CRIU capture whole program state at chosen points; Magic Trace and Perfetto appear here only for their debugger workflows. Their tracing substrates are covered in `data/hardware-tracing` and `data/trace-storage-and-visualization`.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:hardware-tracing`, `family:record-replay`, `family:visualization-trace-interchange`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:medium`\n- **on-cost**: `on-cost:dominant`, `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`\n"
+      "content": "Record/replay debuggers turn execution into an artifact you can rewind or query. Entries differ on **what fraction of execution is re-derived on replay vs. captured at record time**: rr records nondeterministic inputs and re-derives the rest; Pernosco post-processes rr traces into a searchable database; VS Snapshot and CRIU capture whole program state at chosen points; Magic Trace and Perfetto appear here only for their debugger workflows. Their tracing substrates are covered in `data/hardware-tracing` and `data/trace-storage-and-visualization`.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:hardware-tracing`, `family:record-replay`, `family:visualization-trace-interchange`\n- **domain**: `domain:debugging`\n- **off-cost**: `off-cost:medium`\n- **on-cost**: `on-cost:dominant`, `on-cost:high`, `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-frame`, `granularity:per-instruction`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "time-travel-debugging#overview",
+          "type": "supports"
+        },
+        {
+          "target": "post-mortem-debugging#overview",
+          "type": "related-artifact-model"
+        },
+        {
+          "target": "hardware-tracing#overview",
+          "type": "can-use-substrate"
+        }
+      ]
     },
     {
       "id": "rr-deterministic-record-replay",
@@ -236,6 +254,26 @@
         },
         {
           "url": "https://perfetto.dev/docs/analysis/perfetto-sql-syntax"
+        }
+      ]
+    },
+    {
+      "id": "nondeterminism-log-example",
+      "title": "Nondeterminism log example",
+      "tags": [
+        "debugging",
+        "record-replay",
+        "runtime-design"
+      ],
+      "content": "Deterministic replay systems often log only nondeterministic inputs and rederive everything else. A generic log could be:\n\n```text\nstart build_id=abc123 initial_args=[...]\nat instruction_count=18422 syscall read(fd=3) -> bytes=\"...\"\nat instruction_count=20110 signal SIGALRM delivered to thread=2\nat instruction_count=25890 scheduler switch thread=2 -> thread=1\nat instruction_count=30104 mmap(address=0x..., size=4096) -> success\n```\n\nReplay reruns deterministic instructions and injects recorded events at the same logical times. The generic requirement is a progress counter or checkpoint scheme precise enough to place events reproducibly. The payoff is enormous: the recording can be debugged repeatedly without requiring the original race, machine, or production request to happen again.",
+      "refs": [
+        {
+          "target": "time-travel-debugging#query-model-example",
+          "type": "substrate-for"
+        },
+        {
+          "target": "debugger-protocols#request-response-example",
+          "type": "exposed-through"
         }
       ]
     }

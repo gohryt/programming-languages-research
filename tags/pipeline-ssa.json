@@ -1,0 +1,11 @@
+{
+  "tag": "pipeline:ssa",
+  "name": "Pipeline: SSA",
+  "description": "Sections concerning static-single-assignment IR layers, phi nodes, block parameters, value-flow analysis, and optimization substrates.",
+  "axis": "pipeline",
+  "examples": [
+    "ssa",
+    "compiler-pipeline-architecture"
+  ],
+  "id": "pipeline-ssa"
+}

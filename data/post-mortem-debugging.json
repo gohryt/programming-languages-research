@@ -15,7 +15,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint, a hardware-probe halt, or a curated crash artifact — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, the hardware substrate beneath embedded targets, the production pipelines that ship crash artifacts off failing machines, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (`data/record-and-replay#criu-checkpoint-restore`) is the non-crash sibling — checkpoint a *healthy* program for later inspection — and is contrasted with VS Snapshot (`data/record-and-replay#vs-snapshot-debugger`) in the record-and-replay chapter rather than repeated here.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:post-mortem`\n- **domain**: `domain:debugging`\n"
+      "content": "Not every bug can be caught live. Production programs crash hours after the developer went home; kernel panics leave no process to attach to; containers get killed and restarted before anyone can run `gdb -p`. Post-mortem debugging starts from a *frozen record of state* — a core dump, a vmcore, a checkpoint, a hardware-probe halt, or a curated crash artifact — and reconstructs what happened after the fact. This chapter covers the mechanisms that produce these records, the tools that read them, the hardware substrate beneath embedded targets, the production pipelines that ship crash artifacts off failing machines, and the special cases (kernel, managed runtimes) where the generic machinery falls short. CRIU (`data/record-and-replay#criu-checkpoint-restore`) is the non-crash sibling — checkpoint a *healthy* program for later inspection — and is contrasted with VS Snapshot (`data/record-and-replay#vs-snapshot-debugger`) in the record-and-replay chapter rather than repeated here.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:post-mortem`\n- **domain**: `domain:debugging`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "record-and-replay#overview",
+          "type": "related-artifact-model"
+        },
+        {
+          "target": "debugger-protocols#overview",
+          "type": "consumed-by"
+        },
+        {
+          "target": "dwarf-debug-info#overview",
+          "type": "depends-on"
+        }
+      ]
     },
     {
       "id": "core-dumps-coredump-filter",

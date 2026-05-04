@@ -1,0 +1,11 @@
+{
+  "tag": "pipeline:mir",
+  "name": "Pipeline: mid-level IR",
+  "description": "Sections concerning CFG-like analysis IR layers with explicit control flow, temporaries, effects, drops, lifetimes, or ownership information.",
+  "axis": "pipeline",
+  "examples": [
+    "mid-level-ir",
+    "compiler-pipeline-architecture"
+  ],
+  "id": "pipeline-mir"
+}

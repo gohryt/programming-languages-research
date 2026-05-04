@@ -11,7 +11,25 @@
       "id": "overview",
       "title": "Overview",
       "tags": [],
-      "content": "Event emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically. What separates this family from `data/bytecode-and-code-patching` code-patching is that the events are part of the runtime's own semantics — GC pauses, scheduler transitions, query-plan nodes, signpost intervals — not a layer over raw instructions. Entries span JVM, .NET, Windows kernel, Linux kernel, Erlang, Haskell, Go, Apple, database engines, the MoarVM language runtime, and the kernel-event-instrumentation tier (PCP for long-horizon metrics, Sysdig for syscall capture, Falco for security rule evaluation); the mechanism shape (providers + sessions + ring buffers) is remarkably consistent across very different runtimes.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`\n- **domain**: `domain:observability`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-syscall`\n"
+      "content": "Event emission built into a language runtime or operating-system kernel, with structured schema, lock-free per-thread or per-CPU buffers, and a session model that lets consumers enable or disable providers dynamically. What separates this family from `data/bytecode-and-code-patching` code-patching is that the events are part of the runtime's own semantics — GC pauses, scheduler transitions, query-plan nodes, signpost intervals — not a layer over raw instructions. Entries span JVM, .NET, Windows kernel, Linux kernel, Erlang, Haskell, Go, Apple, database engines, the MoarVM language runtime, and the kernel-event-instrumentation tier (PCP for long-horizon metrics, Sysdig for syscall capture, Falco for security rule evaluation); the mechanism shape (providers + sessions + ring buffers) is remarkably consistent across very different runtimes.\n\nSections in this umbrella are tagged across the following axes; each tag has a descriptor under `tags/` and (after Phase 5) a comparison-view page on the static site:\n\n- **family**: `family:buffered-event-emission`\n- **domain**: `domain:observability`, `domain:tracing`\n- **off-cost**: `off-cost:low`, `off-cost:zero`\n- **on-cost**: `on-cost:low`, `on-cost:medium`\n- **granularity**: `granularity:per-event`, `granularity:per-syscall`\n",
+      "refs": [
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "compiler-inserted-tracing#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "continuous-profiling#overview",
+          "type": "complements"
+        },
+        {
+          "target": "bytecode-and-code-patching#overview",
+          "type": "contrasts-with"
+        }
+      ]
     },
     {
       "id": "jdk-flight-recorder-jfr",
@@ -323,6 +341,26 @@
         },
         {
           "url": "https://github.com/falcosecurity/falco"
+        }
+      ]
+    },
+    {
+      "id": "event-schema-example",
+      "title": "Event schema example",
+      "tags": [
+        "tracing",
+        "observability",
+        "runtime-design"
+      ],
+      "content": "Runtime-native tracing works best when events are structured and schema-stable. A generic event definition might be:\n\n```text\nevent gc_pause {\n  timestamp: monotonic_time\n  thread_id: u64\n  generation: u8\n  reason: enum { allocation_failure, explicit_request, idle }\n  heap_before: bytes\n  heap_after: bytes\n  duration: nanoseconds\n}\n```\n\nThe runtime writes compact binary records to per-thread or per-CPU buffers; consumers decode them using the schema. The design lesson is to treat events as an ABI. Names, field meanings, units, and versioning rules matter because production tools will build queries and alerts against them.",
+      "refs": [
+        {
+          "target": "compiler-inserted-tracing#patch-table-example",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "continuous-profiling#profile-shape-example",
+          "type": "complements"
         }
       ]
     }

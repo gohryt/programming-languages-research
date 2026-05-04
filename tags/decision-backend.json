@@ -1,0 +1,10 @@
+{
+  "tag": "decision:backend",
+  "name": "Decision: backend selection",
+  "description": "Sections that help choose execution or code-generation backends: interpreter, bytecode VM, QBE, Cranelift, LLVM, MLIR, copy-and-patch, or custom native codegen.",
+  "axis": "decision",
+  "examples": [
+    "backend-selection"
+  ],
+  "id": "decision-backend"
+}

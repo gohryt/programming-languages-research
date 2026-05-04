@@ -20,6 +20,22 @@
         {
           "target": "dynamic-binary-instrumentation",
           "type": "contrasts-with"
+        },
+        {
+          "target": "observability-first-runtime-design#overview",
+          "type": "design-context"
+        },
+        {
+          "target": "bytecode-and-code-patching#overview",
+          "type": "implemented-by"
+        },
+        {
+          "target": "runtime-event-pipelines#overview",
+          "type": "contrasts-with"
+        },
+        {
+          "target": "breakpoints#overview",
+          "type": "shares-mechanisms"
         }
       ]
     },
@@ -92,6 +108,26 @@
         {
           "target": "sampling-profiling#frame-pointers",
           "type": "related"
+        }
+      ]
+    },
+    {
+      "id": "patch-table-example",
+      "title": "Patch-table example",
+      "tags": [
+        "compiler",
+        "tracing",
+        "runtime"
+      ],
+      "content": "A compiler/runtime contract for low-overhead tracing often consists of reserved patch sites plus a metadata table. A generic shape is:\n\n```text\ncode:\n  fn_add_entry:  nop nop nop nop nop      ; patchable sled\n                 ... normal function body ...\n  fn_add_exit:   nop nop nop nop nop\n\ntrace_sites:\n  { id: 17, kind: function-entry, address: fn_add_entry, patch: call trace_entry, original: nop5 }\n  { id: 18, kind: function-exit,  address: fn_add_exit,  patch: call trace_exit,  original: nop5 }\n```\n\nWhen disabled, normal code runs through NOPs or predictable jumps. When enabled, the runtime patches selected sites and records events. The generic requirement is that code generation, metadata emission, instruction-cache coherency, and debugger/profiler tooling agree on one stable patch-site ABI.",
+      "refs": [
+        {
+          "target": "bytecode-and-code-patching#ftrace-ebpf-nop-to-call",
+          "type": "instance"
+        },
+        {
+          "target": "breakpoints#gdb-int3-displaced-stepping",
+          "type": "shares-mechanism"
         }
       ]
     }

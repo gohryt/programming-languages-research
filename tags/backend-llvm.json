@@ -1,0 +1,11 @@
+{
+  "tag": "backend:llvm",
+  "name": "Backend: LLVM",
+  "description": "Sections discussing LLVM as an optimizing AOT/JIT backend and compiler infrastructure dependency.",
+  "axis": "backend",
+  "examples": [
+    "llvm",
+    "backend-selection"
+  ],
+  "id": "backend-llvm"
+}

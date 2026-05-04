@@ -1,0 +1,11 @@
+{
+  "tag": "backend:cranelift",
+  "name": "Backend: Cranelift",
+  "description": "Sections discussing Cranelift as a fast native compiler backend for JIT, debug, or compile-latency-sensitive workloads.",
+  "axis": "backend",
+  "examples": [
+    "cranelift",
+    "backend-selection"
+  ],
+  "id": "backend-cranelift"
+}

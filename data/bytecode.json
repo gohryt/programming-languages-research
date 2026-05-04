@@ -17,6 +17,18 @@
         {
           "target": "llvm#role-in-jit-and-tiered-systems",
           "type": "alternative-to"
+        },
+        {
+          "target": "compiler-pipeline-architecture#overview",
+          "type": "pipeline-context"
+        },
+        {
+          "target": "backend-selection#overview",
+          "type": "backend-option"
+        },
+        {
+          "target": "observability-first-runtime-design#runtime-abi",
+          "type": "runtime-metadata-context"
         }
       ]
     },
@@ -122,6 +134,30 @@
         {
           "target": "record-and-replay",
           "type": "consumed-by"
+        },
+        {
+          "target": "backend-selection#decision-table",
+          "type": "decision-guide"
+        }
+      ]
+    },
+    {
+      "id": "running-example",
+      "title": "Running example: stack and register bytecode",
+      "tags": [
+        "virtual-machine",
+        "instruction-set",
+        "runtime-design"
+      ],
+      "content": "The same function can be encoded as stack bytecode:\n\n```text\n0: load_arg 0\n1: const_i 0\n2: lt_i\n3: jump_if_false 8\n4: const_i 0\n5: load_arg 0\n6: sub_i\n7: return\n8: load_arg 0\n9: return\n```\n\nOr as register bytecode:\n\n```text\n0: lt_i r1, r0, 0\n1: jump_if_false r1, 4\n2: neg_i r2, r0\n3: return r2\n4: return r0\n```\n\nThe stack form is compact because operand locations are implicit; the register form usually executes fewer dispatches because each instruction names its operands. A new VM should pick based on validation needs, bytecode size, interpreter dispatch cost, and whether the bytecode is also an optimization or debugging boundary.",
+      "refs": [
+        {
+          "target": "ssa#running-example",
+          "type": "lowered-from"
+        },
+        {
+          "target": "bytecode-quickening#design-lesson",
+          "type": "optimized-by"
         }
       ]
     }

@@ -1,7 +1,9 @@
 {
   "kind": "language",
   "name": "Koka",
-  "aliases": ["koka-lang"],
+  "aliases": [
+    "koka-lang"
+  ],
   "summary": "Microsoft Research functional language tracking side effects in function types via row-polymorphic effect types and type-directed compilation strategies (such as selective CPS) driven by those effect rows. Canonical production example of effect handlers as first-class language structure.",
   "sections": [
     {
@@ -10,41 +12,109 @@
       "tags": [],
       "content": "Koka tracks side effects in function types and supports effect handlers as a typed, composable mechanism, using row-polymorphic effect types and type-directed compilation strategies (such as selective CPS) driven by those effect rows.\n\nEvery Koka function arrow carries a row-polymorphic effect set, so purity, exceptions, async, divergence, and user-defined operations are visible to inference, to handler typing, and to selective-CPS lowering. This is the canonical production example of \"effects as first-class structure in the source\".",
       "refs": [
-        { "target": "type-and-effect-systems#algebraic-effects-and-handlers", "type": "instance-of" },
-        { "target": "row-polymorphism#overview", "type": "uses" },
-        { "target": "effect-handler-lowering#overview", "type": "lowered-via" },
-        { "target": "elm#restriction-as-design-lesson", "type": "design-counterpoint" }
+        {
+          "target": "type-and-effect-systems#algebraic-effects-and-handlers",
+          "type": "instance-of"
+        },
+        {
+          "target": "row-polymorphism#overview",
+          "type": "uses"
+        },
+        {
+          "target": "effect-handler-lowering#overview",
+          "type": "lowered-via"
+        },
+        {
+          "target": "elm#restriction-as-design-lesson",
+          "type": "design-counterpoint"
+        }
       ],
       "sources": [
-        { "label": "Koka row-polymorphic effect types", "url": "https://www.microsoft.com/en-us/research/publication/koka-programming-with-row-polymorphic-effect-types/" },
-        { "label": "Koka repository", "url": "https://github.com/koka-lang/koka/" },
-        { "label": "Koka documentation", "url": "https://koka-lang.github.io/koka/doc/" },
-        { "label": "Koka book", "url": "https://koka-lang.github.io/koka/doc/book.html" }
+        {
+          "label": "Koka row-polymorphic effect types",
+          "url": "https://www.microsoft.com/en-us/research/publication/koka-programming-with-row-polymorphic-effect-types/"
+        },
+        {
+          "label": "Koka repository",
+          "url": "https://github.com/koka-lang/koka/"
+        },
+        {
+          "label": "Koka documentation",
+          "url": "https://koka-lang.github.io/koka/doc/"
+        },
+        {
+          "label": "Koka book",
+          "url": "https://koka-lang.github.io/koka/doc/book.html"
+        }
       ]
     },
     {
       "id": "row-polymorphic-effects",
       "title": "Row-polymorphic effect types",
-      "tags": ["effect-system", "type-system"],
+      "tags": [
+        "effect-system",
+        "type-system"
+      ],
       "content": "Function types in Koka have shape `A -> <effects> B` — the angle-brackets contain a row of effects. A pure function has empty effects (`<>`); an exception-throwing function has `<exn>`; an async function might have `<async, exn>`. Row variables (`<exn|e>`) abstract over \"the rest of the effect set\", letting higher-order combinators be effect-polymorphic.\n\nEffect inference unifies effect rows alongside type unification. Programmers usually omit effects in source; the compiler infers and prints them in error messages and signatures. The discipline scales to user-defined operations: a custom `<state<S>>` effect declared by the programmer participates in inference exactly like built-in effects.",
       "sources": [
-        { "label": "Koka type-directed compilation of row-typed algebraic effects", "url": "https://dl.acm.org/doi/10.1145/3009837.3009872" }
+        {
+          "label": "Koka type-directed compilation of row-typed algebraic effects",
+          "url": "https://dl.acm.org/doi/10.1145/3009837.3009872"
+        }
       ]
     },
     {
       "id": "selective-cps-compilation",
       "title": "Selective CPS compilation",
-      "tags": ["compiler", "effect-system"],
+      "tags": [
+        "compiler",
+        "effect-system"
+      ],
       "content": "Koka's compilation strategy uses the inferred effect row to drive selective CPS: pure code stays direct-style; effect-performing code is CPS-transformed so handlers can capture and resume it. The 2021 Xie-Leijen \"generalized evidence passing\" work extends the discipline so multi-handler interactions compose without runtime overhead beyond what the underlying effect operations require. Full lowering treatment lives in `data/effect-handler-lowering`.",
       "refs": [
-        { "target": "effect-handler-lowering#overview", "type": "lowered-via" }
+        {
+          "target": "effect-handler-lowering#overview",
+          "type": "lowered-via"
+        }
+      ]
+    },
+    {
+      "id": "effect-row-example",
+      "title": "Effect-row example",
+      "tags": [
+        "effect-system",
+        "type-system",
+        "language-design"
+      ],
+      "content": "An effect-row system exposes effects in function types while still permitting inference. In pseudocode:\n\n```text\nparseInt: String -> <exn> Int\nreadLine: () -> <io> String\nmain: () -> <io, exn> Int\nmain() = parseInt(readLine())\n```\n\nA higher-order function can be effect-polymorphic:\n\n```text\nmap: (List<A>, A -> <e> B) -> <e> List<B>\n```\n\nThe generic lesson is that effects become ordinary type information. The compiler can use them for diagnostics, handler typing, selective CPS lowering, or capability checks; the price is that API signatures expose more semantic structure and error messages must explain effect rows clearly.",
+      "refs": [
+        {
+          "target": "bidirectional-typing#design-applicability",
+          "type": "can-combine-with"
+        },
+        {
+          "target": "effect-handler-lowering#overview",
+          "type": "lowered-via"
+        }
       ]
     }
   ],
   "sources": [
-    { "label": "Koka row-polymorphic effect types", "url": "https://www.microsoft.com/en-us/research/publication/koka-programming-with-row-polymorphic-effect-types/" },
-    { "label": "Koka type-directed compilation of row-typed algebraic effects", "url": "https://dl.acm.org/doi/10.1145/3009837.3009872" },
-    { "label": "Koka repository", "url": "https://github.com/koka-lang/koka/" },
-    { "label": "Koka book", "url": "https://koka-lang.github.io/koka/doc/book.html" }
+    {
+      "label": "Koka row-polymorphic effect types",
+      "url": "https://www.microsoft.com/en-us/research/publication/koka-programming-with-row-polymorphic-effect-types/"
+    },
+    {
+      "label": "Koka type-directed compilation of row-typed algebraic effects",
+      "url": "https://dl.acm.org/doi/10.1145/3009837.3009872"
+    },
+    {
+      "label": "Koka repository",
+      "url": "https://github.com/koka-lang/koka/"
+    },
+    {
+      "label": "Koka book",
+      "url": "https://koka-lang.github.io/koka/doc/book.html"
+    }
   ]
 }
