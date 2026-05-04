@@ -225,12 +225,18 @@ async fn main() -> Result<()> {
         .layer(cors)
         .with_state(state);
 
-    let address: SocketAddr = format!("{}:{}", cli.host, cli.port)
+    let domain = acme_domain(&cli.host);
+    let listen_host = if domain.is_some() {
+        "0.0.0.0"
+    } else {
+        cli.host.as_str()
+    };
+    let address: SocketAddr = format!("{}:{}", listen_host, cli.port)
         .parse()
-        .with_context(|| format!("parse listen address {}:{}", cli.host, cli.port))?;
+        .with_context(|| format!("parse listen address {}:{}", listen_host, cli.port))?;
     println!("Serving {}", root.join("static").display());
 
-    if let Some(domain) = acme_domain(&cli.host) {
+    if let Some(domain) = domain {
         let email = cli
             .email
             .clone()
