@@ -134,7 +134,7 @@ struct TagDescriptor {
     provenance: Option<Value>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Bundle {
     generated_at: String,
@@ -144,7 +144,7 @@ struct Bundle {
     tag_descriptors: BTreeMap<String, TagDescriptor>,
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Indexes {
     tags: Vec<String>,
@@ -179,15 +179,24 @@ struct CompressedVariant {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     let root = std::env::current_dir().context("resolve working directory")?;
-    let bundle = validate_and_build(&root)?;
-    println!(
-        "Validated {} record(s), {} tag descriptor(s).",
-        bundle.records.len(),
-        bundle.tag_descriptors.len()
-    );
-
     let static_dir = root.join("static");
-    write_static_bundle(&static_dir, &bundle)?;
+    let bundle = if root.join("data").is_dir() {
+        let bundle = validate_and_build(&root)?;
+        println!(
+            "Validated {} record(s), {} tag descriptor(s).",
+            bundle.records.len(),
+            bundle.tag_descriptors.len()
+        );
+        write_static_bundle(&static_dir, &bundle)?;
+        bundle
+    } else if cli.build_summary {
+        bail!(
+            "Cannot build summary because {} is missing",
+            root.join("data").display()
+        );
+    } else {
+        load_static_bundle(&static_dir)?
+    };
     let static_files = precompress_static(&static_dir)?;
     if cli.build_summary {
         return Ok(());
@@ -310,6 +319,19 @@ fn chrono_like_now() -> String {
     Utc::now().to_rfc3339()
 }
 
+fn load_static_bundle(static_dir: &Path) -> Result<Bundle> {
+    let data_path = static_dir.join("data.json");
+    let bundle: Bundle = serde_json::from_value(read_json(&data_path)?)
+        .with_context(|| format!("parse generated bundle {}", data_path.display()))?;
+    println!(
+        "Loaded {} record(s), {} tag descriptor(s) from {}.",
+        bundle.records.len(),
+        bundle.tag_descriptors.len(),
+        data_path.display()
+    );
+    Ok(bundle)
+}
+
 fn read_json(path: &Path) -> Result<Value> {
     let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))
@@ -317,7 +339,8 @@ fn read_json(path: &Path) -> Result<Value> {
 
 fn load_records(data_dir: &Path) -> Result<BTreeMap<String, Record>> {
     let mut records = BTreeMap::new();
-    let mut files: Vec<PathBuf> = fs::read_dir(data_dir)?
+    let mut files: Vec<PathBuf> = fs::read_dir(data_dir)
+        .with_context(|| format!("read data directory {}", data_dir.display()))?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| {
             path.extension()
