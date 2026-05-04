@@ -215,6 +215,7 @@ function renderNav(data) {
     <section class="panel page-topbar compact-panel">
       <div class="controls compact-controls">
         <a href="#index">Index</a>
+        <a href="https://github.com/gohryt/programming-languages-research" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
         <span class="muted">Kinds:</span>
         <div>${kinds}</div>
         ${axes ? `<span class="muted">Axes:</span><div>${axes}</div>` : ""}
